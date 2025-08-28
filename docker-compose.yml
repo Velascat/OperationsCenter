@@ -1,0 +1,22 @@
+services:
+  codex-agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    image: codex-agent:latest
+    environment:
+      CODEX_API_KEY: ${CODEX_API_KEY}
+      REPO_DIR: /workspace
+      STATE_DIR: /workspace/.codex
+      MAIN_BRANCH: main
+      BRANCH_BASE: codex/update
+      RUN_MIN_INTERVAL_S: "900"
+      RUN_JITTER_S: "120"
+      GIT_AUTHOR_NAME: codex-bot
+      GIT_AUTHOR_EMAIL: bot@example.com
+    volumes:
+      - /path/to/your/repo:/workspace
+      - /path/to/state/.codex:/workspace/.codex
+      - ${SSH_AUTH_SOCK:-/run/host-services/ssh-auth.sock}:/ssh-agent
+    working_dir: /workspace
+    restart: unless-stopped
