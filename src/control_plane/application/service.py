@@ -159,6 +159,10 @@ class ExecutionService:
             )
 
             changed_files = self.git.changed_files(repo_path)
+            diff_stat = self.git.diff_stat(repo_path) if changed_files else ""
+            diff_patch = self.git.diff_patch(repo_path) if changed_files else ""
+            if changed_files:
+                artifacts.extend(self.reporter.write_diff(run_dir, diff_stat=diff_stat, diff_patch=diff_patch))
             policy_violations = self.scope_checker.find_violations(changed_files, task.allowed_paths)
             if policy_violations:
                 artifacts.append(self.reporter.write_policy_violation(run_dir, policy_violations))
@@ -214,6 +218,7 @@ class ExecutionService:
                 task_kind=task.execution_mode,
                 success=success,
                 changed_files=changed_files,
+                diff_stat_excerpt=self._diff_stat_excerpt(diff_stat),
                 validation_passed=validation_ok,
                 validation_results=validation_results,
                 branch_pushed=branch_pushed,
@@ -284,6 +289,13 @@ class ExecutionService:
         ]
         if result.execution_stderr_excerpt:
             lines.append(f"- execution_stderr: {result.execution_stderr_excerpt}")
+        if result.changed_files:
+            display = ", ".join(result.changed_files[:5])
+            if len(result.changed_files) > 5:
+                display = f"{display}, ... (+{len(result.changed_files) - 5} more)"
+            lines.append(f"- changed_files: {display}")
+        if result.diff_stat_excerpt:
+            lines.append(f"- diff_stat: {result.diff_stat_excerpt.splitlines()[0]}")
         if result.follow_up_task_ids:
             lines.append(f"- follow_up_task_ids: {', '.join(result.follow_up_task_ids)}")
         if result.blocked_classification:
@@ -299,3 +311,10 @@ class ExecutionService:
             if normalized:
                 return normalized[:300]
         return None
+
+    @staticmethod
+    def _diff_stat_excerpt(diff_stat: str) -> str | None:
+        lines = [line.strip() for line in diff_stat.splitlines() if line.strip()]
+        if not lines:
+            return None
+        return "\n".join(lines[:4])

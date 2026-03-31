@@ -66,6 +66,13 @@ class Reporter:
         path.write_text(json.dumps({"violations": violations}, indent=2))
         return str(path)
 
+    def write_diff(self, run_dir: Path, *, diff_stat: str, diff_patch: str) -> list[str]:
+        stat_path = run_dir / "diff_stat.txt"
+        patch_path = run_dir / "diff.patch"
+        stat_path.write_text(diff_stat)
+        patch_path.write_text(diff_patch)
+        return [str(stat_path), str(patch_path)]
+
     def write_failure(self, run_dir: Path, error: str, phase: str) -> str:
         path = run_dir / "failure.json"
         path.write_text(
@@ -128,6 +135,9 @@ class Reporter:
             "## Changed Files",
         ]
         lines.extend([f"- {f}" for f in result.changed_files] or ["- (none)"])
+        if result.diff_stat_excerpt:
+            lines.extend(["", "## Diff Stat"])
+            lines.extend([f"- {line}" for line in result.diff_stat_excerpt.splitlines()] or ["- (none)"])
         lines.extend(["", "## Policy Violations"])
         lines.extend([f"- {f}" for f in result.policy_violations] or ["- (none)"])
         lines.extend(["", "## Summary", result.summary])

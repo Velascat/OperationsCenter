@@ -91,3 +91,32 @@ def test_draft_push_summary_is_explicit() -> None:
     comment = ExecutionService._comment_markdown(task, result)
     assert "- draft_branch_pushed: True" in comment
     assert "- push_reason: draft_on_validation_failure" in comment
+
+
+def test_comment_markdown_includes_changed_files_and_diff_stat() -> None:
+    task = type("Task", (), {"task_id": "TASK-4"})
+    result = ExecutionResult(
+        run_id="xyz",
+        success=False,
+        changed_files=[
+            "src/a.py",
+            "src/b.py",
+            "tests/test_a.py",
+            "tests/test_b.py",
+            "src/c.py",
+            "src/d.py",
+        ],
+        diff_stat_excerpt="src/a.py | 2 +-\n1 file changed, 1 insertion(+), 1 deletion(-)",
+        validation_passed=True,
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        summary="run_id=xyz execution=passed validation=passed policy=failed branch_push=not_pushed changed_files=6",
+        policy_violations=["kodo/config.json"],
+        final_status="Blocked",
+    )
+
+    comment = ExecutionService._comment_markdown(task, result)
+
+    assert "- changed_files: src/a.py, src/b.py, tests/test_a.py, tests/test_b.py, src/c.py, ... (+1 more)" in comment
+    assert "- diff_stat: src/a.py | 2 +-" in comment

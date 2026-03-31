@@ -50,6 +50,18 @@ class GitClient:
         normalized = [self._normalize_repo_relative_path(path) for path in files]
         return sorted(set(normalized))
 
+    def diff_stat(self, repo_path: Path) -> str:
+        tracked = self._run(["git", "diff", "--stat", "HEAD"], cwd=repo_path)
+        untracked = self._parse_null_delimited_paths(
+            self._run_bytes(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=repo_path)
+        )
+        lines = [line for line in tracked.splitlines() if line.strip()]
+        lines.extend(f" untracked | {self._normalize_repo_relative_path(path)}" for path in untracked)
+        return "\n".join(lines).strip()
+
+    def diff_patch(self, repo_path: Path) -> str:
+        return self._run(["git", "diff", "--binary", "HEAD"], cwd=repo_path)
+
     def commit_all(self, repo_path: Path, message: str) -> bool:
         self._run(["git", "add", "-A"], cwd=repo_path)
         status = self._run(["git", "status", "--porcelain"], cwd=repo_path)

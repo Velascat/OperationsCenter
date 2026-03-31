@@ -65,6 +65,7 @@ class ExecutionResult(BaseModel):
     task_kind: str | None = None
     success: bool
     changed_files: list[str] = Field(default_factory=list)
+    diff_stat_excerpt: str | None = None
     validation_passed: bool = False
     validation_results: list[ValidationResult] = Field(default_factory=list)
     branch_pushed: bool = False
