@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from control_plane.adapters.plane import PlaneClient
-from control_plane.application import ExecutionService
+from control_plane.application import ExecutionService, TaskParser
 from control_plane.config import RepoPolicyStore, load_settings
 from control_plane.domain import ExecutionResult
 
@@ -574,6 +574,24 @@ def allowed_paths_for_repo(repo_key: str) -> list[str]:
     return []
 
 
+def issue_execution_target(issue: dict[str, Any], service: ExecutionService) -> tuple[str, str, list[str]]:
+    description = str(issue.get("description") or "").strip()
+    if description:
+        try:
+            metadata = TaskParser().parse(description).execution_metadata
+            repo_key = str(metadata.get("repo", "")).strip()
+            base_branch = str(metadata.get("base_branch", "")).strip()
+            if repo_key in service.settings.repos and base_branch:
+                allowed_paths = [str(path).strip() for path in metadata.get("allowed_paths", []) if str(path).strip()]
+                return repo_key, base_branch, allowed_paths or allowed_paths_for_repo(repo_key)
+        except ValueError:
+            pass
+
+    repo_key = default_repo_key(service)
+    repo_cfg = service.settings.repos[repo_key]
+    return repo_key, repo_cfg.default_branch, allowed_paths_for_repo(repo_key)
+
+
 def existing_issue_names(client: PlaneClient) -> set[str]:
     names: set[str] = set()
     for issue in client.list_issues():
@@ -596,15 +614,13 @@ def build_follow_up_description(
     handoff_reason: str,
     constraints_text: str | None = None,
 ) -> str:
-    repo_key = default_repo_key(service)
-    repo_cfg = service.settings.repos[repo_key]
+    repo_key, base_branch, allowed_paths = issue_execution_target(original_issue, service)
     lines = [
         "## Execution",
         f"repo: {repo_key}",
-        f"base_branch: {repo_cfg.default_branch}",
+        f"base_branch: {base_branch}",
         "mode: goal",
     ]
-    allowed_paths = allowed_paths_for_repo(repo_key)
     if allowed_paths:
         lines.append("allowed_paths:")
         for path in allowed_paths:

@@ -79,16 +79,19 @@ class FakePlaneClient:
 
 class FakeService:
     def __init__(self, *, success: bool = True) -> None:
-        self.runs: list[str] = []
-        self.settings = SimpleNamespace(
+        settings = SimpleNamespace(
             repos={
                 "control-plane": SimpleNamespace(
                     default_branch="main",
                     clone_url="git@github.com:Velascat/ControlPlane.git",
+                    allowed_base_branches=["main"],
                 )
             },
             report_root="tools/report/kodo_plane",
         )
+        settings.git_token = lambda: None
+        self.runs: list[str] = []
+        self.settings = settings
         self._success = success
 
     def run_task(self, client: FakePlaneClient, task_id: str) -> ExecutionResult:  # noqa: ARG002
@@ -509,6 +512,45 @@ Existing follow-up
     assert classification == "validation_failure"
     assert created_ids == []
     assert len(client.created) == 0
+
+
+def test_handle_blocked_triage_preserves_source_repo_and_branch_for_follow_up() -> None:
+    blocked_description = """## Execution
+repo: code_youtube_shorts
+base_branch: new-feature
+mode: goal
+
+## Goal
+Fix my shit
+"""
+    client = FakePlaneClient(
+        [
+            {
+                "id": "BLOCKED-5",
+                "name": "Broken shorts task",
+                "description": blocked_description,
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ],
+        comments={
+            "BLOCKED-5": [
+                {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
+            ]
+        },
+    )
+    service = FakeService()
+    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+        default_branch="new-feature",
+        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
+    )
+
+    classification, created_ids = handle_blocked_triage(client, service, "BLOCKED-5")
+
+    assert classification == "validation_failure"
+    assert created_ids == ["FOLLOWUP-1"]
+    assert "repo: code_youtube_shorts" in str(client.created[0]["description"])
+    assert "base_branch: new-feature" in str(client.created[0]["description"])
 
 
 def test_build_improve_triage_result_detects_repeated_pattern() -> None:
