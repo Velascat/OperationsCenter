@@ -84,3 +84,35 @@ def test_plane_fetch_project_uses_workspace_and_project_path() -> None:
 
     assert project["name"] == "Engineering"
     assert calls == [("GET", "http://plane.local/api/v1/workspaces/ws/projects/proj/")]
+
+
+def test_plane_list_issues_supports_paginated_results() -> None:
+    calls: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, str(request.url)))
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {"id": "TASK-1", "state": {"name": "Ready for AI"}},
+                    {"id": "TASK-2", "state": {"name": "Backlog"}},
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    client._client = httpx.Client(  # type: ignore[attr-defined]
+        transport=transport,
+        base_url="http://plane.local",
+        headers={"X-API-Key": "token", "Content-Type": "application/json"},
+    )
+
+    try:
+        issues = client.list_issues()
+    finally:
+        client.close()
+
+    assert [issue["id"] for issue in issues] == ["TASK-1", "TASK-2"]
+    assert calls == [("GET", "http://plane.local/api/v1/workspaces/ws/projects/proj/work-items/?expand=state")]

@@ -58,6 +58,11 @@ usage() {
   cat <<EOF
 Usage:
   scripts/control-plane.sh setup
+  scripts/control-plane.sh start
+  scripts/control-plane.sh stop
+  scripts/control-plane.sh run-next
+  scripts/control-plane.sh watch --role goal
+  scripts/control-plane.sh run --task-id TASK-123
   scripts/control-plane.sh plane-up
   scripts/control-plane.sh plane-down
   scripts/control-plane.sh plane-status
@@ -90,12 +95,12 @@ case "${cmd}" in
     ensure_venv
     run_with_log setup "${VENV_DIR}/bin/python" -m control_plane.entrypoints.setup.main "$@"
     ;;
-  plane-up)
+  start|plane-up)
     load_env_file
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
     ;;
-  plane-down)
+  stop|plane-down)
     load_env_file
     run_with_log plane-down "${PLANE_MANAGER}" down
     ;;
@@ -127,6 +132,21 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log api "${VENV_DIR}/bin/python" -m uvicorn control_plane.entrypoints.api.main:app --reload "$@"
+    ;;
+  run)
+    ensure_venv
+    load_env_file
+    run_with_log worker "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main --config "${CONFIG_PATH}" "$@"
+    ;;
+  run-next)
+    ensure_venv
+    load_env_file
+    run_with_log worker "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main --config "${CONFIG_PATH}" --first-ready "$@"
+    ;;
+  watch)
+    ensure_venv
+    load_env_file
+    run_with_log worker "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main --config "${CONFIG_PATH}" --watch "$@"
     ;;
   worker)
     ensure_venv

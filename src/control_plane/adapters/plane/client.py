@@ -36,6 +36,19 @@ class PlaneClient:
         response.raise_for_status()
         return response.json()
 
+    def list_issues(self) -> list[dict[str, Any]]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/"
+        response = self._client.get(url, params={"expand": "state"})
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict):
+            results = payload.get("results")
+            if isinstance(results, list):
+                return [item for item in results if isinstance(item, dict)]
+        return []
+
     def to_board_task(self, issue: dict[str, Any]) -> BoardTask:
         description = issue.get("description") or issue.get("description_stripped") or ""
         parsed_body = self.task_parser.parse(description)
