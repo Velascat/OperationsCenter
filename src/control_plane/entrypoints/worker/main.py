@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import html
 import json
 import logging
+import os
 import re
 import time
 from datetime import UTC, datetime
@@ -15,7 +16,7 @@ import httpx
 
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService
-from control_plane.config import load_settings
+from control_plane.config import RepoPolicyStore, load_settings
 from control_plane.domain import ExecutionResult
 
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
@@ -63,6 +64,7 @@ class ProposalSpec:
     dedup_key: str
     constraints_text: str | None = None
     human_attention_required: bool = False
+    repo_key: str = ""
 
 
 @dataclass
@@ -562,6 +564,16 @@ def default_repo_key(service: ExecutionService) -> str:
     return next(iter(service.settings.repos.keys()))
 
 
+def proposal_repo_keys(service: ExecutionService) -> list[str]:
+    return RepoPolicyStore().enabled_propose_repo_keys(service.settings)
+
+
+def allowed_paths_for_repo(repo_key: str) -> list[str]:
+    if repo_key.strip().lower() in {"controlplane", "control-plane"}:
+        return ["src/", "tests/"]
+    return []
+
+
 def existing_issue_names(client: PlaneClient) -> set[str]:
     names: set[str] = set()
     for issue in client.list_issues():
@@ -592,7 +604,7 @@ def build_follow_up_description(
         f"base_branch: {repo_cfg.default_branch}",
         "mode: goal",
     ]
-    allowed_paths = ["src/", "tests/"] if repo_key.lower() == "controlplane" or repo_key.lower() == "control-plane" else []
+    allowed_paths = allowed_paths_for_repo(repo_key)
     if allowed_paths:
         lines.append("allowed_paths:")
         for path in allowed_paths:
@@ -715,7 +727,7 @@ def read_text_if_exists(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dict[str, str]], list[str]]:
+def discover_improvement_candidates(service: ExecutionService, *, repo_key: str) -> tuple[list[dict[str, str]], list[str]]:
     findings: list[dict[str, str]] = []
     report_notes: list[str] = []
     kodo_adapter_text = read_text_if_exists(Path("src/control_plane/adapters/kodo/adapter.py"))
@@ -775,7 +787,6 @@ def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dic
                 }
             )
 
-    repo_key = default_repo_key(service)
     repo_cfg = service.settings.repos[repo_key]
     workspace_path = service.workspace.create()
     try:
@@ -802,6 +813,7 @@ def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dic
 def proposal_specs_from_findings(
     findings: list[dict[str, str]],
     *,
+    repo_key: str,
     signal_prefix: str,
 ) -> list[ProposalSpec]:
     proposals: list[ProposalSpec] = []
@@ -812,24 +824,32 @@ def proposal_specs_from_findings(
         state = "Ready for AI" if confidence == "high" else "Backlog"
         proposals.append(
             ProposalSpec(
+                repo_key=repo_key,
                 task_kind=kind,
                 title=finding["title"],
                 goal_text=finding["goal"],
                 reason_summary=finding["note"].lstrip("- ").strip(),
-                source_signal=f"{signal_prefix}:{kind}",
+                source_signal=f"{repo_key}:{signal_prefix}:{kind}",
                 confidence=confidence,
                 recommended_state=state,
                 handoff_reason=f"propose_{signal_prefix}_{kind}",
-                dedup_key=f"{signal_prefix}:{normalized_title}",
+                dedup_key=f"{repo_key}:{signal_prefix}:{normalized_title}",
                 constraints_text=finding["constraints"],
             )
         )
     return proposals
 
 
-def build_proposal_candidates(client: PlaneClient, service: ExecutionService) -> tuple[list[ProposalSpec], list[str], bool]:
+def build_proposal_candidates(
+    client: PlaneClient,
+    service: ExecutionService,
+    *,
+    repo_key: str | None = None,
+) -> tuple[list[ProposalSpec], list[str], bool]:
+    repo_key = repo_key or default_repo_key(service)
     board_idle = board_is_idle_for_proposals(client)
     notes = [
+        f"repo: {repo_key}",
         f"board_idle: {str(board_idle).lower()}",
         f"open_goal_or_test_count: {open_goal_or_test_count(client)}",
         f"ready_or_running_goal_or_test_count: {ready_or_running_goal_or_test_count(client)}",
@@ -843,15 +863,16 @@ def build_proposal_candidates(client: PlaneClient, service: ExecutionService) ->
         if classification == "infra_tooling":
             proposals.append(
                 ProposalSpec(
+                    repo_key=repo_key,
                     task_kind="improve",
                     title="Investigate repeated infrastructure/tooling blockers",
                     goal_text="Investigate the recurring infrastructure/tooling blocker pattern and produce one bounded next step or explicit operator guidance.",
                     reason_summary=f"Repeated blocked-task pattern detected: {display_name} ({count} recent occurrences).",
-                    source_signal=f"blocked_pattern:{classification}",
+                    source_signal=f"{repo_key}:blocked_pattern:{classification}",
                     confidence="medium",
                     recommended_state="Backlog",
                     handoff_reason=f"propose_pattern_{classification}",
-                    dedup_key=f"blocked_pattern:{classification}",
+                    dedup_key=f"{repo_key}:blocked_pattern:{classification}",
                     constraints_text=f"- repeated_classification: {classification}\n- occurrence_count: {count}\n- prefer diagnosis and clear operator guidance over broad changes",
                     human_attention_required=True,
                 )
@@ -859,37 +880,39 @@ def build_proposal_candidates(client: PlaneClient, service: ExecutionService) ->
         else:
             proposals.append(
                 ProposalSpec(
+                    repo_key=repo_key,
                     task_kind="goal",
                     title=f"Address repeated {display_name} failures",
                     goal_text=f"Stabilize the local autonomous workflow by addressing the repeated {display_name} pattern showing up across recent work.",
                     reason_summary=f"Repeated blocked-task pattern detected: {display_name} ({count} recent occurrences).",
-                    source_signal=f"blocked_pattern:{classification}",
+                    source_signal=f"{repo_key}:blocked_pattern:{classification}",
                     confidence="high",
                     recommended_state="Ready for AI",
                     handoff_reason=f"propose_pattern_{classification}",
-                    dedup_key=f"blocked_pattern:{classification}",
+                    dedup_key=f"{repo_key}:blocked_pattern:{classification}",
                     constraints_text=f"- repeated_classification: {classification}\n- occurrence_count: {count}\n- keep the task focused on one bounded system-fix",
                 )
             )
         notes.append(f"repeated_pattern: {classification} x{count}")
 
     if board_idle:
-        findings, report_notes = discover_improvement_candidates(service)
+        findings, report_notes = discover_improvement_candidates(service, repo_key=repo_key)
         notes.extend(report_notes)
-        proposals.extend(proposal_specs_from_findings(findings, signal_prefix="idle_board"))
+        proposals.extend(proposal_specs_from_findings(findings, repo_key=repo_key, signal_prefix="idle_board"))
 
     if board_idle and not proposals:
         proposals.append(
             ProposalSpec(
+                repo_key=repo_key,
                 task_kind="improve",
                 title="Scan repo for next bounded improvements",
                 goal_text="Inspect the current repo and recent workflow signals, then propose one to three bounded follow-up tasks grounded in observed codebase or runtime evidence.",
                 reason_summary="The board is idle and no stronger grounded task signal is currently open.",
-                source_signal="idle_board",
+                source_signal=f"{repo_key}:idle_board",
                 confidence="medium",
                 recommended_state="Backlog",
                 handoff_reason="propose_idle_board_scan",
-                dedup_key="idle_board:repo_scan",
+                dedup_key=f"{repo_key}:idle_board:repo_scan",
                 constraints_text="- keep analysis grounded in current repo and recent retained artifacts\n- create tasks first, code second",
             )
         )
@@ -906,7 +929,7 @@ def build_proposal_description(
     service: ExecutionService,
     proposal: ProposalSpec,
 ) -> str:
-    repo_key = default_repo_key(service)
+    repo_key = proposal.repo_key or default_repo_key(service)
     repo_cfg = service.settings.repos[repo_key]
     lines = [
         "## Execution",
@@ -914,7 +937,7 @@ def build_proposal_description(
         f"base_branch: {repo_cfg.default_branch}",
         "mode: goal",
     ]
-    allowed_paths = ["src/", "tests/"] if repo_key.lower() in {"controlplane", "control-plane"} else []
+    allowed_paths = allowed_paths_for_repo(repo_key)
     if allowed_paths and proposal.task_kind in {"goal", "test"}:
         lines.append("allowed_paths:")
         for path in allowed_paths:
@@ -1029,7 +1052,25 @@ def handle_propose_cycle(
             reason_summary="Proposal quota for the current time window has been exhausted.",
         )
 
-    proposals, notes, board_idle = build_proposal_candidates(client, service)
+    repo_keys = proposal_repo_keys(service)
+    if not repo_keys:
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="no_repo_enabled",
+            board_idle=board_is_idle_for_proposals(client),
+            reason_summary="No repos are enabled for propose polling.",
+        )
+    proposals: list[ProposalSpec] = []
+    notes: list[str] = []
+    board_idle = board_is_idle_for_proposals(client)
+    for repo_key in repo_keys:
+        if len(repo_keys) == 1:
+            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service)
+        else:
+            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, repo_key=repo_key)
+        proposals.extend(repo_proposals)
+        notes.extend(repo_notes)
+        board_idle = board_idle and repo_board_idle
     if not proposals:
         return ProposalCycleResult(
             created_task_ids=[],
@@ -1565,6 +1606,7 @@ def main() -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+    os.environ.setdefault("CONTROL_PLANE_CONFIG", args.config)
     settings = load_settings(args.config)
     client = PlaneClient(
         base_url=settings.plane.base_url,
