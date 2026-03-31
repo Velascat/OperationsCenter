@@ -19,7 +19,39 @@ observe -> analyze -> decide -> propose
 - `observe` writes retained repo-state snapshots.
 - `analyze` derives normalized insights from those snapshots.
 - `decide` emits guarded proposal candidates plus suppression records.
-- `propose` turns approved candidates into bounded Plane tasks through existing proposer protections.
+- `propose` routes approved candidates into the existing board-facing proposer lane, which applies final protections before creating bounded Plane tasks.
+
+## Repo-Aware Autonomy Flow
+
+```text
+[Repo]
+  ↓
+[Observer] -> repo_state_snapshot.json
+  ↓
+[Insight Engine] -> repo_insights.json
+  ↓
+[Decision Engine] -> proposal_candidates.json
+  ↓
+[Board-Facing Proposer Lane] -> proposal_results.json -> Plane tasks
+```
+
+## Autonomy Execution Model (Current)
+
+The repo-aware autonomy loop is currently stage-driven and explicit.
+
+- `observe-repo` writes a retained repo-state snapshot.
+- `generate-insights` reads retained snapshots and emits normalized insights.
+- `decide-proposals` reads retained insights and emits guarded proposal candidates.
+- `propose-from-candidates` routes emitted candidates through existing proposer protections and may create bounded Plane tasks.
+
+Today, these stages are run explicitly rather than through an automatic end-to-end wrapper. That is intentional: it keeps the autonomy loop inspectable, easy to validate, and easy to tune before a future chained wrapper exists.
+
+## `Propose` Means Two Related Things
+
+- In the repo-aware autonomy loop, `propose` is the stage that routes approved candidates toward task creation.
+- In the worker model, the proposer lane is the board-facing path that applies final guardrails and writes Plane tasks.
+
+The naming is intentionally close because the second is the board adapter for the first, but they are not the same boundary.
 
 ## What Works Today
 
@@ -107,6 +139,30 @@ Then:
 - Proposer result artifacts: `tools/report/control_plane/proposer/`
 
 The wrapper runs `janitor` automatically before commands and keeps local logs/artifacts for 1 day by default. Override with `CONTROL_PLANE_RETENTION_DAYS`.
+
+## Why An Autonomy-Generated Task Exists
+
+Every repo-aware autonomy task should be traceable through retained artifacts and provenance metadata.
+
+A generated task can be followed back through:
+
+- repo observer snapshot(s)
+- normalized insight artifact
+- guarded decision artifact
+- proposer result artifact
+- task provenance fields and source labels in Plane
+
+This keeps the loop inspectable instead of opaque: operators can reconstruct why a task exists, which signal path created it, and which candidate or dedup key it came from.
+
+## What Good Looks Like
+
+The repo-aware autonomy loop is behaving well when:
+
+- it proposes useful, bounded tasks without manual prompting
+- it suppresses duplicate or weak proposals through dedup keys, cooldowns, and quotas
+- it produces zero proposals when no strong signal exists
+- every autonomy-generated task can be traced back to retained repo signals and decision artifacts
+- it improves visibility and workflow quality rather than inventing open-ended work
 
 ## Current Limitations
 
