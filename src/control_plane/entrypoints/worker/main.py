@@ -148,6 +148,13 @@ def parse_context_value(description: str, key: str) -> str | None:
     return None
 
 
+def parse_execution_value(description: str, key: str) -> str | None:
+    match = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", description, flags=re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
 def status_file_path(status_dir: Path | None, role: str) -> Path | None:
     if status_dir is None:
         return None
@@ -375,6 +382,20 @@ def board_is_idle_for_proposals(client: PlaneClient) -> bool:
     return ready_or_running_goal_or_test_count(client) == 0 and open_goal_or_test_count(client) <= LOW_BACKLOG_THRESHOLD
 
 
+def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]]) -> bool:
+    open_count = 0
+    ready_or_running_count = 0
+    for issue in issues:
+        if not is_open_issue(issue):
+            continue
+        if issue_task_kind(issue) not in {"goal", "test"}:
+            continue
+        open_count += 1
+        if issue_status_name(issue) in {"Ready for AI", "Running"}:
+            ready_or_running_count += 1
+    return ready_or_running_count == 0 and open_count <= LOW_BACKLOG_THRESHOLD
+
+
 def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI", role: str = "goal") -> str:
     issues = client.list_issues()
     for issue in issues:
@@ -488,6 +509,37 @@ def recent_classification_counts(client: PlaneClient) -> dict[str, int]:
             classification = match.group(1).strip().lower()
             counts[classification] = counts.get(classification, 0) + 1
     return counts
+
+
+def reconcile_stale_running_issues(client: PlaneClient, *, role: str, ready_state: str) -> list[str]:
+    if role not in {"goal", "test", "improve"}:
+        return []
+    reconciled: list[str] = []
+    for issue in client.list_issues():
+        if issue_status_name(issue) != "Running":
+            continue
+        task_kind = issue_task_kind(issue)
+        if role == "improve":
+            if task_kind != "improve":
+                continue
+        elif task_kind != role:
+            continue
+        task_id = str(issue["id"])
+        client.transition_issue(task_id, ready_state)
+        client.comment_issue(
+            task_id,
+            render_worker_comment(
+                f"[{worker_title(role)}] Reconciled stale running state",
+                [
+                    f"task_id: {task_id}",
+                    f"task_kind: {task_kind}",
+                    "result_status: ready_for_ai",
+                    "reason: task was left in Running without an active worker completion path",
+                ],
+            ),
+        )
+        reconciled.append(task_id)
+    return reconciled
 
 
 def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tuple[str, str]:
@@ -915,14 +967,26 @@ def build_proposal_candidates(
     service: ExecutionService,
     *,
     repo_key: str | None = None,
+    issues: list[dict[str, Any]] | None = None,
 ) -> tuple[list[ProposalSpec], list[str], bool]:
     repo_key = repo_key or default_repo_key(service)
-    board_idle = board_is_idle_for_proposals(client)
+    issues = issues or client.list_issues()
+    board_idle = board_is_idle_for_proposals_from_issues(issues)
+    open_goal_or_test = 0
+    ready_or_running_goal_or_test = 0
+    for issue in issues:
+        if not is_open_issue(issue):
+            continue
+        if issue_task_kind(issue) not in {"goal", "test"}:
+            continue
+        open_goal_or_test += 1
+        if issue_status_name(issue) in {"Ready for AI", "Running"}:
+            ready_or_running_goal_or_test += 1
     notes = [
         f"repo: {repo_key}",
         f"board_idle: {str(board_idle).lower()}",
-        f"open_goal_or_test_count: {open_goal_or_test_count(client)}",
-        f"ready_or_running_goal_or_test_count: {ready_or_running_goal_or_test_count(client)}",
+        f"open_goal_or_test_count: {open_goal_or_test}",
+        f"ready_or_running_goal_or_test_count: {ready_or_running_goal_or_test}",
     ]
     proposals: list[ProposalSpec] = []
 
@@ -1105,6 +1169,8 @@ def handle_propose_cycle(
     now: datetime | None = None,
 ) -> ProposalCycleResult:
     now = now or datetime.now(UTC)
+    issues = client.list_issues()
+    board_idle = board_is_idle_for_proposals_from_issues(issues)
     remaining = service.usage_store.remaining_exec_capacity(now=now)
     min_remaining = service.settings.execution_controls().min_remaining_exec_for_proposals
     if remaining < min_remaining:
@@ -1116,7 +1182,7 @@ def handle_propose_cycle(
         return ProposalCycleResult(
             created_task_ids=[],
             decision="proposal_budget_too_low",
-            board_idle=board_is_idle_for_proposals(client),
+            board_idle=board_idle,
             reason_summary=(
                 f"Proposal creation suppressed because remaining execution budget is too low "
                 f"({remaining} remaining, minimum {min_remaining})."
@@ -1127,7 +1193,7 @@ def handle_propose_cycle(
         return ProposalCycleResult(
             created_task_ids=[],
             decision="cooldown_active",
-            board_idle=board_is_idle_for_proposals(client),
+            board_idle=board_idle,
             reason_summary="Proposal cooldown is still active.",
         )
     if proposal_quota_exhausted(memory, now):
@@ -1135,7 +1201,7 @@ def handle_propose_cycle(
         return ProposalCycleResult(
             created_task_ids=[],
             decision="quota_exhausted",
-            board_idle=board_is_idle_for_proposals(client),
+            board_idle=board_idle,
             reason_summary="Proposal quota for the current time window has been exhausted.",
         )
 
@@ -1144,17 +1210,27 @@ def handle_propose_cycle(
         return ProposalCycleResult(
             created_task_ids=[],
             decision="no_repo_enabled",
-            board_idle=board_is_idle_for_proposals(client),
+            board_idle=board_idle,
             reason_summary="No repos are enabled for propose polling.",
         )
     proposals: list[ProposalSpec] = []
     notes: list[str] = []
-    board_idle = board_is_idle_for_proposals(client)
     for repo_key in repo_keys:
         if len(repo_keys) == 1:
-            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service)
+            try:
+                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, issues=issues)
+            except TypeError:
+                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service)
         else:
-            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, repo_key=repo_key)
+            try:
+                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(
+                    client,
+                    service,
+                    repo_key=repo_key,
+                    issues=issues,
+                )
+            except TypeError:
+                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, repo_key=repo_key)
         proposals.extend(repo_proposals)
         notes.extend(repo_notes)
         board_idle = board_idle and repo_board_idle
@@ -1398,7 +1474,9 @@ def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id:
     issue = client.fetch_issue(task_id)
     existing_names = existing_issue_names(client)
     existing_follow_ups = existing_follow_up_keys(client)
-    findings, report_notes = discover_improvement_candidates(service)
+    description = str(issue.get("description") or issue.get("description_stripped") or "")
+    repo_key = parse_execution_value(description, "repo") or default_repo_key(service)
+    findings, report_notes = discover_improvement_candidates(service, repo_key=repo_key)
     created_ids: list[str] = []
     created_titles: list[str] = []
 
@@ -1526,6 +1604,10 @@ def run_watch_loop(
             counters=counters,
         )
         try:
+            if cycle == 1:
+                reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state)
+                if reconciled_ids:
+                    logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
             task_id, action = select_watch_candidate(
                 client,
                 ready_state=ready_state,
@@ -1619,56 +1701,76 @@ def run_watch_loop(
                     logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
                     time.sleep(poll_interval_seconds)
                     continue
-                client.transition_issue(task_id, "Running")
-                logger.info(json.dumps(
-                    {
-                        "event": "watch_task_claimed",
-                        "role": role,
-                        "cycle": cycle,
-                        "task_id": task_id,
-                        "task_kind": task_kind,
-                        "action": action,
-                        "run_id": cycle_run_id,
-                    }
-                ))
-                write_watch_status(
-                    status_dir=status_dir,
-                    role=role,
-                    cycle=cycle,
-                    state="active",
-                    run_id=cycle_run_id,
-                    last_action="task_claimed",
-                    task_id=task_id,
-                    task_kind=task_kind,
-                    counters=counters,
-                )
-                if role == "goal":
-                    created_ids = handle_goal_task(client, service, task_id)
-                    counters["follow_up_tasks_created"] += len(created_ids)
-                    logger.info(json.dumps({"event": "watch_action_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "action": "execute", "created_task_ids": created_ids, "run_id": cycle_run_id}))
-                    write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="execute_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
-                elif role == "test":
-                    created_ids = handle_test_task(client, service, task_id)
-                    counters["follow_up_tasks_created"] += len(created_ids)
-                    logger.info(json.dumps({"event": "watch_action_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "action": "execute", "created_task_ids": created_ids, "run_id": cycle_run_id}))
-                    write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="execute_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
-                elif role == "improve":
-                    if action == "blocked_triage":
-                        classification, created_ids = handle_blocked_triage(client, service, task_id)
-                        known_triaged_blocked_ids.add(task_id)
+                claimed = False
+                try:
+                    client.transition_issue(task_id, "Running")
+                    claimed = True
+                    logger.info(json.dumps(
+                        {
+                            "event": "watch_task_claimed",
+                            "role": role,
+                            "cycle": cycle,
+                            "task_id": task_id,
+                            "task_kind": task_kind,
+                            "action": action,
+                            "run_id": cycle_run_id,
+                        }
+                    ))
+                    write_watch_status(
+                        status_dir=status_dir,
+                        role=role,
+                        cycle=cycle,
+                        state="active",
+                        run_id=cycle_run_id,
+                        last_action="task_claimed",
+                        task_id=task_id,
+                        task_kind=task_kind,
+                        counters=counters,
+                    )
+                    if role == "goal":
+                        created_ids = handle_goal_task(client, service, task_id)
                         counters["follow_up_tasks_created"] += len(created_ids)
-                        counters["blocked_tasks_triaged"] += 1
-                        logger.info(json.dumps({"event": "watch_triage_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "classification": classification, "created_task_ids": created_ids, "run_id": cycle_run_id}))
-                        write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_triage_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, blocked_classification=classification, counters=counters)
+                        logger.info(json.dumps({"event": "watch_action_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "action": "execute", "created_task_ids": created_ids, "run_id": cycle_run_id}))
+                        write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="execute_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
+                    elif role == "test":
+                        created_ids = handle_test_task(client, service, task_id)
+                        counters["follow_up_tasks_created"] += len(created_ids)
+                        logger.info(json.dumps({"event": "watch_action_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "action": "execute", "created_task_ids": created_ids, "run_id": cycle_run_id}))
+                        write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="execute_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
+                    elif role == "improve":
+                        if action == "blocked_triage":
+                            classification, created_ids = handle_blocked_triage(client, service, task_id)
+                            known_triaged_blocked_ids.add(task_id)
+                            counters["follow_up_tasks_created"] += len(created_ids)
+                            counters["blocked_tasks_triaged"] += 1
+                            logger.info(json.dumps({"event": "watch_triage_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "classification": classification, "created_task_ids": created_ids, "run_id": cycle_run_id}))
+                            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_triage_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, blocked_classification=classification, counters=counters)
+                        else:
+                            created_ids = handle_improve_task(client, service, task_id)
+                            counters["follow_up_tasks_created"] += len(created_ids)
+                            logger.info(json.dumps({"event": "watch_improve_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "created_task_ids": created_ids, "run_id": cycle_run_id}))
+                            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="improve_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
+                    elif role == "propose":
+                        raise ValueError("Propose role is handled outside task claiming")
                     else:
-                        created_ids = handle_improve_task(client, service, task_id)
-                        counters["follow_up_tasks_created"] += len(created_ids)
-                        logger.info(json.dumps({"event": "watch_improve_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "created_task_ids": created_ids, "run_id": cycle_run_id}))
-                        write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="improve_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
-                elif role == "propose":
-                    raise ValueError("Propose role is handled outside task claiming")
-                else:
-                    raise ValueError(f"Unsupported worker role '{role}'")
+                        raise ValueError(f"Unsupported worker role '{role}'")
+                except Exception:
+                    if claimed:
+                        client.transition_issue(task_id, ready_state if action != "blocked_triage" else "Blocked")
+                        client.comment_issue(
+                            task_id,
+                            render_worker_comment(
+                                f"[{worker_title(role)}] Task returned to queue after worker error",
+                                [
+                                    f"task_id: {task_id}",
+                                    f"task_kind: {task_kind}",
+                                    f"action: {action}",
+                                    f"result_status: {(ready_state if action != 'blocked_triage' else 'blocked').lower().replace(' ', '_')}",
+                                    "reason: worker raised after claiming the task",
+                                ],
+                            ),
+                        )
+                    raise
         except ValueError as exc:
             if role == "propose":
                 proposal_result = handle_propose_cycle(client, service, status_dir=status_dir)

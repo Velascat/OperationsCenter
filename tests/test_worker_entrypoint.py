@@ -20,6 +20,7 @@ from control_plane.entrypoints.worker.main import (
     handle_blocked_triage,
     issue_status_name,
     issue_task_kind,
+    reconcile_stale_running_issues,
     run_watch_loop,
     select_ready_task_id,
     select_watch_candidate,
@@ -423,6 +424,7 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
             {
                 "id": "IMPROVE-1",
                 "name": "Inspect repo",
+                "description": "## Execution\nrepo: control-plane\nbase_branch: main\nmode: improve\n\n## Goal\nInspect repo",
                 "state": {"name": "Ready for AI"},
                 "labels": [{"name": "task-kind: improve"}],
             },
@@ -432,7 +434,7 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.discover_improvement_candidates",
-        lambda _service: (
+        lambda _service, *, repo_key: (
             [
                 {
                     "kind": "goal",
@@ -449,7 +451,7 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
                     "note": "- note: found in repo scan",
                 },
             ],
-            ["- inspected repo: control-plane @ main"],
+            [f"- inspected repo: {repo_key} @ main"],
         ),
     )
 
@@ -458,6 +460,65 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
     assert created_ids == ["FOLLOWUP-1", "FOLLOWUP-2"]
     assert client.transitions[-1] == ("IMPROVE-1", "Review")
     assert any("[Improve] Improvement pass" in comment for _, comment in client.issue_comments)
+
+
+def test_run_watch_loop_returns_claimed_improve_task_to_ready_after_worker_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "IMPROVE-ERR",
+                "name": "Broken improve",
+                "description": "## Execution\nrepo: control-plane\nbase_branch: main\nmode: improve\n\n## Goal\nInspect repo",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: improve"}],
+            },
+        ]
+    )
+    service = FakeService()
+
+    def boom(_client: FakePlaneClient, _service: FakeService, _task_id: str) -> list[str]:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.handle_improve_task", boom)
+
+    run_watch_loop(
+        client,
+        service,
+        role="improve",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+    )
+
+    assert ("IMPROVE-ERR", "Running") in client.transitions
+    assert client.transitions[-1] == ("IMPROVE-ERR", "Ready for AI")
+    assert any("returned to queue after worker error" in comment.lower() for _, comment in client.issue_comments)
+
+
+def test_reconcile_stale_running_issues_moves_owned_running_tasks_back_to_ready() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-RUN",
+                "name": "Stale goal",
+                "state": {"name": "Running"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+            {
+                "id": "TEST-RUN",
+                "name": "Other role",
+                "state": {"name": "Running"},
+                "labels": [{"name": "task-kind: test"}],
+            },
+        ]
+    )
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI")
+
+    assert reconciled == ["GOAL-RUN"]
+    assert ("GOAL-RUN", "Ready for AI") in client.transitions
+    assert ("TEST-RUN", "Ready for AI") not in client.transitions
+    assert any("reconciled stale running state" in comment.lower() for _, comment in client.issue_comments)
 
 
 def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> None:
