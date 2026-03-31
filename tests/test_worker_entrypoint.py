@@ -434,7 +434,7 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.discover_improvement_candidates",
-        lambda _service, *, repo_key: (
+        lambda _service, *, repo_key, base_branch=None: (
             [
                 {
                     "kind": "goal",
@@ -451,7 +451,7 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
                     "note": "- note: found in repo scan",
                 },
             ],
-            [f"- inspected repo: {repo_key} @ main"],
+            [f"- inspected repo: {repo_key} @ {base_branch or 'main'}"],
         ),
     )
 
@@ -460,6 +460,80 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
     assert created_ids == ["FOLLOWUP-1", "FOLLOWUP-2"]
     assert client.transitions[-1] == ("IMPROVE-1", "Review")
     assert any("[Improve] Improvement pass" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_improve_task_preserves_source_repo_and_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "IMPROVE-REPO",
+                "name": "Inspect shorts repo",
+                "description": "## Execution\nrepo: code_youtube_shorts\nbase_branch: new-feature\nmode: goal\n\n## Goal\nInspect repo",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: improve"}],
+            },
+        ]
+    )
+    service = FakeService()
+    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+        default_branch="main",
+        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
+        allowed_base_branches=["main", "new-feature"],
+    )
+    observed: dict[str, str | None] = {}
+
+    def fake_discover(_service: FakeService, *, repo_key: str, base_branch: str | None = None) -> tuple[list[dict[str, str]], list[str]]:
+        observed["repo_key"] = repo_key
+        observed["base_branch"] = base_branch
+        return [], [f"- inspected repo: {repo_key} @ {base_branch}"]
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.discover_improvement_candidates", fake_discover)
+
+    created_ids = handle_improve_task(client, service, "IMPROVE-REPO")
+
+    assert created_ids == []
+    assert observed == {"repo_key": "code_youtube_shorts", "base_branch": "new-feature"}
+    assert client.transitions[-1] == ("IMPROVE-REPO", "Done")
+    assert any("code_youtube_shorts @ new-feature" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_improve_task_reads_execution_target_from_description_html(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "IMPROVE-HTML",
+                "name": "Inspect shorts repo",
+                "description": None,
+                "description_stripped": None,
+                "description_html": (
+                    "<div><p>## Execution<br>repo: code_youtube_shorts<br>base_branch: new-feature<br>mode: goal</p>"
+                    "<p>## Goal<br>Inspect repo</p></div>"
+                ),
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: improve"}],
+            },
+        ]
+    )
+    service = FakeService()
+    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+        default_branch="main",
+        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
+        allowed_base_branches=["main", "new-feature"],
+    )
+    observed: dict[str, str | None] = {}
+
+    def fake_discover(_service: FakeService, *, repo_key: str, base_branch: str | None = None) -> tuple[list[dict[str, str]], list[str]]:
+        observed["repo_key"] = repo_key
+        observed["base_branch"] = base_branch
+        return [], [f"- inspected repo: {repo_key} @ {base_branch}"]
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.discover_improvement_candidates", fake_discover)
+
+    created_ids = handle_improve_task(client, service, "IMPROVE-HTML")
+
+    assert created_ids == []
+    assert observed == {"repo_key": "code_youtube_shorts", "base_branch": "new-feature"}
+    assert client.transitions[-1] == ("IMPROVE-HTML", "Done")
 
 
 def test_run_watch_loop_returns_claimed_improve_task_to_ready_after_worker_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -733,7 +807,7 @@ def test_handle_propose_cycle_creates_bounded_goal_task(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.build_proposal_candidates",
-        lambda _client, _service: (
+        lambda _client, _service, **_kwargs: (
             [
                 ProposalSpec(
                     task_kind="goal",
@@ -758,10 +832,58 @@ def test_handle_propose_cycle_creates_bounded_goal_task(tmp_path: Path, monkeypa
     assert result.decision == "tasks_created"
     assert result.created_task_ids == ["FOLLOWUP-1"]
     assert client.created[0]["state"] == {"name": "Ready for AI"}
+
+
+def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    client = FakePlaneClient([])
+    service = FakeService()
+    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+        default_branch="new-feature",
+        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
+        allowed_base_branches=["main", "new-feature"],
+    )
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.proposal_repo_keys", lambda _service: ["code_youtube_shorts"])
+
+    def fake_build(
+        _client: FakePlaneClient,
+        _service: FakeService,
+        *,
+        repo_key: str | None = None,
+        issues: list[dict[str, object]] | None = None,
+    ) -> tuple[list[ProposalSpec], list[str], bool]:
+        assert repo_key == "code_youtube_shorts"
+        assert issues == []
+        return (
+            [
+                ProposalSpec(
+                    repo_key="code_youtube_shorts",
+                    task_kind="goal",
+                    title="Implement next bounded repo improvement",
+                    goal_text="Inspect the repo.",
+                    reason_summary="Idle board.",
+                    source_signal="code_youtube_shorts:idle_board",
+                    confidence="medium",
+                    recommended_state="Ready for AI",
+                    handoff_reason="propose_idle_board_scan",
+                    dedup_key="code_youtube_shorts:idle_board:repo_scan",
+                )
+            ],
+            ["repo: code_youtube_shorts"],
+            True,
+        )
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.build_proposal_candidates", fake_build)
+
+    result = handle_propose_cycle(client, service, status_dir=tmp_path, now=datetime(2026, 3, 31, 8, 0, tzinfo=UTC))
+
+    assert result.decision == "tasks_created"
+    assert result.created_task_ids == ["FOLLOWUP-1"]
+    assert "repo: code_youtube_shorts" in str(client.created[0]["description"])
+    assert "base_branch: new-feature" in str(client.created[0]["description"])
     assert client.created[0]["labels"] == [
         {"name": "task-kind: goal"},
         {"name": "source: proposer"},
-        {"name": "reason: blocked_pattern_validation_failure"},
+        {"name": "reason: code_youtube_shorts_idle_board"},
     ]
     assert any("[Propose] Autonomous task created" in comment for _, comment in client.issue_comments)
 
@@ -774,16 +896,16 @@ def test_handle_propose_cycle_respects_cooldown(tmp_path: Path, monkeypatch: pyt
 
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.build_proposal_candidates",
-        lambda _client, _service: (
+        lambda _client, _service, **_kwargs: (
             [
                 ProposalSpec(
-                    task_kind="improve",
-                    title="Scan repo for next bounded improvements",
+                    task_kind="goal",
+                    title="Implement next bounded repo improvement",
                     goal_text="Inspect repo state and propose bounded tasks.",
                     reason_summary="Idle board fallback.",
                     source_signal="idle_board",
                     confidence="medium",
-                    recommended_state="Backlog",
+                    recommended_state="Ready for AI",
                     handoff_reason="propose_idle_board_scan",
                     dedup_key="idle_board:repo_scan",
                 )
@@ -834,7 +956,7 @@ Existing proposal
 
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.build_proposal_candidates",
-        lambda _client, _service: (
+        lambda _client, _service, **_kwargs: (
             [
                 ProposalSpec(
                     task_kind="goal",
@@ -866,16 +988,16 @@ def test_run_watch_loop_propose_role_creates_task_when_idle(tmp_path: Path, monk
 
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.build_proposal_candidates",
-        lambda _client, _service: (
+        lambda _client, _service, **_kwargs: (
             [
                 ProposalSpec(
-                    task_kind="improve",
-                    title="Scan repo for next bounded improvements",
+                    task_kind="goal",
+                    title="Implement next bounded repo improvement",
                     goal_text="Inspect repo state and propose bounded tasks.",
                     reason_summary="Idle board fallback.",
                     source_signal="idle_board",
                     confidence="medium",
-                    recommended_state="Backlog",
+                    recommended_state="Ready for AI",
                     handoff_reason="propose_idle_board_scan",
                     dedup_key="idle_board:repo_scan",
                 )
@@ -897,7 +1019,7 @@ def test_run_watch_loop_propose_role_creates_task_when_idle(tmp_path: Path, monk
 
     assert client.created
     assert client.created[0]["labels"] == [
-        {"name": "task-kind: improve"},
+        {"name": "task-kind: goal"},
         {"name": "source: proposer"},
         {"name": "reason: idle_board"},
     ]

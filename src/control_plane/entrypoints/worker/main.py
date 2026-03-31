@@ -463,6 +463,22 @@ def extract_comment_text(comment: dict[str, Any]) -> str:
     return re.sub(r"\n{2,}", "\n", text).strip()
 
 
+def issue_description_text(issue: dict[str, Any]) -> str:
+    raw = issue.get("description") or issue.get("description_stripped")
+    if isinstance(raw, str) and raw.strip():
+        return raw
+    html_body = issue.get("description_html")
+    if isinstance(html_body, str) and html_body.strip():
+        text = html.unescape(html_body)
+        text = re.sub(r"<h[1-6][^>]*>\s*(.*?)\s*</h[1-6]>", lambda m: f"\n## {m.group(1)}\n", text, flags=re.I | re.S)
+        text = re.sub(r"<li[^>]*>\s*(.*?)\s*</li>", lambda m: f"- {m.group(1)}\n", text, flags=re.I | re.S)
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+        text = re.sub(r"</?(p|div|ul|ol|pre)[^>]*>", "\n", text, flags=re.I)
+        text = re.sub(r"<[^>]+>", "", text)
+        return re.sub(r"\n{3,}", "\n\n", text).strip()
+    return ""
+
+
 def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
     for comment in client.list_comments(task_id):
         if TRIAGE_COMMENT_MARKER.lower() in extract_comment_text(comment).lower():
@@ -476,7 +492,7 @@ def existing_follow_up_keys(client: PlaneClient) -> set[tuple[str, str, str]]:
         state_name = issue_status_name(issue).strip().lower()
         if state_name in {"done", "cancelled"}:
             continue
-        description = str(issue.get("description") or issue.get("description_stripped") or "")
+        description = issue_description_text(issue)
         source_task_id = parse_context_value(description, "original_task_id")
         handoff_reason = parse_context_value(description, "handoff_reason")
         follow_up_task_kind = parse_context_value(description, "follow_up_task_kind") or task_kind_for_issue(issue)
@@ -490,7 +506,7 @@ def existing_proposal_keys(client: PlaneClient) -> set[str]:
     for issue in client.list_issues():
         if not is_open_issue(issue):
             continue
-        description = str(issue.get("description") or issue.get("description_stripped") or "")
+        description = issue_description_text(issue)
         proposal_key = parse_context_value(description, "proposal_dedup_key")
         if proposal_key:
             keys.add(proposal_key.strip().lower())
@@ -681,7 +697,7 @@ def allowed_paths_for_repo(repo_key: str) -> list[str]:
 
 
 def issue_execution_target(issue: dict[str, Any], service: ExecutionService) -> tuple[str, str, list[str]]:
-    description = str(issue.get("description") or "").strip()
+    description = issue_description_text(issue).strip()
     if description:
         try:
             metadata = TaskParser().parse(description).execution_metadata
@@ -849,7 +865,12 @@ def read_text_if_exists(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def discover_improvement_candidates(service: ExecutionService, *, repo_key: str) -> tuple[list[dict[str, str]], list[str]]:
+def discover_improvement_candidates(
+    service: ExecutionService,
+    *,
+    repo_key: str,
+    base_branch: str | None = None,
+) -> tuple[list[dict[str, str]], list[str]]:
     findings: list[dict[str, str]] = []
     report_notes: list[str] = []
     kodo_adapter_text = read_text_if_exists(Path("src/control_plane/adapters/kodo/adapter.py"))
@@ -910,16 +931,17 @@ def discover_improvement_candidates(service: ExecutionService, *, repo_key: str)
             )
 
     repo_cfg = service.settings.repos[repo_key]
+    target_branch = base_branch or repo_cfg.default_branch
     workspace_path = service.workspace.create()
     try:
         repo_path = service.git.clone(repo_cfg.clone_url, workspace_path)
-        service.git.checkout_base(repo_path, repo_cfg.default_branch)
+        service.git.checkout_base(repo_path, target_branch)
         top_level = sorted(
             path.name
             for path in repo_path.iterdir()
             if path.name != ".git"
         )
-        report_notes.append(f"- inspected repo: {repo_key} @ {repo_cfg.default_branch}")
+        report_notes.append(f"- inspected repo: {repo_key} @ {target_branch}")
         report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
         report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
         report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
@@ -1030,7 +1052,11 @@ def build_proposal_candidates(
         notes.append(f"repeated_pattern: {classification} x{count}")
 
     if board_idle:
-        findings, report_notes = discover_improvement_candidates(service, repo_key=repo_key)
+        findings, report_notes = discover_improvement_candidates(
+            service,
+            repo_key=repo_key,
+            base_branch=service.settings.repos[repo_key].default_branch,
+        )
         notes.extend(report_notes)
         proposals.extend(proposal_specs_from_findings(findings, repo_key=repo_key, signal_prefix="idle_board"))
 
@@ -1038,16 +1064,20 @@ def build_proposal_candidates(
         proposals.append(
             ProposalSpec(
                 repo_key=repo_key,
-                task_kind="improve",
-                title="Scan repo for next bounded improvements",
-                goal_text="Inspect the current repo and recent workflow signals, then propose one to three bounded follow-up tasks grounded in observed codebase or runtime evidence.",
+                task_kind="goal",
+                title="Implement next bounded repo improvement",
+                goal_text="Inspect the current repo and recent workflow signals, then implement one bounded improvement grounded in observed codebase or runtime evidence.",
                 reason_summary="The board is idle and no stronger grounded task signal is currently open.",
                 source_signal=f"{repo_key}:idle_board",
                 confidence="medium",
-                recommended_state="Backlog",
+                recommended_state="Ready for AI",
                 handoff_reason="propose_idle_board_scan",
                 dedup_key=f"{repo_key}:idle_board:repo_scan",
-                constraints_text="- keep analysis grounded in current repo and recent retained artifacts\n- create tasks first, code second",
+                constraints_text=(
+                    "- keep analysis grounded in current repo and recent retained artifacts\n"
+                    "- make at most one bounded improvement in this task\n"
+                    "- do not expand into unrelated refactors"
+                ),
             )
         )
         notes.append("fallback_proposal: idle_board repo scan")
@@ -1216,21 +1246,15 @@ def handle_propose_cycle(
     proposals: list[ProposalSpec] = []
     notes: list[str] = []
     for repo_key in repo_keys:
-        if len(repo_keys) == 1:
-            try:
-                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, issues=issues)
-            except TypeError:
-                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service)
-        else:
-            try:
-                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(
-                    client,
-                    service,
-                    repo_key=repo_key,
-                    issues=issues,
-                )
-            except TypeError:
-                repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, repo_key=repo_key)
+        try:
+            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(
+                client,
+                service,
+                repo_key=repo_key,
+                issues=issues,
+            )
+        except TypeError:
+            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, repo_key=repo_key)
         proposals.extend(repo_proposals)
         notes.extend(repo_notes)
         board_idle = board_idle and repo_board_idle
@@ -1474,9 +1498,8 @@ def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id:
     issue = client.fetch_issue(task_id)
     existing_names = existing_issue_names(client)
     existing_follow_ups = existing_follow_up_keys(client)
-    description = str(issue.get("description") or issue.get("description_stripped") or "")
-    repo_key = parse_execution_value(description, "repo") or default_repo_key(service)
-    findings, report_notes = discover_improvement_candidates(service, repo_key=repo_key)
+    repo_key, base_branch, _allowed_paths = issue_execution_target(issue, service)
+    findings, report_notes = discover_improvement_candidates(service, repo_key=repo_key, base_branch=base_branch)
     created_ids: list[str] = []
     created_titles: list[str] = []
 
