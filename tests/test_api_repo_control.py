@@ -107,7 +107,7 @@ def test_import_repo_writes_discovered_repo_into_config(tmp_path: Path, monkeypa
     )
     monkeypatch.setattr(
         "control_plane.config.repo_policies.fetch_github_branches",
-        lambda _slug, github_token=None: ["main"],
+        lambda _slug, github_token=None: ["dev", "main", "new-feature"],
     )
 
     client = TestClient(app)
@@ -120,3 +120,5 @@ def test_import_repo_writes_discovered_repo_into_config(tmp_path: Path, monkeypa
     written = config_path.read_text()
     assert "another_repo:" in written
     assert "clone_url: git@github.com:Velascat/another_repo.git" in written
+    assert "allowed_base_branches:" in written
+    assert "- new-feature" in written

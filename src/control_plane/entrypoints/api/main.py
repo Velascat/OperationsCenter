@@ -65,17 +65,19 @@ def validate_repo_branch(settings, repo_key: str, base_branch: str) -> None:
 def import_repo_into_config(*, config_path: Path, repo: dict[str, Any]) -> None:
     raw = yaml.safe_load(config_path.read_text()) or {}
     repos = raw.setdefault("repos", {})
-    if repo["repo_key"] in repos:
-        return
+    branch_options = [str(item).strip() for item in repo.get("branch_options", []) if str(item).strip()]
+    if not branch_options:
+        branch_options = [str(repo["default_branch"]).strip()]
+    existing = repos.get(repo["repo_key"], {})
     repos[repo["repo_key"]] = {
         "clone_url": repo["clone_url"],
-        "default_branch": repo["default_branch"],
-        "validation_commands": [],
-        "allowed_base_branches": [repo["default_branch"]],
-        "bootstrap_enabled": False,
-        "python_binary": "python3",
-        "venv_dir": ".venv",
-        "install_dev_command": None,
+        "default_branch": existing.get("default_branch") or repo["default_branch"],
+        "validation_commands": existing.get("validation_commands", []),
+        "allowed_base_branches": branch_options,
+        "bootstrap_enabled": existing.get("bootstrap_enabled", False),
+        "python_binary": existing.get("python_binary", "python3"),
+        "venv_dir": existing.get("venv_dir", ".venv"),
+        "install_dev_command": existing.get("install_dev_command"),
     }
     config_path.write_text(yaml.safe_dump(raw, sort_keys=False, default_flow_style=False))
 
