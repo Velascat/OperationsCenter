@@ -202,9 +202,11 @@ Role responsibilities:
   - triages `Blocked` tasks
   - consumes explicit `task-kind: improve` tasks
   - reads task comments and recent retained artifacts
+  - detects repeated failure patterns across recent blocked work
   - creates bounded follow-up tasks instead of leaving blocked work stuck
+  - routes unclear cases to explicit human attention instead of spawning low-confidence follow-ups
 
-Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane. Improve is the board-level triage lane for blocked work.
+Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane. Improve is the board-level triage and stabilization lane for blocked work.
 
 `watch-all` is only a local convenience wrapper. It launches three watcher processes with separate logs and PID files. It is not a queue, scheduler, or distributed supervisor.
 
@@ -241,9 +243,33 @@ Blocked-task triage uses a small fixed vocabulary:
 - `validation_failure`
 - `scope_policy`
 - `parse_config`
+- `verification_failure`
 - `unknown`
 
 That same vocabulary is used in board comments, watcher logs, and retained summaries.
+
+Improve uses a small internal triage result model for blocked work:
+
+- `classification`
+- `certainty`
+- `reason_summary`
+- `recommended_action`
+- `human_attention_required`
+- optional bounded follow-up task spec
+
+This keeps improve behavior explicit and testable instead of magical. In practice, improve answers:
+
+- what failed
+- how confident the classification is
+- whether a bounded `goal` or `test` task should be created
+- whether the task should remain visible for human attention
+
+Phase 3 safeguards:
+
+- improve avoids duplicate follow-up creation for the same source task and handoff reason
+- improve caps how many follow-up tasks it creates in one cycle
+- improve uses recent blocked-task history to collapse recurring failure classes into one focused system-fix task instead of many similar children
+- improve does not recursively generate unblock tasks for improve-generated failures
 
 ## Task lineage
 
@@ -360,7 +386,7 @@ The current autonomous path is a polling loop with `goal`, `test`, and `improve`
 
 - `goal` produces implementation outcomes
 - `test` resolves verification outcomes
-- `improve` triages blocked work and creates bounded follow-ups
+- `improve` triages blocked work, detects repeated failure patterns, and creates bounded follow-ups or explicit human-attention notes
 
 There is still no webhook consumer, concurrency lock manager, or distributed supervisor.
 
@@ -522,6 +548,7 @@ Retained `result_summary.md` files now align with the board/log vocabulary and i
 - `final_status`
 - `blocked_classification`
 - `follow_up_task_ids`
+- `human_attention_required` when relevant
 - execution, validation, policy, and branch-push outcomes
 
 This is intended to make board comments, watcher logs, and retained artifacts describe the same run in the same language.

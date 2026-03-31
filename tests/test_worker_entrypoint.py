@@ -6,6 +6,7 @@ import pytest
 
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
+    build_improve_triage_result,
     classify_blocked_issue,
     handle_goal_task,
     handle_improve_task,
@@ -163,6 +164,15 @@ def test_classify_blocked_issue_detects_provider_auth_failure() -> None:
     )
     assert classification == "infra_tooling"
     assert "tooling" in rationale.lower()
+
+
+def test_classify_blocked_issue_detects_verification_failure_for_test_tasks() -> None:
+    classification, rationale = classify_blocked_issue(
+        {"name": "Task", "labels": [{"name": "task-kind: test"}]},
+        [{"comment_html": "<p>[Test] Execution result</p><ul><li>validation_passed: False</li></ul>"}],
+    )
+    assert classification == "verification_failure"
+    assert "Verification failed" in rationale
 
 
 def test_run_watch_loop_claims_and_runs_one_goal_task(caplog: pytest.LogCaptureFixture) -> None:
@@ -419,6 +429,114 @@ def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> 
     assert created_ids == []
     assert client.created == []
     assert any("will not create another recursive unblock" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_blocked_triage_marks_human_attention_for_infra_tooling() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "BLOCKED-3",
+                "name": "Auth failure",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ],
+        comments={
+            "BLOCKED-3": [
+                {"comment_html": "<p>[Goal] Execution result</p><ul><li>execution_stderr: Error: ANTHROPIC_API_KEY not set</li></ul>"},
+            ]
+        },
+    )
+    service = FakeService()
+
+    classification, created_ids = handle_blocked_triage(client, service, "BLOCKED-3")
+
+    assert classification == "infra_tooling"
+    assert created_ids == []
+    assert client.created == []
+    assert any("human_attention_required: true" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_blocked_triage_avoids_duplicate_follow_up_for_same_source_reason() -> None:
+    existing_description = """## Execution
+repo: control-plane
+base_branch: main
+mode: goal
+
+## Goal
+Existing follow-up
+
+## Context
+- original_task_id: BLOCKED-4
+- original_task_title: Broken task
+- source_worker_role: improve
+- source_task_kind: goal
+- follow_up_task_kind: goal
+- handoff_reason: improve_triage_validation_failure
+"""
+    client = FakePlaneClient(
+        [
+            {
+                "id": "BLOCKED-4",
+                "name": "Broken task",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+            {
+                "id": "FOLLOWUP-EXISTING",
+                "name": "Resolve blocked Broken task",
+                "description": existing_description,
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: goal"}, {"name": "source: improve-worker"}],
+            },
+        ],
+        comments={
+            "BLOCKED-4": [
+                {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
+            ]
+        },
+    )
+    service = FakeService()
+
+    classification, created_ids = handle_blocked_triage(client, service, "BLOCKED-4")
+
+    assert classification == "validation_failure"
+    assert created_ids == []
+    assert len(client.created) == 0
+
+
+def test_build_improve_triage_result_detects_repeated_pattern() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "BLOCKED-A",
+                "name": "Broken task A",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+            {
+                "id": "BLOCKED-B",
+                "name": "Broken task B",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ],
+        comments={
+            "BLOCKED-A": [
+                {"comment_html": "<p>[Improve] Blocked triage</p><ul><li>blocked_classification: validation_failure</li></ul>"},
+            ],
+            "BLOCKED-B": [
+                {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
+            ],
+        },
+    )
+
+    triage = build_improve_triage_result(client, client.fetch_issue("BLOCKED-B"), client.list_comments("BLOCKED-B"))
+
+    assert triage.classification == "validation_failure"
+    assert triage.follow_up is not None
+    assert triage.follow_up.handoff_reason == "improve_pattern_validation_failure"
+    assert "repeated" in triage.reason_summary.lower()
 
 
 def test_run_watch_loop_uses_backoff_on_rate_limit(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:

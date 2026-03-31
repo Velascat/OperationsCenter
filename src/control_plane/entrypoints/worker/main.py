@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import html
 import json
 import logging
@@ -21,6 +22,26 @@ TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
 RATE_LIMIT_BACKOFF_MULTIPLIER = 4
 UNKNOWN_BLOCKED_CLASSIFICATION = "unknown"
+MAX_IMPROVE_FOLLOW_UPS_PER_CYCLE = 3
+
+
+@dataclass
+class ImproveFollowUpSpec:
+    task_kind: str
+    title: str
+    goal_text: str
+    handoff_reason: str
+    constraints_text: str | None = None
+
+
+@dataclass
+class ImproveTriageResult:
+    classification: str
+    certainty: str
+    reason_summary: str
+    recommended_action: str
+    human_attention_required: bool
+    follow_up: ImproveFollowUpSpec | None = None
 
 
 def worker_title(role: str) -> str:
@@ -42,6 +63,10 @@ def blocked_classification_token(raw: str) -> str:
         "unknown/manual attention": UNKNOWN_BLOCKED_CLASSIFICATION,
     }
     return mapping.get(raw, UNKNOWN_BLOCKED_CLASSIFICATION)
+
+
+def classification_display_name(classification: str) -> str:
+    return classification.replace("_", " ")
 
 
 def task_kind_for_issue(issue: dict[str, Any]) -> str:
@@ -82,6 +107,13 @@ def classify_execution_result(result: ExecutionResult) -> str:
     ):
         return "infra_tooling"
     return UNKNOWN_BLOCKED_CLASSIFICATION
+
+
+def parse_context_value(description: str, key: str) -> str | None:
+    match = re.search(rf"^- {re.escape(key)}:\s*(.+?)\s*$", description, flags=re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def status_file_path(status_dir: Path | None, role: str) -> Path | None:
@@ -273,6 +305,35 @@ def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
     return False
 
 
+def existing_follow_up_keys(client: PlaneClient) -> set[tuple[str, str, str]]:
+    keys: set[tuple[str, str, str]] = set()
+    for issue in client.list_issues():
+        state_name = issue_status_name(issue).strip().lower()
+        if state_name in {"done", "cancelled"}:
+            continue
+        description = str(issue.get("description") or issue.get("description_stripped") or "")
+        source_task_id = parse_context_value(description, "original_task_id")
+        handoff_reason = parse_context_value(description, "handoff_reason")
+        follow_up_task_kind = parse_context_value(description, "follow_up_task_kind") or task_kind_for_issue(issue)
+        if source_task_id and handoff_reason and follow_up_task_kind:
+            keys.add((source_task_id, follow_up_task_kind.strip().lower(), handoff_reason.strip().lower()))
+    return keys
+
+
+def recent_classification_counts(client: PlaneClient) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for issue in client.list_issues():
+        comments = client.list_comments(str(issue["id"]))
+        for comment in comments:
+            text = extract_comment_text(comment)
+            match = re.search(r"blocked_classification:\s*([a-z_]+)", text)
+            if not match:
+                continue
+            classification = match.group(1).strip().lower()
+            counts[classification] = counts.get(classification, 0) + 1
+    return counts
+
+
 def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tuple[str, str]:
     chunks = [str(issue.get("name", "")), str(issue.get("description", "")), str(issue.get("description_html", ""))]
     chunks.extend(extract_comment_text(comment) for comment in comments)
@@ -280,6 +341,8 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
 
     if "policy_violations:" in lowered or "policy=failed" in lowered:
         return "scope_policy", "Changes landed outside the allowed repo scope."
+    if task_kind_for_issue(issue) == "test" and ("validation_passed: false" in lowered or "validation=failed" in lowered):
+        return "verification_failure", "Verification failed and needs implementation follow-up."
     if "validation_passed: false" in lowered or "validation=failed" in lowered:
         return "validation_failure", "Validation failed after execution."
     if any(
@@ -314,6 +377,85 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
     ):
         return "parse_config", "The work item contract or repo configuration is invalid for execution."
     return UNKNOWN_BLOCKED_CLASSIFICATION, "The failure needs human review or a more specific follow-up task."
+
+
+def build_improve_triage_result(
+    client: PlaneClient,
+    issue: dict[str, Any],
+    comments: list[dict[str, Any]],
+) -> ImproveTriageResult:
+    classification, rationale = classify_blocked_issue(issue, comments)
+    classification_counts = recent_classification_counts(client)
+    # Treat one existing classified failure plus the current blocked task as a
+    # meaningful recurring pattern worth collapsing into a single system-fix task.
+    repeated_pattern = classification_counts.get(classification, 0) >= 1
+    issue_title = str(issue.get("name", "task"))
+    issue_kind = task_kind_for_issue(issue)
+
+    if classification in {"infra_tooling", UNKNOWN_BLOCKED_CLASSIFICATION}:
+        return ImproveTriageResult(
+            classification=classification,
+            certainty="high" if classification == "infra_tooling" else "low",
+            reason_summary=rationale,
+            recommended_action="human_attention",
+            human_attention_required=True,
+        )
+
+    if repeated_pattern:
+        follow_up = ImproveFollowUpSpec(
+            task_kind="goal",
+            title=f"Address repeated {classification_display_name(classification)} failures",
+            goal_text=(
+                f"Stabilize the autonomous workflow by addressing the repeated {classification_display_name(classification)} pattern "
+                "showing up across recent tasks."
+            ),
+            handoff_reason=f"improve_pattern_{classification}",
+            constraints_text=(
+                f"- source_task_id: {issue.get('id')}\n"
+                f"- repeated_classification: {classification}\n"
+                "- focus on one bounded system-fix task rather than many task-specific children"
+            ),
+        )
+        return ImproveTriageResult(
+            classification=classification,
+            certainty="high",
+            reason_summary=f"{rationale} This same failure pattern has appeared repeatedly in recent work.",
+            recommended_action="create_follow_up_goal",
+            human_attention_required=False,
+            follow_up=follow_up,
+        )
+
+    task_kind = "goal"
+    goal_text = f"Resolve the blocked task '{issue_title}' by addressing the classified failure: {classification_display_name(classification)}."
+    if classification == "scope_policy":
+        goal_text = (
+            f"Resolve the blocked task '{issue_title}' with a narrower, policy-compliant implementation that stays within allowed paths."
+        )
+    if classification == "verification_failure":
+        goal_text = (
+            f"Fix the implementation gap exposed by verification in '{issue_title}' so the verification task can pass on the next run."
+        )
+
+    follow_up = ImproveFollowUpSpec(
+        task_kind=task_kind,
+        title=f"Resolve blocked {issue_title}",
+        goal_text=goal_text,
+        handoff_reason=f"improve_triage_{classification}",
+        constraints_text=(
+            f"- source_task_id: {issue.get('id')}\n"
+            f"- source_task_kind: {issue_kind}\n"
+            f"- classification: {classification}\n"
+            f"- rationale: {rationale}"
+        ),
+    )
+    return ImproveTriageResult(
+        classification=classification,
+        certainty="high" if classification != "parse_config" else "medium",
+        reason_summary=rationale,
+        recommended_action=f"create_follow_up_{task_kind}",
+        human_attention_required=False,
+        follow_up=follow_up,
+    )
 
 
 def default_repo_key(service: ExecutionService) -> str:
@@ -423,6 +565,7 @@ def create_follow_up_task_if_missing(
     service: ExecutionService,
     *,
     existing_names: set[str],
+    existing_follow_ups: set[tuple[str, str, str]],
     source_role: str,
     task_kind: str,
     original_issue: dict[str, Any],
@@ -434,6 +577,9 @@ def create_follow_up_task_if_missing(
 ) -> dict[str, Any] | None:
     normalized = title.strip().lower()
     if normalized in existing_names:
+        return None
+    duplicate_key = (str(original_issue.get("id")), task_kind.strip().lower(), handoff_reason.strip().lower())
+    if duplicate_key in existing_follow_ups:
         return None
     created = create_follow_up_task(
         client,
@@ -448,6 +594,7 @@ def create_follow_up_task_if_missing(
         state=state,
     )
     existing_names.add(normalized)
+    existing_follow_ups.add(duplicate_key)
     return created
 
 
@@ -580,10 +727,12 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     if result.success:
         if goal_requires_test_follow_up(issue, result):
             existing_names = existing_issue_names(client)
+            existing_follow_ups = existing_follow_up_keys(client)
             follow_up = create_follow_up_task_if_missing(
                 client,
                 service,
                 existing_names=existing_names,
+                existing_follow_ups=existing_follow_ups,
                 source_role="goal",
                 task_kind="test",
                 original_issue=issue,
@@ -737,15 +886,19 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
 def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
     existing_names = existing_issue_names(client)
+    existing_follow_ups = existing_follow_up_keys(client)
     findings, report_notes = discover_improvement_candidates(service)
     created_ids: list[str] = []
     created_titles: list[str] = []
 
     for finding in findings:
+        if len(created_ids) >= MAX_IMPROVE_FOLLOW_UPS_PER_CYCLE:
+            break
         created = create_follow_up_task_if_missing(
             client,
             service,
             existing_names=existing_names,
+            existing_follow_ups=existing_follow_ups,
             source_role="improve",
             task_kind=finding["kind"],
             original_issue=issue,
@@ -782,35 +935,31 @@ def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id:
 def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_id: str) -> tuple[str, list[str]]:
     issue = client.fetch_issue(task_id)
     comments = client.list_comments(task_id)
-    classification, rationale = classify_blocked_issue(issue, comments)
+    triage = build_improve_triage_result(client, issue, comments)
     created_ids: list[str] = []
 
-    target_task_kind = "goal"
-    if task_kind_for_issue(issue) == "improve" and classification == "validation_failure":
-        target_task_kind = "test"
+    existing_names = existing_issue_names(client)
+    existing_follow_ups = existing_follow_up_keys(client)
 
-    if classification not in {UNKNOWN_BLOCKED_CLASSIFICATION, "infra_tooling"} and not issue_is_unblock_chain(issue):
-        follow_up = create_follow_up_task(
+    if triage.follow_up is not None and not issue_is_unblock_chain(issue):
+        created = create_follow_up_task_if_missing(
             client,
             service,
+            existing_names=existing_names,
+            existing_follow_ups=existing_follow_ups,
             source_role="improve",
-            task_kind=target_task_kind,
+            task_kind=triage.follow_up.task_kind,
             original_issue=issue,
-            title=f"Resolve blocked {issue.get('name', 'task')}",
-            goal_text=(
-                f"Resolve the blocked task '{issue.get('name', 'Untitled')}' by addressing the classified failure: {classification}."
-            ),
-            handoff_reason=f"improve_triage_{classification}",
-            constraints_text=(
-                f"- source_task_id: {task_id}\n"
-                f"- classification: {classification}\n"
-                f"- rationale: {rationale}"
-            ),
+            title=triage.follow_up.title,
+            goal_text=triage.follow_up.goal_text,
+            handoff_reason=triage.follow_up.handoff_reason,
+            constraints_text=triage.follow_up.constraints_text,
         )
-        created_ids.append(str(follow_up.get("id")))
+        if created is not None:
+            created_ids.append(str(created.get("id")))
     elif issue_is_unblock_chain(issue):
-        rationale = (
-            f"{rationale} Improve already generated this unblock task, so the watcher will not create another "
+        triage.reason_summary = (
+            f"{triage.reason_summary} Improve already generated this unblock task, so the watcher will not create another "
             "recursive unblock follow-up."
         )
 
@@ -822,16 +971,18 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
                 f"task_id: {task_id}",
                 f"task_kind: {task_kind_for_issue(issue)}",
                 "result_status: blocked",
-                f"blocked_classification: {classification}",
-                f"reason: {rationale}",
+                f"blocked_classification: {triage.classification}",
+                f"certainty: {triage.certainty}",
+                f"reason: {triage.reason_summary}",
                 f"follow_up_task_ids: {', '.join(created_ids) if created_ids else 'none'}",
-                f"next_action: {'follow-up task created' if created_ids else 'human attention or existing context required'}",
-                f"handoff_reason: {'improve_triage_created_follow_up' if created_ids else 'improve_triage_human_attention'}",
+                f"next_action: {triage.recommended_action if not created_ids else 'follow_up_created'}",
+                f"human_attention_required: {str(triage.human_attention_required).lower()}",
+                f"handoff_reason: {triage.follow_up.handoff_reason if triage.follow_up and created_ids else ('improve_triage_human_attention' if triage.human_attention_required else 'improve_triage_no_change')}",
             ],
         ),
     )
     client.transition_issue(task_id, "Blocked")
-    return classification, created_ids
+    return triage.classification, created_ids
 
 
 def run_watch_loop(
