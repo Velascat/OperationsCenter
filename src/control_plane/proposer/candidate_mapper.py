@@ -24,7 +24,7 @@ class ProposalCandidateMapper:
         settings: Settings,
         provenance: ProposalProvenance,
     ) -> PlaneTaskDraft:
-        repo_key = next(iter(settings.repos.keys()))
+        repo_key = self._repo_key_for_candidate(settings=settings, provenance=provenance)
         repo_cfg = settings.repos[repo_key]
         task_kind = self._task_kind_for_candidate(candidate)
         state = "Ready for AI" if task_kind == "goal" else "Backlog"
@@ -73,6 +73,15 @@ class ProposalCandidateMapper:
             ],
             task_kind=task_kind,
         )
+
+    @staticmethod
+    def _repo_key_for_candidate(*, settings: Settings, provenance: ProposalProvenance) -> str:
+        if provenance.repo_name in settings.repos:
+            return provenance.repo_name
+        for repo_key in settings.repos:
+            if repo_key.strip().lower() == provenance.repo_name.strip().lower():
+                return repo_key
+        return next(iter(settings.repos.keys()))
 
     @staticmethod
     def _task_kind_for_candidate(candidate: ProposalCandidate) -> str:

@@ -73,6 +73,9 @@ def write_config(tmp_path: Path) -> Path:
                 "  control-plane:",
                 "    clone_url: git@github.com:Velascat/ControlPlane.git",
                 "    default_branch: main",
+                "  code_youtube_shorts:",
+                "    clone_url: git@github.com:Velascat/code_youtube_shorts.git",
+                "    default_branch: new-feature",
                 f"report_root: {tmp_path / 'reports'}",
             ]
         )
@@ -159,6 +162,28 @@ def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
     ]
 
 
+def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
+    decision, insight = make_decision_artifact(tmp_path)
+    decision.repo.name = "code_youtube_shorts"
+    settings = load_settings(write_config(tmp_path))
+    candidate = decision.candidates[0]
+    mapper = ProposalCandidateMapper()
+
+    draft = mapper.map_to_task(
+        candidate=candidate,
+        settings=settings,
+        provenance=build_provenance(
+            candidate=candidate,
+            decision_artifact=decision,
+            insight_artifact=insight,
+            proposer_run_id="prop_1",
+        ),
+    )
+
+    assert "repo: code_youtube_shorts" in draft.description
+    assert "base_branch: new-feature" in draft.description
+
+
 def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_path: Path) -> None:
     make_decision_artifact(tmp_path)
     settings = load_settings(write_config(tmp_path))
@@ -227,3 +252,56 @@ def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Pat
 
     assert artifact.created == []
     assert artifact.skipped[0].reason == "existing_open_equivalent_task"
+
+
+def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> None:
+    decision, _ = make_decision_artifact(tmp_path)
+    decision.candidates.append(
+        ProposalCandidate(
+            candidate_id="candidate:dependency_drift:deps:persistent",
+            dedup_key="candidate|dependency_drift|deps|persistent",
+            family="dependency_drift",
+            subject="deps",
+            rationale=CandidateRationale(matched_rules=["rule_b"], suppressed_by=[]),
+            proposal_outline=ProposalOutline(
+                title_hint="Investigate persistent dependency drift",
+                summary_hint="Investigate the persistent dependency drift signal with one bounded follow-up.",
+                labels_hint=["task-kind: improve", "source: proposer"],
+                source_family="dependency_drift",
+            ),
+        )
+    )
+    DecisionArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "decision").write(decision)
+    settings = load_settings(write_config(tmp_path))
+
+    class FailingSecondCreateClient(FakePlaneClient):
+        def create_issue(self, **kwargs):  # noqa: ANN003
+            if len(self.created) == 1:
+                raise RuntimeError("plane exploded")
+            return super().create_issue(**kwargs)
+
+    client = FailingSecondCreateClient()
+    service = CandidateProposerIntegrationService(
+        settings=settings,
+        client=client,
+        loader=ProposalCandidateLoader(
+            decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
+            insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
+        ),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+    )
+
+    artifact, _ = service.run(
+        new_proposer_integration_context(
+            repo_filter=None,
+            decision_run_id=None,
+            max_create=5,
+            dry_run=False,
+            source_command="control-plane propose-from-candidates",
+        )
+    )
+
+    assert len(artifact.created) == 1
+    assert len(artifact.failed) == 1
+    assert artifact.failed[0].reason == "plane_create_failed"

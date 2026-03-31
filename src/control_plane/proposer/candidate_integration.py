@@ -186,6 +186,7 @@ class CandidateProposerIntegrationService:
             f"- candidate_id: {candidate.candidate_id}",
             f"- dedup_key: {candidate.dedup_key}",
             f"- decision_run_id: {decision_run_id}",
+            f"- proposer_run_id: {draft.description.split('proposer_run_id: ', 1)[1].splitlines()[0] if 'proposer_run_id:' in draft.description else 'unknown'}",
             f"- handoff_reason: proposer_candidate_{candidate.family}",
         ]
         return "\n".join(lines)

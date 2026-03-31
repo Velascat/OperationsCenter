@@ -8,6 +8,7 @@ from control_plane.insights.models import RepoInsightsArtifact
 
 class ProposalProvenance(BaseModel):
     source: str = "autonomy-proposer"
+    repo_name: str
     source_family: str
     candidate_id: str
     candidate_dedup_key: str
@@ -25,6 +26,7 @@ def build_provenance(
     proposer_run_id: str,
 ) -> ProposalProvenance:
     return ProposalProvenance(
+        repo_name=decision_artifact.repo.name,
         source_family=candidate.family,
         candidate_id=candidate.candidate_id,
         candidate_dedup_key=candidate.dedup_key,
