@@ -160,6 +160,45 @@ Do thing.
     assert issue["labels"] == [{"id": "LABEL-1", "name": "task-kind: improve"}]
 
 
+def test_plane_fetch_issue_refreshes_label_cache_for_unknown_label_ids() -> None:
+    label_calls = {"count": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/labels/"):
+            label_calls["count"] += 1
+            if label_calls["count"] == 1:
+                return httpx.Response(200, json={"results": [{"id": "LABEL-OLD", "name": "task-kind: goal"}]})
+            return httpx.Response(200, json={"results": [{"id": "LABEL-NEW", "name": "task-kind: test"}]})
+        return httpx.Response(
+            200,
+            json={
+                "id": "TASK-2",
+                "project_id": "proj",
+                "name": "Task",
+                "state": {"name": "Ready for AI"},
+                "labels": ["LABEL-NEW"],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    client._client = httpx.Client(  # type: ignore[attr-defined]
+        transport=transport,
+        base_url="http://plane.local",
+        headers={"X-API-Key": "token", "Content-Type": "application/json"},
+    )
+
+    try:
+        assert client.list_labels() == [{"id": "LABEL-OLD", "name": "task-kind: goal"}]
+        issue = client.fetch_issue("TASK-2")
+    finally:
+        client.close()
+
+    assert issue["labels"] == [{"id": "LABEL-NEW", "name": "task-kind: test"}]
+    assert label_calls["count"] == 2
+
+
 def test_plane_create_issue_ensures_labels_and_state() -> None:
     calls: list[tuple[str, str, dict[str, object] | None]] = []
 

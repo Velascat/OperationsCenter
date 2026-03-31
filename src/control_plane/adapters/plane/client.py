@@ -73,8 +73,8 @@ class PlaneClient:
                 return list(self._states_cache)
         return []
 
-    def list_labels(self) -> list[dict[str, Any]]:
-        if self._labels_cache is not None:
+    def list_labels(self, *, force_refresh: bool = False) -> list[dict[str, Any]]:
+        if self._labels_cache is not None and not force_refresh:
             return list(self._labels_cache)
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/labels/"
         response = self._request("GET", url)
@@ -207,11 +207,17 @@ class PlaneClient:
         if all(isinstance(label, dict) for label in raw_labels):
             return issue
 
-        by_id = {
-            str(label.get("id")): label
-            for label in self.list_labels()
-            if isinstance(label, dict) and label.get("id")
-        }
+        def label_map(*, force_refresh: bool = False) -> dict[str, Any]:
+            return {
+                str(label.get("id")): label
+                for label in self.list_labels(force_refresh=force_refresh)
+                if isinstance(label, dict) and label.get("id")
+            }
+
+        by_id = label_map()
+        unresolved = [str(raw) for raw in raw_labels if not isinstance(raw, dict) and str(raw) not in by_id]
+        if unresolved:
+            by_id = label_map(force_refresh=True)
         hydrated: list[Any] = []
         for raw in raw_labels:
             if isinstance(raw, dict):
