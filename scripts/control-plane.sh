@@ -105,6 +105,10 @@ Usage:
   scripts/control-plane.sh api
   scripts/control-plane.sh worker --task-id TASK-123
   scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
+  scripts/control-plane.sh observe-repo [--repo /abs/path]
+  scripts/control-plane.sh generate-insights [--repo /abs/path]
+  scripts/control-plane.sh decide-proposals [--repo /abs/path]
+  scripts/control-plane.sh propose-from-candidates [--repo /abs/path] [--dry-run]
 
 Environment:
   CONTROL_PLANE_CONFIG   Override config path (default: ${CONFIG_PATH})
@@ -321,6 +325,26 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log smoke "${VENV_DIR}/bin/python" -m control_plane.entrypoints.smoke.plane --config "${CONFIG_PATH}" "$@"
+    ;;
+  observe-repo)
+    ensure_venv
+    load_env_file
+    run_with_log observe-repo "${VENV_DIR}/bin/python" -m control_plane.entrypoints.observer.main --config "${CONFIG_PATH}" "$@"
+    ;;
+  generate-insights)
+    ensure_venv
+    load_env_file
+    run_with_log generate-insights "${VENV_DIR}/bin/python" -m control_plane.entrypoints.insights.main "$@"
+    ;;
+  decide-proposals)
+    ensure_venv
+    load_env_file
+    run_with_log decide-proposals "${VENV_DIR}/bin/python" -m control_plane.entrypoints.decision.main "$@"
+    ;;
+  propose-from-candidates)
+    ensure_venv
+    load_env_file
+    run_with_log propose-from-candidates "${VENV_DIR}/bin/python" -m control_plane.entrypoints.proposer.main --config "${CONFIG_PATH}" "$@"
     ;;
   plane-doctor)
     ensure_venv

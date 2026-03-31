@@ -79,6 +79,17 @@ Retained `result_summary.md` files align with board/log language and include:
 4. retained artifact directory in `tools/report/kodo_plane/`
 5. `plane-doctor` if the board/API contract looks wrong
 
+For autonomy-layer inputs:
+
+- `./scripts/control-plane.sh observe-repo`
+- `./scripts/control-plane.sh generate-insights`
+- `./scripts/control-plane.sh decide-proposals`
+- `./scripts/control-plane.sh propose-from-candidates --dry-run`
+- retained observer artifacts in `tools/report/control_plane/observer/`
+- retained insight artifacts in `tools/report/control_plane/insights/`
+- retained decision artifacts in `tools/report/control_plane/decision/`
+- retained proposer artifacts in `tools/report/control_plane/proposer/`
+
 When the board is quiet, also check the proposer lane:
 
 - proposer heartbeat/status in `watch-all-status`

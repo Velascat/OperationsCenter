@@ -16,6 +16,10 @@ This repo runs as a local polling workflow.
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
+./scripts/control-plane.sh observe-repo
+./scripts/control-plane.sh generate-insights
+./scripts/control-plane.sh decide-proposals
+./scripts/control-plane.sh propose-from-candidates
 ```
 
 ## Watchers
@@ -70,6 +74,20 @@ This is the quickest way to tell whether the local system is alive or stalled.
 - Plane runtime logs: `logs/local/plane-runtime/`
 - watcher logs, PIDs, heartbeat files: `logs/local/watch-all/`
 - retained run artifacts: `tools/report/kodo_plane/`
+- observer snapshots: `tools/report/control_plane/observer/`
+- insight artifacts: `tools/report/control_plane/insights/`
+- decision artifacts: `tools/report/control_plane/decision/`
+- proposer result artifacts: `tools/report/control_plane/proposer/`
+
+## Repo-Aware Autonomy Stages
+
+The repo-aware autonomy chain is explicit:
+
+```text
+observe-repo -> generate-insights -> decide-proposals -> propose-from-candidates
+```
+
+Each stage writes its own retained artifact before the next stage consumes it.
 
 ## Retention
 

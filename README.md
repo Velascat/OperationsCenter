@@ -10,6 +10,17 @@ Local autonomous coding workflow system that uses **Plane** as the board, **Cont
 - **goal**, **test**, **improve**, and **propose** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
+## Repo-Aware Autonomy Loop
+
+```text
+observe -> analyze -> decide -> propose
+```
+
+- `observe` writes retained repo-state snapshots.
+- `analyze` derives normalized insights from those snapshots.
+- `decide` emits guarded proposal candidates plus suppression records.
+- `propose` turns approved candidates into bounded Plane tasks through existing proposer protections.
+
 ## What Works Today
 
 - Single-task execution from a Plane work item.
@@ -19,6 +30,10 @@ Local autonomous coding workflow system that uses **Plane** as the board, **Cont
 - Isolated ephemeral clone + task branch workflow.
 - Repo-local bootstrap and validation execution.
 - Worker comments, retained artifacts, and local heartbeat/status files.
+- Read-only repo observer snapshots.
+- Read-only normalized insight generation from retained observer snapshots.
+- Guarded proposal-candidate generation from retained insights.
+- Candidate-driven Plane task creation through the proposer lane with provenance and dedup protection.
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
 - Dependency drift reporting with optional Plane improve-task creation.
@@ -70,6 +85,10 @@ Then:
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
+./scripts/control-plane.sh observe-repo
+./scripts/control-plane.sh generate-insights
+./scripts/control-plane.sh decide-proposals
+./scripts/control-plane.sh propose-from-candidates
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ./scripts/control-plane.sh dependency-check
@@ -82,6 +101,10 @@ Then:
 - Plane runtime logs: `logs/local/plane-runtime/`
 - Watcher logs, PIDs, and heartbeat files: `logs/local/watch-all/`
 - Retained execution artifacts: `tools/report/kodo_plane/`
+- Repo observer snapshots: `tools/report/control_plane/observer/`
+- Insight artifacts: `tools/report/control_plane/insights/`
+- Decision artifacts: `tools/report/control_plane/decision/`
+- Proposer result artifacts: `tools/report/control_plane/proposer/`
 
 The wrapper runs `janitor` automatically before commands and keeps local logs/artifacts for 1 day by default. Override with `CONTROL_PLANE_RETENTION_DAYS`.
 
@@ -96,6 +119,7 @@ The wrapper runs `janitor` automatically before commands and keeps local logs/ar
 - No production-grade supervisor beyond local `watch-all`.
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
+- No automatic end-to-end autonomy wrapper yet; `observe`, `generate-insights`, `decide-proposals`, and `propose-from-candidates` are still explicit stages.
 
 ## Documentation
 
@@ -103,6 +127,11 @@ The wrapper runs `janitor` automatically before commands and keeps local logs/ar
 
 - [Lifecycle Contract](/home/dev/Documents/GitHub/ControlPlane/docs/design/lifecycle.md)
 - [Improve Worker](/home/dev/Documents/GitHub/ControlPlane/docs/design/improve_worker.md)
+- [Repo Observer](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_repo_observer.md)
+- [Insight Engine](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_insight_engine.md)
+- [Decision Engine](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_decision_engine.md)
+- [Proposer Integration](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_proposer_integration.md)
+- [Repo-Aware Autonomy Layer](/home/dev/Documents/GitHub/ControlPlane/docs/design/repo_aware_autonomy.md)
 - [Plane + Kodo Wrapper Design](/home/dev/Documents/GitHub/ControlPlane/docs/design/plane_kodo_wrapper.md)
 
 ### Operator Guides
