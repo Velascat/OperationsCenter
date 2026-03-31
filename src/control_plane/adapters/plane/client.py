@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Any
 
 import httpx
@@ -26,7 +27,7 @@ class PlaneClient:
 
     def fetch_issue(self, task_id: str) -> dict[str, Any]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
-        response = self._client.get(url)
+        response = self._client.get(url, params={"expand": "state"})
         response.raise_for_status()
         return response.json()
 
@@ -49,8 +50,21 @@ class PlaneClient:
                 return [item for item in results if isinstance(item, dict)]
         return []
 
+    def list_states(self) -> list[dict[str, Any]]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/states/"
+        response = self._client.get(url)
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict):
+            results = payload.get("results")
+            if isinstance(results, list):
+                return [item for item in results if isinstance(item, dict)]
+        return []
+
     def to_board_task(self, issue: dict[str, Any]) -> BoardTask:
-        description = issue.get("description") or issue.get("description_stripped") or ""
+        description = self._issue_description_text(issue)
         parsed_body = self.task_parser.parse(description)
         metadata = parsed_body.execution_metadata
         state = issue.get("state")
@@ -76,7 +90,12 @@ class PlaneClient:
 
     def transition_issue(self, task_id: str, state: str) -> None:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
-        response = self._client.patch(url, json={"state": state})
+        state_value: str = state
+        for item in self.list_states():
+            if str(item.get("name", "")).strip().lower() == state.strip().lower():
+                state_value = str(item["id"])
+                break
+        response = self._client.patch(url, json={"state": state_value})
         response.raise_for_status()
 
     def comment_issue(self, task_id: str, comment_markdown: str) -> None:
@@ -102,3 +121,24 @@ class PlaneClient:
         if items:
             return f"<p>{header}</p><ul>{''.join(items)}</ul>"
         return f"<p>{header}</p>"
+
+    @staticmethod
+    def _issue_description_text(issue: dict[str, Any]) -> str:
+        raw = issue.get("description") or issue.get("description_stripped")
+        if isinstance(raw, str) and raw.strip():
+            return raw
+        html_body = issue.get("description_html")
+        if isinstance(html_body, str) and html_body.strip():
+            return PlaneClient._html_to_task_text(html_body)
+        return ""
+
+    @staticmethod
+    def _html_to_task_text(html_body: str) -> str:
+        text = html.unescape(html_body)
+        text = re.sub(r"<h[1-6][^>]*>\s*(.*?)\s*</h[1-6]>", lambda m: f"\n## {m.group(1)}\n", text, flags=re.I | re.S)
+        text = re.sub(r"<li[^>]*>\s*(.*?)\s*</li>", lambda m: f"- {m.group(1)}\n", text, flags=re.I | re.S)
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+        text = re.sub(r"</?(p|div|ul|ol|pre)[^>]*>", "\n", text, flags=re.I)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()

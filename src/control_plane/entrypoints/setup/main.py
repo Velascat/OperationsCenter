@@ -125,6 +125,64 @@ def prompt_with_default(label: str, default: str, *, note: str | None = None, hi
     return typer.prompt(label, default=default, hide_input=hide_input)
 
 
+def prepend_local_bin_to_path() -> None:
+    local_bin = str(Path.home() / ".local" / "bin")
+    current_path = os.environ.get("PATH", "")
+    parts = current_path.split(":") if current_path else []
+    if local_bin not in parts:
+        os.environ["PATH"] = f"{local_bin}:{current_path}" if current_path else local_bin
+
+
+def check_command_installed(command: str) -> bool:
+    prepend_local_bin_to_path()
+    return shutil.which(command) is not None
+
+
+def ensure_uv_installed() -> None:
+    if check_command_installed("uv"):
+        return
+    typer.echo("[kodo] uv not found -> installing...")
+    proc = subprocess.run(
+        "curl -LsSf https://astral.sh/uv/install.sh | sh",
+        shell=True,
+        check=False,
+        env=os.environ.copy(),
+    )
+    prepend_local_bin_to_path()
+    if proc.returncode != 0 or not check_command_installed("uv"):
+        raise typer.BadParameter("[kodo] ERROR: uv installation failed")
+
+
+def ensure_kodo_installed(binary: str) -> None:
+    typer.echo("[kodo] Checking installation...")
+    if check_command_installed(binary):
+        typer.echo("[kodo] already installed")
+        return
+    if binary != "kodo":
+        raise typer.BadParameter(
+            f"[kodo] ERROR: custom kodo binary '{binary}' is not on PATH and automatic install only supports 'kodo'"
+        )
+    ensure_uv_installed()
+    typer.echo("[kodo] Installing via uv...")
+    proc = subprocess.run(
+        ["uv", "tool", "install", "git+https://github.com/ikamensh/kodo"],
+        check=False,
+        env=os.environ.copy(),
+    )
+    prepend_local_bin_to_path()
+    if proc.returncode != 0 or not check_command_installed(binary):
+        raise typer.BadParameter("[kodo] ERROR: installation failed")
+    typer.echo("[kodo] installed successfully")
+
+
+def verify_kodo(binary: str) -> None:
+    typer.echo("[kodo] Verifying...")
+    proc = subprocess.run([binary, "--help"], check=False, capture_output=True, text=True, env=os.environ.copy())
+    if proc.returncode != 0:
+        raise typer.BadParameter("[kodo] ERROR: kodo not functioning")
+    typer.echo("[kodo] OK")
+
+
 def verify_plane_configuration(
     base_url: str,
     api_token: str,
@@ -976,6 +1034,10 @@ def main(
     statuses = detect_all_provider_statuses()
     typer.echo("[provider] Final provider summary:")
     typer.echo(summarize_provider_statuses(statuses))
+
+    print_section("Kodo Install", "Ensure the Kodo CLI is available before writing config.")
+    ensure_kodo_installed(kodo_binary)
+    verify_kodo(kodo_binary)
 
     usable_providers = [status.key for status in statuses if status.interactive_ready]
     if not usable_providers:

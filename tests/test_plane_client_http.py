@@ -116,3 +116,33 @@ def test_plane_list_issues_supports_paginated_results() -> None:
 
     assert [issue["id"] for issue in issues] == ["TASK-1", "TASK-2"]
     assert calls == [("GET", "http://plane.local/api/v1/workspaces/ws/projects/proj/work-items/?expand=state")]
+
+
+def test_plane_task_parses_from_description_html_when_plain_text_missing() -> None:
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    issue = {
+        "id": "TASK-9",
+        "project_id": "proj",
+        "name": "Task",
+        "description_html": """
+<h2>Execution</h2>
+<p>repo: repo_a
+<br/>base_branch: main
+<br/>mode: goal</p>
+<h2>Goal</h2>
+<p>Do thing.</p>
+<h2>Constraints</h2>
+<ul><li>Keep tests green.</li></ul>
+""",
+        "state": {"name": "Ready for AI"},
+        "labels": [],
+    }
+    try:
+        task = client.to_board_task(issue)
+    finally:
+        client.close()
+
+    assert task.repo_key == "repo_a"
+    assert task.base_branch == "main"
+    assert task.goal_text == "Do thing."
+    assert task.constraints_text == "- Keep tests green."

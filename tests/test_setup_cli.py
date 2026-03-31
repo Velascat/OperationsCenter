@@ -1,7 +1,12 @@
+import os
+from pathlib import Path
+
 from control_plane.entrypoints.setup.main import (
     RepoSetupAnswers,
     SetupAnswers,
+    check_command_installed,
     infer_repo_key_from_clone_url,
+    prepend_local_bin_to_path,
     github_https_to_ssh,
     parse_remote_branches,
     render_env_file,
@@ -253,6 +258,18 @@ def test_parse_remote_branches_extracts_head_names() -> None:
 
 def test_infer_repo_key_from_clone_url_prefers_repo_name() -> None:
     assert infer_repo_key_from_clone_url("git@github.com:Velascat/ControlPlane.git") == "ControlPlane"
+
+
+def test_prepend_local_bin_to_path_adds_home_local_bin(monkeypatch) -> None:
+    monkeypatch.setenv("PATH", "/usr/bin")
+    prepend_local_bin_to_path()
+    assert str((Path.home() / ".local" / "bin")) in os.environ["PATH"]
+
+
+def test_check_command_installed_uses_local_bin_path(monkeypatch) -> None:
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setattr("shutil.which", lambda command: "/home/dev/.local/bin/kodo" if command == "kodo" else None)
+    assert check_command_installed("kodo") is True
 
 
 def test_summarize_provider_statuses_distinguishes_states() -> None:
