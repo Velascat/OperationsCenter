@@ -1,11 +1,13 @@
 import logging
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
     classify_blocked_issue,
+    handle_blocked_triage,
     issue_status_name,
     issue_task_kind,
     run_watch_loop,
@@ -205,3 +207,61 @@ def test_run_watch_loop_improve_role_triages_blocked_task() -> None:
         {"name": "source: improve-worker"},
     ]
     assert any("Blocked triage result" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "BLOCKED-2",
+                "name": "Unblock watcher task",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}, {"name": "source: improve-worker"}],
+            },
+        ],
+        comments={
+            "BLOCKED-2": [
+                {"comment_html": "<p>AI execution result</p><ul><li>validation_passed: False</li></ul>"},
+            ]
+        },
+    )
+    service = FakeService()
+
+    classification, created_ids = handle_blocked_triage(client, service, "BLOCKED-2")
+
+    assert classification == "validation failure"
+    assert created_ids == []
+    assert client.created == []
+    assert any("will not create another recursive unblock" in comment for _, comment in client.issue_comments)
+
+
+def test_run_watch_loop_uses_backoff_on_rate_limit(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    request = httpx.Request("GET", "http://plane.local/work-items/")
+    response = httpx.Response(429, request=request)
+    attempts = {"count": 0}
+
+    class RateLimitedClient(FakePlaneClient):
+        def list_issues(self) -> list[dict[str, object]]:
+            attempts["count"] += 1
+            if attempts["count"] == 1:
+                raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+            return []
+
+    client = RateLimitedClient([])
+    service = FakeService()
+    sleeps: list[int] = []
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.time.sleep", lambda seconds: sleeps.append(seconds))
+
+    with caplog.at_level(logging.INFO):
+        run_watch_loop(
+            client,
+            service,
+            role="goal",
+            ready_state="Ready for AI",
+            poll_interval_seconds=3,
+            max_cycles=2,
+        )
+
+    assert sleeps == [12]
+    assert any("watch_rate_limited" in record.message for record in caplog.records)

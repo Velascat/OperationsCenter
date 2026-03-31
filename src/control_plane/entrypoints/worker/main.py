@@ -7,12 +7,15 @@ import re
 import time
 from typing import Any
 
+import httpx
+
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService
 from control_plane.config import load_settings
 
 TRIAGE_COMMENT_MARKER = "Blocked triage result"
 IMPROVE_COMMENT_MARKER = "Improve worker result"
+RATE_LIMIT_BACKOFF_MULTIPLIER = 4
 
 
 def issue_status_name(issue: dict[str, Any]) -> str:
@@ -44,6 +47,23 @@ def issue_task_kind(issue: dict[str, Any]) -> str:
     return "goal"
 
 
+def issue_source(issue: dict[str, Any]) -> str | None:
+    for label in issue_label_names(issue):
+        normalized = label.strip().lower()
+        if normalized.startswith("source:"):
+            return normalized.split(":", 1)[1].strip()
+    return None
+
+
+def issue_is_improve_generated(issue: dict[str, Any]) -> bool:
+    return issue_source(issue) == "improve-worker"
+
+
+def issue_is_unblock_chain(issue: dict[str, Any]) -> bool:
+    title = str(issue.get("name", "")).strip().lower()
+    return issue_is_improve_generated(issue) or title.startswith("unblock ")
+
+
 def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI", role: str = "goal") -> str:
     issues = client.list_issues()
     for issue in issues:
@@ -61,23 +81,33 @@ def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI",
     raise ValueError(f"No work item found in state '{ready_state}'")
 
 
-def select_watch_candidate(client: PlaneClient, *, ready_state: str, role: str) -> tuple[str, str]:
+def select_watch_candidate(
+    client: PlaneClient,
+    *,
+    ready_state: str,
+    role: str,
+    known_triaged_blocked_ids: set[str] | None = None,
+) -> tuple[str, str]:
     issues = client.list_issues()
     if role == "improve":
         for issue in issues:
             task_id = str(issue["id"])
-            if issue_status_name(issue) != "Blocked":
-                continue
-            detailed_issue = client.fetch_issue(task_id)
-            if issue_status_name(detailed_issue) == "Blocked" and not blocked_issue_already_triaged(client, task_id):
-                return task_id, "blocked_triage"
-        for issue in issues:
-            task_id = str(issue["id"])
             if issue_status_name(issue) == ready_state and issue_task_kind(issue) == "improve":
                 return task_id, "improve_task"
-            detailed_issue = client.fetch_issue(task_id)
-            if issue_status_name(detailed_issue) == ready_state and issue_task_kind(detailed_issue) == "improve":
-                return task_id, "improve_task"
+        for issue in issues:
+            task_id = str(issue["id"])
+            if issue_status_name(issue) != "Blocked":
+                continue
+            if known_triaged_blocked_ids is not None and task_id in known_triaged_blocked_ids:
+                continue
+            if issue_is_unblock_chain(issue):
+                if known_triaged_blocked_ids is not None:
+                    known_triaged_blocked_ids.add(task_id)
+                continue
+            if not blocked_issue_already_triaged(client, task_id):
+                return task_id, "blocked_triage"
+            if known_triaged_blocked_ids is not None:
+                known_triaged_blocked_ids.add(task_id)
         raise ValueError("No improve work item found for blocked triage or improve task routing")
 
     task_id = select_ready_task_id(client, ready_state=ready_state, role=role)
@@ -294,7 +324,7 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
     classification, rationale = classify_blocked_issue(issue, comments)
     created_ids: list[str] = []
 
-    if classification != "unknown/manual attention":
+    if classification != "unknown/manual attention" and not issue_is_unblock_chain(issue):
         follow_up = create_follow_up_task(
             client,
             service,
@@ -312,6 +342,11 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
             ),
         )
         created_ids.append(str(follow_up.get("id")))
+    elif issue_is_unblock_chain(issue):
+        rationale = (
+            f"{rationale} Improve already generated this unblock task, so the watcher will not create another "
+            "recursive unblock follow-up."
+        )
 
     client.comment_issue(
         task_id,
@@ -340,6 +375,7 @@ def run_watch_loop(
 ) -> None:
     logger = logging.getLogger(__name__)
     cycle = 0
+    known_triaged_blocked_ids: set[str] = set()
 
     while True:
         cycle += 1
@@ -350,7 +386,12 @@ def run_watch_loop(
             poll_interval_seconds,
         )
         try:
-            task_id, action = select_watch_candidate(client, ready_state=ready_state, role=role)
+            task_id, action = select_watch_candidate(
+                client,
+                ready_state=ready_state,
+                role=role,
+                known_triaged_blocked_ids=known_triaged_blocked_ids,
+            )
             logger.info(
                 '{"event":"watch_task_selected","role":"%s","cycle":%d,"task_id":"%s","action":"%s"}',
                 role,
@@ -408,6 +449,7 @@ def run_watch_loop(
                 elif role == "improve":
                     if action == "blocked_triage":
                         classification, created_ids = handle_blocked_triage(client, service, task_id)
+                        known_triaged_blocked_ids.add(task_id)
                         logger.info(
                             '{"event":"watch_triage_complete","role":"%s","cycle":%d,"task_id":"%s","classification":"%s","created_task_ids":"%s"}',
                             role,
@@ -430,6 +472,29 @@ def run_watch_loop(
         except ValueError as exc:
             logger.info(
                 '{"event":"watch_no_task","role":"%s","cycle":%d,"message":"%s"}',
+                role,
+                cycle,
+                str(exc).replace('"', "'"),
+            )
+        except httpx.HTTPStatusError as exc:
+            response = exc.response
+            if response.status_code == 429:
+                retry_after_header = response.headers.get("Retry-After", "").strip()
+                retry_after = int(retry_after_header) if retry_after_header.isdigit() else 0
+                backoff_seconds = max(poll_interval_seconds * RATE_LIMIT_BACKOFF_MULTIPLIER, retry_after)
+                logger.info(
+                    '{"event":"watch_rate_limited","role":"%s","cycle":%d,"status":429,"backoff_seconds":%d}',
+                    role,
+                    cycle,
+                    backoff_seconds,
+                )
+                if max_cycles is not None and cycle >= max_cycles:
+                    logger.info('{"event":"watch_complete","role":"%s","cycles":%d}', role, cycle)
+                    return
+                time.sleep(backoff_seconds)
+                continue
+            logger.info(
+                '{"event":"watch_error","role":"%s","cycle":%d,"message":"%s"}',
                 role,
                 cycle,
                 str(exc).replace('"', "'"),

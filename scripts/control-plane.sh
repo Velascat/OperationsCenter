@@ -99,6 +99,12 @@ watch_log_file() {
 
 start_watch_role() {
   local role="$1"
+  local poll_interval=20
+  case "${role}" in
+    goal) poll_interval="${CONTROL_PLANE_GOAL_POLL_SECONDS:-20}" ;;
+    test) poll_interval="${CONTROL_PLANE_TEST_POLL_SECONDS:-30}" ;;
+    improve) poll_interval="${CONTROL_PLANE_IMPROVE_POLL_SECONDS:-45}" ;;
+  esac
   local pid_file
   pid_file="$(watch_pid_file "${role}")"
   if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
@@ -116,11 +122,12 @@ start_watch_role() {
     exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.worker.main \
       --config '${CONFIG_PATH}' \
       --watch \
-      --role '${role}'
+      --role '${role}' \
+      --poll-interval-seconds '${poll_interval}'
   " >>"${log_file}" 2>&1 < /dev/null &
   local pid=$!
   echo "${pid}" > "${pid_file}"
-  echo "watch-${role} started: pid=${pid} log=${log_file}"
+  echo "watch-${role} started: pid=${pid} poll_interval=${poll_interval}s log=${log_file}"
 }
 
 stop_watch_role() {

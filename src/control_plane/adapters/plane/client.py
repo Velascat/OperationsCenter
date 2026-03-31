@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import re
+import time
 from typing import Any
 
 import httpx
@@ -16,6 +17,8 @@ class PlaneClient:
         self.workspace_slug = workspace_slug
         self.project_id = project_id
         self.task_parser = TaskParser()
+        self._states_cache: list[dict[str, Any]] | None = None
+        self._labels_cache: list[dict[str, Any]] | None = None
         self._client = httpx.Client(
             base_url=self.base_url,
             headers={"X-API-Key": api_token, "Content-Type": "application/json"},
@@ -27,19 +30,19 @@ class PlaneClient:
 
     def fetch_issue(self, task_id: str) -> dict[str, Any]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
-        response = self._client.get(url, params={"expand": "state"})
+        response = self._request("GET", url, params={"expand": "state"})
         response.raise_for_status()
         return response.json()
 
     def fetch_project(self) -> dict[str, Any]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/"
-        response = self._client.get(url)
+        response = self._request("GET", url)
         response.raise_for_status()
         return response.json()
 
     def list_issues(self) -> list[dict[str, Any]]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/"
-        response = self._client.get(url, params={"expand": "state"})
+        response = self._request("GET", url, params={"expand": "state"})
         response.raise_for_status()
         payload = response.json()
         if isinstance(payload, list):
@@ -51,34 +54,42 @@ class PlaneClient:
         return []
 
     def list_states(self) -> list[dict[str, Any]]:
+        if self._states_cache is not None:
+            return list(self._states_cache)
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/states/"
-        response = self._client.get(url)
+        response = self._request("GET", url)
         response.raise_for_status()
         payload = response.json()
         if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
+            self._states_cache = [item for item in payload if isinstance(item, dict)]
+            return list(self._states_cache)
         if isinstance(payload, dict):
             results = payload.get("results")
             if isinstance(results, list):
-                return [item for item in results if isinstance(item, dict)]
+                self._states_cache = [item for item in results if isinstance(item, dict)]
+                return list(self._states_cache)
         return []
 
     def list_labels(self) -> list[dict[str, Any]]:
+        if self._labels_cache is not None:
+            return list(self._labels_cache)
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/labels/"
-        response = self._client.get(url)
+        response = self._request("GET", url)
         response.raise_for_status()
         payload = response.json()
         if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
+            self._labels_cache = [item for item in payload if isinstance(item, dict)]
+            return list(self._labels_cache)
         if isinstance(payload, dict):
             results = payload.get("results")
             if isinstance(results, list):
-                return [item for item in results if isinstance(item, dict)]
+                self._labels_cache = [item for item in results if isinstance(item, dict)]
+                return list(self._labels_cache)
         return []
 
     def list_comments(self, task_id: str) -> list[dict[str, Any]]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/comments/"
-        response = self._client.get(url)
+        response = self._request("GET", url)
         response.raise_for_status()
         payload = response.json()
         if isinstance(payload, list):
@@ -117,7 +128,7 @@ class PlaneClient:
     def transition_issue(self, task_id: str, state: str) -> None:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
         state_value = self._resolve_state_value(state)
-        response = self._client.patch(url, json={"state": state_value})
+        response = self._request("PATCH", url, json={"state": state_value})
         response.raise_for_status()
 
     def create_issue(
@@ -138,7 +149,7 @@ class PlaneClient:
             payload["state"] = self._resolve_state_value(state)
         if label_names:
             payload["labels"] = self._ensure_label_ids(label_names)
-        response = self._client.post(url, json=payload)
+        response = self._request("POST", url, json=payload)
         response.raise_for_status()
         return response.json()
 
@@ -147,7 +158,7 @@ class PlaneClient:
             f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/"
             f"work-items/{task_id}/comments/"
         )
-        response = self._client.post(url, json={"comment_html": self._render_comment_html(comment_markdown)})
+        response = self._request("POST", url, json={"comment_html": self._render_comment_html(comment_markdown)})
         response.raise_for_status()
 
     def _resolve_state_value(self, state: str) -> str:
@@ -179,9 +190,25 @@ class PlaneClient:
 
     def _create_label(self, label_name: str) -> dict[str, Any]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/labels/"
-        response = self._client.post(url, json={"name": label_name})
+        response = self._request("POST", url, json={"name": label_name})
         response.raise_for_status()
-        return response.json()
+        created = response.json()
+        if self._labels_cache is not None and isinstance(created, dict):
+            self._labels_cache.append(created)
+        return created
+
+    def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        attempts = 4
+        for attempt in range(1, attempts + 1):
+            response = self._client.request(method, url, **kwargs)
+            if response.status_code != 429:
+                return response
+            if attempt == attempts:
+                return response
+            retry_after_header = response.headers.get("Retry-After", "").strip()
+            retry_after = int(retry_after_header) if retry_after_header.isdigit() else attempt * 2
+            time.sleep(retry_after)
+        raise RuntimeError("unreachable")
 
     @staticmethod
     def _render_comment_html(comment_markdown: str) -> str:
