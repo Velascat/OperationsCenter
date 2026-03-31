@@ -27,18 +27,31 @@ Self-hosted AI execution wrapper that uses **Plane** as the Jira-like board and 
 
 ## Quick start
 
-1. Create config file, for example `config/control_plane.yaml`.
-2. Export secrets referenced by `*_env` fields.
-3. Run worker for a task id:
+Interactive local setup:
 
 ```bash
-PYTHONPATH=src python -m control_plane.entrypoints.worker.main --config config/control_plane.yaml --task-id TASK-123
+./scripts/control-plane.sh setup
 ```
 
-4. Optional API:
+This bootstraps `.venv`, installs the repo in editable mode with dev dependencies, and launches a Typer setup wizard that writes:
+
+- `config/control_plane.local.yaml`
+- `.env.control-plane.local`
+
+Then use the helper script for common tasks:
 
 ```bash
-PYTHONPATH=src uvicorn control_plane.entrypoints.api.main:app --reload
+./scripts/control-plane.sh test
+./scripts/control-plane.sh api
+./scripts/control-plane.sh worker --task-id TASK-123
+./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
+```
+
+Manual equivalents remain available. For example, worker:
+
+```bash
+source .env.control-plane.local
+.venv/bin/python -m control_plane.entrypoints.worker.main --config config/control_plane.local.yaml --task-id TASK-123
 ```
 
 ## Plane smoke test
@@ -87,6 +100,25 @@ Per-repo config supports:
 - `install_dev_command`
 
 If `install_dev_command` is omitted, the worker defaults to `pip install -e .[dev]`. Repos without a usable dev extra should override this command or disable bootstrap explicitly.
+
+## Local setup wizard
+
+The setup wizard is implemented with Typer and is intended for local operator setup rather than production secret management.
+
+It prompts for:
+
+- Plane base URL, workspace slug, project id, and Plane API token
+- Git provider, GitHub token, and bot identity
+- Kodo binary/orchestration defaults
+- Preferred provider auth mode for Kodo:
+  - `codex_subscription`
+  - `claude_subscription`
+  - `openai_api_key`
+  - `anthropic_api_key`
+  - `custom`
+- One default repo entry with clone URL, allowed branches, validation commands, and repo-local `.venv` bootstrap settings
+
+For subscription-backed modes, the wizard records the mode and leaves a note in `.env.control-plane.local`; you still need the relevant local provider tooling already installed and logged in on the machine.
 
 ## Plane API verification note
 
