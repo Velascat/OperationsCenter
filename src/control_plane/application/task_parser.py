@@ -12,6 +12,7 @@ SECTION_PATTERN = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 class TaskParser:
     REQUIRED_EXEC_FIELDS = ("repo", "base_branch", "mode")
+    SUPPORTED_MODES = {"goal"}
 
     def parse(self, description: str) -> ParsedTaskBody:
         sections = self._extract_sections(description)
@@ -51,9 +52,15 @@ class TaskParser:
             sections[title] = description[content_start:content_end].strip("\n")
         return sections
 
-    @staticmethod
-    def _normalize_metadata(metadata: dict[str, Any]) -> dict[str, object]:
+    def _normalize_metadata(self, metadata: dict[str, Any]) -> dict[str, object]:
         data = dict(metadata)
+        mode = str(data["mode"]).strip().lower()
+        if mode not in self.SUPPORTED_MODES:
+            raise ValueError(
+                f"Unsupported execution mode '{data['mode']}'. MVP currently supports only 'goal'."
+            )
+        data["mode"] = mode
+
         allowed_paths = data.get("allowed_paths", [])
         if isinstance(allowed_paths, str):
             allowed_paths = [allowed_paths]

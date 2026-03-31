@@ -45,7 +45,7 @@ class PlaneClient:
             labels=[label.get("name", "") for label in issue.get("labels", []) if isinstance(label, dict)],
             repo_key=str(metadata["repo"]),
             base_branch=str(metadata["base_branch"]),
-            execution_mode=str(metadata["mode"]),
+            execution_mode=metadata["mode"],
             allowed_paths=[str(path) for path in metadata.get("allowed_paths", [])],
             validation_profile=(
                 str(metadata.get("validation_profile")) if metadata.get("validation_profile") else None
@@ -65,8 +65,21 @@ class PlaneClient:
             f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/"
             f"work-items/{task_id}/comments/"
         )
-        html_body = "<p>" + "</p><p>".join(
-            html.escape(line) for line in comment_markdown.split("\n") if line.strip()
-        ) + "</p>"
-        response = self._client.post(url, json={"comment_html": html_body})
+        response = self._client.post(url, json={"comment_html": self._render_comment_html(comment_markdown)})
         response.raise_for_status()
+
+    @staticmethod
+    def _render_comment_html(comment_markdown: str) -> str:
+        lines = [line.strip() for line in comment_markdown.splitlines() if line.strip()]
+        if not lines:
+            return "<p>(no summary)</p>"
+
+        header = html.escape(lines[0])
+        items: list[str] = []
+        for line in lines[1:]:
+            if line.startswith("- "):
+                items.append(f"<li>{html.escape(line[2:])}</li>")
+
+        if items:
+            return f"<p>{header}</p><ul>{''.join(items)}</ul>"
+        return f"<p>{header}</p>"

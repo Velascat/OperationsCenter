@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-ExecutionMode = Literal["goal", "test", "improve"]
+ExecutionMode = Literal["goal"]
 
 
 class ParsedTaskBody(BaseModel):
@@ -66,6 +66,8 @@ class ExecutionResult(BaseModel):
     validation_passed: bool = False
     validation_results: list[ValidationResult] = Field(default_factory=list)
     branch_pushed: bool = False
+    draft_branch_pushed: bool = False
+    push_reason: str | None = None
     pull_request_url: str | None = None
     summary: str
     artifacts: list[str] = Field(default_factory=list)

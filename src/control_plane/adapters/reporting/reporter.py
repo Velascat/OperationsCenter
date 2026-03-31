@@ -17,6 +17,21 @@ class Reporter:
         run_dir.mkdir(parents=True, exist_ok=True)
         return run_dir
 
+    def write_request_context(self, run_dir: Path, task_id: str, run_id: str, phase: str) -> str:
+        path = run_dir / "request_context.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "task_id": task_id,
+                    "phase": phase,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+                indent=2,
+            )
+        )
+        return str(path)
+
     def write_request(self, run_dir: Path, req: ExecutionRequest) -> str:
         path = run_dir / "request.json"
         path.write_text(req.model_dump_json(indent=2, exclude={"workspace_path", "goal_file_path"}))
@@ -41,9 +56,18 @@ class Reporter:
         path.write_text(json.dumps({"violations": violations}, indent=2))
         return str(path)
 
-    def write_failure(self, run_dir: Path, error: str) -> str:
-        path = run_dir / "failure.md"
-        path.write_text("# Execution Failure\n\n" + error + "\n")
+    def write_failure(self, run_dir: Path, error: str, phase: str) -> str:
+        path = run_dir / "failure.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "phase": phase,
+                    "error": error,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+                indent=2,
+            )
+        )
         return str(path)
 
     def write_summary(self, run_dir: Path, result: ExecutionResult) -> str:
@@ -54,6 +78,8 @@ class Reporter:
             f"- success: {result.success}",
             f"- validation_passed: {result.validation_passed}",
             f"- branch_pushed: {result.branch_pushed}",
+            f"- draft_branch_pushed: {result.draft_branch_pushed}",
+            f"- push_reason: {result.push_reason}",
             f"- pull_request_url: {result.pull_request_url}",
             "",
             "## Changed Files",
