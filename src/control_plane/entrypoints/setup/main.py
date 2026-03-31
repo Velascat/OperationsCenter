@@ -3,9 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import webbrowser
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 import typer
 import yaml
 
@@ -21,6 +25,7 @@ from control_plane.entrypoints.setup.providers import (
 )
 
 app = typer.Typer(help="Interactive local setup for Control Plane.")
+console = Console()
 
 DEFAULT_PLANE_URL = "http://localhost:8080"
 DEFAULT_PLANE_START_COMMAND = "./deployment/plane/manage.sh up"
@@ -42,6 +47,14 @@ class RepoSetupAnswers:
     repo_python_binary: str
     repo_venv_dir: str
     repo_install_dev_command: str | None
+
+
+@dataclass
+class RepoDiscoveryChoice:
+    label: str
+    repo_key: str
+    clone_url: str
+    default_branch: str
 
 
 @dataclass
@@ -84,9 +97,202 @@ def split_csv(value: str) -> list[str]:
 
 def print_section(title: str, detail: str | None = None) -> None:
     typer.echo("")
-    typer.secho(f"[{title}]", fg=typer.colors.CYAN, bold=True)
-    if detail:
-        typer.secho(detail, fg=typer.colors.BRIGHT_BLACK)
+    body = detail or ""
+    console.print(
+        Panel.fit(
+            body,
+            title=f"[bold cyan]{title}[/bold cyan]",
+            border_style="cyan",
+            padding=(0, 2),
+        )
+    )
+
+
+def print_banner() -> None:
+    width = max(60, min(shutil.get_terminal_size((80, 20)).columns, 100))
+    rule = "=" * width
+    title = "Control Plane Setup"
+    subtitle = "Plane + Kodo local operator bootstrap"
+    console.print(f"[blue]{rule}[/blue]")
+    console.print(f"[bold green]{title.center(width)}[/bold green]")
+    console.print(f"[bright_black]{subtitle.center(width)}[/bright_black]")
+    console.print(f"[blue]{rule}[/blue]")
+
+
+def prompt_with_default(label: str, default: str, *, note: str | None = None, hide_input: bool = False) -> str:
+    if note:
+        console.print(f"[bright_black]{note}[/bright_black]")
+    return typer.prompt(label, default=default, hide_input=hide_input)
+
+
+def verify_plane_configuration(
+    base_url: str,
+    api_token: str,
+    workspace_slug: str,
+    project_id: str,
+) -> bool:
+    from control_plane.adapters.plane import PlaneClient
+
+    client = PlaneClient(
+        base_url=base_url,
+        api_token=api_token,
+        workspace_slug=workspace_slug,
+        project_id=project_id,
+    )
+    try:
+        project = client.fetch_project()
+    except Exception as exc:
+        console.print(f"[red]Plane API verification failed:[/red] {exc}")
+        console.print(
+            "[bright_black]Check that the Plane API workspace slug and project id match a real project in your Plane instance.[/bright_black]"
+        )
+        return False
+    finally:
+        client.close()
+
+    project_name = str(project.get("name", project_id))
+    console.print(
+        f"[green]Plane API verified.[/green] Workspace slug [cyan]{workspace_slug}[/cyan], "
+        f"project [cyan]{project_name}[/cyan] ([cyan]{project_id}[/cyan])."
+    )
+    return True
+
+
+def prompt_choice(label: str, options: list[tuple[str, str]], default_index: int = 1) -> str:
+    table = Table(show_header=True, header_style="bold magenta", box=None, pad_edge=False)
+    table.add_column("#", style="cyan", no_wrap=True)
+    table.add_column("Option", style="white")
+    for index, (_, description) in enumerate(options, start=1):
+        table.add_row(str(index), description)
+    console.print(table)
+    while True:
+        raw = typer.prompt(label, default=str(default_index))
+        try:
+            selected = int(raw)
+        except ValueError:
+            console.print("[red]Enter one of the numbered options.[/red]")
+            continue
+        if 1 <= selected <= len(options):
+            return options[selected - 1][0]
+        console.print("[red]Enter one of the numbered options.[/red]")
+
+
+def parse_github_remote(url: str) -> tuple[str, str] | None:
+    if url.startswith("git@github.com:"):
+        path = url.removeprefix("git@github.com:")
+    elif url.startswith("https://github.com/"):
+        path = url.removeprefix("https://github.com/")
+    else:
+        return None
+    if path.endswith(".git"):
+        path = path[:-4]
+    if "/" not in path:
+        return None
+    owner, repo = path.split("/", 1)
+    return owner, repo
+
+
+def infer_repo_key_from_clone_url(clone_url: str) -> str:
+    parsed = parse_github_remote(clone_url)
+    if parsed:
+        return parsed[1]
+    tail = clone_url.rstrip("/").rsplit("/", 1)[-1]
+    return tail[:-4] if tail.endswith(".git") else tail
+
+
+def discover_repo_choices(existing_config: dict[str, object], repo_root: Path) -> list[RepoDiscoveryChoice]:
+    choices: list[RepoDiscoveryChoice] = []
+    seen: set[str] = set()
+
+    current_remote = get_origin_remote_url(repo_root)
+    if current_remote:
+        parsed = parse_github_remote(current_remote)
+        if parsed:
+            owner, repo = parsed
+            clone_url = f"git@github.com:{owner}/{repo}.git"
+            key = repo
+            choices.append(
+                RepoDiscoveryChoice(
+                    label=f"Current checkout: {owner}/{repo}",
+                    repo_key=key,
+                    clone_url=clone_url,
+                    default_branch="main",
+                )
+            )
+            seen.add(clone_url)
+
+    existing_repos = existing_config.get("repos", {})
+    if isinstance(existing_repos, dict):
+        for repo_key, raw in existing_repos.items():
+            if not isinstance(raw, dict):
+                continue
+            clone_url = str(raw.get("clone_url", "")).strip()
+            if not clone_url or clone_url in seen:
+                continue
+            default_branch = str(raw.get("default_branch", "main"))
+            choices.append(
+                RepoDiscoveryChoice(
+                    label=f"Saved config: {repo_key}",
+                    repo_key=str(repo_key),
+                    clone_url=clone_url,
+                    default_branch=default_branch,
+                )
+            )
+            seen.add(clone_url)
+
+    return choices
+
+
+def parse_remote_branches(output: str) -> list[str]:
+    branches: list[str] = []
+    for line in output.splitlines():
+        parts = line.strip().split()
+        if len(parts) != 2:
+            continue
+        ref = parts[1]
+        prefix = "refs/heads/"
+        if ref.startswith(prefix):
+            branches.append(ref[len(prefix) :])
+    return sorted(set(branches))
+
+
+def discover_remote_branches(clone_url: str) -> list[str]:
+    proc = subprocess.run(
+        ["git", "ls-remote", "--heads", clone_url],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return []
+    return parse_remote_branches(proc.stdout)
+
+
+def prompt_branch_selection(clone_url: str, default_branch: str) -> tuple[str, list[str]]:
+    branches = discover_remote_branches(clone_url)
+    if not branches:
+        branch = typer.prompt("Repo default branch", default=default_branch)
+        return branch, [branch]
+
+    if default_branch not in branches:
+        default_branch = branches[0]
+
+    if len(branches) == 1:
+        only_branch = branches[0]
+        console.print(f"[bright_black]Discovered one remote branch: {only_branch}[/bright_black]")
+        return only_branch, [only_branch]
+
+    options = [(branch, branch) for branch in branches[:15]]
+    options.append(("__manual__", "Enter branch manually"))
+    selected = prompt_choice("Select repo default branch", options, default_index=branches.index(default_branch) + 1)
+    if selected == "__manual__":
+        selected = typer.prompt("Repo default branch", default=default_branch)
+
+    allowed_default = selected
+    allowed_base_branches = split_csv(
+        typer.prompt("Allowed base branches (comma separated)", default=allowed_default)
+    )
+    return selected, allowed_base_branches
 
 
 def run_local_command(command: str) -> None:
@@ -402,29 +608,78 @@ def shell_quote(value: str) -> str:
 
 def prompt_repo(repo_index: int) -> RepoSetupAnswers:
     suffix = "" if repo_index == 1 else f" #{repo_index}"
-    print_section(f"Repo Setup{suffix}")
-    repo_key = typer.prompt("Repo key", default="control-plane" if repo_index == 1 else f"repo_{repo_index}")
-    repo_clone_url = typer.prompt(
-        "Repo clone URL",
-        default="git@github.com:you/control-plane.git" if repo_index == 1 else "git@github.com:you/repo.git",
-    )
-    repo_default_branch = typer.prompt("Repo default branch", default="main")
-    repo_allowed_base_branches = split_csv(
-        typer.prompt("Allowed base branches (comma separated)", default=repo_default_branch)
-    )
-    repo_validation_commands = split_multiline(
-        typer.prompt(
-            "Validation commands (use ';' between commands)",
-            default=".venv/bin/pytest -q;.venv/bin/ruff check .",
-        ).replace(";", "\n")
-    )
-    repo_bootstrap_enabled = typer.confirm("Bootstrap repo-local .venv for this repo?", default=True)
-    repo_python_binary = typer.prompt("Python binary for bootstrap", default="python3")
-    repo_venv_dir = typer.prompt("Repo-local venv directory", default=".venv")
-    repo_install_dev_command = typer.prompt(
-        "Install dev command",
-        default=f"{repo_venv_dir}/bin/pip install -e .[dev]",
-    ).strip()
+    print_section(f"Repo Setup{suffix}", "Choose a target repo and branch policy for AI task runs.")
+    repo_key = "control-plane" if repo_index == 1 else f"repo_{repo_index}"
+    repo_clone_url = "git@github.com:you/control-plane.git" if repo_index == 1 else "git@github.com:you/repo.git"
+    repo_default_branch = "main"
+    repo_allowed_base_branches = [repo_default_branch]
+    raise RuntimeError("prompt_repo now requires discovery context")
+
+
+def prompt_repo_with_discovery(
+    repo_index: int,
+    existing_config: dict[str, object],
+    repo_root: Path,
+) -> RepoSetupAnswers:
+    suffix = "" if repo_index == 1 else f" #{repo_index}"
+    print_section(f"Repo Setup{suffix}", "Choose a target repo and branch policy for AI task runs.")
+    choices = discover_repo_choices(existing_config, repo_root)
+    selected_mode: str
+    if repo_index == 1 and choices:
+        selected_mode = "choice:1"
+        console.print(f"[bright_black]Defaulting to {choices[0].label}[/bright_black]")
+        use_default_repo = typer.confirm("Use this repo?", default=True)
+        if not use_default_repo:
+            selection_options = [(f"choice:{index}", choice.label) for index, choice in enumerate(choices, start=1)]
+            selection_options.append(("manual", "Enter repo details manually"))
+            selected_mode = prompt_choice("Select repo source", selection_options, default_index=1)
+    else:
+        selection_options = [(f"choice:{index}", choice.label) for index, choice in enumerate(choices, start=1)]
+        selection_options.append(("manual", "Enter repo details manually"))
+        selected_mode = prompt_choice("Select repo source", selection_options, default_index=1)
+
+    if selected_mode == "manual":
+        repo_key = typer.prompt("Repo key", default="control-plane" if repo_index == 1 else f"repo_{repo_index}")
+        repo_clone_url = typer.prompt(
+            "Repo clone URL",
+            default="git@github.com:you/control-plane.git" if repo_index == 1 else "git@github.com:you/repo.git",
+        )
+        repo_default_branch, repo_allowed_base_branches = prompt_branch_selection(repo_clone_url, "main")
+    else:
+        selected_choice = choices[int(selected_mode.split(":")[1]) - 1]
+        console.print(
+            f"[bright_black]Selected {selected_choice.label} -> {selected_choice.clone_url}[/bright_black]"
+        )
+        repo_key = typer.prompt("Repo key", default=selected_choice.repo_key)
+        repo_clone_url = selected_choice.clone_url
+        repo_default_branch, repo_allowed_base_branches = prompt_branch_selection(
+            repo_clone_url,
+            selected_choice.default_branch,
+        )
+
+    repo_advanced = typer.confirm("Adjust validation or bootstrap details for this repo?", default=False)
+    if repo_advanced:
+        repo_validation_commands = split_multiline(
+            typer.prompt(
+                "Validation commands (use ';' between commands)",
+                default=".venv/bin/pytest -q;.venv/bin/ruff check .",
+            ).replace(";", "\n")
+        )
+        repo_bootstrap_enabled = typer.confirm("Bootstrap repo-local .venv for this repo?", default=True)
+        repo_python_binary = typer.prompt("Python binary for bootstrap", default="python3")
+        repo_venv_dir = typer.prompt("Repo-local venv directory", default=".venv")
+        repo_install_dev_command = typer.prompt(
+            "Install dev command",
+            default=f"{repo_venv_dir}/bin/pip install -e .[dev]",
+        ).strip()
+    else:
+        console.print("[bright_black]Using default validation and repo-local .venv bootstrap settings.[/bright_black]")
+        repo_validation_commands = [".venv/bin/pytest -q", ".venv/bin/ruff check ."]
+        repo_bootstrap_enabled = True
+        repo_python_binary = "python3"
+        repo_venv_dir = ".venv"
+        repo_install_dev_command = ".venv/bin/pip install -e .[dev]"
+
     return RepoSetupAnswers(
         repo_key=repo_key,
         repo_clone_url=repo_clone_url,
@@ -453,25 +708,41 @@ def main(
         help="Path to write a starter Plane task template.",
     ),
 ) -> None:
-    typer.secho("Control Plane Setup", fg=typer.colors.GREEN, bold=True)
+    print_banner()
     existing_env = load_env_exports(env_path)
     existing_config = load_existing_config(config_path)
 
-    print_section("Plane", "Local Plane service, workspace target, and API access.")
+    print_section("Plane", "Local Plane service plus the Plane API workspace/project values used by the wrapper.")
     advanced_mode = typer.confirm("Advanced setup?", default=False)
-    plane_base_url = typer.prompt(
-        "Plane base URL",
-        default=existing_env.get("CONTROL_PLANE_PLANE_URL")
+    plane_base_default = (
+        existing_env.get("CONTROL_PLANE_PLANE_URL")
         or existing_config_value(existing_config, "plane", "base_url")
-        or DEFAULT_PLANE_URL,
+        or DEFAULT_PLANE_URL
     )
-    plane_workspace_slug = typer.prompt(
-        "Plane workspace slug",
-        default=existing_config_value(existing_config, "plane", "workspace_slug") or "engineering",
+    plane_base_url = prompt_with_default(
+        "Plane base URL",
+        plane_base_default,
+        note="Using saved value." if existing_env.get("CONTROL_PLANE_PLANE_URL") or existing_config_value(existing_config, "plane", "base_url") else None,
     )
-    plane_project_id = typer.prompt(
-        "Plane project id",
-        default=existing_config_value(existing_config, "plane", "project_id") or "1",
+    plane_workspace_default = existing_config_value(existing_config, "plane", "workspace_slug") or "engineering"
+    plane_workspace_slug = prompt_with_default(
+        "Plane API workspace slug",
+        plane_workspace_default,
+        note=(
+            "Used for Plane API paths like /api/v1/workspaces/{workspace_slug}/... Not used for the browser open URL."
+            if existing_config_value(existing_config, "plane", "workspace_slug")
+            else "Used for Plane API paths like /api/v1/workspaces/{workspace_slug}/... Not used for the browser open URL."
+        ),
+    )
+    plane_project_default = existing_config_value(existing_config, "plane", "project_id") or "1"
+    plane_project_id = prompt_with_default(
+        "Plane API project id",
+        plane_project_default,
+        note=(
+            "Used for Plane API paths like /api/v1/workspaces/{workspace_slug}/projects/{project_id}/... Not used for the browser open URL."
+            if existing_config_value(existing_config, "plane", "project_id")
+            else "Used for Plane API paths like /api/v1/workspaces/{workspace_slug}/projects/{project_id}/... Not used for the browser open URL."
+        ),
     )
     plane_api_token_env = existing_config_value(existing_config, "plane", "api_token_env") or "PLANE_API_TOKEN"
     if advanced_mode:
@@ -542,6 +813,7 @@ def main(
         reuse_plane_token = typer.confirm("Reuse existing Plane API token from local env?", default=True)
         if reuse_plane_token:
             plane_api_token_value = existing_plane_token
+            typer.secho("Reusing existing Plane API token.", fg=typer.colors.BRIGHT_BLACK)
         else:
             plane_api_token_value = typer.prompt(
                 "Paste Plane API token",
@@ -554,6 +826,17 @@ def main(
             hide_input=True,
             default="",
         )
+    verify_now = typer.confirm("Verify Plane API workspace/project now?", default=True)
+    if verify_now:
+        verified = verify_plane_configuration(
+            plane_base_url,
+            plane_api_token_value,
+            plane_workspace_slug,
+            plane_project_id,
+        )
+        if not verified:
+            if not typer.confirm("Continue setup anyway?", default=False):
+                raise typer.Abort()
 
     print_section("Git", "Remote host, authentication, commit identity, and SSH access.")
     git_provider = typer.prompt(
@@ -572,6 +855,7 @@ def main(
         reuse_git_token = typer.confirm("Reuse existing Git token from local env?", default=True)
         if reuse_git_token:
             git_token_value = existing_git_token
+            typer.secho("Reusing existing Git authentication key.", fg=typer.colors.BRIGHT_BLACK)
         else:
             git_token_value = typer.prompt(
                 "Git authentication key/token (optional; leave blank if SSH will be used for git remotes)",
@@ -584,13 +868,15 @@ def main(
             hide_input=True,
             default="",
         )
-    git_author_name = typer.prompt(
+    git_author_name = prompt_with_default(
         "Git bot author name",
-        default=existing_config_value(existing_config, "git", "author_name") or "Control Plane Bot",
+        existing_config_value(existing_config, "git", "author_name") or "Control Plane Bot",
+        note="Using saved value." if existing_config_value(existing_config, "git", "author_name") else None,
     )
-    git_author_email = typer.prompt(
+    git_author_email = prompt_with_default(
         "Git bot author email",
-        default=existing_config_value(existing_config, "git", "author_email") or "control-plane-bot@example.com",
+        existing_config_value(existing_config, "git", "author_email") or "control-plane-bot@example.com",
+        note="Using saved value." if existing_config_value(existing_config, "git", "author_email") else None,
     )
     typer.echo("Commit signing is optional and only affects future signed-commit wiring.")
     git_sign_commits = typer.confirm(
@@ -607,17 +893,38 @@ def main(
     ensure_github_ssh_setup(git_author_email, Path.cwd())
 
     print_section("Kodo", "Execution defaults for the local coding engine.")
-    kodo_binary = typer.prompt("Kodo binary", default=existing_config_value(existing_config, "kodo", "binary") or "kodo")
-    kodo_team = typer.prompt("Kodo team", default=existing_config_value(existing_config, "kodo", "team") or "full")
-    kodo_cycles = int(typer.prompt("Kodo cycles", default=existing_config_value(existing_config, "kodo", "cycles") or "3"))
+    kodo_binary = prompt_with_default(
+        "Kodo binary",
+        existing_config_value(existing_config, "kodo", "binary") or "kodo",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "binary") else None,
+    )
+    kodo_team = prompt_with_default(
+        "Kodo team",
+        existing_config_value(existing_config, "kodo", "team") or "full",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "team") else None,
+    )
+    kodo_cycles = int(prompt_with_default(
+        "Kodo cycles",
+        existing_config_value(existing_config, "kodo", "cycles") or "3",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "cycles") else None,
+    ))
     kodo_exchanges = int(
-        typer.prompt("Kodo exchanges", default=existing_config_value(existing_config, "kodo", "exchanges") or "20")
+        prompt_with_default(
+            "Kodo exchanges",
+            existing_config_value(existing_config, "kodo", "exchanges") or "20",
+            note="Using saved value." if existing_config_value(existing_config, "kodo", "exchanges") else None,
+        )
     )
-    kodo_orchestrator = typer.prompt(
+    kodo_orchestrator = prompt_with_default(
         "Kodo orchestrator",
-        default=existing_config_value(existing_config, "kodo", "orchestrator") or "api",
+        existing_config_value(existing_config, "kodo", "orchestrator") or "api",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "orchestrator") else None,
     )
-    kodo_effort = typer.prompt("Kodo effort", default=existing_config_value(existing_config, "kodo", "effort") or "medium")
+    kodo_effort = prompt_with_default(
+        "Kodo effort",
+        existing_config_value(existing_config, "kodo", "effort") or "medium",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "effort") else None,
+    )
 
     print_section("Providers", "Supported Kodo backends detected on this machine.")
     statuses = detect_all_provider_statuses()
@@ -649,19 +956,22 @@ def main(
                     prompt_api_key = typer.confirm(f"Use {env_var} for headless auth with {spec.label}?", default=False)
                     if prompt_api_key:
                         typer.echo(f"Set {env_var} in your shell or local env file before unattended runs.")
-            if spec.interactive_login_command:
+            if spec.interactive_login_command and not status.authenticated:
                 run_login = typer.confirm(f"Launch {spec.label} login now?", default=status.key in {"codex"})
                 if run_login:
                     typer.echo(f"[provider] Running: {spec.interactive_login_command}")
                     if not run_interactive_provider_login(spec, cwd=Path.cwd()):
                         typer.echo(f"[provider] {spec.label} login did not complete successfully. You can finish it later and rerun setup or providers-status.")
         elif status.key == "claude":
-            typer.echo("Claude Code uses browser-based account login from the CLI.")
-            run_login = typer.confirm("Launch Claude Code login now?", default=True)
-            if run_login:
-                typer.echo(f"[provider] Running: {spec.interactive_login_command}")
-                if not run_interactive_provider_login(spec, cwd=Path.cwd()):
-                    typer.echo("[provider] Claude Code login did not complete successfully. Finish it later with `claude auth login`.")
+            if status.authenticated:
+                typer.echo("[provider] Claude Code is already logged in.")
+            else:
+                typer.echo("Claude Code uses browser-based account login from the CLI.")
+                run_login = typer.confirm("Launch Claude Code login now?", default=True)
+                if run_login:
+                    typer.echo(f"[provider] Running: {spec.interactive_login_command}")
+                    if not run_interactive_provider_login(spec, cwd=Path.cwd()):
+                        typer.echo("[provider] Claude Code login did not complete successfully. Finish it later with `claude auth login`.")
 
     statuses = detect_all_provider_statuses()
     typer.echo("[provider] Final provider summary:")
@@ -691,7 +1001,7 @@ def main(
     repos: list[RepoSetupAnswers] = []
     repo_index = 1
     while True:
-        repos.append(prompt_repo(repo_index))
+        repos.append(prompt_repo_with_discovery(repo_index, existing_config, Path.cwd()))
         repo_index += 1
         if not typer.confirm("Add another repo?", default=False):
             break

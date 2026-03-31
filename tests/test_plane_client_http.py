@@ -60,3 +60,27 @@ Do thing.
 
     for _, _, _, headers in calls:
         assert headers.get("x-api-key") == "token"
+
+
+def test_plane_fetch_project_uses_workspace_and_project_path() -> None:
+    calls: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, str(request.url)))
+        return httpx.Response(200, json={"id": "proj", "name": "Engineering"})
+
+    transport = httpx.MockTransport(handler)
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    client._client = httpx.Client(  # type: ignore[attr-defined]
+        transport=transport,
+        base_url="http://plane.local",
+        headers={"X-API-Key": "token", "Content-Type": "application/json"},
+    )
+
+    try:
+        project = client.fetch_project()
+    finally:
+        client.close()
+
+    assert project["name"] == "Engineering"
+    assert calls == [("GET", "http://plane.local/api/v1/workspaces/ws/projects/proj/")]

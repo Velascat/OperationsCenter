@@ -4,10 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PLANE_DIR="${ROOT_DIR}/deployment/plane"
 RUNTIME_DIR="${PLANE_DIR}/runtime"
+RUNTIME_LOG_DIR="${ROOT_DIR}/logs/local/plane-runtime"
 SETUP_SH="${RUNTIME_DIR}/setup.sh"
 PLANE_APP_DIR="${RUNTIME_DIR}/plane-app"
 PLANE_ENV="${PLANE_APP_DIR}/plane.env"
 PLANE_URL="${CONTROL_PLANE_PLANE_URL:-http://localhost:8080}"
+LAST_RUNTIME_LOG=""
+
+timestamp() {
+  date +"%Y%m%dT%H%M%S"
+}
 
 download_setup() {
   mkdir -p "${RUNTIME_DIR}"
@@ -19,10 +25,18 @@ download_setup() {
 
 run_setup_menu() {
   local action="$1"
-  (
+  mkdir -p "${RUNTIME_LOG_DIR}"
+  local log_path="${RUNTIME_LOG_DIR}/$(timestamp)_plane_${action}.log"
+  LAST_RUNTIME_LOG="${log_path}"
+  if ! (
     cd "${RUNTIME_DIR}"
     printf '%s\n8\n' "${action}" | ./setup.sh
-  )
+  ) >"${log_path}" 2>&1; then
+    echo "Plane command failed. Runtime log: ${log_path}"
+    tail -n 40 "${log_path}" || true
+    return 1
+  fi
+  echo "Plane runtime log: ${log_path}"
 }
 
 set_env_value() {
@@ -86,13 +100,18 @@ fi
 
 case "${cmd}" in
   up)
+    echo "Preparing local Plane runtime..."
     ensure_installed
+    echo "Starting Plane containers..."
     run_setup_menu 2
+    echo "Checking Plane readiness..."
     wait_until_ready
     ;;
   down)
     if [[ -x "${SETUP_SH}" ]]; then
+      echo "Stopping Plane containers..."
       run_setup_menu 3
+      echo "Plane containers stopped."
     else
       echo "Plane runtime is not installed yet."
     fi

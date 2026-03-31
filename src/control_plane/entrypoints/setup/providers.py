@@ -8,6 +8,10 @@ import shlex
 import subprocess
 
 import typer
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
 
 
 @dataclass
@@ -32,6 +36,7 @@ class ProviderStatus:
     auth_mode: str | None
     interactive_ready: bool
     headless_ready: bool
+    authenticated: bool
     detail: str
 
 
@@ -87,6 +92,18 @@ def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, check=False, capture_output=True, text=True)
 
 
+def _provider_logged_in(spec: ProviderSpec) -> tuple[bool, str | None]:
+    if spec.key == "codex":
+        proc = _run(["codex", "login", "status"])
+        output = "\n".join(part for part in [proc.stdout.strip(), proc.stderr.strip()] if part).strip()
+        return proc.returncode == 0 and "logged in" in output.lower(), output or None
+    if spec.key == "claude":
+        proc = _run(["claude", "auth", "status"])
+        output = "\n".join(part for part in [proc.stdout.strip(), proc.stderr.strip()] if part).strip()
+        return '"loggedIn": true' in output or '"loggedIn":true' in output, output or None
+    return False, None
+
+
 def detect_provider_status(spec: ProviderSpec) -> ProviderStatus:
     binary_path = shutil.which(spec.binary)
     installed = binary_path is not None
@@ -101,19 +118,25 @@ def detect_provider_status(spec: ProviderSpec) -> ProviderStatus:
         detail = "binary not found on PATH"
 
     env_present = bool(spec.auth_env_var and os.environ.get(spec.auth_env_var))
+    authenticated = False
+    auth_detail: str | None = None
+    if installed:
+        authenticated, auth_detail = _provider_logged_in(spec)
     if spec.key == "cursor":
         interactive_ready = installed
         headless_ready = installed
         auth_mode = "local_binary" if installed else None
     elif spec.key == "claude":
-        interactive_ready = installed
+        interactive_ready = installed and authenticated
         headless_ready = False
         auth_mode = "browser_login" if installed else None
     elif spec.key in {"codex", "gemini"}:
-        interactive_ready = installed
+        interactive_ready = installed and (authenticated or spec.key == "gemini")
         headless_ready = installed and env_present
         if env_present:
             auth_mode = "api_key"
+        elif authenticated:
+            auth_mode = "browser_login"
         elif installed:
             auth_mode = "browser_login"
         else:
@@ -131,7 +154,8 @@ def detect_provider_status(spec: ProviderSpec) -> ProviderStatus:
         auth_mode=auth_mode,
         interactive_ready=interactive_ready,
         headless_ready=headless_ready,
-        detail=detail,
+        authenticated=authenticated,
+        detail=auth_detail or detail,
     )
 
 
@@ -146,10 +170,12 @@ def summarize_provider_statuses(statuses: list[ProviderStatus]) -> str:
             state = "not installed"
         elif status.headless_ready:
             state = "installed + headless ready"
+        elif status.authenticated:
+            state = "installed + logged in"
         elif status.interactive_ready:
             state = "installed + interactive ready"
         else:
-            state = "installed + needs auth"
+            state = "installed + needs login"
         version = f" ({status.version})" if status.version else ""
         lines.append(f"- {status.label}: {state}{version}")
     return "\n".join(lines)
@@ -194,7 +220,21 @@ def choose_preferred_provider(statuses: list[ProviderStatus], prompt_label: str,
 
 
 def write_provider_summary(statuses: list[ProviderStatus]) -> None:
-    typer.echo(summarize_provider_statuses(statuses))
+    table = Table(show_header=True, header_style="bold magenta", box=None, pad_edge=False)
+    table.add_column("Provider", style="cyan")
+    table.add_column("Status", style="white")
+    table.add_column("Version", style="bright_black")
+    for status in statuses:
+        if not status.installed:
+            state = "[red]not installed[/red]"
+        elif status.headless_ready:
+            state = "[green]headless ready[/green]"
+        elif status.authenticated:
+            state = "[green]logged in[/green]"
+        else:
+            state = "[yellow]needs login[/yellow]"
+        table.add_row(status.label, state, status.version or "")
+    console.print(table)
 
 
 def https_remote_to_ssh(url: str) -> str | None:

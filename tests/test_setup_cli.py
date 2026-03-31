@@ -1,7 +1,9 @@
 from control_plane.entrypoints.setup.main import (
     RepoSetupAnswers,
     SetupAnswers,
+    infer_repo_key_from_clone_url,
     github_https_to_ssh,
+    parse_remote_branches,
     render_env_file,
     render_settings_yaml,
     render_task_template,
@@ -238,6 +240,21 @@ def test_github_https_to_ssh_ignores_non_github_remote() -> None:
     assert github_https_to_ssh("git@gitlab.com:group/repo.git") is None
 
 
+def test_parse_remote_branches_extracts_head_names() -> None:
+    output = "\n".join(
+        [
+            "abc123\trefs/heads/main",
+            "def456\trefs/heads/develop",
+            "ghi789\trefs/tags/v1.0.0",
+        ]
+    )
+    assert parse_remote_branches(output) == ["develop", "main"]
+
+
+def test_infer_repo_key_from_clone_url_prefers_repo_name() -> None:
+    assert infer_repo_key_from_clone_url("git@github.com:Velascat/ControlPlane.git") == "ControlPlane"
+
+
 def test_summarize_provider_statuses_distinguishes_states() -> None:
     summary = summarize_provider_statuses(
         [
@@ -249,6 +266,7 @@ def test_summarize_provider_statuses_distinguishes_states() -> None:
                 auth_mode="browser_login",
                 interactive_ready=True,
                 headless_ready=False,
+                authenticated=True,
                 detail="ok",
             ),
             ProviderStatus(
@@ -259,6 +277,7 @@ def test_summarize_provider_statuses_distinguishes_states() -> None:
                 auth_mode="api_key",
                 interactive_ready=True,
                 headless_ready=True,
+                authenticated=True,
                 detail="ok",
             ),
             ProviderStatus(
@@ -269,11 +288,12 @@ def test_summarize_provider_statuses_distinguishes_states() -> None:
                 auth_mode=None,
                 interactive_ready=False,
                 headless_ready=False,
+                authenticated=False,
                 detail="missing",
             ),
         ]
     )
 
-    assert "Claude Code: installed + interactive ready (1.0.0)" in summary
+    assert "Claude Code: installed + logged in (1.0.0)" in summary
     assert "OpenAI Codex CLI: installed + headless ready (1.0.0)" in summary
     assert "Gemini CLI: not installed" in summary

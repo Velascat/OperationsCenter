@@ -1,5 +1,21 @@
-from control_plane.application.scope_policy import ChangedFilePolicyChecker
-from control_plane.application.service import ExecutionService
-from control_plane.application.task_parser import TaskParser
+from __future__ import annotations
+
+from typing import Any
 
 __all__ = ["ChangedFilePolicyChecker", "ExecutionService", "TaskParser"]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "ChangedFilePolicyChecker":
+        from control_plane.application.scope_policy import ChangedFilePolicyChecker
+
+        return ChangedFilePolicyChecker
+    if name == "ExecutionService":
+        from control_plane.application.service import ExecutionService
+
+        return ExecutionService
+    if name == "TaskParser":
+        from control_plane.application.task_parser import TaskParser
+
+        return TaskParser
+    raise AttributeError(name)

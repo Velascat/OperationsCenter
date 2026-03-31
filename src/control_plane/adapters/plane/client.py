@@ -30,6 +30,12 @@ class PlaneClient:
         response.raise_for_status()
         return response.json()
 
+    def fetch_project(self) -> dict[str, Any]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/"
+        response = self._client.get(url)
+        response.raise_for_status()
+        return response.json()
+
     def to_board_task(self, issue: dict[str, Any]) -> BoardTask:
         description = issue.get("description") or issue.get("description_stripped") or ""
         parsed_body = self.task_parser.parse(description)
