@@ -1,0 +1,22 @@
+#!/home/dev/.local/share/uv/tools/kodo/bin/python
+from __future__ import annotations
+
+import sys
+
+from kodo.cli import main
+from kodo.orchestrators.claude_code import ClaudeCodeOrchestrator
+
+
+_original_cycle = ClaudeCodeOrchestrator.cycle
+
+
+def _patched_cycle(self, goal, project_dir, team, **kwargs):
+    kwargs.pop("coach", None)
+    return _original_cycle(self, goal, project_dir, team, **kwargs)
+
+
+ClaudeCodeOrchestrator.cycle = _patched_cycle
+
+
+if __name__ == "__main__":
+    sys.exit(main())

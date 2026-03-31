@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import html
 import json
 import logging
@@ -30,6 +30,7 @@ PROPOSAL_COOLDOWN_SECONDS = 30 * 60
 PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
 LOW_BACKLOG_THRESHOLD = 2
 EXECUTION_ACTIONS = {"execute", "improve_task"}
+MAX_CLASSIFICATION_ISSUES = 20
 
 
 @dataclass
@@ -65,6 +66,7 @@ class ProposalSpec:
     constraints_text: str | None = None
     human_attention_required: bool = False
     repo_key: str = ""
+    evidence_lines: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -486,9 +488,43 @@ def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
     return False
 
 
-def existing_follow_up_keys(client: PlaneClient) -> set[tuple[str, str, str]]:
+def parse_section_lines(text: str, heading: str) -> list[str]:
+    pattern = rf"^##\s+{re.escape(heading)}\s*$"
+    lines = text.splitlines()
+    collecting = False
+    values: list[str] = []
+    for raw in lines:
+        line = raw.rstrip()
+        if re.match(pattern, line.strip(), flags=re.I):
+            collecting = True
+            continue
+        if collecting and line.strip().startswith("## "):
+            break
+        if collecting and line.strip().startswith("- "):
+            values.append(line.strip()[2:].strip())
+    return values
+
+
+def issue_evidence_lines(issue: dict[str, Any]) -> list[str]:
+    return parse_section_lines(issue_description_text(issue), "Evidence")
+
+
+def selected_evidence_from_issue(issue: dict[str, Any]) -> str:
+    evidence = issue_evidence_lines(issue)
+    return evidence[0] if evidence else "none"
+
+
+def target_area_hint_from_issue(issue: dict[str, Any]) -> str:
+    for line in issue_evidence_lines(issue):
+        lowered = line.lower()
+        if lowered.startswith("recently changed files:"):
+            return line.split(":", 1)[1].strip() or "none"
+    return "none"
+
+
+def existing_follow_up_keys(client: PlaneClient, *, issues: list[dict[str, Any]] | None = None) -> set[tuple[str, str, str]]:
     keys: set[tuple[str, str, str]] = set()
-    for issue in client.list_issues():
+    for issue in issues or client.list_issues():
         state_name = issue_status_name(issue).strip().lower()
         if state_name in {"done", "cancelled"}:
             continue
@@ -501,9 +537,9 @@ def existing_follow_up_keys(client: PlaneClient) -> set[tuple[str, str, str]]:
     return keys
 
 
-def existing_proposal_keys(client: PlaneClient) -> set[str]:
+def existing_proposal_keys(client: PlaneClient, *, issues: list[dict[str, Any]] | None = None) -> set[str]:
     keys: set[str] = set()
-    for issue in client.list_issues():
+    for issue in issues or client.list_issues():
         if not is_open_issue(issue):
             continue
         description = issue_description_text(issue)
@@ -513,9 +549,15 @@ def existing_proposal_keys(client: PlaneClient) -> set[str]:
     return keys
 
 
-def recent_classification_counts(client: PlaneClient) -> dict[str, int]:
+def recent_classification_counts(client: PlaneClient, *, issues: list[dict[str, Any]] | None = None) -> dict[str, int]:
     counts: dict[str, int] = {}
-    for issue in client.list_issues():
+    scanned = 0
+    for issue in issues or client.list_issues():
+        if scanned >= MAX_CLASSIFICATION_ISSUES:
+            break
+        if issue_status_name(issue) not in {"Blocked", "Done", "Cancelled", "Review", "Running"}:
+            continue
+        scanned += 1
         comments = client.list_comments(str(issue["id"]))
         for comment in comments:
             text = extract_comment_text(comment)
@@ -714,9 +756,9 @@ def issue_execution_target(issue: dict[str, Any], service: ExecutionService) -> 
     return repo_key, repo_cfg.default_branch, allowed_paths_for_repo(repo_key)
 
 
-def existing_issue_names(client: PlaneClient) -> set[str]:
+def existing_issue_names(client: PlaneClient, *, issues: list[dict[str, Any]] | None = None) -> set[str]:
     names: set[str] = set()
-    for issue in client.list_issues():
+    for issue in issues or client.list_issues():
         state_name = issue_status_name(issue).strip().lower()
         if state_name in {"done", "cancelled"}:
             continue
@@ -942,6 +984,12 @@ def discover_improvement_candidates(
             if path.name != ".git"
         )
         report_notes.append(f"- inspected repo: {repo_key} @ {target_branch}")
+        recent_commits = service.git.recent_commits(repo_path, max_count=5)
+        if recent_commits:
+            report_notes.append(f"- recent commits: {' | '.join(recent_commits[:3])}")
+        recent_files = service.git.recent_changed_files(repo_path, max_count=3)
+        if recent_files:
+            report_notes.append(f"- recently changed files: {', '.join(recent_files[:5])}")
         report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
         report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
         report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
@@ -952,6 +1000,20 @@ def discover_improvement_candidates(
     for finding in findings:
         unique.setdefault(finding["title"].strip().lower(), finding)
     return list(unique.values())[:3], report_notes
+
+
+def evidence_lines_from_notes(notes: list[str]) -> list[str]:
+    return [note.removeprefix("- ").strip() for note in notes if note.strip()]
+
+
+def idle_board_evidence_is_strong(*, findings: list[dict[str, str]], evidence_lines: list[str]) -> bool:
+    if findings:
+        return True
+    for line in evidence_lines:
+        lowered = line.lower()
+        if lowered.startswith("recent commits:") or lowered.startswith("recently changed files:") or lowered.startswith("report signal:"):
+            return True
+    return False
 
 
 def proposal_specs_from_findings(
@@ -990,6 +1052,7 @@ def build_proposal_candidates(
     *,
     repo_key: str | None = None,
     issues: list[dict[str, Any]] | None = None,
+    classification_counts: dict[str, int] | None = None,
 ) -> tuple[list[ProposalSpec], list[str], bool]:
     repo_key = repo_key or default_repo_key(service)
     issues = issues or client.list_issues()
@@ -1012,7 +1075,8 @@ def build_proposal_candidates(
     ]
     proposals: list[ProposalSpec] = []
 
-    for classification, count in sorted(recent_classification_counts(client).items(), key=lambda item: item[1], reverse=True):
+    counts = classification_counts or recent_classification_counts(client, issues=issues)
+    for classification, count in sorted(counts.items(), key=lambda item: item[1], reverse=True):
         if count < 2:
             continue
         display_name = classification_display_name(classification)
@@ -1061,26 +1125,37 @@ def build_proposal_candidates(
         proposals.extend(proposal_specs_from_findings(findings, repo_key=repo_key, signal_prefix="idle_board"))
 
     if board_idle and not proposals:
-        proposals.append(
-            ProposalSpec(
-                repo_key=repo_key,
-                task_kind="goal",
-                title="Implement next bounded repo improvement",
-                goal_text="Inspect the current repo and recent workflow signals, then implement one bounded improvement grounded in observed codebase or runtime evidence.",
-                reason_summary="The board is idle and no stronger grounded task signal is currently open.",
-                source_signal=f"{repo_key}:idle_board",
-                confidence="medium",
-                recommended_state="Ready for AI",
-                handoff_reason="propose_idle_board_scan",
-                dedup_key=f"{repo_key}:idle_board:repo_scan",
-                constraints_text=(
-                    "- keep analysis grounded in current repo and recent retained artifacts\n"
-                    "- make at most one bounded improvement in this task\n"
-                    "- do not expand into unrelated refactors"
-                ),
+        evidence_lines = evidence_lines_from_notes(report_notes[:6])
+        if idle_board_evidence_is_strong(findings=findings, evidence_lines=evidence_lines):
+            proposals.append(
+                ProposalSpec(
+                    repo_key=repo_key,
+                    task_kind="goal",
+                    title="Implement next bounded repo improvement",
+                    goal_text=(
+                        "Inspect recent retained signals and recent repo history, choose one concrete bounded issue they point to, "
+                        "and implement exactly that improvement."
+                    ),
+                    reason_summary="The board is idle and no stronger grounded task signal is currently open.",
+                    source_signal=f"{repo_key}:idle_board",
+                    confidence="medium",
+                    recommended_state="Ready for AI",
+                    handoff_reason="propose_idle_board_scan",
+                    dedup_key=f"{repo_key}:idle_board:repo_scan",
+                    constraints_text=(
+                        "- start from the evidence listed below before exploring elsewhere\n"
+                        "- choose exactly one evidence item as the source of truth and name it in your worker summary\n"
+                        "- use recent commit history and retained reports to choose the target area\n"
+                        "- make at most one bounded improvement in this task\n"
+                        "- if no strong grounded improvement survives inspection, leave the repo unchanged and report no_op\n"
+                        "- do not expand into unrelated refactors"
+                    ),
+                    evidence_lines=evidence_lines,
+                )
             )
-        )
-        notes.append("fallback_proposal: idle_board repo scan")
+            notes.append("fallback_proposal: idle_board evidence-anchored repo improvement")
+        else:
+            notes.append("fallback_suppressed: idle_board evidence too weak")
 
     unique: dict[str, ProposalSpec] = {}
     for proposal in proposals:
@@ -1121,6 +1196,9 @@ def build_proposal_description(
             f"- proposal_dedup_key: {proposal.dedup_key}",
         ]
     )
+    if proposal.evidence_lines:
+        lines.extend(["", "## Evidence"])
+        lines.extend(f"- {line}" for line in proposal.evidence_lines)
     return "\n".join(lines).strip()
 
 
@@ -1245,6 +1323,7 @@ def handle_propose_cycle(
         )
     proposals: list[ProposalSpec] = []
     notes: list[str] = []
+    classification_counts = recent_classification_counts(client, issues=issues)
     for repo_key in repo_keys:
         try:
             repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(
@@ -1252,9 +1331,15 @@ def handle_propose_cycle(
                 service,
                 repo_key=repo_key,
                 issues=issues,
+                classification_counts=classification_counts,
             )
         except TypeError:
-            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(client, service, repo_key=repo_key)
+            repo_proposals, repo_notes, repo_board_idle = build_proposal_candidates(
+                client,
+                service,
+                repo_key=repo_key,
+                issues=issues,
+            )
         proposals.extend(repo_proposals)
         notes.extend(repo_notes)
         board_idle = board_idle and repo_board_idle
@@ -1266,8 +1351,8 @@ def handle_propose_cycle(
             reason_summary="No sufficiently grounded autonomous proposal was available.",
         )
 
-    existing_names = existing_issue_names(client)
-    proposal_keys = existing_proposal_keys(client)
+    existing_names = existing_issue_names(client, issues=issues)
+    proposal_keys = existing_proposal_keys(client, issues=issues)
     created_ids: list[str] = []
     created_states: set[str] = set()
 
@@ -1312,6 +1397,8 @@ def handle_propose_cycle(
 
 def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
+    selected_evidence = selected_evidence_from_issue(issue)
+    target_area_hint = target_area_hint_from_issue(issue)
     result = run_service_task(service, client, task_id, worker_role="goal")
     created_ids: list[str] = []
     if result.outcome_status == "no_op":
@@ -1325,6 +1412,9 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                     "task_kind: goal",
                     "result_status: blocked",
                     f"outcome_reason: {result.outcome_reason or 'no_op'}",
+                    f"selected_evidence: {selected_evidence}",
+                    f"target_area_hint: {target_area_hint}",
+                    "bounded_scope_reason: execution produced no meaningful repo change to verify",
                     "follow_up_task_ids: none",
                     "next_action: investigate why execution only changed internal executor files",
                 ],
@@ -1344,6 +1434,9 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                     "task_kind: goal",
                     "result_status: blocked",
                     "blocked_classification: infra_tooling",
+                    f"selected_evidence: {selected_evidence}",
+                    f"target_area_hint: {target_area_hint}",
+                    "bounded_scope_reason: task remained scoped to one concrete evidence-led target but execution tooling failed first",
                     f"detail: {result.execution_stderr_excerpt or 'provider or backend configuration failed before execution'}",
                     "follow_up_task_ids: none",
                     "next_action: fix the configured Kodo orchestrator or provider auth before retrying",
@@ -1388,6 +1481,9 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                         f"task_id: {task_id}",
                         "task_kind: goal",
                         "result_status: review",
+                        f"selected_evidence: {selected_evidence}",
+                        f"target_area_hint: {target_area_hint}",
+                        "bounded_scope_reason: follow-up verification is scoped to the single evidence-led change from this goal run",
                         f"follow_up_task_ids: {', '.join(created_ids) if created_ids else 'none'}",
                         "handoff_reason: goal_completed_requires_verification",
                     ],
@@ -1403,6 +1499,9 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                         f"task_id: {task_id}",
                         "task_kind: goal",
                         "result_status: review",
+                        f"selected_evidence: {selected_evidence}",
+                        f"target_area_hint: {target_area_hint}",
+                        "bounded_scope_reason: the run stayed within one evidence-led target and did not require separate verification handoff",
                         "follow_up_task_ids: none",
                         "handoff_reason: goal_completed_no_explicit_test_required",
                     ],
@@ -1420,6 +1519,9 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                     "task_kind: goal",
                     "result_status: blocked",
                     f"blocked_classification: {result.blocked_classification}",
+                    f"selected_evidence: {selected_evidence}",
+                    f"target_area_hint: {target_area_hint}",
+                    "bounded_scope_reason: the run attempted one evidence-led change and blocked before completion",
                     "follow_up_task_ids: none",
                     "handoff_reason: goal_blocked_requires_improve_triage",
                 ],
@@ -1447,6 +1549,8 @@ def goal_failure_needs_manual_env_fix(result: ExecutionResult) -> bool:
 
 def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
+    selected_evidence = selected_evidence_from_issue(issue)
+    target_area_hint = target_area_hint_from_issue(issue)
     result = run_service_task(service, client, task_id, worker_role="test")
     if result.outcome_status == "no_op":
         result.final_status = "Blocked"
@@ -1460,6 +1564,9 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
                     "task_kind: test",
                     "result_status: blocked",
                     f"outcome_reason: {result.outcome_reason or 'no_op'}",
+                    f"selected_evidence: {selected_evidence}",
+                    f"target_area_hint: {target_area_hint}",
+                    "bounded_scope_reason: verification found no meaningful repo change tied to the selected evidence",
                     "follow_up_task_ids: none",
                     "next_action: investigate why verification only touched internal executor files",
                 ],
@@ -1480,6 +1587,9 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
                     "task_kind: test",
                     "result_status: done",
                     f"validation_passed: {result.validation_passed}",
+                    f"selected_evidence: {selected_evidence}",
+                    f"target_area_hint: {target_area_hint}",
+                    "bounded_scope_reason: verification stayed scoped to the same evidence-led target area",
                     "follow_up_task_ids: none",
                     "handoff_reason: verification_passed",
                 ],
@@ -1522,6 +1632,9 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
                 "result_status: blocked",
                 f"validation_passed: {result.validation_passed}",
                 f"blocked_classification: {blocked_classification}",
+                f"selected_evidence: {selected_evidence}",
+                f"target_area_hint: {target_area_hint}",
+                "bounded_scope_reason: verification failure stayed scoped to the same evidence-led target and generated one bounded fix task",
                 f"follow_up_task_ids: {', '.join(result.follow_up_task_ids)}",
                 "handoff_reason: test_failed_requires_goal_follow_up",
             ],

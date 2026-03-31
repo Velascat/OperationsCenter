@@ -425,6 +425,7 @@ def test_handle_goal_task_does_not_create_test_follow_up_for_internal_only_no_op
             {
                 "id": "GOAL-NOOP",
                 "name": "Implement watcher fix",
+                "description": "## Execution\nrepo: code_youtube_shorts\nbase_branch: new-feature\nmode: goal\n\n## Evidence\n- recent commits: abc123 Fix prompt wiring\n- recently changed files: test/conftest.py, src/main.py",
                 "state": {"name": "Ready for AI"},
                 "labels": [{"name": "task-kind: goal"}],
             },
@@ -456,6 +457,8 @@ def test_handle_goal_task_does_not_create_test_follow_up_for_internal_only_no_op
     assert created_ids == []
     assert client.created == []
     assert any("No meaningful repo change produced" in comment for _, comment in client.issue_comments)
+    assert any("selected_evidence: recent commits: abc123 Fix prompt wiring" in comment for _, comment in client.issue_comments)
+    assert any("target_area_hint: test/conftest.py, src/main.py" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -615,6 +618,7 @@ def test_handle_test_task_does_not_mark_done_for_internal_only_no_op() -> None:
             {
                 "id": "TEST-NOOP",
                 "name": "Verify watcher",
+                "description": "## Execution\nrepo: code_youtube_shorts\nbase_branch: new-feature\nmode: test\n\n## Evidence\n- recent commits: abc123 Fix prompt wiring\n- recently changed files: test/conftest.py, src/main.py",
                 "state": {"name": "Ready for AI"},
                 "labels": [{"name": "task-kind: test"}],
             },
@@ -647,6 +651,8 @@ def test_handle_test_task_does_not_mark_done_for_internal_only_no_op() -> None:
     assert client.created == []
     assert ("TEST-NOOP", "Done") not in client.transitions
     assert any("Verification produced no meaningful repo change" in comment for _, comment in client.issue_comments)
+    assert any("selected_evidence: recent commits: abc123 Fix prompt wiring" in comment for _, comment in client.issue_comments)
+    assert any("target_area_hint: test/conftest.py, src/main.py" in comment for _, comment in client.issue_comments)
 
 
 def test_reconcile_stale_running_issues_moves_owned_running_tasks_back_to_ready() -> None:
@@ -946,6 +952,7 @@ def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest
                     recommended_state="Ready for AI",
                     handoff_reason="propose_idle_board_scan",
                     dedup_key="code_youtube_shorts:idle_board:repo_scan",
+                    evidence_lines=["recent commits: abc123 Fix prompt wiring"],
                 )
             ],
             ["repo: code_youtube_shorts"],
@@ -965,6 +972,7 @@ def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest
         {"name": "source: proposer"},
         {"name": "reason: code_youtube_shorts_idle_board"},
     ]
+    assert "## Evidence" in str(client.created[0]["description"])
     assert any("[Propose] Autonomous task created" in comment for _, comment in client.issue_comments)
 
 
@@ -1103,6 +1111,81 @@ def test_run_watch_loop_propose_role_creates_task_when_idle(tmp_path: Path, monk
         {"name": "source: proposer"},
         {"name": "reason: idle_board"},
     ]
+
+
+def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient([])
+    service = FakeService()
+    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+        default_branch="new-feature",
+        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
+        allowed_base_branches=["new-feature"],
+    )
+
+    def fake_discover(
+        _service: FakeService,
+        *,
+        repo_key: str,
+        base_branch: str | None = None,
+    ) -> tuple[list[dict[str, str]], list[str]]:
+        assert repo_key == "code_youtube_shorts"
+        assert base_branch == "new-feature"
+        return (
+            [],
+            [
+                "- inspected repo: code_youtube_shorts @ new-feature",
+                "- recent commits: abc123 Fix prompt wiring | def456 Add coverage",
+                "- report signal: repeated pytest collection errors",
+            ],
+        )
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.discover_improvement_candidates", fake_discover)
+    from control_plane.entrypoints.worker.main import build_proposal_candidates
+
+    proposals, notes, board_idle = build_proposal_candidates(client, service, repo_key="code_youtube_shorts", issues=[])
+
+    assert board_idle is True
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert proposal.title == "Implement next bounded repo improvement"
+    assert "recent retained signals and recent repo history" in proposal.goal_text
+    assert "use recent commit history and retained reports to choose the target area" in str(proposal.constraints_text)
+    assert proposal.evidence_lines == [
+        "inspected repo: code_youtube_shorts @ new-feature",
+        "recent commits: abc123 Fix prompt wiring | def456 Add coverage",
+        "report signal: repeated pytest collection errors",
+    ]
+    assert any("fallback_proposal: idle_board evidence-anchored repo improvement" == note for note in notes)
+
+
+def test_build_proposal_candidates_idle_board_fallback_suppresses_weak_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient([])
+    service = FakeService()
+
+    def fake_discover(
+        _service: FakeService,
+        *,
+        repo_key: str,
+        base_branch: str | None = None,
+    ) -> tuple[list[dict[str, str]], list[str]]:
+        return (
+            [],
+            [
+                "- inspected repo: control-plane @ main",
+                "- top-level entries: src, tests, docs",
+                "- tests directory present: yes",
+                "- docs directory present: yes",
+            ],
+        )
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.discover_improvement_candidates", fake_discover)
+    from control_plane.entrypoints.worker.main import build_proposal_candidates
+
+    proposals, notes, board_idle = build_proposal_candidates(client, service, repo_key="control-plane", issues=[])
+
+    assert board_idle is True
+    assert proposals == []
+    assert "fallback_suppressed: idle_board evidence too weak" in notes
 
 
 def test_handle_propose_cycle_suppresses_when_budget_too_low(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

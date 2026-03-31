@@ -48,6 +48,26 @@ class GitClient:
     def create_task_branch(self, repo_path: Path, task_branch: str) -> None:
         self._run(["git", "checkout", "-b", task_branch], cwd=repo_path)
 
+    def recent_commits(self, repo_path: Path, max_count: int = 5) -> list[str]:
+        output = self._run(
+            ["git", "log", f"-n{max_count}", "--pretty=format:%h %s"],
+            cwd=repo_path,
+        )
+        return [line.strip() for line in output.splitlines() if line.strip()]
+
+    def recent_changed_files(self, repo_path: Path, max_count: int = 3) -> list[str]:
+        output = self._run(
+            ["git", "log", f"-n{max_count}", "--name-only", "--pretty=format:"],
+            cwd=repo_path,
+        )
+        files = [line.strip() for line in output.splitlines() if line.strip()]
+        normalized = [self._normalize_repo_relative_path(path) for path in files]
+        deduped: list[str] = []
+        for path in normalized:
+            if path not in deduped:
+                deduped.append(path)
+        return deduped
+
     def set_identity(self, repo_path: Path, author_name: str, author_email: str) -> None:
         self._run(["git", "config", "user.name", author_name], cwd=repo_path)
         self._run(["git", "config", "user.email", author_email], cwd=repo_path)
