@@ -1135,6 +1135,7 @@ def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(
             [
                 "- inspected repo: code_youtube_shorts @ new-feature",
                 "- recent commits: abc123 Fix prompt wiring | def456 Add coverage",
+                "- recently changed files: test/conftest.py, src/main.py",
                 "- report signal: repeated pytest collection errors",
             ],
         )
@@ -1147,15 +1148,38 @@ def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(
     assert board_idle is True
     assert len(proposals) == 1
     proposal = proposals[0]
-    assert proposal.title == "Implement next bounded repo improvement"
-    assert "recent retained signals and recent repo history" in proposal.goal_text
-    assert "use recent commit history and retained reports to choose the target area" in str(proposal.constraints_text)
+    assert proposal.title == "Implement bounded improvement in test/conftest.py"
+    assert "Start with `test/conftest.py` as the target area" in proposal.goal_text
+    assert "prefer `test/conftest.py`" in str(proposal.constraints_text)
     assert proposal.evidence_lines == [
-        "inspected repo: code_youtube_shorts @ new-feature",
-        "recent commits: abc123 Fix prompt wiring | def456 Add coverage",
         "report signal: repeated pytest collection errors",
+        "recently changed files: test/conftest.py, src/main.py",
+        "recent commits: abc123 Fix prompt wiring | def456 Add coverage",
+        "inspected repo: code_youtube_shorts @ new-feature",
     ]
     assert any("fallback_proposal: idle_board evidence-anchored repo improvement" == note for note in notes)
+
+
+def test_evidence_lines_from_notes_prioritizes_actionable_signals() -> None:
+    from control_plane.entrypoints.worker.main import evidence_lines_from_notes
+
+    evidence_lines = evidence_lines_from_notes(
+        [
+            "- inspected repo: code_youtube_shorts @ new-feature",
+            "- top-level entries: src, docs",
+            "- recently changed files: test/conftest.py, src/main.py",
+            "- recent commits: abc123 Fix prompt wiring | def456 Add coverage",
+            "- report signal: repeated pytest collection errors",
+        ]
+    )
+
+    assert evidence_lines == [
+        "report signal: repeated pytest collection errors",
+        "recently changed files: test/conftest.py, src/main.py",
+        "recent commits: abc123 Fix prompt wiring | def456 Add coverage",
+        "inspected repo: code_youtube_shorts @ new-feature",
+        "top-level entries: src, docs",
+    ]
 
 
 def test_build_proposal_candidates_idle_board_fallback_suppresses_weak_evidence(monkeypatch: pytest.MonkeyPatch) -> None:

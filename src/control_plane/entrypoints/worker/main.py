@@ -1003,7 +1003,90 @@ def discover_improvement_candidates(
 
 
 def evidence_lines_from_notes(notes: list[str]) -> list[str]:
-    return [note.removeprefix("- ").strip() for note in notes if note.strip()]
+    values = [note.removeprefix("- ").strip() for note in notes if note.strip()]
+    priorities = (
+        "report signal:",
+        "recently changed files:",
+        "recent commits:",
+        "inspected repo:",
+        "top-level entries:",
+        "tests directory present:",
+        "docs directory present:",
+    )
+
+    def sort_key(line: str) -> tuple[int, str]:
+        lowered = line.lower()
+        for index, prefix in enumerate(priorities):
+            if lowered.startswith(prefix):
+                return (index, lowered)
+        return (len(priorities), lowered)
+
+    return sorted(values, key=sort_key)
+
+
+def idle_board_target_area(evidence_lines: list[str]) -> str | None:
+    for line in evidence_lines:
+        lowered = line.lower()
+        if lowered.startswith("recently changed files:"):
+            paths = [part.strip() for part in line.split(":", 1)[1].split(",") if part.strip()]
+            if paths:
+                return paths[0]
+    return None
+
+
+def idle_board_recent_commit_hint(evidence_lines: list[str]) -> str | None:
+    for line in evidence_lines:
+        lowered = line.lower()
+        if lowered.startswith("recent commits:"):
+            commit_text = line.split(":", 1)[1].strip()
+            if commit_text:
+                return commit_text.split("|", 1)[0].strip()
+    return None
+
+
+def idle_board_fallback_proposal(*, repo_key: str, evidence_lines: list[str]) -> ProposalSpec:
+    target_area = idle_board_target_area(evidence_lines)
+    commit_hint = idle_board_recent_commit_hint(evidence_lines)
+    title = "Implement next bounded repo improvement"
+    goal_text = (
+        "Inspect recent retained signals and recent repo history, choose one concrete bounded issue they point to, "
+        "and implement exactly that improvement."
+    )
+    reason_summary = "The board is idle and no stronger grounded task signal is currently open."
+    dedup_key = f"{repo_key}:idle_board:repo_scan"
+    constraints_lines = [
+        "- start from the evidence listed below before exploring elsewhere",
+        "- choose exactly one evidence item as the source of truth and name it in your worker summary",
+        "- use recent commit history and retained reports to choose the target area",
+        "- make at most one bounded improvement in this task",
+        "- if no strong grounded improvement survives inspection, leave the repo unchanged and report no_op",
+        "- do not expand into unrelated refactors",
+    ]
+    if target_area:
+        title = f"Implement bounded improvement in {target_area}"
+        goal_text = (
+            f"Start with `{target_area}` as the target area, inspect the retained evidence and recent history around it, "
+            "then implement one concrete bounded improvement there."
+        )
+        reason_summary = f"Idle-board fallback anchored to recent change activity in {target_area}."
+        dedup_key = f"{repo_key}:idle_board:{re.sub(r'[^a-z0-9]+', '_', target_area.lower()).strip('_')}"
+        constraints_lines.insert(2, f"- prefer `{target_area}` unless the evidence directly proves another nearby file is the true fix location")
+    if commit_hint:
+        constraints_lines.insert(3 if target_area else 2, f"- recent commit anchor: {commit_hint}")
+    return ProposalSpec(
+        repo_key=repo_key,
+        task_kind="goal",
+        title=title,
+        goal_text=goal_text,
+        reason_summary=reason_summary,
+        source_signal=f"{repo_key}:idle_board",
+        confidence="medium",
+        recommended_state="Ready for AI",
+        handoff_reason="propose_idle_board_scan",
+        dedup_key=dedup_key,
+        constraints_text="\n".join(constraints_lines),
+        evidence_lines=evidence_lines,
+    )
 
 
 def idle_board_evidence_is_strong(*, findings: list[dict[str, str]], evidence_lines: list[str]) -> bool:
@@ -1127,32 +1210,7 @@ def build_proposal_candidates(
     if board_idle and not proposals:
         evidence_lines = evidence_lines_from_notes(report_notes[:6])
         if idle_board_evidence_is_strong(findings=findings, evidence_lines=evidence_lines):
-            proposals.append(
-                ProposalSpec(
-                    repo_key=repo_key,
-                    task_kind="goal",
-                    title="Implement next bounded repo improvement",
-                    goal_text=(
-                        "Inspect recent retained signals and recent repo history, choose one concrete bounded issue they point to, "
-                        "and implement exactly that improvement."
-                    ),
-                    reason_summary="The board is idle and no stronger grounded task signal is currently open.",
-                    source_signal=f"{repo_key}:idle_board",
-                    confidence="medium",
-                    recommended_state="Ready for AI",
-                    handoff_reason="propose_idle_board_scan",
-                    dedup_key=f"{repo_key}:idle_board:repo_scan",
-                    constraints_text=(
-                        "- start from the evidence listed below before exploring elsewhere\n"
-                        "- choose exactly one evidence item as the source of truth and name it in your worker summary\n"
-                        "- use recent commit history and retained reports to choose the target area\n"
-                        "- make at most one bounded improvement in this task\n"
-                        "- if no strong grounded improvement survives inspection, leave the repo unchanged and report no_op\n"
-                        "- do not expand into unrelated refactors"
-                    ),
-                    evidence_lines=evidence_lines,
-                )
-            )
+            proposals.append(idle_board_fallback_proposal(repo_key=repo_key, evidence_lines=evidence_lines))
             notes.append("fallback_proposal: idle_board evidence-anchored repo improvement")
         else:
             notes.append("fallback_suppressed: idle_board evidence too weak")
