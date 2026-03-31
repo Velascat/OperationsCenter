@@ -11,6 +11,8 @@ WATCH_DIR="${LOG_DIR}/watch-all"
 REPORT_DIR="${ROOT_DIR}/tools/report/kodo_plane"
 PLANE_MANAGER="${ROOT_DIR}/deployment/plane/manage.sh"
 JANITOR_MAX_AGE_DAYS="${CONTROL_PLANE_RETENTION_DAYS:-1}"
+API_HOST="${CONTROL_PLANE_API_HOST:-127.0.0.1}"
+API_PORT="${CONTROL_PLANE_API_PORT:-8787}"
 
 ensure_venv() {
   if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
@@ -84,10 +86,14 @@ Usage:
   scripts/control-plane.sh setup
   scripts/control-plane.sh start
   scripts/control-plane.sh stop
+  scripts/control-plane.sh api-up
+  scripts/control-plane.sh api-down
+  scripts/control-plane.sh api-status
   scripts/control-plane.sh run-next
   scripts/control-plane.sh watch-all
   scripts/control-plane.sh watch-all-stop
   scripts/control-plane.sh watch-all-status
+  scripts/control-plane.sh dev-status
   scripts/control-plane.sh watch --role goal
   scripts/control-plane.sh watch --role propose
   scripts/control-plane.sh run --task-id TASK-123
@@ -114,6 +120,70 @@ Environment:
   CONTROL_PLANE_CONFIG   Override config path (default: ${CONFIG_PATH})
   CONTROL_PLANE_ENV_FILE Override env file path (default: ${ENV_PATH})
 EOF
+}
+
+api_pid_file() {
+  echo "${LOG_DIR}/api.pid"
+}
+
+api_status_file() {
+  echo "${LOG_DIR}/api.status.json"
+}
+
+api_log_file() {
+  echo "${LOG_DIR}/$(timestamp)_api.log"
+}
+
+start_api_service() {
+  local pid_file
+  pid_file="$(api_pid_file)"
+  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
+    echo "api already running with PID $(cat "${pid_file}")"
+    return 0
+  fi
+  rm -f "${pid_file}"
+  mkdir -p "${LOG_DIR}"
+  local log_file
+  log_file="$(api_log_file)"
+  setsid /bin/bash -lc "
+    set -a
+    source '${ENV_PATH}'
+    set +a
+    exec '${VENV_DIR}/bin/python' -m uvicorn control_plane.entrypoints.api.main:app \
+      --host '${API_HOST}' \
+      --port '${API_PORT}'
+  " >>"${log_file}" 2>&1 < /dev/null &
+  local pid=$!
+  echo "${pid}" > "${pid_file}"
+  echo "api started: pid=${pid} url=http://${API_HOST}:${API_PORT} log=${log_file}"
+}
+
+stop_api_service() {
+  local pid_file
+  pid_file="$(api_pid_file)"
+  if [[ ! -f "${pid_file}" ]]; then
+    echo "api is not running"
+    return 0
+  fi
+  local pid
+  pid="$(cat "${pid_file}")"
+  if kill -0 "${pid}" >/dev/null 2>&1; then
+    kill "${pid}" >/dev/null 2>&1 || true
+    echo "api stopped: pid=${pid}"
+  else
+    echo "api was not running"
+  fi
+  rm -f "${pid_file}"
+}
+
+status_api_service() {
+  local pid_file
+  pid_file="$(api_pid_file)"
+  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
+    echo "api: running (pid $(cat "${pid_file}")) url=http://${API_HOST}:${API_PORT}"
+  else
+    echo "api: stopped"
+  fi
 }
 
 watch_pid_file() {
@@ -261,11 +331,30 @@ case "${cmd}" in
     load_env_file
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
+    start_api_service
+    start_watch_role goal
+    start_watch_role test
+    start_watch_role improve
+    start_watch_role propose
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-down)
     load_env_file
+    stop_watch_role goal
+    stop_watch_role test
+    stop_watch_role improve
+    stop_watch_role propose
+    stop_api_service
     run_with_log plane-down "${PLANE_MANAGER}" down
+    ;;
+  dev-status)
+    load_env_file
+    run_with_log plane-status "${PLANE_MANAGER}" status || true
+    status_api_service
+    status_watch_role goal
+    status_watch_role test
+    status_watch_role improve
+    status_watch_role propose
     ;;
   providers-status|doctor)
     ensure_venv
@@ -280,6 +369,17 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log api "${VENV_DIR}/bin/python" -m uvicorn control_plane.entrypoints.api.main:app --reload "$@"
+    ;;
+  api-up)
+    ensure_venv
+    load_env_file
+    start_api_service
+    ;;
+  api-down)
+    stop_api_service
+    ;;
+  api-status)
+    status_api_service
     ;;
   run)
     ensure_venv

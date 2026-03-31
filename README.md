@@ -10,6 +10,15 @@ Local autonomous coding workflow system that uses **Plane** as the board, **Cont
 - **goal**, **test**, **improve**, and **propose** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
+## System Boundaries
+
+- Local-first and single-machine today.
+- Plane remains the board and source of truth for work state.
+- Repo-aware autonomy is artifact-driven and bounded by guardrails.
+- The proposer lane remains the board-facing guarded adapter.
+- Expensive execution is budget-aware and suppresses unnecessary runs.
+- Repo-aware autonomy stages remain explicit and inspectable for now.
+
 ## Repo-Aware Autonomy Loop
 
 ```text
@@ -55,6 +64,8 @@ The naming is intentionally close because the second is the board adapter for th
 
 ## What Works Today
 
+### Core Workflow
+
 - Single-task execution from a Plane work item.
 - Background watchers for `goal`, `test`, `improve`, and `propose`.
 - `watch-all` to launch the four local watcher lanes together.
@@ -62,15 +73,24 @@ The naming is intentionally close because the second is the board adapter for th
 - Isolated ephemeral clone + task branch workflow.
 - Repo-local bootstrap and validation execution.
 - Worker comments, retained artifacts, and local heartbeat/status files.
+
+### Repo-Aware Autonomy
+
 - Read-only repo observer snapshots.
 - Read-only normalized insight generation from retained observer snapshots.
 - Guarded proposal-candidate generation from retained insights.
 - Candidate-driven Plane task creation through the proposer lane with provenance and dedup protection.
-- End-to-end repo-aware autonomy handoff coverage from observer -> insights -> decision -> proposer.
+- End-to-end coverage of the repo-aware autonomy handoff chain from observer -> insights -> decision -> proposer.
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
-- Execution budget enforcement, retry caps, no-op suppression, and proposal-budget suppression.
 - Dependency drift reporting with optional Plane improve-task creation.
+
+### Execution Safety
+
+- Execution budget enforcement, retry caps, no-op suppression, and proposal suppression when execution budget is low.
+
+### Operator UI and Discovery
+
 - Repo-control UI for repo discovery, repo import, branch selection, and proposer scope control.
 - GitHub-backed repo and branch discovery for configured owners, with private-repo support when `GITHUB_TOKEN` is set.
 - Live board polling view that reflects Plane work-item changes without manually refreshing the Plane issues page.
@@ -91,9 +111,8 @@ propose -> bounded board tasks when the board is idle or recent signals justify 
 ```bash
 ./scripts/control-plane.sh setup
 source .env.control-plane.local
-./scripts/control-plane.sh start
-./scripts/control-plane.sh plane-doctor
-./scripts/control-plane.sh watch-all
+./scripts/control-plane.sh dev-up
+./scripts/control-plane.sh dev-status
 ```
 
 Then:
@@ -103,7 +122,7 @@ Then:
 3. Watch the local loop with:
 
 ```bash
-./scripts/control-plane.sh watch-all-status
+./scripts/control-plane.sh dev-status
 ```
 
 ## Core Commands
@@ -113,6 +132,9 @@ Then:
 ./scripts/control-plane.sh start
 ./scripts/control-plane.sh stop
 ./scripts/control-plane.sh plane-status
+./scripts/control-plane.sh api-up
+./scripts/control-plane.sh api-down
+./scripts/control-plane.sh api-status
 ./scripts/control-plane.sh run --task-id TASK-123
 ./scripts/control-plane.sh run-next
 ./scripts/control-plane.sh watch --role goal
@@ -122,6 +144,9 @@ Then:
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
+./scripts/control-plane.sh dev-up
+./scripts/control-plane.sh dev-down
+./scripts/control-plane.sh dev-status
 ./scripts/control-plane.sh observe-repo
 ./scripts/control-plane.sh generate-insights
 ./scripts/control-plane.sh decide-proposals
@@ -142,7 +167,7 @@ Control Plane now enforces a bounded execution-control layer before expensive wo
 - rolling execution budgets over hourly and daily windows
 - retry caps per task for automatic `goal` and `test` execution
 - watcher-side no-op suppression for unchanged task signatures
-- proposal suppression when remaining execution budget is too low
+- proposal suppression when execution budget is low
 - explicit retained accounting in `tools/report/control_plane/execution/usage.json`
 
 Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/GitHub/ControlPlane/.env.control-plane.local):
@@ -163,7 +188,7 @@ Skipping is treated as a valid outcome when execution is not justified. Budget s
 Control Plane now exposes a small local UI and API for repo operations:
 
 - Repo control page: `http://127.0.0.1:8787/`
-- Live board page: same UI, with a polling work-item table
+- Live board: available in the same UI, with a polling work-item table
 - Repo list source: GitHub discovery for the owner(s) inferred from configured repos
 - Branch list source: GitHub branch API for each discovered/configured repo
 - Propose watcher scope: controlled by per-repo `propose_enabled` policy
@@ -174,6 +199,28 @@ Notes:
 - The watcher only operates on repos that are actually configured in `config/control_plane.local.yaml`.
 - Discovered repos are visible before import, but remain read-only/unconfigured until imported.
 - Private repos require a valid `GITHUB_TOKEN` in `.env.control-plane.local`.
+
+## Local Stack Startup
+
+The easiest way to bring up the whole local system is:
+
+```bash
+./scripts/control-plane.sh dev-up
+```
+
+That starts:
+
+- Plane on `http://localhost:8080`
+- the Control Plane UI/API on `http://127.0.0.1:8787/`
+- all four watcher lanes: `goal`, `test`, `improve`, and `propose`
+
+Useful companions:
+
+- `./scripts/control-plane.sh dev-status`
+- `./scripts/control-plane.sh dev-down`
+- `./scripts/control-plane.sh api-up`
+- `./scripts/control-plane.sh api-down`
+- `./scripts/control-plane.sh api-status`
 
 ## Live Board
 
@@ -234,8 +281,7 @@ The repo-aware autonomy loop is behaving well when:
 - No production-grade supervisor beyond local `watch-all`.
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
-- No automatic end-to-end autonomy wrapper yet; `observe`, `generate-insights`, `decide-proposals`, and `propose-from-candidates` are still explicit stages.
-- No `autonomy-cycle` wrapper yet; stage boundaries are still intentionally explicit.
+- No automatic end-to-end `autonomy-cycle` wrapper yet; the repo-aware autonomy stages remain intentionally explicit and inspectable.
 - Repo discovery is GitHub-specific today.
 - Private repo discovery depends on `GITHUB_TOKEN`; SSH alone is not enough to enumerate all accessible GitHub repos.
 - Plane custom-field/native dropdown integration is not used in this local deployment; repo/branch selection is handled by Control Plane's local UI/API.
@@ -281,6 +327,8 @@ Improve the autonomous Plane watcher and local workflow.
 
 Notes:
 
+- Tasks may still be authored manually with the `## Execution` block, or created through the local repo-control UI/API. In both cases, Control Plane resolves the same structured execution contract before work runs.
+- The UI/API is a convenience input layer, not a separate execution model.
 - `mode: goal` is the supported runtime mode today.
 - `allowed_paths` is enforced before commit/push.
 - Kodo receives Goal/Constraints, not the `## Execution` block.
