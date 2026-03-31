@@ -203,6 +203,36 @@ def import_repo(payload: RepoImportRequest) -> dict[str, Any]:
     }
 
 
+@app.get("/plane/live-work-items")
+def live_work_items(config_path: str | None = None) -> dict[str, Any]:
+    _, settings, _ = load_runtime_config(config_path)
+    client = PlaneClient(
+        settings.plane.base_url,
+        settings.plane_token(),
+        settings.plane.workspace_slug,
+        settings.plane.project_id,
+    )
+    try:
+        issues = client.list_issues()
+        rows: list[dict[str, Any]] = []
+        for issue in issues:
+            state = issue.get("state")
+            state_name = state.get("name", "Unknown") if isinstance(state, dict) else str(state or "Unknown")
+            rows.append(
+                {
+                    "id": str(issue.get("id")),
+                    "name": str(issue.get("name", "Untitled")),
+                    "state": state_name,
+                    "updated_at": issue.get("updated_at"),
+                    "created_at": issue.get("created_at"),
+                }
+            )
+        rows.sort(key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+        return {"count": len(rows), "items": rows}
+    finally:
+        client.close()
+
+
 @app.get("/", response_class=HTMLResponse)
 def repo_control_page() -> str:
     return """
@@ -320,6 +350,17 @@ def repo_control_page() -> str:
         <div class="status" id="taskStatus"></div>
       </section>
     </div>
+    <section class="panel" style="margin-top:20px;">
+      <h2>Live Board</h2>
+      <p class="hint">This view polls Plane every 5 seconds so you can watch issue state changes without manually refreshing the Plane UI.</p>
+      <div class="status" id="liveStatus"></div>
+      <table>
+        <thead>
+          <tr><th>Updated</th><th>State</th><th>Title</th><th>ID</th></tr>
+        </thead>
+        <tbody id="liveRows"></tbody>
+      </table>
+    </section>
   </main>
   <script>
     let repos = [];
@@ -328,6 +369,8 @@ def repo_control_page() -> str:
     const baseBranch = document.getElementById("baseBranch");
     const policyStatus = document.getElementById("policyStatus");
     const taskStatus = document.getElementById("taskStatus");
+    const liveRows = document.getElementById("liveRows");
+    const liveStatus = document.getElementById("liveStatus");
 
     function branchOptionsFor(repo) {
       return repo.branch_options && repo.branch_options.length ? repo.branch_options : [repo.default_branch];
@@ -385,8 +428,26 @@ def repo_control_page() -> str:
           repos = payload.repos;
           renderRepos();
           policyStatus.textContent = `Imported ${button.dataset.import} into config.`;
-        });
       });
+    });
+
+    async function loadLiveBoard() {
+      const response = await fetch("/plane/live-work-items");
+      const payload = await response.json();
+      if (!response.ok) {
+        liveStatus.textContent = payload.detail || "Failed to load live work items.";
+        return;
+      }
+      liveStatus.textContent = `Updated ${new Date().toLocaleTimeString()} | ${payload.count} work item(s)`;
+      liveRows.innerHTML = payload.items.map((item) => `
+        <tr>
+          <td class="mono">${item.updated_at || "-"}</td>
+          <td>${item.state}</td>
+          <td>${item.name}</td>
+          <td class="mono">${item.id}</td>
+        </tr>
+      `).join("");
+    }
     }
 
     repoKey.addEventListener("change", renderBranchOptions);
@@ -434,6 +495,14 @@ def repo_control_page() -> str:
     loadRepos().catch((error) => {
       policyStatus.textContent = String(error);
     });
+    loadLiveBoard().catch((error) => {
+      liveStatus.textContent = String(error);
+    });
+    setInterval(() => {
+      loadLiveBoard().catch((error) => {
+        liveStatus.textContent = String(error);
+      });
+    }, 5000);
   </script>
 </body>
 </html>
