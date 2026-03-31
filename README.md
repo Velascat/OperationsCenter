@@ -69,6 +69,9 @@ The naming is intentionally close because the second is the board adapter for th
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
 - Dependency drift reporting with optional Plane improve-task creation.
+- Repo-control UI for repo discovery, repo import, branch selection, and proposer scope control.
+- GitHub-backed repo and branch discovery for configured owners, with private-repo support when `GITHUB_TOKEN` is set.
+- Live board polling view that reflects Plane work-item changes without manually refreshing the Plane issues page.
 
 ## Lifecycle Contract
 
@@ -125,7 +128,35 @@ Then:
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ./scripts/control-plane.sh dependency-check
 ./scripts/control-plane.sh janitor
+./scripts/control-plane.sh api
 ```
+
+## Repo Control UI
+
+Control Plane now exposes a small local UI and API for repo operations:
+
+- Repo control page: `http://127.0.0.1:8787/`
+- Live board page: same UI, with a polling work-item table
+- Repo list source: GitHub discovery for the owner(s) inferred from configured repos
+- Branch list source: GitHub branch API for each discovered/configured repo
+- Propose watcher scope: controlled by per-repo `propose_enabled` policy
+- Repo import: discovered repos can be imported into local Control Plane config directly from the UI
+
+Notes:
+
+- The watcher only operates on repos that are actually configured in `config/control_plane.local.yaml`.
+- Discovered repos are visible before import, but remain read-only/unconfigured until imported.
+- Private repos require a valid `GITHUB_TOKEN` in `.env.control-plane.local`.
+
+## Live Board
+
+The self-hosted Plane issues page does not reliably auto-refresh in this local setup, even though the Plane API reflects updates immediately.
+
+Use the Control Plane UI at `http://127.0.0.1:8787/` when you want a live-updating task view:
+
+- `Live Board` polls Plane every 5 seconds
+- shows work-item ids, titles, states, and update timestamps
+- useful for watching watcher/proposer activity without manually refreshing the Plane frontend
 
 ## Runtime Files
 
@@ -176,6 +207,9 @@ The repo-aware autonomy loop is behaving well when:
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
 - No automatic end-to-end autonomy wrapper yet; `observe`, `generate-insights`, `decide-proposals`, and `propose-from-candidates` are still explicit stages.
+- Repo discovery is GitHub-specific today.
+- Private repo discovery depends on `GITHUB_TOKEN`; SSH alone is not enough to enumerate all accessible GitHub repos.
+- Plane custom-field/native dropdown integration is not used in this local deployment; repo/branch selection is handled by Control Plane's local UI/API.
 
 ## Documentation
 
