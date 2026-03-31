@@ -66,8 +66,10 @@ The naming is intentionally close because the second is the board adapter for th
 - Read-only normalized insight generation from retained observer snapshots.
 - Guarded proposal-candidate generation from retained insights.
 - Candidate-driven Plane task creation through the proposer lane with provenance and dedup protection.
+- End-to-end repo-aware autonomy handoff coverage from observer -> insights -> decision -> proposer.
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
+- Execution budget enforcement, retry caps, no-op suppression, and proposal-budget suppression.
 - Dependency drift reporting with optional Plane improve-task creation.
 - Repo-control UI for repo discovery, repo import, branch selection, and proposer scope control.
 - GitHub-backed repo and branch discovery for configured owners, with private-repo support when `GITHUB_TOKEN` is set.
@@ -123,13 +125,38 @@ Then:
 ./scripts/control-plane.sh observe-repo
 ./scripts/control-plane.sh generate-insights
 ./scripts/control-plane.sh decide-proposals
+./scripts/control-plane.sh decide-proposals --dry-run
 ./scripts/control-plane.sh propose-from-candidates
+./scripts/control-plane.sh propose-from-candidates --dry-run
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ./scripts/control-plane.sh dependency-check
 ./scripts/control-plane.sh janitor
 ./scripts/control-plane.sh api
 ```
+
+## Execution Controls
+
+Control Plane now enforces a bounded execution-control layer before expensive worker actions run.
+
+- rolling execution budgets over hourly and daily windows
+- retry caps per task for automatic `goal` and `test` execution
+- watcher-side no-op suppression for unchanged task signatures
+- proposal suppression when remaining execution budget is too low
+- explicit retained accounting in `tools/report/control_plane/execution/usage.json`
+
+Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/GitHub/ControlPlane/.env.control-plane.local):
+
+- `CONTROL_PLANE_MAX_EXEC_PER_HOUR`
+- `CONTROL_PLANE_MAX_EXEC_PER_DAY`
+- `CONTROL_PLANE_MAX_RETRIES_PER_TASK`
+- `CONTROL_PLANE_MIN_REMAINING_EXEC_FOR_PROPOSALS`
+- `CONTROL_PLANE_WATCH_INTERVAL_GOAL_SECONDS`
+- `CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS`
+- `CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS`
+- `CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS`
+
+Skipping is treated as a valid outcome when execution is not justified. Budget skips, no-op skips, retry-cap blocks, and proposal suppression are written to retained artifacts and surfaced in watcher logs.
 
 ## Repo Control UI
 
@@ -164,6 +191,7 @@ Use the Control Plane UI at `http://127.0.0.1:8787/` when you want a live-updati
 - Plane runtime logs: `logs/local/plane-runtime/`
 - Watcher logs, PIDs, and heartbeat files: `logs/local/watch-all/`
 - Retained execution artifacts: `tools/report/kodo_plane/`
+- Retained execution usage ledger: `tools/report/control_plane/execution/`
 - Repo observer snapshots: `tools/report/control_plane/observer/`
 - Insight artifacts: `tools/report/control_plane/insights/`
 - Decision artifacts: `tools/report/control_plane/decision/`
@@ -207,6 +235,7 @@ The repo-aware autonomy loop is behaving well when:
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
 - No automatic end-to-end autonomy wrapper yet; `observe`, `generate-insights`, `decide-proposals`, and `propose-from-candidates` are still explicit stages.
+- No `autonomy-cycle` wrapper yet; stage boundaries are still intentionally explicit.
 - Repo discovery is GitHub-specific today.
 - Private repo discovery depends on `GITHUB_TOKEN`; SSH alone is not enough to enumerate all accessible GitHub repos.
 - Plane custom-field/native dropdown integration is not used in this local deployment; repo/branch selection is handled by Control Plane's local UI/API.
@@ -222,6 +251,7 @@ The repo-aware autonomy loop is behaving well when:
 - [Decision Engine](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_decision_engine.md)
 - [Proposer Integration](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_proposer_integration.md)
 - [Repo-Aware Autonomy Layer](/home/dev/Documents/GitHub/ControlPlane/docs/design/repo_aware_autonomy.md)
+- [Execution Budget And Safety Controls](/home/dev/Documents/GitHub/ControlPlane/docs/design/execution_budget_and_safety_controls.md)
 - [Plane + Kodo Wrapper Design](/home/dev/Documents/GitHub/ControlPlane/docs/design/plane_kodo_wrapper.md)
 
 ### Operator Guides
