@@ -120,6 +120,46 @@ def test_plane_list_issues_supports_paginated_results() -> None:
     assert calls == [("GET", "http://plane.local/api/v1/workspaces/ws/projects/proj/work-items/?expand=state")]
 
 
+def test_plane_fetch_issue_hydrates_label_ids_to_label_objects() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/labels/"):
+            return httpx.Response(200, json={"results": [{"id": "LABEL-1", "name": "task-kind: improve"}]})
+        return httpx.Response(
+            200,
+            json={
+                "id": "TASK-1",
+                "project_id": "proj",
+                "name": "Task",
+                "description": """## Execution
+repo: repo_a
+base_branch: main
+mode: goal
+
+## Goal
+Do thing.
+""",
+                "state": {"name": "Ready for AI"},
+                "labels": ["LABEL-1"],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    client._client = httpx.Client(  # type: ignore[attr-defined]
+        transport=transport,
+        base_url="http://plane.local",
+        headers={"X-API-Key": "token", "Content-Type": "application/json"},
+    )
+
+    try:
+        issue = client.fetch_issue("TASK-1")
+    finally:
+        client.close()
+
+    assert issue["labels"] == [{"id": "LABEL-1", "name": "task-kind: improve"}]
+
+
 def test_plane_create_issue_ensures_labels_and_state() -> None:
     calls: list[tuple[str, str, dict[str, object] | None]] = []
 

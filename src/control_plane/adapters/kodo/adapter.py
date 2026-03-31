@@ -31,6 +31,8 @@ class KodoAdapter:
             self.settings.binary,
             "--goal-file",
             str(goal_file),
+            "--project",
+            str(repo_path),
             "--team",
             self.settings.team,
             "--cycles",
@@ -42,7 +44,6 @@ class KodoAdapter:
             "--effort",
             self.settings.effort,
             "--yes",
-            str(repo_path),
         ]
 
     def run(self, goal_file: Path, repo_path: Path) -> KodoRunResult:

@@ -32,7 +32,10 @@ class PlaneClient:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
         response = self._request("GET", url, params={"expand": "state"})
         response.raise_for_status()
-        return response.json()
+        payload = response.json()
+        if isinstance(payload, dict):
+            return self._hydrate_issue_labels(payload)
+        return payload
 
     def fetch_project(self) -> dict[str, Any]:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/"
@@ -46,11 +49,11 @@ class PlaneClient:
         response.raise_for_status()
         payload = response.json()
         if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
+            return [self._hydrate_issue_labels(item) for item in payload if isinstance(item, dict)]
         if isinstance(payload, dict):
             results = payload.get("results")
             if isinstance(results, list):
-                return [item for item in results if isinstance(item, dict)]
+                return [self._hydrate_issue_labels(item) for item in results if isinstance(item, dict)]
         return []
 
     def list_states(self) -> list[dict[str, Any]]:
@@ -196,6 +199,28 @@ class PlaneClient:
         if self._labels_cache is not None and isinstance(created, dict):
             self._labels_cache.append(created)
         return created
+
+    def _hydrate_issue_labels(self, issue: dict[str, Any]) -> dict[str, Any]:
+        raw_labels = issue.get("labels")
+        if not isinstance(raw_labels, list) or not raw_labels:
+            return issue
+        if all(isinstance(label, dict) for label in raw_labels):
+            return issue
+
+        by_id = {
+            str(label.get("id")): label
+            for label in self.list_labels()
+            if isinstance(label, dict) and label.get("id")
+        }
+        hydrated: list[Any] = []
+        for raw in raw_labels:
+            if isinstance(raw, dict):
+                hydrated.append(raw)
+            else:
+                mapped = by_id.get(str(raw))
+                hydrated.append(mapped or raw)
+        issue["labels"] = hydrated
+        return issue
 
     def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         attempts = 4

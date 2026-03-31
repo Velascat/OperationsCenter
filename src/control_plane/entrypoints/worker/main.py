@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import logging
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -47,6 +49,11 @@ def issue_task_kind(issue: dict[str, Any]) -> str:
     return "goal"
 
 
+def issue_needs_detail(issue: dict[str, Any]) -> bool:
+    raw_labels = issue.get("labels")
+    return not isinstance(raw_labels, list) or len(raw_labels) == 0
+
+
 def issue_source(issue: dict[str, Any]) -> str | None:
     for label in issue_label_names(issue):
         normalized = label.strip().lower()
@@ -70,6 +77,10 @@ def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI",
         task_id = str(issue["id"])
         status_name = issue_status_name(issue)
         task_kind = issue_task_kind(issue)
+        if issue_needs_detail(issue):
+            detailed_issue = client.fetch_issue(task_id)
+            status_name = issue_status_name(detailed_issue)
+            task_kind = issue_task_kind(detailed_issue)
         if task_kind != role:
             continue
         if status_name == ready_state:
@@ -92,15 +103,17 @@ def select_watch_candidate(
     if role == "improve":
         for issue in issues:
             task_id = str(issue["id"])
-            if issue_status_name(issue) == ready_state and issue_task_kind(issue) == "improve":
+            candidate = client.fetch_issue(task_id) if issue_needs_detail(issue) else issue
+            if issue_status_name(candidate) == ready_state and issue_task_kind(candidate) == "improve":
                 return task_id, "improve_task"
         for issue in issues:
             task_id = str(issue["id"])
-            if issue_status_name(issue) != "Blocked":
+            candidate = client.fetch_issue(task_id) if issue_needs_detail(issue) else issue
+            if issue_status_name(candidate) != "Blocked":
                 continue
             if known_triaged_blocked_ids is not None and task_id in known_triaged_blocked_ids:
                 continue
-            if issue_is_unblock_chain(issue):
+            if issue_is_unblock_chain(candidate):
                 if known_triaged_blocked_ids is not None:
                     known_triaged_blocked_ids.add(task_id)
                 continue
@@ -173,6 +186,18 @@ def default_repo_key(service: ExecutionService) -> str:
     return next(iter(service.settings.repos.keys()))
 
 
+def existing_issue_names(client: PlaneClient) -> set[str]:
+    names: set[str] = set()
+    for issue in client.list_issues():
+        state_name = issue_status_name(issue).strip().lower()
+        if state_name in {"done", "cancelled"}:
+            continue
+        name = str(issue.get("name", "")).strip().lower()
+        if name:
+            names.add(name)
+    return names
+
+
 def build_follow_up_description(
     *,
     service: ExecutionService,
@@ -233,8 +258,170 @@ def create_follow_up_task(
     )
 
 
-def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: str) -> None:
-    service.run_task(client, task_id)
+def create_follow_up_task_if_missing(
+    client: PlaneClient,
+    service: ExecutionService,
+    *,
+    existing_names: set[str],
+    source_role: str,
+    task_kind: str,
+    original_issue: dict[str, Any],
+    title: str,
+    goal_text: str,
+    constraints_text: str | None = None,
+    state: str = "Ready for AI",
+) -> dict[str, Any] | None:
+    normalized = title.strip().lower()
+    if normalized in existing_names:
+        return None
+    created = create_follow_up_task(
+        client,
+        service,
+        source_role=source_role,
+        task_kind=task_kind,
+        original_issue=original_issue,
+        title=title,
+        goal_text=goal_text,
+        constraints_text=constraints_text,
+        state=state,
+    )
+    existing_names.add(normalized)
+    return created
+
+
+def recent_report_dirs(service: ExecutionService, limit: int = 8) -> list[Path]:
+    report_root = Path(service.settings.report_root)
+    if not report_root.exists():
+        return []
+    return sorted(
+        [path for path in report_root.iterdir() if path.is_dir()],
+        key=lambda path: path.name,
+        reverse=True,
+    )[:limit]
+
+
+def read_text_if_exists(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dict[str, str]], list[str]]:
+    findings: list[dict[str, str]] = []
+    report_notes: list[str] = []
+
+    for run_dir in recent_report_dirs(service):
+        result_summary = read_text_if_exists(run_dir / "result_summary.md").lower()
+        kodo_stderr = read_text_if_exists(run_dir / "kodo_stderr.log").lower()
+        failure_json = read_text_if_exists(run_dir / "failure.json").lower()
+        request_json = read_text_if_exists(run_dir / "request.json")
+
+        task_title = "recent task"
+        if request_json:
+            try:
+                payload = json.loads(request_json)
+                task_title = str(payload.get("task", {}).get("title") or task_title)
+            except json.JSONDecodeError:
+                task_title = "recent task"
+
+        if "unrecognized arguments:" in kodo_stderr and "--project" in kodo_stderr:
+            findings.append(
+                {
+                    "kind": "goal",
+                    "title": "Adapt wrapper to installed Kodo CLI contract",
+                    "goal": "Update the wrapper to match the installed Kodo CLI argument contract and add a regression test for the command builder.",
+                    "constraints": "- source: retained report analysis\n- focus on the Kodo adapter and its tests",
+                    "note": f"- report signal: Kodo CLI contract mismatch observed in {run_dir.name}",
+                }
+            )
+
+        if "execution=failed" in result_summary and "validation=passed" in result_summary and "changed_files=0" in result_summary:
+            findings.append(
+                {
+                    "kind": "goal",
+                    "title": "Handle no-op failed Kodo executions explicitly",
+                    "goal": (
+                        f"Improve worker/execution handling so failed no-op Kodo runs for '{task_title}' are classified and surfaced clearly "
+                        "instead of only ending as generic blocked tasks."
+                    ),
+                    "constraints": "- source: retained report analysis\n- focus on execution summaries, classification, and operator feedback",
+                    "note": f"- report signal: no-op failed execution observed in {run_dir.name}",
+                }
+            )
+
+        if "429 too many requests" in failure_json:
+            findings.append(
+                {
+                    "kind": "goal",
+                    "title": "Reduce Plane API pressure during worker execution",
+                    "goal": "Reduce Plane API pressure during worker execution and retries so task fetch/comment flows do not degrade into avoidable 429s.",
+                    "constraints": "- source: retained failure artifact\n- focus on request reduction, retries, and worker fetch patterns",
+                    "note": f"- report signal: Plane rate limiting observed in {run_dir.name}",
+                }
+            )
+
+    repo_key = default_repo_key(service)
+    repo_cfg = service.settings.repos[repo_key]
+    workspace_path = service.workspace.create()
+    try:
+        repo_path = service.git.clone(repo_cfg.clone_url, workspace_path)
+        service.git.checkout_base(repo_path, repo_cfg.default_branch)
+        top_level = sorted(
+            path.name
+            for path in repo_path.iterdir()
+            if path.name != ".git"
+        )
+        report_notes.append(f"- inspected repo: {repo_key} @ {repo_cfg.default_branch}")
+        report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
+        report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
+        report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
+    finally:
+        service.workspace.cleanup(workspace_path)
+
+    unique: dict[str, dict[str, str]] = {}
+    for finding in findings:
+        unique.setdefault(finding["title"].strip().lower(), finding)
+    return list(unique.values())[:3], report_notes
+
+
+def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
+    issue = client.fetch_issue(task_id)
+    result = service.run_task(client, task_id)
+    created_ids: list[str] = []
+    if not result.success and result.validation_passed and not result.changed_files:
+        existing_names = existing_issue_names(client)
+        follow_up = create_follow_up_task_if_missing(
+            client,
+            service,
+            existing_names=existing_names,
+            source_role="goal",
+            task_kind="improve",
+            original_issue=issue,
+            title=f"Investigate no-op execution for {issue.get('name', 'goal task')}",
+            goal_text=(
+                f"Inspect why the goal task '{issue.get('name', 'Untitled')}' failed without producing any repository changes "
+                "and turn the finding into one or more bounded follow-up tasks."
+            ),
+            constraints_text=(
+                f"- source_task_id: {task_id}\n"
+                f"- source_run_id: {result.run_id}\n"
+                "- focus on execution-path diagnosis before proposing more implementation work"
+            ),
+        )
+        if follow_up is not None:
+            created_ids.append(str(follow_up.get("id")))
+            client.comment_issue(
+                task_id,
+                "\n".join(
+                    [
+                        "Goal worker created an improve follow-up task",
+                        f"- follow_up_task_id: {follow_up.get('id')}",
+                        f"- follow_up_title: {follow_up.get('name')}",
+                        "- reason: execution failed without code changes",
+                    ]
+                ),
+            )
+    return created_ids
 
 
 def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
@@ -287,35 +474,47 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
 
 def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
-    created = create_follow_up_task(
-        client,
-        service,
-        source_role="improve",
-        task_kind="goal",
-        original_issue=issue,
-        title=f"Implement follow-up for {issue.get('name', 'improve task')}",
-        goal_text=(
-            f"Turn the improve task '{issue.get('name', 'Untitled')}' into a bounded implementation task and complete "
-            "the described follow-up work."
-        ),
-        constraints_text=(
-            f"- source_task_id: {task_id}\n"
-            "- keep this follow-up bounded and implementation-focused"
-        ),
-    )
+    existing_names = existing_issue_names(client)
+    findings, report_notes = discover_improvement_candidates(service)
+    created_ids: list[str] = []
+    created_titles: list[str] = []
+
+    for finding in findings:
+        created = create_follow_up_task_if_missing(
+            client,
+            service,
+            existing_names=existing_names,
+            source_role="improve",
+            task_kind=finding["kind"],
+            original_issue=issue,
+            title=finding["title"],
+            goal_text=finding["goal"],
+            constraints_text=(
+                f"- source_task_id: {task_id}\n"
+                f"{finding['constraints']}"
+            ),
+        )
+        if created is not None:
+            created_ids.append(str(created.get("id")))
+            created_titles.append(str(created.get("name")))
+
+    comment_lines = [
+        IMPROVE_COMMENT_MARKER,
+        *report_notes,
+        f"- created_task_ids: {', '.join(created_ids) if created_ids else 'none'}",
+    ]
+    if findings:
+        comment_lines.append("- discovered_findings:")
+        for finding in findings:
+            comment_lines.append(f"- {finding['title']}")
+            comment_lines.append(finding["note"])
+
     client.comment_issue(
         task_id,
-        "\n".join(
-            [
-                IMPROVE_COMMENT_MARKER,
-                f"- follow_up_task_id: {created.get('id')}",
-                f"- follow_up_title: {created.get('name')}",
-                "- status: review",
-            ]
-        ),
+        "\n".join(comment_lines),
     )
-    client.transition_issue(task_id, "Review")
-    return [str(created.get("id"))]
+    client.transition_issue(task_id, "Review" if created_ids else "Done")
+    return created_ids
 
 
 def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_id: str) -> tuple[str, list[str]]:
@@ -430,12 +629,13 @@ def run_watch_loop(
                     action,
                 )
                 if role == "goal":
-                    handle_goal_task(client, service, task_id)
+                    created_ids = handle_goal_task(client, service, task_id)
                     logger.info(
-                        '{"event":"watch_action_complete","role":"%s","cycle":%d,"task_id":"%s","action":"execute","created_task_ids":""}',
+                        '{"event":"watch_action_complete","role":"%s","cycle":%d,"task_id":"%s","action":"execute","created_task_ids":"%s"}',
                         role,
                         cycle,
                         task_id,
+                        ",".join(created_ids),
                     )
                 elif role == "test":
                     created_ids = handle_test_task(client, service, task_id)

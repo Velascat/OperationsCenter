@@ -7,11 +7,14 @@ import pytest
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
     classify_blocked_issue,
+    handle_goal_task,
+    handle_improve_task,
     handle_blocked_triage,
     issue_status_name,
     issue_task_kind,
     run_watch_loop,
     select_ready_task_id,
+    select_watch_candidate,
 )
 
 
@@ -114,6 +117,28 @@ def test_select_ready_task_id_returns_first_matching_issue() -> None:
     assert select_ready_task_id(client) == "TASK-2"
 
 
+def test_select_watch_candidate_fetches_detail_when_labels_missing_for_improve_role() -> None:
+    class DetailedClient(FakePlaneClient):
+        def fetch_issue(self, task_id: str) -> dict[str, object]:
+            if task_id == "IMPROVE-1":
+                return {
+                    "id": "IMPROVE-1",
+                    "state": {"name": "Ready for AI"},
+                    "labels": [{"name": "task-kind: improve"}],
+                }
+            return super().fetch_issue(task_id)
+
+    client = DetailedClient(
+        [
+            {"id": "IMPROVE-1", "state": {"name": "Ready for AI"}, "labels": []},
+        ]
+    )
+
+    task_id, action = select_watch_candidate(client, ready_state="Ready for AI", role="improve")
+
+    assert (task_id, action) == ("IMPROVE-1", "improve_task")
+
+
 def test_issue_task_kind_defaults_to_goal_without_label() -> None:
     assert issue_task_kind({"labels": []}) == "goal"
 
@@ -207,6 +232,86 @@ def test_run_watch_loop_improve_role_triages_blocked_task() -> None:
         {"name": "source: improve-worker"},
     ]
     assert any("Blocked triage result" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_goal_task_creates_improve_follow_up_for_noop_failure() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-1",
+                "name": "Fix watcher",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ]
+    )
+    service = FakeService(success=False)
+    service.run_task = lambda _client, task_id: ExecutionResult(  # type: ignore[assignment]
+        run_id="run-123",
+        success=False,
+        changed_files=[],
+        validation_passed=True,
+        validation_results=[],
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        pull_request_url=None,
+        summary="failed without changes",
+        artifacts=[],
+        policy_violations=[],
+    )
+
+    created_ids = handle_goal_task(client, service, "GOAL-1")
+
+    assert created_ids == ["FOLLOWUP-1"]
+    assert client.created[0]["labels"] == [
+        {"name": "task-kind: improve"},
+        {"name": "source: goal-worker"},
+    ]
+    assert any("Goal worker created an improve follow-up task" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "IMPROVE-1",
+                "name": "Inspect repo",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: improve"}],
+            },
+        ]
+    )
+    service = FakeService()
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.discover_improvement_candidates",
+        lambda _service: (
+            [
+                {
+                    "kind": "goal",
+                    "title": "Harden worker classification",
+                    "goal": "Improve worker failure classification.",
+                    "constraints": "- keep the change bounded",
+                    "note": "- note: found in reports",
+                },
+                {
+                    "kind": "test",
+                    "title": "Add watcher regression coverage",
+                    "goal": "Add a regression test for watcher behavior.",
+                    "constraints": "- use existing test style",
+                    "note": "- note: found in repo scan",
+                },
+            ],
+            ["- inspected repo: control-plane @ main"],
+        ),
+    )
+
+    created_ids = handle_improve_task(client, service, "IMPROVE-1")
+
+    assert created_ids == ["FOLLOWUP-1", "FOLLOWUP-2"]
+    assert client.transitions[-1] == ("IMPROVE-1", "Review")
+    assert any("Improve worker result" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> None:
