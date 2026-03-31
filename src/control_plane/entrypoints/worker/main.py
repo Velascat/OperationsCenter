@@ -1314,6 +1314,24 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     issue = client.fetch_issue(task_id)
     result = run_service_task(service, client, task_id, worker_role="goal")
     created_ids: list[str] = []
+    if result.outcome_status == "no_op":
+        client.comment_issue(
+            task_id,
+            render_worker_comment(
+                "[Goal] No meaningful repo change produced",
+                [
+                    f"run_id: {result.run_id}",
+                    f"task_id: {task_id}",
+                    "task_kind: goal",
+                    "result_status: blocked",
+                    f"outcome_reason: {result.outcome_reason or 'no_op'}",
+                    "follow_up_task_ids: none",
+                    "next_action: investigate why execution only changed internal executor files",
+                ],
+            ),
+        )
+        rewrite_worker_summary(result, service)
+        return created_ids
     if goal_failure_needs_manual_env_fix(result):
         result.blocked_classification = "infra_tooling"
         client.comment_issue(
@@ -1430,6 +1448,25 @@ def goal_failure_needs_manual_env_fix(result: ExecutionResult) -> bool:
 def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
     result = run_service_task(service, client, task_id, worker_role="test")
+    if result.outcome_status == "no_op":
+        result.final_status = "Blocked"
+        client.comment_issue(
+            task_id,
+            render_worker_comment(
+                "[Test] Verification produced no meaningful repo change",
+                [
+                    f"run_id: {result.run_id}",
+                    f"task_id: {task_id}",
+                    "task_kind: test",
+                    "result_status: blocked",
+                    f"outcome_reason: {result.outcome_reason or 'no_op'}",
+                    "follow_up_task_ids: none",
+                    "next_action: investigate why verification only touched internal executor files",
+                ],
+            ),
+        )
+        rewrite_worker_summary(result, service)
+        return []
     if result.success:
         client.transition_issue(task_id, "Done")
         result.final_status = "Done"

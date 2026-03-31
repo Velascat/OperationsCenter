@@ -67,6 +67,7 @@ class ExecutionResult(BaseModel):
     outcome_status: str = "executed"
     outcome_reason: str | None = None
     changed_files: list[str] = Field(default_factory=list)
+    internal_changed_files: list[str] = Field(default_factory=list)
     diff_stat_excerpt: str | None = None
     validation_passed: bool = False
     validation_results: list[ValidationResult] = Field(default_factory=list)

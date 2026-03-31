@@ -18,6 +18,7 @@ from control_plane.entrypoints.worker.main import (
     handle_improve_task,
     handle_propose_cycle,
     handle_blocked_triage,
+    handle_test_task,
     issue_status_name,
     issue_task_kind,
     reconcile_stale_running_issues,
@@ -418,6 +419,45 @@ def test_handle_goal_task_does_not_create_follow_up_for_provider_auth_failure() 
     assert any("[Goal] Execution blocked by environment/auth" in comment for _, comment in client.issue_comments)
 
 
+def test_handle_goal_task_does_not_create_test_follow_up_for_internal_only_no_op() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-NOOP",
+                "name": "Implement watcher fix",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ]
+    )
+    service = FakeService(success=True)
+    service.run_task = lambda _client, task_id: ExecutionResult(  # type: ignore[assignment]
+        run_id="run-noop-goal",
+        success=True,
+        outcome_status="no_op",
+        outcome_reason="internal_only_change",
+        changed_files=[],
+        internal_changed_files=["kodo/config.json"],
+        validation_passed=True,
+        validation_results=[],
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        pull_request_url=None,
+        execution_stderr_excerpt=None,
+        summary="run_id=run-noop-goal execution=passed validation=passed policy=passed branch_push=not_pushed changed_files=0 internal_changed_files=1 no_op=true",
+        artifacts=[],
+        policy_violations=[],
+        final_status="Blocked",
+    )
+
+    created_ids = handle_goal_task(client, service, "GOAL-NOOP")
+
+    assert created_ids == []
+    assert client.created == []
+    assert any("No meaningful repo change produced" in comment for _, comment in client.issue_comments)
+
+
 def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.MonkeyPatch) -> None:
     client = FakePlaneClient(
         [
@@ -567,6 +607,46 @@ def test_run_watch_loop_returns_claimed_improve_task_to_ready_after_worker_error
     assert ("IMPROVE-ERR", "Running") in client.transitions
     assert client.transitions[-1] == ("IMPROVE-ERR", "Ready for AI")
     assert any("returned to queue after worker error" in comment.lower() for _, comment in client.issue_comments)
+
+
+def test_handle_test_task_does_not_mark_done_for_internal_only_no_op() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "TEST-NOOP",
+                "name": "Verify watcher",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: test"}],
+            },
+        ]
+    )
+    service = FakeService(success=True)
+    service.run_task = lambda _client, task_id: ExecutionResult(  # type: ignore[assignment]
+        run_id="run-noop-test",
+        success=True,
+        outcome_status="no_op",
+        outcome_reason="internal_only_change",
+        changed_files=[],
+        internal_changed_files=["kodo/config.json"],
+        validation_passed=True,
+        validation_results=[],
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        pull_request_url=None,
+        execution_stderr_excerpt=None,
+        summary="run_id=run-noop-test execution=passed validation=passed policy=passed branch_push=not_pushed changed_files=0 internal_changed_files=1 no_op=true",
+        artifacts=[],
+        policy_violations=[],
+        final_status="Blocked",
+    )
+
+    created_ids = handle_test_task(client, service, "TEST-NOOP")
+
+    assert created_ids == []
+    assert client.created == []
+    assert ("TEST-NOOP", "Done") not in client.transitions
+    assert any("Verification produced no meaningful repo change" in comment for _, comment in client.issue_comments)
 
 
 def test_reconcile_stale_running_issues_moves_owned_running_tasks_back_to_ready() -> None:

@@ -212,6 +212,8 @@ class ExecutionService:
             phase = "repo_setup"
             self._log_event("phase", run_id, phase=phase, repo_key=repo_target.repo_key)
             repo_path = self.git.clone(repo_target.clone_url, workspace_path)
+            self.git.add_local_exclude(repo_path, ".kodo/")
+            self._log_event("workspace_exclude_added", run_id, repo_path=str(repo_path), pattern=".kodo/")
             self.git.verify_remote_branch_exists(repo_path, task.base_branch)
             self.git.checkout_base(repo_path, task.base_branch)
             self.git.set_identity(
@@ -289,10 +291,12 @@ class ExecutionService:
                 )
             )
 
-            changed_files = self.git.changed_files(repo_path)
-            diff_stat = self.git.diff_stat(repo_path) if changed_files else ""
-            diff_patch = self.git.diff_patch(repo_path) if changed_files else ""
-            if changed_files:
+            all_changed_files = self.git.changed_files(repo_path)
+            changed_files = self._meaningful_changed_files(all_changed_files)
+            internal_changed_files = [path for path in all_changed_files if path not in changed_files]
+            diff_stat = self.git.diff_stat(repo_path) if all_changed_files else ""
+            diff_patch = self.git.diff_patch(repo_path) if all_changed_files else ""
+            if all_changed_files:
                 artifacts.extend(self.reporter.write_diff(run_dir, diff_stat=diff_stat, diff_patch=diff_patch))
             policy_violations = self.scope_checker.find_violations(changed_files, task.allowed_paths)
             if policy_violations:
@@ -301,6 +305,7 @@ class ExecutionService:
                 "policy_evaluated",
                 run_id,
                 changed_files=changed_files,
+                internal_changed_files=internal_changed_files,
                 policy_success=not policy_violations,
                 policy_violations=policy_violations,
             )
@@ -314,10 +319,11 @@ class ExecutionService:
             if execution_success and not changed_files:
                 success = True
                 outcome_status = "no_op"
-                outcome_reason = "no_material_change"
+                outcome_reason = "internal_only_change" if internal_changed_files else "no_material_change"
                 summary = (
                     f"run_id={run_id} execution=passed validation={'passed' if validation_ok else 'failed'} "
-                    f"policy={'passed' if policy_success else 'failed'} branch_push=not_pushed changed_files=0 no_op=true"
+                    f"policy={'passed' if policy_success else 'failed'} branch_push=not_pushed "
+                    f"changed_files=0 internal_changed_files={len(internal_changed_files)} no_op=true"
                 )
             else:
                 summary = (
@@ -351,7 +357,7 @@ class ExecutionService:
                 push_reason=push_reason or "not_pushed",
             )
 
-            status = "Blocked" if policy_violations or not success else "Review"
+            status = "Blocked" if outcome_status == "no_op" or policy_violations or not success else "Review"
 
             result = ExecutionResult(
                 run_id=run_id,
@@ -361,6 +367,7 @@ class ExecutionService:
                 outcome_status=outcome_status,
                 outcome_reason=outcome_reason,
                 changed_files=changed_files,
+                internal_changed_files=internal_changed_files,
                 diff_stat_excerpt=self._diff_stat_excerpt(diff_stat),
                 validation_passed=validation_ok,
                 validation_results=validation_results,
@@ -451,6 +458,11 @@ class ExecutionService:
             if len(result.changed_files) > 5:
                 display = f"{display}, ... (+{len(result.changed_files) - 5} more)"
             lines.append(f"- changed_files: {display}")
+        if result.internal_changed_files:
+            display = ", ".join(result.internal_changed_files[:5])
+            if len(result.internal_changed_files) > 5:
+                display = f"{display}, ... (+{len(result.internal_changed_files) - 5} more)"
+            lines.append(f"- internal_changed_files: {display}")
         if result.diff_stat_excerpt:
             lines.append(f"- diff_stat: {result.diff_stat_excerpt.splitlines()[0]}")
         if result.follow_up_task_ids:
@@ -475,3 +487,12 @@ class ExecutionService:
         if not lines:
             return None
         return "\n".join(lines[:4])
+
+    @staticmethod
+    def _is_internal_execution_path(path: str) -> bool:
+        normalized = path.strip().replace("\\", "/").lower()
+        return normalized.startswith("kodo/")
+
+    @classmethod
+    def _meaningful_changed_files(cls, changed_files: list[str]) -> list[str]:
+        return [path for path in changed_files if not cls._is_internal_execution_path(path)]

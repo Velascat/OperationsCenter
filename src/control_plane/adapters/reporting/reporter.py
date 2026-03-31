@@ -137,6 +137,8 @@ class Reporter:
             "## Changed Files",
         ]
         lines.extend([f"- {f}" for f in result.changed_files] or ["- (none)"])
+        lines.extend(["", "## Internal Changed Files"])
+        lines.extend([f"- {f}" for f in result.internal_changed_files] or ["- (none)"])
         if result.diff_stat_excerpt:
             lines.extend(["", "## Diff Stat"])
             lines.extend([f"- {line}" for line in result.diff_stat_excerpt.splitlines()] or ["- (none)"])

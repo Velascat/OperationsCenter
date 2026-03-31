@@ -57,6 +57,8 @@ def test_service_uses_bootstrap_environment_for_validation(tmp_path: Path) -> No
     service.workspace.create = lambda: tmp_path / "workspace"  # type: ignore[assignment]
     service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
     service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    added_excludes: list[tuple[Path, str]] = []
+    service.git.add_local_exclude = lambda repo_path, pattern: added_excludes.append((repo_path, pattern))  # type: ignore[assignment]
     service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
     service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
     service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
@@ -97,3 +99,4 @@ def test_service_uses_bootstrap_environment_for_validation(tmp_path: Path) -> No
     assert result.validation_passed is True
     assert captured_env["VIRTUAL_ENV"] == str(repo_path / ".venv")
     assert captured_env["PATH"].startswith(f"{repo_path / '.venv' / 'bin'}:")
+    assert added_excludes == [(repo_path, ".kodo/")]

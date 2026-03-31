@@ -24,6 +24,19 @@ class GitClient:
         self._run(["git", "clone", clone_url, str(repo_path)])
         return repo_path
 
+    def add_local_exclude(self, repo_path: Path, pattern: str) -> None:
+        exclude_path = repo_path / ".git" / "info" / "exclude"
+        exclude_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = exclude_path.read_text() if exclude_path.exists() else ""
+        lines = [line.strip() for line in existing.splitlines()]
+        if pattern.strip() in lines:
+            return
+        updated = existing
+        if updated and not updated.endswith("\n"):
+            updated += "\n"
+        updated += f"{pattern.strip()}\n"
+        exclude_path.write_text(updated)
+
     def verify_remote_branch_exists(self, repo_path: Path, branch: str) -> None:
         out = self._run(["git", "ls-remote", "--heads", "origin", branch], cwd=repo_path)
         if not out:
