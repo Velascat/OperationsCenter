@@ -58,6 +58,8 @@ class SetupAnswers:
     git_token_value: str
     git_author_name: str
     git_author_email: str
+    git_sign_commits: bool
+    git_signing_key: str | None
     kodo_binary: str
     kodo_team: str
     kodo_cycles: int
@@ -82,9 +84,9 @@ def split_csv(value: str) -> list[str]:
 
 def print_section(title: str, detail: str | None = None) -> None:
     typer.echo("")
-    typer.secho(title, fg=typer.colors.CYAN, bold=True)
+    typer.secho(f"[{title}]", fg=typer.colors.CYAN, bold=True)
     if detail:
-        typer.echo(detail)
+        typer.secho(detail, fg=typer.colors.BRIGHT_BLACK)
 
 
 def run_local_command(command: str) -> None:
@@ -98,6 +100,43 @@ def maybe_open_url(url: str) -> None:
         webbrowser.open(url)
     except Exception:
         return
+
+
+def load_env_exports(env_path: Path) -> dict[str, str]:
+    if not env_path.exists():
+        return {}
+    exports: dict[str, str] = {}
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        body = line[len("export ") :]
+        key, value = body.split("=", 1)
+        parsed = value.strip()
+        if parsed.startswith("'") and parsed.endswith("'"):
+            parsed = parsed[1:-1].replace("'\"'\"'", "'")
+        exports[key.strip()] = parsed
+    return exports
+
+
+def load_existing_config(config_path: Path) -> dict[str, object]:
+    if not config_path.exists():
+        return {}
+    raw = yaml.safe_load(config_path.read_text())
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+def existing_config_value(config: dict[str, object], *keys: str) -> str | None:
+    current: object = config
+    for key in keys:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
+    if current is None:
+        return None
+    return str(current)
 
 
 def find_ssh_key_pair() -> tuple[Path, Path] | None:
@@ -245,15 +284,7 @@ def ensure_github_ssh_setup(git_email: str, repo_root: Path) -> None:
 
 
 def read_saved_plane_start_command(env_path: Path) -> str | None:
-    if not env_path.exists():
-        return None
-    for line in env_path.read_text().splitlines():
-        if line.startswith("export CONTROL_PLANE_PLANE_START_COMMAND="):
-            value = line.split("=", 1)[1].strip()
-            if value.startswith("'") and value.endswith("'"):
-                return value[1:-1].replace("'\"'\"'", "'")
-            return value or None
-    return None
+    return load_env_exports(env_path).get("CONTROL_PLANE_PLANE_START_COMMAND")
 
 
 def resolve_default_plane_start_command(env_path: Path) -> str | None:
@@ -294,6 +325,8 @@ def render_settings_yaml(answers: SetupAnswers) -> str:
             "push_on_validation_failure": True,
             "author_name": answers.git_author_name,
             "author_email": answers.git_author_email,
+            "sign_commits": answers.git_sign_commits,
+            "signing_key": answers.git_signing_key,
         },
         "kodo": {
             "binary": answers.kodo_binary,
@@ -421,13 +454,26 @@ def main(
     ),
 ) -> None:
     typer.secho("Control Plane Setup", fg=typer.colors.GREEN, bold=True)
+    existing_env = load_env_exports(env_path)
+    existing_config = load_existing_config(config_path)
 
-    print_section("Plane")
+    print_section("Plane", "Local Plane service, workspace target, and API access.")
     advanced_mode = typer.confirm("Advanced setup?", default=False)
-    plane_base_url = typer.prompt("Plane base URL", default=DEFAULT_PLANE_URL)
-    plane_workspace_slug = typer.prompt("Plane workspace slug", default="engineering")
-    plane_project_id = typer.prompt("Plane project id", default="1")
-    plane_api_token_env = "PLANE_API_TOKEN"
+    plane_base_url = typer.prompt(
+        "Plane base URL",
+        default=existing_env.get("CONTROL_PLANE_PLANE_URL")
+        or existing_config_value(existing_config, "plane", "base_url")
+        or DEFAULT_PLANE_URL,
+    )
+    plane_workspace_slug = typer.prompt(
+        "Plane workspace slug",
+        default=existing_config_value(existing_config, "plane", "workspace_slug") or "engineering",
+    )
+    plane_project_id = typer.prompt(
+        "Plane project id",
+        default=existing_config_value(existing_config, "plane", "project_id") or "1",
+    )
+    plane_api_token_env = existing_config_value(existing_config, "plane", "api_token_env") or "PLANE_API_TOKEN"
     if advanced_mode:
         plane_api_token_env = typer.prompt("Plane token env var name (required)", default="PLANE_API_TOKEN")
     default_plane_start_command = resolve_default_plane_start_command(env_path)
@@ -487,39 +533,93 @@ def main(
             typer.echo(f"Opening {plane_base_url} ...")
             maybe_open_url(plane_base_url)
         typer.echo("Log into Plane in the browser, then create a personal access token.")
-        typer.echo("Path in Plane: Profile Settings -> Personal Access Tokens")
+        typer.echo("Plane path: Profile Settings -> Personal Access Tokens")
     else:
         typer.echo("Plane was not started by setup.")
 
-    plane_api_token_value = typer.prompt(
-        "Paste Plane API token",
-        hide_input=True,
-        default="",
-    )
+    existing_plane_token = existing_env.get(plane_api_token_env, "")
+    if existing_plane_token:
+        reuse_plane_token = typer.confirm("Reuse existing Plane API token from local env?", default=True)
+        if reuse_plane_token:
+            plane_api_token_value = existing_plane_token
+        else:
+            plane_api_token_value = typer.prompt(
+                "Paste Plane API token",
+                hide_input=True,
+                default="",
+            )
+    else:
+        plane_api_token_value = typer.prompt(
+            "Paste Plane API token",
+            hide_input=True,
+            default="",
+        )
 
-    print_section("Git")
-    git_provider = typer.prompt("Git provider", default="github")
-    git_token_env = "GITHUB_TOKEN"
-    if advanced_mode:
-        git_token_env = typer.prompt("Git token env var name (recommended)", default="GITHUB_TOKEN")
-    git_token_value = typer.prompt(
-        "Git token (optional; leave blank if SSH will be used for git remotes)",
-        hide_input=True,
-        default="",
+    print_section("Git", "Remote host, authentication, commit identity, and SSH access.")
+    git_provider = typer.prompt(
+        "Git provider (remote host/service)",
+        default=existing_config_value(existing_config, "git", "provider") or "github",
     )
-    git_author_name = typer.prompt("Git bot author name", default="Control Plane Bot")
-    git_author_email = typer.prompt("Git bot author email", default="control-plane-bot@example.com")
+    git_token_env = existing_config_value(existing_config, "git", "token_env") or "GITHUB_TOKEN"
+    if advanced_mode:
+        git_token_env = typer.prompt(
+            "Git authentication key env var name (optional; used for HTTPS clone/push)",
+            default=git_token_env,
+        )
+    typer.echo("HTTPS authentication is optional. If your remotes use SSH, leave the auth key blank.")
+    existing_git_token = existing_env.get(git_token_env, "")
+    if existing_git_token:
+        reuse_git_token = typer.confirm("Reuse existing Git token from local env?", default=True)
+        if reuse_git_token:
+            git_token_value = existing_git_token
+        else:
+            git_token_value = typer.prompt(
+                "Git authentication key/token (optional; leave blank if SSH will be used for git remotes)",
+                hide_input=True,
+                default="",
+            )
+    else:
+        git_token_value = typer.prompt(
+            "Git authentication key/token (optional; leave blank if SSH will be used for git remotes)",
+            hide_input=True,
+            default="",
+        )
+    git_author_name = typer.prompt(
+        "Git bot author name",
+        default=existing_config_value(existing_config, "git", "author_name") or "Control Plane Bot",
+    )
+    git_author_email = typer.prompt(
+        "Git bot author email",
+        default=existing_config_value(existing_config, "git", "author_email") or "control-plane-bot@example.com",
+    )
+    typer.echo("Commit signing is optional and only affects future signed-commit wiring.")
+    git_sign_commits = typer.confirm(
+        "Configure commit signing for the bot identity?",
+        default=(existing_config_value(existing_config, "git", "sign_commits") or "false").lower() == "true",
+    )
+    existing_signing_key = existing_config_value(existing_config, "git", "signing_key") or ""
+    git_signing_key: str | None = None
+    if git_sign_commits:
+        git_signing_key = typer.prompt(
+            "Git signing key id/fingerprint (optional; leave blank to configure later)",
+            default=existing_signing_key,
+        ).strip() or None
     ensure_github_ssh_setup(git_author_email, Path.cwd())
 
-    print_section("Kodo")
-    kodo_binary = typer.prompt("Kodo binary", default="kodo")
-    kodo_team = typer.prompt("Kodo team", default="full")
-    kodo_cycles = int(typer.prompt("Kodo cycles", default="3"))
-    kodo_exchanges = int(typer.prompt("Kodo exchanges", default="20"))
-    kodo_orchestrator = typer.prompt("Kodo orchestrator", default="api")
-    kodo_effort = typer.prompt("Kodo effort", default="medium")
+    print_section("Kodo", "Execution defaults for the local coding engine.")
+    kodo_binary = typer.prompt("Kodo binary", default=existing_config_value(existing_config, "kodo", "binary") or "kodo")
+    kodo_team = typer.prompt("Kodo team", default=existing_config_value(existing_config, "kodo", "team") or "full")
+    kodo_cycles = int(typer.prompt("Kodo cycles", default=existing_config_value(existing_config, "kodo", "cycles") or "3"))
+    kodo_exchanges = int(
+        typer.prompt("Kodo exchanges", default=existing_config_value(existing_config, "kodo", "exchanges") or "20")
+    )
+    kodo_orchestrator = typer.prompt(
+        "Kodo orchestrator",
+        default=existing_config_value(existing_config, "kodo", "orchestrator") or "api",
+    )
+    kodo_effort = typer.prompt("Kodo effort", default=existing_config_value(existing_config, "kodo", "effort") or "medium")
 
-    print_section("Providers")
+    print_section("Providers", "Supported Kodo backends detected on this machine.")
     statuses = detect_all_provider_statuses()
     write_provider_summary(statuses)
 
@@ -532,6 +632,7 @@ def main(
             continue
         should_install = typer.confirm(f"Install {spec.label} via {spec.install_method}?", default=status.key in {"codex", "claude"})
         if should_install:
+            typer.echo(f"[provider] Installing {spec.label}...")
             install_provider(spec)
             typer.echo(f"[provider] Installed {spec.label}")
     statuses = detect_all_provider_statuses()
@@ -539,8 +640,6 @@ def main(
     for status in statuses:
         spec = PROVIDER_SPECS[status.key]
         if not status.installed:
-            continue
-        if status.key == "claude" and not status.interactive_ready:
             continue
         if status.key in {"codex", "gemini"} and not status.headless_ready:
             env_var = spec.auth_env_var
@@ -551,13 +650,18 @@ def main(
                     if prompt_api_key:
                         typer.echo(f"Set {env_var} in your shell or local env file before unattended runs.")
             if spec.interactive_login_command:
-                run_login = typer.confirm(f"Run {spec.label} interactive login/verification now?", default=status.key in {"codex"})
+                run_login = typer.confirm(f"Launch {spec.label} login now?", default=status.key in {"codex"})
                 if run_login:
-                    run_interactive_provider_login(spec)
+                    typer.echo(f"[provider] Running: {spec.interactive_login_command}")
+                    if not run_interactive_provider_login(spec, cwd=Path.cwd()):
+                        typer.echo(f"[provider] {spec.label} login did not complete successfully. You can finish it later and rerun setup or providers-status.")
         elif status.key == "claude":
-            run_login = typer.confirm("Run Claude Code now to complete/login verify auth?", default=True)
+            typer.echo("Claude Code uses browser-based account login from the CLI.")
+            run_login = typer.confirm("Launch Claude Code login now?", default=True)
             if run_login:
-                run_interactive_provider_login(spec)
+                typer.echo(f"[provider] Running: {spec.interactive_login_command}")
+                if not run_interactive_provider_login(spec, cwd=Path.cwd()):
+                    typer.echo("[provider] Claude Code login did not complete successfully. Finish it later with `claude auth login`.")
 
     statuses = detect_all_provider_statuses()
     typer.echo("[provider] Final provider summary:")
@@ -567,14 +671,23 @@ def main(
     if not usable_providers:
         raise typer.BadParameter("No usable provider backend is ready. Install/authenticate at least one provider.")
 
-    headless_required = typer.confirm("Require unattended/headless provider readiness?", default=False)
+    existing_headless_required = existing_env.get("CONTROL_PLANE_PROVIDER_HEADLESS_REQUIRED") == "1"
+    headless_required = typer.confirm("Require unattended/headless provider readiness?", default=existing_headless_required)
     if headless_required and not any(status.headless_ready for status in statuses):
         raise typer.BadParameter("Headless mode requested, but no provider has API-key/headless readiness.")
 
-    preferred_smart_provider = choose_preferred_provider(statuses, "Preferred smart provider", default="claude")
-    preferred_fast_provider = choose_preferred_provider(statuses, "Preferred fast provider", default="codex")
+    preferred_smart_provider = choose_preferred_provider(
+        statuses,
+        "Preferred smart provider",
+        default=existing_env.get("CONTROL_PLANE_PROVIDER_PREFERRED_SMART") or "claude",
+    )
+    preferred_fast_provider = choose_preferred_provider(
+        statuses,
+        "Preferred fast provider",
+        default=existing_env.get("CONTROL_PLANE_PROVIDER_PREFERRED_FAST") or "codex",
+    )
 
-    print_section("Repos", "You can configure one or more target repos.")
+    print_section("Repos", "Target repositories, branch policy, validation, and repo-local bootstrap.")
     repos: list[RepoSetupAnswers] = []
     repo_index = 1
     while True:
@@ -603,6 +716,8 @@ def main(
         git_token_value=git_token_value,
         git_author_name=git_author_name,
         git_author_email=git_author_email,
+        git_sign_commits=git_sign_commits,
+        git_signing_key=git_signing_key,
         kodo_binary=kodo_binary,
         kodo_team=kodo_team,
         kodo_cycles=kodo_cycles,
@@ -623,11 +738,13 @@ def main(
     task_template_path.parent.mkdir(parents=True, exist_ok=True)
     task_template_path.write_text(render_task_template(answers))
 
-    typer.echo(f"Wrote config: {config_path}")
-    typer.echo(f"Wrote env file: {env_path}")
-    typer.echo(f"Wrote task template: {task_template_path}")
+    print_section("Done", "Local setup files were updated.")
+    typer.echo(f"Config: {config_path}")
+    typer.echo(f"Env:    {env_path}")
+    typer.echo(f"Task:   {task_template_path}")
     typer.echo("")
-    typer.echo(f"Next: source {env_path} and use {config_path} with worker/api/smoke commands.")
+    typer.echo(f"Next: source {env_path}")
+    typer.echo(f"Then use {config_path} with worker/api/smoke commands.")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ class GitSettings(BaseModel):
     push_on_validation_failure: bool = True
     author_name: str = "Control Plane Bot"
     author_email: str = "control-plane-bot@example.com"
+    sign_commits: bool = False
+    signing_key: str | None = None
 
 
 class KodoSettings(BaseModel):

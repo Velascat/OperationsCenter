@@ -23,6 +23,8 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
         git_token_value="gh-secret",
         git_author_name="Control Plane Bot",
         git_author_email="bot@example.com",
+        git_sign_commits=True,
+        git_signing_key="ABC12345",
         kodo_binary="kodo",
         kodo_team="full",
         kodo_cycles=3,
@@ -53,6 +55,8 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
 
     assert "api_token_env: PLANE_API_TOKEN" in rendered
     assert "token_env: GITHUB_TOKEN" in rendered
+    assert "sign_commits: true" in rendered
+    assert "signing_key: ABC12345" in rendered
     assert "bootstrap_enabled: true" in rendered
     assert "venv_dir: .venv" in rendered
     assert "install_dev_command: .venv/bin/pip install -e .[dev]" in rendered
@@ -73,6 +77,8 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
         git_token_value="gh-secret",
         git_author_name="Control Plane Bot",
         git_author_email="bot@example.com",
+        git_sign_commits=False,
+        git_signing_key=None,
         kodo_binary="kodo",
         kodo_team="full",
         kodo_cycles=3,
@@ -128,6 +134,8 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
         git_token_value="gh-secret",
         git_author_name="Control Plane Bot",
         git_author_email="bot@example.com",
+        git_sign_commits=False,
+        git_signing_key=None,
         kodo_binary="kodo",
         kodo_team="full",
         kodo_cycles=3,
@@ -187,6 +195,8 @@ def test_render_task_template_uses_default_repo() -> None:
         git_token_value="gh-secret",
         git_author_name="Control Plane Bot",
         git_author_email="bot@example.com",
+        git_sign_commits=False,
+        git_signing_key=None,
         kodo_binary="kodo",
         kodo_team="full",
         kodo_cycles=3,
@@ -264,6 +274,6 @@ def test_summarize_provider_statuses_distinguishes_states() -> None:
         ]
     )
 
-    assert "Claude Code: installed + interactive ready" in summary
-    assert "OpenAI Codex CLI: installed + headless ready" in summary
+    assert "Claude Code: installed + interactive ready (1.0.0)" in summary
+    assert "OpenAI Codex CLI: installed + headless ready (1.0.0)" in summary
     assert "Gemini CLI: not installed" in summary

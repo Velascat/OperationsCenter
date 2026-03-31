@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 
 import typer
@@ -43,7 +44,7 @@ PROVIDER_SPECS = {
         install_method="Native installer (preferred)",
         install_command="curl -fsSL https://claude.ai/install.sh | bash",
         auth_env_var=None,
-        interactive_login_command="claude",
+        interactive_login_command="claude auth login",
         installable=True,
     ),
     "codex": ProviderSpec(
@@ -54,7 +55,7 @@ PROVIDER_SPECS = {
         install_method="npm",
         install_command="npm install -g @openai/codex",
         auth_env_var="CODEX_API_KEY",
-        interactive_login_command="codex --help",
+        interactive_login_command="codex login",
         installable=True,
     ),
     "gemini": ProviderSpec(
@@ -149,7 +150,8 @@ def summarize_provider_statuses(statuses: list[ProviderStatus]) -> str:
             state = "installed + interactive ready"
         else:
             state = "installed + needs auth"
-        lines.append(f"- {status.label}: {state}")
+        version = f" ({status.version})" if status.version else ""
+        lines.append(f"- {status.label}: {state}{version}")
     return "\n".join(lines)
 
 
@@ -172,12 +174,11 @@ def install_provider(spec: ProviderSpec) -> None:
         raise typer.BadParameter(f"{spec.label} install failed with exit code {proc.returncode}")
 
 
-def run_interactive_provider_login(spec: ProviderSpec) -> None:
+def run_interactive_provider_login(spec: ProviderSpec, cwd: Path | None = None) -> bool:
     if not spec.interactive_login_command:
         raise typer.BadParameter(f"{spec.label} does not support automated interactive login guidance here")
-    proc = subprocess.run(spec.interactive_login_command, shell=True, check=False)
-    if proc.returncode != 0:
-        raise typer.BadParameter(f"{spec.label} login/verification command failed with exit code {proc.returncode}")
+    proc = subprocess.run(shlex.split(spec.interactive_login_command), cwd=cwd, check=False)
+    return proc.returncode == 0
 
 
 def choose_preferred_provider(statuses: list[ProviderStatus], prompt_label: str, default: str | None = None) -> str | None:
