@@ -63,6 +63,7 @@ Usage:
   scripts/control-plane.sh run-next
   scripts/control-plane.sh watch --role goal
   scripts/control-plane.sh run --task-id TASK-123
+  scripts/control-plane.sh plane-doctor [--task-id TASK-123]
   scripts/control-plane.sh plane-up
   scripts/control-plane.sh plane-down
   scripts/control-plane.sh plane-status
@@ -157,6 +158,11 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log smoke "${VENV_DIR}/bin/python" -m control_plane.entrypoints.smoke.plane --config "${CONFIG_PATH}" "$@"
+    ;;
+  plane-doctor)
+    ensure_venv
+    load_env_file
+    run_with_log plane-doctor "${VENV_DIR}/bin/python" -m control_plane.entrypoints.smoke.plane_doctor --config "${CONFIG_PATH}" "$@"
     ;;
   *)
     usage

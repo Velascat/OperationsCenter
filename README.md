@@ -48,6 +48,7 @@ Then use the helper script for common tasks:
 ./scripts/control-plane.sh dev-up
 ./scripts/control-plane.sh dev-down
 ./scripts/control-plane.sh providers-status
+./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh test
 ./scripts/control-plane.sh api
 ./scripts/control-plane.sh worker --task-id TASK-123
@@ -79,6 +80,23 @@ This writes retained smoke artifacts under `tools/report/kodo_plane/<timestamp>_
 - `request_context.json`
 - `plane_work_item.json`
 - `smoke_result.json`
+
+## Plane doctor
+
+Use the Plane doctor command to verify local Plane API access and diagnose permission/config mismatches:
+
+```bash
+./scripts/control-plane.sh plane-doctor --task-id TASK-123
+```
+
+It reports:
+
+- configured Plane base URL
+- configured workspace/project values
+- current API user from `/api/v1/users/me/`
+- status codes and body previews for project, list-work-items, and optional work-item-detail endpoints
+
+This is the fastest way to see whether the local token can only fetch a specific work item or can also list project work items for autonomous polling.
 
 ## Demo run recipe
 
