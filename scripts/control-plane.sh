@@ -8,7 +8,9 @@ ENV_PATH="${CONTROL_PLANE_ENV_FILE:-${ROOT_DIR}/.env.control-plane.local}"
 BOOTSTRAP_STAMP="${VENV_DIR}/.control-plane-bootstrap"
 LOG_DIR="${ROOT_DIR}/logs/local"
 WATCH_DIR="${LOG_DIR}/watch-all"
+REPORT_DIR="${ROOT_DIR}/tools/report/kodo_plane"
 PLANE_MANAGER="${ROOT_DIR}/deployment/plane/manage.sh"
+JANITOR_MAX_AGE_DAYS="${CONTROL_PLANE_RETENTION_DAYS:-1}"
 
 ensure_venv() {
   if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
@@ -55,6 +57,27 @@ run_with_log() {
   "$@" 2>&1 | tee "${log_path}"
 }
 
+run_janitor() {
+  local max_age_minutes=$((JANITOR_MAX_AGE_DAYS * 24 * 60))
+  [[ "${max_age_minutes}" -lt 0 ]] && max_age_minutes=1440
+
+  mkdir -p "${LOG_DIR}" "${WATCH_DIR}" "${REPORT_DIR}"
+
+  while IFS= read -r path; do
+    rm -f "${path}"
+  done < <(find "${LOG_DIR}" -type f ! -name "*.pid" -mmin +"${max_age_minutes}" -print)
+
+  while IFS= read -r path; do
+    rm -f "${path}"
+  done < <(find "${WATCH_DIR}" -type f -name "*.pid" -mmin +"${max_age_minutes}" -print)
+
+  while IFS= read -r path; do
+    rm -rf "${path}"
+  done < <(find "${REPORT_DIR}" -mindepth 1 -maxdepth 1 -type d -mmin +"${max_age_minutes}" -print)
+
+  find "${LOG_DIR}" -depth -type d -empty -delete >/dev/null 2>&1 || true
+}
+
 usage() {
   cat <<EOF
 Usage:
@@ -69,6 +92,7 @@ Usage:
   scripts/control-plane.sh run --task-id TASK-123
   scripts/control-plane.sh plane-doctor [--task-id TASK-123]
   scripts/control-plane.sh dependency-check [--create-plane-tasks]
+  scripts/control-plane.sh janitor
   scripts/control-plane.sh plane-up
   scripts/control-plane.sh plane-down
   scripts/control-plane.sh plane-status
@@ -168,6 +192,7 @@ fi
 shift || true
 
 cd "${ROOT_DIR}"
+run_janitor
 
 case "${cmd}" in
   setup)
@@ -263,6 +288,9 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log dependency-check "${VENV_DIR}/bin/python" -m control_plane.entrypoints.maintenance.dependency_check --config "${CONFIG_PATH}" "$@"
+    ;;
+  janitor)
+    echo "Janitor complete. Retention window: ${JANITOR_MAX_AGE_DAYS} day(s)"
     ;;
   *)
     usage

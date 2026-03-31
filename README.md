@@ -85,6 +85,7 @@ Local operation commands:
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
+./scripts/control-plane.sh janitor
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ```
 
@@ -97,6 +98,18 @@ Maintenance commands:
 ```
 
 Each helper command writes a local log file under `logs/local/`.
+
+Runtime files and retained artifacts:
+
+- command logs: `logs/local/`
+- Plane runtime logs: `logs/local/plane-runtime/`
+- watcher logs and PID files: `logs/local/watch-all/`
+- retained execution artifacts and reports: `tools/report/kodo_plane/`
+
+Retention policy:
+
+- `./scripts/control-plane.sh janitor` prunes local logs and retained artifact directories older than 1 day
+- the shell wrapper runs this janitor automatically before commands, using `CONTROL_PLANE_RETENTION_DAYS` if you need to override the default
 
 Manual worker equivalent:
 
@@ -167,6 +180,7 @@ Role responsibilities:
 - `improve`
   - triages `Blocked` tasks
   - consumes explicit `task-kind: improve` tasks
+  - reads task comments and recent retained artifacts
   - creates bounded follow-up tasks instead of leaving blocked work stuck
 
 Blocked-task handling currently lives inside `improve`, not in a separate `unblocker` lane.
@@ -174,6 +188,12 @@ Blocked-task handling currently lives inside `improve`, not in a separate `unblo
 `watch-all` is only a local convenience wrapper. It launches three watcher processes with separate logs and PID files. It is not a queue, scheduler, or distributed supervisor.
 
 Control Plane operates at the board/task level. Kodo remains the multi-agent executor for a single run.
+
+Workers can read each other's board comments. In the current MVP:
+
+- `improve` reads task comments through the Plane API when triaging blocked tasks
+- worker-created comments are part of the shared board context for later runs
+- coordination is still board-first rather than hidden inter-worker messaging
 
 ## Task template
 

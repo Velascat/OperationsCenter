@@ -309,6 +309,8 @@ def read_text_if_exists(path: Path) -> str:
 def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dict[str, str]], list[str]]:
     findings: list[dict[str, str]] = []
     report_notes: list[str] = []
+    kodo_adapter_text = read_text_if_exists(Path("src/control_plane/adapters/kodo/adapter.py"))
+    kodo_project_flag_present = "--project" in kodo_adapter_text
 
     for run_dir in recent_report_dirs(service):
         result_summary = read_text_if_exists(run_dir / "result_summary.md").lower()
@@ -324,7 +326,11 @@ def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dic
             except json.JSONDecodeError:
                 task_title = "recent task"
 
-        if "unrecognized arguments:" in kodo_stderr and "--project" in kodo_stderr:
+        if (
+            not kodo_project_flag_present
+            and "unrecognized arguments:" in kodo_stderr
+            and "/tmp/" in kodo_stderr
+        ):
             findings.append(
                 {
                     "kind": "goal",
