@@ -37,15 +37,24 @@ This bootstraps `.venv`, installs the repo in editable mode with dev dependencie
 
 - `config/control_plane.local.yaml`
 - `.env.control-plane.local`
+- `config/plane_task_template.local.md`
 
 Then use the helper script for common tasks:
 
 ```bash
+./scripts/control-plane.sh plane-up
+./scripts/control-plane.sh plane-down
+./scripts/control-plane.sh plane-status
+./scripts/control-plane.sh dev-up
+./scripts/control-plane.sh dev-down
+./scripts/control-plane.sh providers-status
 ./scripts/control-plane.sh test
 ./scripts/control-plane.sh api
 ./scripts/control-plane.sh worker --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ```
+
+Each helper command writes a local log file under `logs/local/`.
 
 Manual equivalents remain available. For example, worker:
 
@@ -105,20 +114,52 @@ If `install_dev_command` is omitted, the worker defaults to `pip install -e .[de
 
 The setup wizard is implemented with Typer and is intended for local operator setup rather than production secret management.
 
+### Before running setup
+
+Plane:
+
+1. This repo now owns the local Plane dev deployment path under `deployment/plane/`.
+2. In the normal setup path, the wizard assumes the repo-managed Plane deployment and can start it immediately.
+3. `./scripts/control-plane.sh plane-up` brings up Plane for local dev.
+4. `./scripts/control-plane.sh plane-down` stops it.
+5. `./scripts/control-plane.sh plane-status` checks reachability.
+6. After Plane is up, sign in via the browser, create a personal access token, and paste it into setup.
+
+GitHub:
+
+1. During setup, the wizard now checks for a usable SSH key for GitHub.
+2. If no SSH key exists, it generates `~/.ssh/id_ed25519`, starts `ssh-agent`, adds the key, and prints the public key.
+3. Add that public key to GitHub at `https://github.com/settings/keys`.
+4. The wizard pauses, then verifies SSH with `ssh -T git@github.com`.
+5. If the current repo uses an HTTPS GitHub remote, setup can switch it to SSH automatically.
+6. A GitHub token remains optional and can be left blank if SSH is used for git operations.
+
+Provider CLIs:
+
+1. Setup now detects provider CLIs for Claude Code, Codex CLI, Gemini CLI, and Cursor Agent.
+2. Setup can install missing Claude, Codex, and Gemini CLIs when possible.
+3. Setup then guides interactive auth or API-key/headless guidance per provider.
+4. At least one usable provider backend is required before setup finishes successfully.
+5. Recheck provider readiness anytime with `./scripts/control-plane.sh providers-status`.
+
 It prompts for:
 
-- Plane base URL, workspace slug, project id, and Plane API token
-- Git provider, GitHub token, and bot identity
+- Plane base URL (default `http://localhost:8080`), workspace slug, project id (default `1`), and Plane API token
+- Git provider, optional GitHub token, bot identity, and GitHub SSH bootstrap
 - Kodo binary/orchestration defaults
-- Preferred provider auth mode for Kodo:
-  - `codex_subscription`
-  - `claude_subscription`
-  - `openai_api_key`
-  - `anthropic_api_key`
-  - `custom`
-- One default repo entry with clone URL, allowed branches, validation commands, and repo-local `.venv` bootstrap settings
+- Provider detection, install, auth guidance, and preferred-provider selection
+- One or more repo entries with clone URL, allowed branches, validation commands, and repo-local `.venv` bootstrap settings
+- A default repo key used when generating a starter Plane task template
+
+In normal mode, the wizard uses the repo-managed local Plane deployment, default env var names like `PLANE_API_TOKEN` and `GITHUB_TOKEN`, provider-safe defaults, and other safe defaults without asking. Enable `Advanced setup` only if you want to override those values.
 
 For subscription-backed modes, the wizard records the mode and leaves a note in `.env.control-plane.local`; you still need the relevant local provider tooling already installed and logged in on the machine.
+
+References:
+
+- Claude Code setup: https://code.claude.com/docs/en/setup
+- Codex CLI install/auth: https://github.com/openai/codex/blob/main/docs/install.md
+- Kodo provider backends: https://raw.githubusercontent.com/ikamensh/kodo/dev/docs/providers.md
 
 ## Plane API verification note
 

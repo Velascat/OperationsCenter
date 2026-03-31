@@ -9,3 +9,6 @@ __pycache__/
 .ruff_cache/
 .env.control-plane.local
 config/control_plane.local.yaml
+config/plane_task_template.local.md
+logs/local/
+deployment/plane/runtime/
