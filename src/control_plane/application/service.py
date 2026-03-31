@@ -47,7 +47,7 @@ class ExecutionService:
             allowed_base_branches=repo_cfg.allowed_base_branches,
         )
 
-    def run_task(self, plane_client: PlaneClient, task_id: str) -> ExecutionResult:
+    def run_task(self, plane_client: PlaneClient, task_id: str, *, worker_role: str = "goal") -> ExecutionResult:
         run_id = uuid.uuid4().hex[:12]
         workspace_path = self.workspace.create()
         run_dir = self.reporter.create_run_dir(task_id, run_id)
@@ -206,8 +206,12 @@ class ExecutionService:
                 f"changed_files={len(changed_files)}"
             )
 
+            status = "Blocked" if policy_violations or not success else "Review"
+
             result = ExecutionResult(
                 run_id=run_id,
+                worker_role=worker_role,
+                task_kind=task.execution_mode,
                 success=success,
                 changed_files=changed_files,
                 validation_passed=validation_ok,
@@ -220,12 +224,13 @@ class ExecutionService:
                 summary=summary,
                 artifacts=artifacts,
                 policy_violations=policy_violations,
+                final_status=status,
             )
             artifacts.append(self.reporter.write_summary(run_dir, result))
 
-            status = "Blocked" if policy_violations or not success else "Review"
             plane_client.transition_issue(task.task_id, status)
-            plane_client.comment_issue(task.task_id, self._comment_markdown(task, result))
+            result.final_status = status
+            plane_client.comment_issue(task.task_id, self._comment_markdown(task, result, worker_role=worker_role))
             self._log_event(
                 "run_end",
                 run_id,
@@ -242,10 +247,11 @@ class ExecutionService:
                 task_id,
                 "\n".join(
                     [
-                        f"Execution failed for {task_id}",
+                        f"[{worker_role.capitalize()}] Execution failed",
                         f"- run_id: {run_id}",
+                        f"- worker_role: {worker_role}",
                         f"- phase: {phase}",
-                        "- status: blocked",
+                        "- result_status: blocked",
                     ]
                 ),
             )
@@ -259,12 +265,18 @@ class ExecutionService:
         self.logger.info(json.dumps(payload, sort_keys=True, default=str))
 
     @staticmethod
-    def _comment_markdown(task: BoardTask, result: ExecutionResult) -> str:
+    def _comment_markdown(task: BoardTask, result: ExecutionResult, *, worker_role: str = "goal") -> str:
+        task_kind = getattr(task, "execution_mode", result.task_kind or "goal")
         lines = [
-            f"AI execution result for {task.task_id}",
+            f"[{worker_role.capitalize()}] Execution result",
             f"- run_id: {result.run_id}",
+            f"- task_id: {task.task_id}",
+            f"- task_kind: {task_kind}",
+            f"- worker_role: {worker_role}",
+            f"- result_status: {result.final_status or ('review' if result.success else 'blocked')}",
             f"- success: {result.success}",
             f"- validation_passed: {result.validation_passed}",
+            f"- policy_passed: {not result.policy_violations}",
             f"- branch_pushed: {result.branch_pushed}",
             f"- draft_branch_pushed: {result.draft_branch_pushed}",
             f"- push_reason: {result.push_reason or 'not_pushed'}",
@@ -272,6 +284,10 @@ class ExecutionService:
         ]
         if result.execution_stderr_excerpt:
             lines.append(f"- execution_stderr: {result.execution_stderr_excerpt}")
+        if result.follow_up_task_ids:
+            lines.append(f"- follow_up_task_ids: {', '.join(result.follow_up_task_ids)}")
+        if result.blocked_classification:
+            lines.append(f"- blocked_classification: {result.blocked_classification}")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
         return "\n".join(lines)

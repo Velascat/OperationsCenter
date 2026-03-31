@@ -121,6 +121,11 @@ watch_log_file() {
   echo "${WATCH_DIR}/$(timestamp)_${role}.log"
 }
 
+watch_status_file() {
+  local role="$1"
+  echo "${WATCH_DIR}/${role}.status.json"
+}
+
 start_watch_role() {
   local role="$1"
   local poll_interval=20
@@ -147,7 +152,8 @@ start_watch_role() {
       --config '${CONFIG_PATH}' \
       --watch \
       --role '${role}' \
-      --poll-interval-seconds '${poll_interval}'
+      --poll-interval-seconds '${poll_interval}' \
+      --status-dir '${WATCH_DIR}'
   " >>"${log_file}" 2>&1 < /dev/null &
   local pid=$!
   echo "${pid}" > "${pid_file}"
@@ -176,11 +182,43 @@ stop_watch_role() {
 status_watch_role() {
   local role="$1"
   local pid_file
+  local status_file
   pid_file="$(watch_pid_file "${role}")"
+  status_file="$(watch_status_file "${role}")"
   if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
-    echo "watch-${role}: running (pid $(cat "${pid_file}"))"
+    if [[ -f "${status_file}" ]]; then
+      python3 - "${role}" "${pid_file}" "${status_file}" <<'PY'
+import json, sys
+role, pid_file, status_file = sys.argv[1:]
+pid = open(pid_file).read().strip()
+data = json.load(open(status_file))
+counters = data.get("counters", {})
+print(
+    f"watch-{role}: running (pid {pid}) | "
+    f"cycle={data.get('cycle')} state={data.get('state')} last_action={data.get('last_action')} "
+    f"task_id={data.get('task_id') or '-'} task_kind={data.get('task_kind') or '-'} "
+    f"followups={len(data.get('follow_up_task_ids') or [])} triaged={counters.get('blocked_tasks_triaged', 0)} "
+    f"created={counters.get('follow_up_tasks_created', 0)} updated_at={data.get('updated_at')}"
+)
+PY
+    else
+      echo "watch-${role}: running (pid $(cat "${pid_file}"))"
+    fi
   else
-    echo "watch-${role}: stopped"
+    if [[ -f "${status_file}" ]]; then
+      python3 - "${role}" "${status_file}" <<'PY'
+import json, sys
+role, status_file = sys.argv[1:]
+data = json.load(open(status_file))
+print(
+    f"watch-{role}: stopped | "
+    f"last_cycle={data.get('cycle')} state={data.get('state')} last_action={data.get('last_action')} "
+    f"task_id={data.get('task_id') or '-'} updated_at={data.get('updated_at')}"
+)
+PY
+    else
+      echo "watch-${role}: stopped"
+    fi
   fi
 }
 

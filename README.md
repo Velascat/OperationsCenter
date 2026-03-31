@@ -17,7 +17,7 @@ Self-hosted AI execution wrapper that uses **Plane** as the Jira-like board and 
 - Enforce `allowed_paths` against changed files before commit/push.
 - Set repo-local git identity from config before committing.
 - Emit retained artifacts with a `run_id` under `tools/report/kodo_plane/`.
-- Update Plane state and add short result comments.
+- Update Plane state and add explicit role-identified worker comments.
 
 ## Not implemented yet
 
@@ -103,7 +103,7 @@ Runtime files and retained artifacts:
 
 - command logs: `logs/local/`
 - Plane runtime logs: `logs/local/plane-runtime/`
-- watcher logs and PID files: `logs/local/watch-all/`
+- watcher logs, PID files, and heartbeat status files: `logs/local/watch-all/`
 - retained execution artifacts and reports: `tools/report/kodo_plane/`
 
 Retention policy:
@@ -159,6 +159,7 @@ Current watch loop behavior:
 - claims a task by moving it to `Running`
 - executes one task at a time
 - logs each poll cycle to `logs/local/`
+- writes one heartbeat/status file per watcher under `logs/local/watch-all/`
 - uses the board itself for worker coordination through labels, comments, and follow-up tasks
 
 Current role support:
@@ -167,23 +168,43 @@ Current role support:
 - `test`: implemented
 - `improve`: implemented
 
+Lifecycle contract:
+
+- `goal -> test`
+  - when implementation succeeds and explicit verification is required
+- `goal -> review`
+  - when implementation succeeds and no explicit test handoff is required
+- `goal -> blocked -> improve`
+  - when implementation fails or is blocked
+- `test -> done`
+  - when verification succeeds
+- `test -> goal`
+  - when verification fails and a follow-up implementation task is required
+- `blocked -> improve triage`
+  - when a blocked task needs classification and a next step
+
 Role responsibilities:
 
 - `goal`
   - consumes `task-kind: goal`
   - runs implementation work
-  - moves successful tasks toward `Review`
+  - ends with an explicit next-step outcome:
+    - success with no explicit verification need -> `Review`
+    - success with verification required -> creates a `test` follow-up task
+    - failure/block -> leaves the task `Blocked` for improve triage
 - `test`
   - consumes `task-kind: test`
   - runs verification work
-  - creates follow-up `goal` tasks when verification fails
+  - ends with an explicit next-step outcome:
+    - verification success -> `Done`
+    - verification failure -> creates a follow-up `goal` task
 - `improve`
   - triages `Blocked` tasks
   - consumes explicit `task-kind: improve` tasks
   - reads task comments and recent retained artifacts
   - creates bounded follow-up tasks instead of leaving blocked work stuck
 
-Blocked-task handling currently lives inside `improve`, not in a separate `unblocker` lane.
+Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane. Improve is the board-level triage lane for blocked work.
 
 `watch-all` is only a local convenience wrapper. It launches three watcher processes with separate logs and PID files. It is not a queue, scheduler, or distributed supervisor.
 
@@ -194,6 +215,72 @@ Workers can read each other's board comments. In the current MVP:
 - `improve` reads task comments through the Plane API when triaging blocked tasks
 - worker-created comments are part of the shared board context for later runs
 - coordination is still board-first rather than hidden inter-worker messaging
+
+## Board clarity
+
+Worker comments now identify the acting lane directly in Plane:
+
+- `[Goal] ...`
+- `[Test] ...`
+- `[Improve] ...`
+
+Each worker comment is intended to show:
+
+- `run_id`
+- `task_id`
+- `task_kind`
+- `worker_role`
+- `result_status`
+- `follow_up_task_ids`
+- `blocked_classification` when relevant
+- `handoff_reason` when a task is passed to another lane
+
+Blocked-task triage uses a small fixed vocabulary:
+
+- `infra_tooling`
+- `validation_failure`
+- `scope_policy`
+- `parse_config`
+- `unknown`
+
+That same vocabulary is used in board comments, watcher logs, and retained summaries.
+
+## Task lineage
+
+When a worker creates a follow-up task:
+
+- the parent task gets a comment with the child task ids
+- the child task body includes:
+  - `original_task_id`
+  - `original_task_title`
+  - `source_worker_role`
+  - `source_task_kind`
+  - `follow_up_task_kind`
+  - `handoff_reason`
+- the child task also gets an initial worker comment noting the source task and source worker role
+
+This keeps the work chain readable from the Plane board itself instead of forcing log inspection first.
+
+## Watcher heartbeat
+
+`watch-all-status` now reports more than PID liveness.
+
+For each watcher it shows:
+
+- whether it is running
+- current/last cycle
+- current state
+- last action
+- current task id and task kind if any
+- follow-up tasks created this session
+- blocked tasks triaged this session
+- last update timestamp
+
+Example:
+
+```text
+watch-goal: running (pid 12345) | cycle=7 state=idle last_action=execute_complete task_id=TASK-123 task_kind=goal followups=1 triaged=0 created=1 updated_at=...
+```
 
 ## Task template
 
@@ -267,9 +354,15 @@ For a safe end-to-end demo:
 2. Use a low-risk goal that touches only that allowed path set.
 3. Move the task to `Ready for AI`.
 4. Run `run --task-id TASK_ID`, `run-next`, `watch --role <role>`, or `watch-all`.
-5. Inspect `result_summary.md`, `validation.json`, the worker log, and the Plane comment.
+5. Inspect `result_summary.md`, `validation.json`, the worker log, `watch-all-status`, and the Plane comments.
 
-The current autonomous path is a polling loop with `goal`, `test`, and `improve` roles. There is still no webhook consumer, concurrency lock manager, or distributed supervisor.
+The current autonomous path is a polling loop with `goal`, `test`, and `improve` roles. In normal board flow:
+
+- `goal` produces implementation outcomes
+- `test` resolves verification outcomes
+- `improve` triages blocked work and creates bounded follow-ups
+
+There is still no webhook consumer, concurrency lock manager, or distributed supervisor.
 
 ## Local tooling
 
@@ -418,3 +511,17 @@ References:
 - Comments use `POST .../comments/` with structured `comment_html`.
 - Live local verification is available via `./scripts/control-plane.sh plane-doctor`.
 - This repository verifies these contracts via mocked HTTP tests and provides a live smoke-test entrypoint for operator verification.
+
+## Retained summaries
+
+Retained `result_summary.md` files now align with the board/log vocabulary and include:
+
+- `worker_role`
+- `task_kind`
+- `run_id`
+- `final_status`
+- `blocked_classification`
+- `follow_up_task_ids`
+- execution, validation, policy, and branch-push outcomes
+
+This is intended to make board comments, watcher logs, and retained artifacts describe the same run in the same language.

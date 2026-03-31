@@ -112,13 +112,18 @@ class Reporter:
         path = run_dir / "result_summary.md"
         lines = [
             "# Execution Result",
+            f"- worker_role: {result.worker_role}",
+            f"- task_kind: {result.task_kind}",
             f"- run_id: {result.run_id}",
             f"- success: {result.success}",
+            f"- final_status: {result.final_status}",
             f"- validation_passed: {result.validation_passed}",
             f"- branch_pushed: {result.branch_pushed}",
             f"- draft_branch_pushed: {result.draft_branch_pushed}",
             f"- push_reason: {result.push_reason}",
             f"- pull_request_url: {result.pull_request_url}",
+            f"- blocked_classification: {result.blocked_classification}",
+            f"- follow_up_task_ids: {', '.join(result.follow_up_task_ids) if result.follow_up_task_ids else 'none'}",
             "",
             "## Changed Files",
         ]

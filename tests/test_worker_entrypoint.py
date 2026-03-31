@@ -150,18 +150,18 @@ def test_issue_task_kind_extracts_label_value() -> None:
 def test_classify_blocked_issue_detects_validation_failure() -> None:
     classification, rationale = classify_blocked_issue(
         {"name": "Task"},
-        [{"comment_html": "<p>AI execution result</p><ul><li>validation_passed: False</li></ul>"}],
+        [{"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"}],
     )
-    assert classification == "validation failure"
+    assert classification == "validation_failure"
     assert "Validation failed" in rationale
 
 
 def test_classify_blocked_issue_detects_provider_auth_failure() -> None:
     classification, rationale = classify_blocked_issue(
         {"name": "Task"},
-        [{"comment_html": "<p>AI execution result</p><ul><li>execution_stderr: Error: ANTHROPIC_API_KEY not set</li></ul>"}],
+        [{"comment_html": "<p>[Goal] Execution result</p><ul><li>execution_stderr: Error: ANTHROPIC_API_KEY not set</li></ul>"}],
     )
-    assert classification == "infra/tooling"
+    assert classification == "infra_tooling"
     assert "tooling" in rationale.lower()
 
 
@@ -219,7 +219,7 @@ def test_run_watch_loop_improve_role_triages_blocked_task() -> None:
         ],
         comments={
             "BLOCKED-1": [
-                {"comment_html": "<p>AI execution result</p><ul><li>validation_passed: False</li></ul>"},
+                {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
             ]
         },
     )
@@ -240,10 +240,10 @@ def test_run_watch_loop_improve_role_triages_blocked_task() -> None:
         {"name": "task-kind: goal"},
         {"name": "source: improve-worker"},
     ]
-    assert any("Blocked triage result" in comment for _, comment in client.issue_comments)
+    assert any("[Improve] Blocked triage" in comment for _, comment in client.issue_comments)
 
 
-def test_handle_goal_task_creates_improve_follow_up_for_noop_failure() -> None:
+def test_handle_goal_task_hands_off_blocked_work_to_improve_triage() -> None:
     client = FakePlaneClient(
         [
             {
@@ -273,11 +273,48 @@ def test_handle_goal_task_creates_improve_follow_up_for_noop_failure() -> None:
 
     created_ids = handle_goal_task(client, service, "GOAL-1")
 
+    assert created_ids == []
+    assert client.created == []
+    assert any("[Goal] Blocked; handed off to Improve triage" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_goal_task_creates_test_follow_up_on_success_with_changes() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-3",
+                "name": "Implement watcher fix",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ]
+    )
+    service = FakeService(success=True)
+    service.run_task = lambda _client, task_id: ExecutionResult(  # type: ignore[assignment]
+        run_id="run-125",
+        success=True,
+        changed_files=["src/control_plane/entrypoints/worker/main.py"],
+        validation_passed=True,
+        validation_results=[],
+        branch_pushed=True,
+        draft_branch_pushed=False,
+        push_reason="success",
+        pull_request_url=None,
+        execution_stderr_excerpt=None,
+        summary="success with changes",
+        artifacts=[],
+        policy_violations=[],
+        final_status="Review",
+    )
+
+    created_ids = handle_goal_task(client, service, "GOAL-3")
+
     assert created_ids == ["FOLLOWUP-1"]
     assert client.created[0]["labels"] == [
-        {"name": "task-kind: improve"},
+        {"name": "task-kind: test"},
         {"name": "source: goal-worker"},
     ]
+    assert any("[Goal] Execution complete; handed off to Test" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_goal_task_does_not_create_follow_up_for_provider_auth_failure() -> None:
@@ -312,7 +349,7 @@ def test_handle_goal_task_does_not_create_follow_up_for_provider_auth_failure() 
 
     assert created_ids == []
     assert client.created == []
-    assert any("execution environment/auth failure" in comment for _, comment in client.issue_comments)
+    assert any("[Goal] Execution blocked by environment/auth" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -355,7 +392,7 @@ def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.Monke
 
     assert created_ids == ["FOLLOWUP-1", "FOLLOWUP-2"]
     assert client.transitions[-1] == ("IMPROVE-1", "Review")
-    assert any("Improve worker result" in comment for _, comment in client.issue_comments)
+    assert any("[Improve] Improvement pass" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> None:
@@ -370,7 +407,7 @@ def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> 
         ],
         comments={
             "BLOCKED-2": [
-                {"comment_html": "<p>AI execution result</p><ul><li>validation_passed: False</li></ul>"},
+                {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
             ]
         },
     )
@@ -378,7 +415,7 @@ def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> 
 
     classification, created_ids = handle_blocked_triage(client, service, "BLOCKED-2")
 
-    assert classification == "validation failure"
+    assert classification == "validation_failure"
     assert created_ids == []
     assert client.created == []
     assert any("will not create another recursive unblock" in comment for _, comment in client.issue_comments)

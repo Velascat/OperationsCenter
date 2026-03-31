@@ -61,6 +61,8 @@ class ValidationResult(BaseModel):
 
 class ExecutionResult(BaseModel):
     run_id: str
+    worker_role: str | None = None
+    task_kind: str | None = None
     success: bool
     changed_files: list[str] = Field(default_factory=list)
     validation_passed: bool = False
@@ -73,3 +75,6 @@ class ExecutionResult(BaseModel):
     summary: str
     artifacts: list[str] = Field(default_factory=list)
     policy_violations: list[str] = Field(default_factory=list)
+    final_status: str | None = None
+    blocked_classification: str | None = None
+    follow_up_task_ids: list[str] = Field(default_factory=list)
