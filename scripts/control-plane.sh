@@ -105,6 +105,7 @@ Usage:
   scripts/control-plane.sh plane-status
   scripts/control-plane.sh dev-up
   scripts/control-plane.sh dev-down
+  scripts/control-plane.sh dev-restart
   scripts/control-plane.sh providers-status
   scripts/control-plane.sh doctor
   scripts/control-plane.sh test
@@ -329,6 +330,7 @@ case "${cmd}" in
   dev-up)
     ensure_venv
     load_env_file
+    run_janitor
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
     start_api_service
@@ -336,16 +338,41 @@ case "${cmd}" in
     start_watch_role test
     start_watch_role improve
     start_watch_role propose
+    run_janitor
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-down)
     load_env_file
+    run_janitor
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
     stop_api_service
     run_with_log plane-down "${PLANE_MANAGER}" down
+    run_janitor
+    ;;
+  dev-restart)
+    load_env_file
+    run_janitor
+    stop_watch_role goal
+    stop_watch_role test
+    stop_watch_role improve
+    stop_watch_role propose
+    stop_api_service
+    run_with_log plane-down "${PLANE_MANAGER}" down
+    run_janitor
+    ensure_venv
+    run_janitor
+    run_with_log plane-up "${PLANE_MANAGER}" up
+    maybe_open_browser
+    start_api_service
+    start_watch_role goal
+    start_watch_role test
+    start_watch_role improve
+    start_watch_role propose
+    run_janitor
+    run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-status)
     load_env_file

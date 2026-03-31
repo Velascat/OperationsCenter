@@ -146,6 +146,7 @@ Then:
 ./scripts/control-plane.sh watch-all-stop
 ./scripts/control-plane.sh dev-up
 ./scripts/control-plane.sh dev-down
+./scripts/control-plane.sh dev-restart
 ./scripts/control-plane.sh dev-status
 ./scripts/control-plane.sh observe-repo
 ./scripts/control-plane.sh generate-insights
@@ -218,6 +219,7 @@ Useful companions:
 
 - `./scripts/control-plane.sh dev-status`
 - `./scripts/control-plane.sh dev-down`
+- `./scripts/control-plane.sh dev-restart`
 - `./scripts/control-plane.sh api-up`
 - `./scripts/control-plane.sh api-down`
 - `./scripts/control-plane.sh api-status`

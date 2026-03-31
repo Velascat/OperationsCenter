@@ -50,6 +50,13 @@ run_setup_menu() {
   echo "Plane runtime log: ${log_path}"
 }
 
+compose_cmd() {
+  (
+    cd "${PLANE_APP_DIR}"
+    docker compose --env-file "${PLANE_ENV}" -f docker-compose.yaml "$@"
+  )
+}
+
 set_env_value() {
   local key="$1"
   local value="$2"
@@ -86,6 +93,17 @@ ensure_installed() {
   configure_plane_env
 }
 
+fallback_up() {
+  echo "Falling back to direct docker compose startup..."
+  compose_cmd down --remove-orphans >/dev/null 2>&1 || true
+  compose_cmd up -d
+}
+
+fallback_down() {
+  echo "Falling back to direct docker compose shutdown..."
+  compose_cmd down --remove-orphans || true
+}
+
 wait_until_ready() {
   local attempts=30
   local delay_seconds=5
@@ -114,14 +132,18 @@ case "${cmd}" in
     echo "Preparing local Plane runtime..."
     ensure_installed
     echo "Starting Plane containers..."
-    run_setup_menu 2
+    if ! run_setup_menu 2; then
+      fallback_up
+    fi
     echo "Checking Plane readiness..."
     wait_until_ready
     ;;
   down)
     if [[ -x "${SETUP_SH}" ]]; then
       echo "Stopping Plane containers..."
-      run_setup_menu 3
+      if ! run_setup_menu 3; then
+        fallback_down
+      fi
       echo "Plane containers stopped."
     else
       echo "Plane runtime is not installed yet."
