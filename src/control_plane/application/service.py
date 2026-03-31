@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 import traceback
@@ -25,6 +27,7 @@ class ExecutionService:
         self.validation = ValidationRunner()
         self.reporter = Reporter(settings.report_root)
         self.scope_checker = ChangedFilePolicyChecker()
+        self.logger = logging.getLogger(__name__)
 
     @staticmethod
     def task_branch(task: BoardTask) -> str:
@@ -50,20 +53,32 @@ class ExecutionService:
         artifacts = [self.reporter.write_request_context(run_dir, task_id, run_id, phase="initialized")]
         task: BoardTask | None = None
         phase = "initialized"
+        self._log_event("run_start", run_id, task_id=task_id, workspace_path=str(workspace_path))
 
         try:
             phase = "fetch_task"
+            self._log_event("phase", run_id, phase=phase)
             issue = plane_client.fetch_issue(task_id)
             task = plane_client.to_board_task(issue)
             repo_target = self._repo_target_for(task)
+            self._log_event(
+                "task_resolved",
+                run_id,
+                task_id=task.task_id,
+                repo_key=task.repo_key,
+                base_branch=task.base_branch,
+                allowed_paths=task.allowed_paths,
+            )
 
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
                 raise ValueError(f"Base branch '{task.base_branch}' is not allowed by policy")
 
             phase = "running"
+            self._log_event("phase", run_id, phase=phase)
             plane_client.transition_issue(task.task_id, "Running")
 
             phase = "repo_setup"
+            self._log_event("phase", run_id, phase=phase, repo_key=repo_target.repo_key)
             repo_path = self.git.clone(repo_target.clone_url, workspace_path)
             self.git.verify_remote_branch_exists(repo_path, task.base_branch)
             self.git.checkout_base(repo_path, task.base_branch)
@@ -75,6 +90,7 @@ class ExecutionService:
 
             task_branch = self.task_branch(task)
             self.git.create_task_branch(repo_path, task_branch)
+            self._log_event("task_branch_created", run_id, task_branch=task_branch, repo_path=str(repo_path))
 
             goal_file = workspace_path / "goal.md"
             self.kodo.write_goal_file(goal_file, task.goal_text, task.constraints_text)
@@ -90,6 +106,7 @@ class ExecutionService:
             artifacts.append(self.reporter.write_request(run_dir, req))
 
             phase = "kodo"
+            self._log_event("phase", run_id, phase=phase)
             kodo_result = self.kodo.run(goal_file, repo_path)
             artifacts.extend(
                 self.reporter.write_kodo(
@@ -101,6 +118,7 @@ class ExecutionService:
             )
 
             phase = "validation"
+            self._log_event("phase", run_id, phase=phase)
             run_env = os.environ.copy()
             run_env.update(repo_target.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
@@ -116,6 +134,13 @@ class ExecutionService:
             policy_violations = self.scope_checker.find_violations(changed_files, task.allowed_paths)
             if policy_violations:
                 artifacts.append(self.reporter.write_policy_violation(run_dir, policy_violations))
+            self._log_event(
+                "policy_evaluated",
+                run_id,
+                changed_files=changed_files,
+                policy_success=not policy_violations,
+                policy_violations=policy_violations,
+            )
 
             execution_success = kodo_result.exit_code == 0
             policy_success = not policy_violations
@@ -136,6 +161,13 @@ class ExecutionService:
                         branch_pushed = True
                         draft_branch_pushed = True
                         push_reason = "draft_on_validation_failure"
+            self._log_event(
+                "push_evaluated",
+                run_id,
+                branch_pushed=branch_pushed,
+                draft_branch_pushed=draft_branch_pushed,
+                push_reason=push_reason or "not_pushed",
+            )
 
             summary = (
                 f"run_id={run_id} execution={'passed' if execution_success else 'failed'} "
@@ -164,6 +196,14 @@ class ExecutionService:
             status = "Blocked" if policy_violations or not success else "Review"
             plane_client.transition_issue(task.task_id, status)
             plane_client.comment_issue(task.task_id, self._comment_markdown(task, result))
+            self._log_event(
+                "run_end",
+                run_id,
+                task_id=task.task_id,
+                status=status,
+                success=success,
+                summary=summary,
+            )
             return result
         except Exception:
             artifacts.append(self.reporter.write_failure(run_dir, traceback.format_exc(), phase=phase))
@@ -179,9 +219,14 @@ class ExecutionService:
                     ]
                 ),
             )
+            self._log_event("run_failed", run_id, task_id=task_id, phase=phase)
             raise
         finally:
             self.workspace.cleanup(workspace_path)
+
+    def _log_event(self, event: str, run_id: str, **fields: object) -> None:
+        payload = {"event": event, "run_id": run_id, **fields}
+        self.logger.info(json.dumps(payload, sort_keys=True, default=str))
 
     @staticmethod
     def _comment_markdown(task: BoardTask, result: ExecutionResult) -> str:

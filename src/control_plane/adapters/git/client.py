@@ -12,6 +12,13 @@ class GitClient:
             raise RuntimeError(f"git command failed: {' '.join(args)}\n{proc.stderr}")
         return proc.stdout.strip()
 
+    def _run_bytes(self, args: list[str], cwd: Path | None = None) -> bytes:
+        proc = subprocess.run(args, cwd=cwd, capture_output=True, check=False)
+        if proc.returncode != 0:
+            stderr = proc.stderr.decode("utf-8", errors="replace")
+            raise RuntimeError(f"git command failed: {' '.join(args)}\n{stderr}")
+        return proc.stdout
+
     def clone(self, clone_url: str, workspace_path: Path) -> Path:
         repo_path = workspace_path / "repo"
         self._run(["git", "clone", clone_url, str(repo_path)])
@@ -33,32 +40,14 @@ class GitClient:
         self._run(["git", "config", "user.email", author_email], cwd=repo_path)
 
     def changed_files(self, repo_path: Path) -> list[str]:
-        out = self._run(["git", "diff", "--name-status", "-z", "HEAD"], cwd=repo_path)
-        if not out:
-            return []
-
-        parts = [part for part in out.split("\x00") if part]
-        files: list[str] = []
-        idx = 0
-        while idx < len(parts):
-            status = parts[idx]
-            idx += 1
-            status_code = status[0]
-            if status_code in {"R", "C"}:
-                if idx + 1 >= len(parts):
-                    break
-                idx += 1  # old path
-                new_path = parts[idx]
-                idx += 1
-                files.append(new_path)
-                continue
-
-            if idx >= len(parts):
-                break
-            files.append(parts[idx])
-            idx += 1
-
-        normalized = [str(Path(path)).replace("\\", "/").lstrip("./") for path in files]
+        diff_output = self._run_bytes(["git", "diff", "--name-status", "-z", "HEAD"], cwd=repo_path)
+        untracked_output = self._run_bytes(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            cwd=repo_path,
+        )
+        files = self._parse_name_status_output(diff_output)
+        files.extend(self._parse_null_delimited_paths(untracked_output))
+        normalized = [self._normalize_repo_relative_path(path) for path in files]
         return sorted(set(normalized))
 
     def commit_all(self, repo_path: Path, message: str) -> bool:
@@ -71,6 +60,43 @@ class GitClient:
 
     def push_branch(self, repo_path: Path, branch: str) -> None:
         self._run(["git", "push", "-u", "origin", branch], cwd=repo_path)
+
+    def _parse_name_status_output(self, output: bytes) -> list[str]:
+        if not output:
+            return []
+
+        parts = [part.decode("utf-8", errors="surrogateescape") for part in output.split(b"\x00") if part]
+        files: list[str] = []
+        idx = 0
+        while idx < len(parts):
+            status = parts[idx]
+            idx += 1
+            status_code = status[0]
+            if status_code in {"R", "C"}:
+                if idx + 1 >= len(parts):
+                    break
+                idx += 1
+                files.append(parts[idx])
+                idx += 1
+                continue
+
+            if idx >= len(parts):
+                break
+            files.append(parts[idx])
+            idx += 1
+        return files
+
+    def _parse_null_delimited_paths(self, output: bytes) -> list[str]:
+        if not output:
+            return []
+        return [
+            part.decode("utf-8", errors="surrogateescape")
+            for part in output.split(b"\x00")
+            if part
+        ]
+
+    def _normalize_repo_relative_path(self, path: str) -> str:
+        return str(Path(path)).replace("\\", "/").lstrip("./")
 
 
 def branch_allowed(base_branch: str, allowed_patterns: list[str]) -> bool:

@@ -40,6 +40,33 @@ PYTHONPATH=src python -m control_plane.entrypoints.worker.main --config config/c
 PYTHONPATH=src uvicorn control_plane.entrypoints.api.main:app --reload
 ```
 
+## Plane smoke test
+
+Use the smoke entrypoint to verify Plane fetch, parse, comment, and optional state transition behavior without running Kodo:
+
+```bash
+PYTHONPATH=src python -m control_plane.entrypoints.smoke.plane \
+  --config config/control_plane.yaml \
+  --task-id TASK-123 \
+  --comment-only
+```
+
+This writes retained smoke artifacts under `tools/report/kodo_plane/<timestamp>_<task_id>_<run_id>/`, including:
+
+- `request_context.json`
+- `plane_work_item.json`
+- `smoke_result.json`
+
+## Demo run recipe
+
+For a safe end-to-end demo:
+
+1. Create a Plane work item with `mode: goal`, a known safe `repo`, a known `base_branch`, and tight `allowed_paths`.
+2. Use a low-risk goal that touches only that allowed path set.
+3. Run the worker manually by task id.
+4. Inspect `result_summary.md`, `validation.json`, and the Plane comment for the run outcome.
+
+The worker remains manual-by-task-id in the current MVP. There is no scheduler or webhook consumer yet.
 
 ## Plane API verification note
 
@@ -47,4 +74,5 @@ PYTHONPATH=src uvicorn control_plane.entrypoints.api.main:app --reload
 - Auth header is `X-API-Key`.
 - Status transitions use `PATCH` with `{ "state": "<state>" }`.
 - Comments use `POST .../comments/` with structured `comment_html`.
-- This repository currently verifies these contracts via mocked HTTP tests; run a live smoke test against your Plane deployment before production use.
+- This repository verifies these contracts via mocked HTTP tests and provides a live smoke-test entrypoint for operator verification.
+- No live Plane contract record is checked into this repository yet; capture observed response and state/comment behavior from your deployment before production use.

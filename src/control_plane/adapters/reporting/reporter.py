@@ -37,6 +37,11 @@ class Reporter:
         path.write_text(req.model_dump_json(indent=2, exclude={"workspace_path", "goal_file_path"}))
         return str(path)
 
+    def write_plane_payload(self, run_dir: Path, payload: dict[str, object]) -> str:
+        path = run_dir / "plane_work_item.json"
+        path.write_text(json.dumps(payload, indent=2))
+        return str(path)
+
     def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str) -> list[str]:
         cmd = run_dir / "kodo_command.json"
         out = run_dir / "kodo_stdout.log"
@@ -63,6 +68,34 @@ class Reporter:
                 {
                     "phase": phase,
                     "error": error,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+                indent=2,
+            )
+        )
+        return str(path)
+
+    def write_smoke_result(
+        self,
+        run_dir: Path,
+        *,
+        task_id: str,
+        fetched: bool,
+        parsed: bool,
+        comment_posted: bool,
+        transition_state: str | None,
+        restore_state: str | None,
+    ) -> str:
+        path = run_dir / "smoke_result.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "task_id": task_id,
+                    "fetched": fetched,
+                    "parsed": parsed,
+                    "comment_posted": comment_posted,
+                    "transition_state": transition_state,
+                    "restore_state": restore_state,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
                 indent=2,

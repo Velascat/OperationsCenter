@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService
@@ -12,6 +13,8 @@ def main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--task-id", required=True)
     args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     settings = load_settings(args.config)
     client = PlaneClient(
