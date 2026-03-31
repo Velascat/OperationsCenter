@@ -109,11 +109,15 @@ start_watch_role() {
   mkdir -p "${WATCH_DIR}"
   local log_file
   log_file="$(watch_log_file "${role}")"
-  "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main \
-    --config "${CONFIG_PATH}" \
-    --watch \
-    --role "${role}" \
-    >>"${log_file}" 2>&1 &
+  setsid /bin/bash -lc "
+    set -a
+    source '${ENV_PATH}'
+    set +a
+    exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.worker.main \
+      --config '${CONFIG_PATH}' \
+      --watch \
+      --role '${role}'
+  " >>"${log_file}" 2>&1 < /dev/null &
   local pid=$!
   echo "${pid}" > "${pid_file}"
   echo "watch-${role} started: pid=${pid} log=${log_file}"

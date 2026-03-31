@@ -31,7 +31,7 @@ class KodoSettings(BaseModel):
     cycles: int = 3
     exchanges: int = 20
     orchestrator: str = "api"
-    effort: str = "medium"
+    effort: str = "standard"
     timeout_seconds: int = 3600
 
 

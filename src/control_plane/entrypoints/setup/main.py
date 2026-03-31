@@ -15,7 +15,6 @@ import yaml
 
 from control_plane.entrypoints.setup.providers import (
     PROVIDER_SPECS,
-    ProviderStatus,
     choose_preferred_provider,
     detect_all_provider_statuses,
     install_provider,
@@ -687,12 +686,6 @@ def shell_quote(value: str) -> str:
 
 
 def prompt_repo(repo_index: int) -> RepoSetupAnswers:
-    suffix = "" if repo_index == 1 else f" #{repo_index}"
-    print_section(f"Repo Setup{suffix}", "Choose a target repo and branch policy for AI task runs.")
-    repo_key = "control-plane" if repo_index == 1 else f"repo_{repo_index}"
-    repo_clone_url = "git@github.com:you/control-plane.git" if repo_index == 1 else "git@github.com:you/repo.git"
-    repo_default_branch = "main"
-    repo_allowed_base_branches = [repo_default_branch]
     raise RuntimeError("prompt_repo now requires discovery context")
 
 
@@ -1090,7 +1083,7 @@ def main(
     )
     kodo_effort = prompt_with_default(
         "Kodo effort",
-        existing_config_value(existing_config, "kodo", "effort") or "medium",
+        existing_config_value(existing_config, "kodo", "effort") or "standard",
         note="Using saved value." if existing_config_value(existing_config, "kodo", "effort") else None,
     )
 
