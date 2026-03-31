@@ -69,6 +69,7 @@ class ExecutionResult(BaseModel):
     draft_branch_pushed: bool = False
     push_reason: str | None = None
     pull_request_url: str | None = None
+    execution_stderr_excerpt: str | None = None
     summary: str
     artifacts: list[str] = Field(default_factory=list)
     policy_violations: list[str] = Field(default_factory=list)

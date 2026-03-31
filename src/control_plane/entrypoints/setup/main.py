@@ -15,6 +15,7 @@ import yaml
 
 from control_plane.entrypoints.setup.providers import (
     PROVIDER_SPECS,
+    ProviderStatus,
     choose_preferred_provider,
     detect_all_provider_statuses,
     install_provider,
@@ -139,6 +140,33 @@ def prepend_local_bin_to_path() -> None:
 def check_command_installed(command: str) -> bool:
     prepend_local_bin_to_path()
     return shutil.which(command) is not None
+
+
+def provider_default_orchestrator(provider_key: str) -> str:
+    mapping = {
+        "claude": "claude-code:opus",
+        "codex": "codex:gpt-5.4",
+        "gemini": "gemini-cli:gemini-3-flash",
+        "cursor": "cursor:sonnet-4-6",
+    }
+    return mapping.get(provider_key, "codex:gpt-5.4")
+
+
+def default_orchestrator_for_statuses(
+    statuses: list[ProviderStatus],
+    *,
+    preferred_smart_provider: str | None = None,
+    saved_value: str | None = None,
+) -> str:
+    if saved_value:
+        return saved_value
+    usable = {status.key for status in statuses if status.interactive_ready}
+    if preferred_smart_provider and preferred_smart_provider in usable:
+        return provider_default_orchestrator(preferred_smart_provider)
+    for candidate in ("claude", "codex", "gemini", "cursor"):
+        if candidate in usable:
+            return provider_default_orchestrator(candidate)
+    return "codex:gpt-5.4"
 
 
 def ensure_uv_installed() -> None:
@@ -1058,6 +1086,26 @@ def main(
     ensure_kodo_installed(kodo_binary, install_ref=kodo_install_ref)
     verify_kodo(kodo_binary)
 
+    usable_providers = [status.key for status in statuses if status.interactive_ready]
+    if not usable_providers:
+        raise typer.BadParameter("No usable provider backend is ready. Install/authenticate at least one provider.")
+
+    existing_headless_required = existing_env.get("CONTROL_PLANE_PROVIDER_HEADLESS_REQUIRED") == "1"
+    headless_required = typer.confirm("Require unattended/headless provider readiness?", default=existing_headless_required)
+    if headless_required and not any(status.headless_ready for status in statuses):
+        raise typer.BadParameter("Headless mode requested, but no provider has API-key/headless readiness.")
+
+    preferred_smart_provider = choose_preferred_provider(
+        statuses,
+        "Preferred smart provider",
+        default=existing_env.get("CONTROL_PLANE_PROVIDER_PREFERRED_SMART") or "claude",
+    )
+    preferred_fast_provider = choose_preferred_provider(
+        statuses,
+        "Preferred fast provider",
+        default=existing_env.get("CONTROL_PLANE_PROVIDER_PREFERRED_FAST") or "codex",
+    )
+
     print_section("Kodo", "Execution defaults for the local coding engine.")
     kodo_team = prompt_with_default(
         "Kodo team",
@@ -1078,33 +1126,17 @@ def main(
     )
     kodo_orchestrator = prompt_with_default(
         "Kodo orchestrator",
-        existing_config_value(existing_config, "kodo", "orchestrator") or "api",
+        default_orchestrator_for_statuses(
+            statuses,
+            preferred_smart_provider=preferred_smart_provider,
+            saved_value=existing_config_value(existing_config, "kodo", "orchestrator"),
+        ),
         note="Using saved value." if existing_config_value(existing_config, "kodo", "orchestrator") else None,
     )
     kodo_effort = prompt_with_default(
         "Kodo effort",
         existing_config_value(existing_config, "kodo", "effort") or "standard",
         note="Using saved value." if existing_config_value(existing_config, "kodo", "effort") else None,
-    )
-
-    usable_providers = [status.key for status in statuses if status.interactive_ready]
-    if not usable_providers:
-        raise typer.BadParameter("No usable provider backend is ready. Install/authenticate at least one provider.")
-
-    existing_headless_required = existing_env.get("CONTROL_PLANE_PROVIDER_HEADLESS_REQUIRED") == "1"
-    headless_required = typer.confirm("Require unattended/headless provider readiness?", default=existing_headless_required)
-    if headless_required and not any(status.headless_ready for status in statuses):
-        raise typer.BadParameter("Headless mode requested, but no provider has API-key/headless readiness.")
-
-    preferred_smart_provider = choose_preferred_provider(
-        statuses,
-        "Preferred smart provider",
-        default=existing_env.get("CONTROL_PLANE_PROVIDER_PREFERRED_SMART") or "claude",
-    )
-    preferred_fast_provider = choose_preferred_provider(
-        statuses,
-        "Preferred fast provider",
-        default=existing_env.get("CONTROL_PLANE_PROVIDER_PREFERRED_FAST") or "codex",
     )
 
     print_section("Repos", "Target repositories, branch policy, validation, and repo-local bootstrap.")

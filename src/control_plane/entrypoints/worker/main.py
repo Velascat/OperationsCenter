@@ -14,6 +14,7 @@ import httpx
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService
 from control_plane.config import load_settings
+from control_plane.domain import ExecutionResult
 
 TRIAGE_COMMENT_MARKER = "Blocked triage result"
 IMPROVE_COMMENT_MARKER = "Improve worker result"
@@ -157,6 +158,12 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
     if any(
         token in lowered
         for token in [
+            "anthropic_api_key not set",
+            "api key not set",
+            "login required",
+            "authentication",
+            "auth",
+            "execution_stderr: error:",
             "no such file or directory",
             "phase: bootstrap",
             "phase: kodo",
@@ -394,6 +401,20 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     issue = client.fetch_issue(task_id)
     result = service.run_task(client, task_id)
     created_ids: list[str] = []
+    if goal_failure_needs_manual_env_fix(result):
+        client.comment_issue(
+            task_id,
+            "\n".join(
+                [
+                    "Goal worker detected an execution environment/auth failure",
+                    f"- run_id: {result.run_id}",
+                    f"- detail: {result.execution_stderr_excerpt or 'provider or backend configuration failed before execution'}",
+                    "- follow_up_created: no",
+                    "- action: fix the configured Kodo orchestrator or provider auth before retrying",
+                ]
+            ),
+        )
+        return created_ids
     if not result.success and result.validation_passed and not result.changed_files:
         existing_names = existing_issue_names(client)
         follow_up = create_follow_up_task_if_missing(
@@ -428,6 +449,22 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ),
             )
     return created_ids
+
+
+def goal_failure_needs_manual_env_fix(result: ExecutionResult) -> bool:
+    excerpt = (result.execution_stderr_excerpt or "").lower()
+    if not excerpt:
+        return False
+    return any(
+        token in excerpt
+        for token in [
+            "anthropic_api_key not set",
+            "api key not set",
+            "login required",
+            "authentication",
+            "auth",
+        ]
+    )
 
 
 def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:

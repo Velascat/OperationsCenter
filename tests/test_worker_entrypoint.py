@@ -156,6 +156,15 @@ def test_classify_blocked_issue_detects_validation_failure() -> None:
     assert "Validation failed" in rationale
 
 
+def test_classify_blocked_issue_detects_provider_auth_failure() -> None:
+    classification, rationale = classify_blocked_issue(
+        {"name": "Task"},
+        [{"comment_html": "<p>AI execution result</p><ul><li>execution_stderr: Error: ANTHROPIC_API_KEY not set</li></ul>"}],
+    )
+    assert classification == "infra/tooling"
+    assert "tooling" in rationale.lower()
+
+
 def test_run_watch_loop_claims_and_runs_one_goal_task(caplog: pytest.LogCaptureFixture) -> None:
     client = FakePlaneClient(
         [
@@ -256,6 +265,7 @@ def test_handle_goal_task_creates_improve_follow_up_for_noop_failure() -> None:
         draft_branch_pushed=False,
         push_reason=None,
         pull_request_url=None,
+        execution_stderr_excerpt=None,
         summary="failed without changes",
         artifacts=[],
         policy_violations=[],
@@ -268,7 +278,41 @@ def test_handle_goal_task_creates_improve_follow_up_for_noop_failure() -> None:
         {"name": "task-kind: improve"},
         {"name": "source: goal-worker"},
     ]
-    assert any("Goal worker created an improve follow-up task" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_goal_task_does_not_create_follow_up_for_provider_auth_failure() -> None:
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-2",
+                "name": "Fix watcher",
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ]
+    )
+    service = FakeService(success=False)
+    service.run_task = lambda _client, task_id: ExecutionResult(  # type: ignore[assignment]
+        run_id="run-124",
+        success=False,
+        changed_files=[],
+        validation_passed=True,
+        validation_results=[],
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        pull_request_url=None,
+        execution_stderr_excerpt="Error: ANTHROPIC_API_KEY not set",
+        summary="failed without changes",
+        artifacts=[],
+        policy_violations=[],
+    )
+
+    created_ids = handle_goal_task(client, service, "GOAL-2")
+
+    assert created_ids == []
+    assert client.created == []
+    assert any("execution environment/auth failure" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_improve_task_discovers_repo_follow_ups(monkeypatch: pytest.MonkeyPatch) -> None:

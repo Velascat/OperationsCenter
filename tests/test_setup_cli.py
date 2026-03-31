@@ -5,10 +5,12 @@ from control_plane.entrypoints.setup.main import (
     RepoSetupAnswers,
     SetupAnswers,
     check_command_installed,
+    default_orchestrator_for_statuses,
     infer_repo_key_from_clone_url,
     prepend_local_bin_to_path,
     github_https_to_ssh,
     parse_remote_branches,
+    provider_default_orchestrator,
     render_env_file,
     render_settings_yaml,
     render_task_template,
@@ -72,6 +74,40 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
     assert "venv_dir: .venv" in rendered
     assert "install_dev_command: .venv/bin/pip install -e .[dev]" in rendered
     assert "- .venv/bin/pytest -q" in rendered
+
+
+def test_provider_default_orchestrator_prefers_cli_sessions() -> None:
+    assert provider_default_orchestrator("claude") == "claude-code:opus"
+    assert provider_default_orchestrator("codex") == "codex:gpt-5.4"
+
+
+def test_default_orchestrator_for_statuses_uses_preferred_smart_provider() -> None:
+    statuses = [
+        ProviderStatus(
+            key="claude",
+            label="Claude Code",
+            installed=True,
+            version="2.1.88",
+            auth_mode="browser_login",
+            interactive_ready=True,
+            headless_ready=False,
+            authenticated=True,
+            detail="ok",
+        ),
+        ProviderStatus(
+            key="codex",
+            label="OpenAI Codex CLI",
+            installed=True,
+            version="0.117.0",
+            auth_mode="browser_login",
+            interactive_ready=True,
+            headless_ready=False,
+            authenticated=True,
+            detail="ok",
+        ),
+    ]
+    assert default_orchestrator_for_statuses(statuses, preferred_smart_provider="claude") == "claude-code:opus"
+    assert default_orchestrator_for_statuses(statuses, preferred_smart_provider="codex") == "codex:gpt-5.4"
 
 
 def test_render_env_file_for_subscription_mode_skips_provider_secret_export() -> None:

@@ -30,7 +30,7 @@ class KodoSettings(BaseModel):
     team: str = "full"
     cycles: int = 3
     exchanges: int = 20
-    orchestrator: str = "api"
+    orchestrator: str = "codex:gpt-5.4"
     effort: str = "standard"
     timeout_seconds: int = 3600
 

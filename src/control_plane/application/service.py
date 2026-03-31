@@ -173,6 +173,7 @@ class ExecutionService:
             execution_success = kodo_result.exit_code == 0
             policy_success = not policy_violations
             success = execution_success and validation_ok and policy_success
+            execution_stderr_excerpt = self._stderr_excerpt(kodo_result.stderr)
 
             branch_pushed = False
             draft_branch_pushed = False
@@ -215,6 +216,7 @@ class ExecutionService:
                 draft_branch_pushed=draft_branch_pushed,
                 push_reason=push_reason,
                 pull_request_url=None,
+                execution_stderr_excerpt=execution_stderr_excerpt,
                 summary=summary,
                 artifacts=artifacts,
                 policy_violations=policy_violations,
@@ -268,6 +270,16 @@ class ExecutionService:
             f"- push_reason: {result.push_reason or 'not_pushed'}",
             f"- summary: {result.summary}",
         ]
+        if result.execution_stderr_excerpt:
+            lines.append(f"- execution_stderr: {result.execution_stderr_excerpt}")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _stderr_excerpt(stderr: str) -> str | None:
+        for line in stderr.splitlines():
+            normalized = line.strip()
+            if normalized:
+                return normalized[:300]
+        return None
