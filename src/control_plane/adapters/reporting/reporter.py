@@ -11,9 +11,9 @@ class Reporter:
     def __init__(self, report_root: Path) -> None:
         self.report_root = report_root
 
-    def create_run_dir(self, task_id: str) -> Path:
+    def create_run_dir(self, task_id: str, run_id: str) -> Path:
         ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        run_dir = self.report_root / f"{ts}_{task_id}"
+        run_dir = self.report_root / f"{ts}_{task_id}_{run_id}"
         run_dir.mkdir(parents=True, exist_ok=True)
         return run_dir
 
@@ -36,10 +36,21 @@ class Reporter:
         path.write_text(json.dumps(data, indent=2))
         return str(path)
 
+    def write_policy_violation(self, run_dir: Path, violations: list[str]) -> str:
+        path = run_dir / "policy_violation.json"
+        path.write_text(json.dumps({"violations": violations}, indent=2))
+        return str(path)
+
+    def write_failure(self, run_dir: Path, error: str) -> str:
+        path = run_dir / "failure.md"
+        path.write_text("# Execution Failure\n\n" + error + "\n")
+        return str(path)
+
     def write_summary(self, run_dir: Path, result: ExecutionResult) -> str:
         path = run_dir / "result_summary.md"
         lines = [
             "# Execution Result",
+            f"- run_id: {result.run_id}",
             f"- success: {result.success}",
             f"- validation_passed: {result.validation_passed}",
             f"- branch_pushed: {result.branch_pushed}",
@@ -48,6 +59,8 @@ class Reporter:
             "## Changed Files",
         ]
         lines.extend([f"- {f}" for f in result.changed_files] or ["- (none)"])
+        lines.extend(["", "## Policy Violations"])
+        lines.extend([f"- {f}" for f in result.policy_violations] or ["- (none)"])
         lines.extend(["", "## Summary", result.summary])
         path.write_text("\n".join(lines))
         return str(path)

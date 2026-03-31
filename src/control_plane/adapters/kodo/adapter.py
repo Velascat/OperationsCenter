@@ -19,8 +19,11 @@ class KodoAdapter:
     def __init__(self, settings: KodoSettings) -> None:
         self.settings = settings
 
-    def write_goal_file(self, path: Path, goal_text: str) -> Path:
-        path.write_text(goal_text)
+    def write_goal_file(self, path: Path, goal_text: str, constraints_text: str | None = None) -> Path:
+        lines = ["## Goal", goal_text.strip()]
+        if constraints_text:
+            lines.extend(["", "## Constraints", constraints_text.strip()])
+        path.write_text("\n".join(lines).strip() + "\n")
         return path
 
     def build_command(self, goal_file: Path, repo_path: Path) -> list[str]:

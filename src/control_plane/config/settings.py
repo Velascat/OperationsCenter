@@ -19,6 +19,8 @@ class GitSettings(BaseModel):
     token_env: str | None = None
     open_pr_default: bool = True
     push_on_validation_failure: bool = True
+    author_name: str = "Control Plane Bot"
+    author_email: str = "control-plane-bot@example.com"
 
 
 class KodoSettings(BaseModel):
