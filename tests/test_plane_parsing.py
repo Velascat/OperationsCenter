@@ -1,3 +1,5 @@
+import pytest
+
 from control_plane.application.task_parser import TaskParser
 
 
@@ -7,7 +9,7 @@ def test_parser_extracts_execution_goal_constraints() -> None:
         """## Execution
 repo: repo_a
 base_branch: main
-mode: goal
+mode: GOAL
 allowed_paths:
   - src/
 open_pr: true
@@ -30,7 +32,7 @@ Do the thing.
 def test_parser_rejects_missing_required_execution_fields() -> None:
     parser = TaskParser()
 
-    try:
+    with pytest.raises(ValueError, match="Missing execution metadata fields"):
         parser.parse(
             """## Execution
 repo: repo_a
@@ -39,7 +41,18 @@ repo: repo_a
 Do the thing.
 """
         )
-    except ValueError as exc:
-        assert "Missing execution metadata fields" in str(exc)
-    else:
-        raise AssertionError("Expected ValueError")
+
+
+def test_parser_rejects_invalid_execution_mode() -> None:
+    parser = TaskParser()
+    with pytest.raises(ValueError, match="supports only 'goal'"):
+        parser.parse(
+            """## Execution
+repo: repo_a
+base_branch: main
+mode: improve
+
+## Goal
+Do the thing.
+"""
+        )

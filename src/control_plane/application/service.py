@@ -4,7 +4,6 @@ import os
 import re
 import traceback
 import uuid
-from pathlib import Path
 
 from control_plane.adapters.git import GitClient, branch_allowed
 from control_plane.adapters.kodo import KodoAdapter
@@ -47,25 +46,24 @@ class ExecutionService:
     def run_task(self, plane_client: PlaneClient, task_id: str) -> ExecutionResult:
         run_id = uuid.uuid4().hex[:12]
         workspace_path = self.workspace.create()
-        run_dir: Path | None = None
-        repo_path = Path()
+        run_dir = self.reporter.create_run_dir(task_id, run_id)
+        artifacts = [self.reporter.write_request_context(run_dir, task_id, run_id, phase="initialized")]
         task: BoardTask | None = None
+        phase = "initialized"
 
         try:
+            phase = "fetch_task"
             issue = plane_client.fetch_issue(task_id)
             task = plane_client.to_board_task(issue)
             repo_target = self._repo_target_for(task)
 
-            if task.execution_mode != "goal":
-                raise ValueError(
-                    f"Unsupported execution mode '{task.execution_mode}'. MVP currently supports only 'goal'."
-                )
-
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
                 raise ValueError(f"Base branch '{task.base_branch}' is not allowed by policy")
 
+            phase = "running"
             plane_client.transition_issue(task.task_id, "Running")
 
+            phase = "repo_setup"
             repo_path = self.git.clone(repo_target.clone_url, workspace_path)
             self.git.verify_remote_branch_exists(repo_path, task.base_branch)
             self.git.checkout_base(repo_path, task.base_branch)
@@ -89,9 +87,9 @@ class ExecutionService:
                 task_branch=task_branch,
                 goal_file_path=goal_file,
             )
-            run_dir = self.reporter.create_run_dir(task.task_id, run_id)
-            artifacts = [self.reporter.write_request(run_dir, req)]
+            artifacts.append(self.reporter.write_request(run_dir, req))
 
+            phase = "kodo"
             kodo_result = self.kodo.run(goal_file, repo_path)
             artifacts.extend(
                 self.reporter.write_kodo(
@@ -102,6 +100,7 @@ class ExecutionService:
                 )
             )
 
+            phase = "validation"
             run_env = os.environ.copy()
             run_env.update(repo_target.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
@@ -118,19 +117,31 @@ class ExecutionService:
             if policy_violations:
                 artifacts.append(self.reporter.write_policy_violation(run_dir, policy_violations))
 
-            success = kodo_result.exit_code == 0 and validation_ok and not policy_violations
+            execution_success = kodo_result.exit_code == 0
+            policy_success = not policy_violations
+            success = execution_success and validation_ok and policy_success
 
             branch_pushed = False
-            if changed_files and not policy_violations and (success or self.settings.git.push_on_validation_failure):
+            draft_branch_pushed = False
+            push_reason: str | None = None
+            if changed_files and policy_success:
                 committed = self.git.commit_all(repo_path, f"chore: apply Plane task {task.task_id}")
                 if committed:
-                    self.git.push_branch(repo_path, task_branch)
-                    branch_pushed = True
+                    if success:
+                        self.git.push_branch(repo_path, task_branch)
+                        branch_pushed = True
+                        push_reason = "success"
+                    elif self.settings.git.push_on_validation_failure:
+                        self.git.push_branch(repo_path, task_branch)
+                        branch_pushed = True
+                        draft_branch_pushed = True
+                        push_reason = "draft_on_validation_failure"
 
             summary = (
-                f"run_id={run_id} kodo_exit={kodo_result.exit_code} "
+                f"run_id={run_id} execution={'passed' if execution_success else 'failed'} "
                 f"validation={'passed' if validation_ok else 'failed'} "
-                f"policy={'passed' if not policy_violations else 'failed'} "
+                f"policy={'passed' if policy_success else 'failed'} "
+                f"branch_push={push_reason or 'not_pushed'} "
                 f"changed_files={len(changed_files)}"
             )
 
@@ -141,6 +152,8 @@ class ExecutionService:
                 validation_passed=validation_ok,
                 validation_results=validation_results,
                 branch_pushed=branch_pushed,
+                draft_branch_pushed=draft_branch_pushed,
+                push_reason=push_reason,
                 pull_request_url=None,
                 summary=summary,
                 artifacts=artifacts,
@@ -153,12 +166,18 @@ class ExecutionService:
             plane_client.comment_issue(task.task_id, self._comment_markdown(task, result))
             return result
         except Exception:
-            if run_dir is not None:
-                self.reporter.write_failure(run_dir, traceback.format_exc())
+            artifacts.append(self.reporter.write_failure(run_dir, traceback.format_exc(), phase=phase))
             plane_client.transition_issue(task_id, "Blocked")
             plane_client.comment_issue(
                 task_id,
-                f"Execution failed (run_id={run_id}). See retained artifacts for details.",
+                "\n".join(
+                    [
+                        f"Execution failed for {task_id}",
+                        f"- run_id: {run_id}",
+                        f"- phase: {phase}",
+                        "- status: blocked",
+                    ]
+                ),
             )
             raise
         finally:
@@ -167,16 +186,15 @@ class ExecutionService:
     @staticmethod
     def _comment_markdown(task: BoardTask, result: ExecutionResult) -> str:
         lines = [
-            f"### AI execution result for {task.task_id}",
+            f"AI execution result for {task.task_id}",
             f"- run_id: {result.run_id}",
             f"- success: {result.success}",
             f"- validation_passed: {result.validation_passed}",
             f"- branch_pushed: {result.branch_pushed}",
+            f"- draft_branch_pushed: {result.draft_branch_pushed}",
+            f"- push_reason: {result.push_reason or 'not_pushed'}",
             f"- summary: {result.summary}",
         ]
         if result.policy_violations:
-            lines.append("- policy_violations:")
-            lines.extend([f"  - {path}" for path in result.policy_violations])
-        lines.extend(["", "Artifacts:"])
-        lines.extend([f"- `{artifact}`" for artifact in result.artifacts])
+            lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
         return "\n".join(lines)

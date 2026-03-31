@@ -39,3 +39,12 @@ PYTHONPATH=src python -m control_plane.entrypoints.worker.main --config config/c
 ```bash
 PYTHONPATH=src uvicorn control_plane.entrypoints.api.main:app --reload
 ```
+
+
+## Plane API verification note
+
+- Adapter targets Plane `work-items` endpoints under `/api/v1/workspaces/{workspace}/projects/{project}/work-items/{id}/`.
+- Auth header is `X-API-Key`.
+- Status transitions use `PATCH` with `{ "state": "<state>" }`.
+- Comments use `POST .../comments/` with structured `comment_html`.
+- This repository currently verifies these contracts via mocked HTTP tests; run a live smoke test against your Plane deployment before production use.

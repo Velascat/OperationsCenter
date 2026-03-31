@@ -33,12 +33,33 @@ class GitClient:
         self._run(["git", "config", "user.email", author_email], cwd=repo_path)
 
     def changed_files(self, repo_path: Path) -> list[str]:
-        out = self._run(["git", "status", "--porcelain"], cwd=repo_path)
+        out = self._run(["git", "diff", "--name-status", "-z", "HEAD"], cwd=repo_path)
+        if not out:
+            return []
+
+        parts = [part for part in out.split("\x00") if part]
         files: list[str] = []
-        for line in out.splitlines():
-            if len(line) > 3:
-                files.append(line[3:])
-        return files
+        idx = 0
+        while idx < len(parts):
+            status = parts[idx]
+            idx += 1
+            status_code = status[0]
+            if status_code in {"R", "C"}:
+                if idx + 1 >= len(parts):
+                    break
+                idx += 1  # old path
+                new_path = parts[idx]
+                idx += 1
+                files.append(new_path)
+                continue
+
+            if idx >= len(parts):
+                break
+            files.append(parts[idx])
+            idx += 1
+
+        normalized = [str(Path(path)).replace("\\", "/").lstrip("./") for path in files]
+        return sorted(set(normalized))
 
     def commit_all(self, repo_path: Path, message: str) -> bool:
         self._run(["git", "add", "-A"], cwd=repo_path)

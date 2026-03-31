@@ -38,7 +38,7 @@ allowed_paths:
   - src/workflow/long_form/
   - tools/audit/
 validation_profile: default
-open_pr: false
+# open_pr is reserved for future PR automation and ignored in MVP
 
 ## Goal
 Improve reporting output and ensure policy violations are visible.
@@ -46,3 +46,9 @@ Improve reporting output and ensure policy violations are visible.
 ## Constraints
 - Keep changes inside wrapper service code.
 ```
+
+
+## Runtime semantics
+
+- Current operation is **manual-by-task-id** (no scheduler/webhook yet).
+- If validation fails but `push_on_validation_failure` is enabled, the branch may still be pushed as **draft output**. This does not indicate run success.
