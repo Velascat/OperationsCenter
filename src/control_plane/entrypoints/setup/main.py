@@ -950,38 +950,12 @@ def main(
         ).strip() or None
     ensure_github_ssh_setup(git_author_email, Path.cwd())
 
-    print_section("Kodo", "Execution defaults for the local coding engine.")
+    existing_kodo_binary = existing_config_value(existing_config, "kodo", "binary") or "kodo"
+    print_section("Kodo Install", "Ensure the Kodo CLI is available before writing config.")
     kodo_binary = prompt_with_default(
         "Kodo binary",
-        existing_config_value(existing_config, "kodo", "binary") or "kodo",
-        note="Using saved value." if existing_config_value(existing_config, "kodo", "binary") else None,
-    )
-    kodo_team = prompt_with_default(
-        "Kodo team",
-        existing_config_value(existing_config, "kodo", "team") or "full",
-        note="Using saved value." if existing_config_value(existing_config, "kodo", "team") else None,
-    )
-    kodo_cycles = int(prompt_with_default(
-        "Kodo cycles",
-        existing_config_value(existing_config, "kodo", "cycles") or "3",
-        note="Using saved value." if existing_config_value(existing_config, "kodo", "cycles") else None,
-    ))
-    kodo_exchanges = int(
-        prompt_with_default(
-            "Kodo exchanges",
-            existing_config_value(existing_config, "kodo", "exchanges") or "20",
-            note="Using saved value." if existing_config_value(existing_config, "kodo", "exchanges") else None,
-        )
-    )
-    kodo_orchestrator = prompt_with_default(
-        "Kodo orchestrator",
-        existing_config_value(existing_config, "kodo", "orchestrator") or "api",
-        note="Using saved value." if existing_config_value(existing_config, "kodo", "orchestrator") else None,
-    )
-    kodo_effort = prompt_with_default(
-        "Kodo effort",
-        existing_config_value(existing_config, "kodo", "effort") or "medium",
-        note="Using saved value." if existing_config_value(existing_config, "kodo", "effort") else None,
+        existing_kodo_binary,
+        note="Using saved value." if existing_kodo_binary != "kodo" or existing_config_value(existing_config, "kodo", "binary") else None,
     )
 
     print_section("Providers", "Supported Kodo backends detected on this machine.")
@@ -1035,9 +1009,37 @@ def main(
     typer.echo("[provider] Final provider summary:")
     typer.echo(summarize_provider_statuses(statuses))
 
-    print_section("Kodo Install", "Ensure the Kodo CLI is available before writing config.")
     ensure_kodo_installed(kodo_binary)
     verify_kodo(kodo_binary)
+
+    print_section("Kodo", "Execution defaults for the local coding engine.")
+    kodo_team = prompt_with_default(
+        "Kodo team",
+        existing_config_value(existing_config, "kodo", "team") or "full",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "team") else None,
+    )
+    kodo_cycles = int(prompt_with_default(
+        "Kodo cycles",
+        existing_config_value(existing_config, "kodo", "cycles") or "3",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "cycles") else None,
+    ))
+    kodo_exchanges = int(
+        prompt_with_default(
+            "Kodo exchanges",
+            existing_config_value(existing_config, "kodo", "exchanges") or "20",
+            note="Using saved value." if existing_config_value(existing_config, "kodo", "exchanges") else None,
+        )
+    )
+    kodo_orchestrator = prompt_with_default(
+        "Kodo orchestrator",
+        existing_config_value(existing_config, "kodo", "orchestrator") or "api",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "orchestrator") else None,
+    )
+    kodo_effort = prompt_with_default(
+        "Kodo effort",
+        existing_config_value(existing_config, "kodo", "effort") or "medium",
+        note="Using saved value." if existing_config_value(existing_config, "kodo", "effort") else None,
+    )
 
     usable_providers = [status.key for status in statuses if status.interactive_ready]
     if not usable_providers:
