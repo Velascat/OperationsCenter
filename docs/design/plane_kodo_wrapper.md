@@ -11,12 +11,13 @@ Build a self-hosted AI execution wrapper that uses Plane as the Jira-like board 
 3. Worker validates mode support (current MVP: `goal` only).
 4. Worker resolves repo config and base-branch policy.
 5. Worker creates isolated ephemeral clone and task branch.
-6. Worker writes `goal.md` from Goal/Constraints only.
-7. Worker runs Kodo and validation commands.
-8. Worker enforces `allowed_paths` policy for changed files.
-9. Worker commits/pushes only when policy allows.
-10. Worker writes retained artifacts under `tools/report/kodo_plane/<timestamp>_<task_id>_<run_id>/`.
-11. Worker posts a short Plane comment and updates status.
+6. Worker bootstraps a repo-local Python virtualenv inside the cloned repo when enabled.
+7. Worker writes `goal.md` from Goal/Constraints only.
+8. Worker runs Kodo and validation commands.
+9. Worker enforces `allowed_paths` policy for changed files.
+10. Worker commits/pushes only when policy allows.
+11. Worker writes retained artifacts under `tools/report/kodo_plane/<timestamp>_<task_id>_<run_id>/`.
+12. Worker posts a short Plane comment and updates status.
 
 ## Explicit MVP boundaries (not implemented)
 
@@ -53,6 +54,13 @@ Improve reporting output and ensure policy violations are visible.
 - Current operation is **manual-by-task-id** (no scheduler/webhook yet).
 - If validation fails but `push_on_validation_failure` is enabled, the branch may still be pushed as **draft output**. This does not indicate run success.
 - Changed-file policy evaluation includes tracked modifications, additions, deletions, renames, and untracked files before commit.
+- Python validation is intended to run inside a repo-local virtualenv in the cloned workspace, not against host-global Python packages.
+
+## Repo bootstrap
+
+- Default bootstrap path is `.venv` at the cloned repo root.
+- Default bootstrap commands are `python3 -m venv .venv`, pip upgrade, and `.venv/bin/pip install -e .[dev]`.
+- Repos can override `python_binary`, `venv_dir`, `install_dev_command`, or disable bootstrap with `bootstrap_enabled: false`.
 
 ## Smoke verification
 

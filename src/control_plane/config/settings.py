@@ -39,6 +39,10 @@ class RepoSettings(BaseModel):
     validation_commands: list[str] = Field(default_factory=list)
     allowed_base_branches: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
+    bootstrap_enabled: bool = True
+    python_binary: str = "python3"
+    venv_dir: str = ".venv"
+    install_dev_command: str | None = None
 
 
 class Settings(BaseModel):

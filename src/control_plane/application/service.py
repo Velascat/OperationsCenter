@@ -11,7 +11,7 @@ from control_plane.adapters.git import GitClient, branch_allowed
 from control_plane.adapters.kodo import KodoAdapter
 from control_plane.adapters.plane import PlaneClient
 from control_plane.adapters.reporting import Reporter
-from control_plane.adapters.workspace import WorkspaceManager
+from control_plane.adapters.workspace import RepoEnvironmentBootstrapper, WorkspaceManager
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
@@ -27,6 +27,7 @@ class ExecutionService:
         self.validation = ValidationRunner()
         self.reporter = Reporter(settings.report_root)
         self.scope_checker = ChangedFilePolicyChecker()
+        self.bootstrapper = RepoEnvironmentBootstrapper()
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
@@ -92,6 +93,33 @@ class ExecutionService:
             self.git.create_task_branch(repo_path, task_branch)
             self._log_event("task_branch_created", run_id, task_branch=task_branch, repo_path=str(repo_path))
 
+            phase = "bootstrap"
+            self._log_event("phase", run_id, phase=phase)
+            repo_cfg = self.settings.repos[task.repo_key]
+            bootstrap_result = self.bootstrapper.prepare(
+                repo_path,
+                python_binary=repo_cfg.python_binary,
+                venv_dir=repo_cfg.venv_dir,
+                install_dev_command=repo_cfg.install_dev_command,
+                base_env=os.environ.copy(),
+                enabled=repo_cfg.bootstrap_enabled,
+            )
+            artifacts.append(
+                self.reporter.write_bootstrap(
+                    run_dir,
+                    [
+                        {
+                            "command": result.command,
+                            "exit_code": result.exit_code,
+                            "stdout": result.stdout,
+                            "stderr": result.stderr,
+                            "duration_ms": result.duration_ms,
+                        }
+                        for result in bootstrap_result.commands
+                    ],
+                )
+            )
+
             goal_file = workspace_path / "goal.md"
             self.kodo.write_goal_file(goal_file, task.goal_text, task.constraints_text)
 
@@ -119,7 +147,7 @@ class ExecutionService:
 
             phase = "validation"
             self._log_event("phase", run_id, phase=phase)
-            run_env = os.environ.copy()
+            run_env = dict(bootstrap_result.env)
             run_env.update(repo_target.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
             validation_ok = self.validation.passed(validation_results)

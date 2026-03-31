@@ -51,6 +51,11 @@ class Reporter:
         err.write_text(stderr)
         return [str(cmd), str(out), str(err)]
 
+    def write_bootstrap(self, run_dir: Path, commands: list[dict[str, object]]) -> str:
+        path = run_dir / "bootstrap.json"
+        path.write_text(json.dumps(commands, indent=2))
+        return str(path)
+
     def write_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
         path = run_dir / "validation.json"
         path.write_text(json.dumps(data, indent=2))

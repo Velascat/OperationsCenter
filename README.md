@@ -8,8 +8,9 @@ Self-hosted AI execution wrapper that uses **Plane** as the Jira-like board and 
 - Parse structured task body sections: `## Execution`, `## Goal`, optional `## Constraints`.
 - Use explicit repo/base branch metadata from the task.
 - Create an isolated ephemeral clone and task branch (`plane/<task_id>-<slug>`).
+- Prepare a repo-local Python virtualenv in the cloned repo (`.venv` by default).
 - Generate Kodo goal file from Goal/Constraints only (Execution metadata is excluded).
-- Run Kodo, then repo-configured validation commands.
+- Run Kodo, then repo-configured validation commands through the repo-local virtualenv.
 - Enforce `allowed_paths` policy against changed files before commit/push.
 - Set repo-local git identity from config before committing.
 - Emit retained artifacts with a `run_id` under `tools/report/kodo_plane/`.
@@ -67,6 +68,25 @@ For a safe end-to-end demo:
 4. Inspect `result_summary.md`, `validation.json`, and the Plane comment for the run outcome.
 
 The worker remains manual-by-task-id in the current MVP. There is no scheduler or webhook consumer yet.
+
+## Repo-local Python environment
+
+For Python repos, the worker now bootstraps a repo-local virtual environment inside the cloned workspace before validation:
+
+- default venv path: `.venv`
+- default creation command: `python3 -m venv .venv`
+- default install command: `.venv/bin/pip install -e .[dev]`
+
+Validation then runs with `VIRTUAL_ENV` set to that repo-local environment and its `bin` directory prepended to `PATH`.
+
+Per-repo config supports:
+
+- `bootstrap_enabled`
+- `python_binary`
+- `venv_dir`
+- `install_dev_command`
+
+If `install_dev_command` is omitted, the worker defaults to `pip install -e .[dev]`. Repos without a usable dev extra should override this command or disable bootstrap explicitly.
 
 ## Plane API verification note
 
