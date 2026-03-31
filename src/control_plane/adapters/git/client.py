@@ -28,6 +28,10 @@ class GitClient:
     def create_task_branch(self, repo_path: Path, task_branch: str) -> None:
         self._run(["git", "checkout", "-b", task_branch], cwd=repo_path)
 
+    def set_identity(self, repo_path: Path, author_name: str, author_email: str) -> None:
+        self._run(["git", "config", "user.name", author_name], cwd=repo_path)
+        self._run(["git", "config", "user.email", author_email], cwd=repo_path)
+
     def changed_files(self, repo_path: Path) -> list[str]:
         out = self._run(["git", "status", "--porcelain"], cwd=repo_path)
         files: list[str] = []
@@ -36,9 +40,13 @@ class GitClient:
                 files.append(line[3:])
         return files
 
-    def commit_all(self, repo_path: Path, message: str) -> None:
+    def commit_all(self, repo_path: Path, message: str) -> bool:
         self._run(["git", "add", "-A"], cwd=repo_path)
+        status = self._run(["git", "status", "--porcelain"], cwd=repo_path)
+        if not status:
+            return False
         self._run(["git", "commit", "-m", message], cwd=repo_path)
+        return True
 
     def push_branch(self, repo_path: Path, branch: str) -> None:
         self._run(["git", "push", "-u", "origin", branch], cwd=repo_path)

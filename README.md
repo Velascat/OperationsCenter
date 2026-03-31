@@ -2,40 +2,27 @@
 
 Self-hosted AI execution wrapper that uses **Plane** as the Jira-like board and **Kodo** as the coding engine.
 
-## What this repo provides
+## Current MVP (implemented)
 
-- Typed execution contracts (`BoardTask`, `RepoTarget`, `ExecutionRequest`, `ExecutionResult`)
-- Plane adapter for task fetch/comment/status update
-- Git/workspace orchestration for isolated ephemeral clones
-- Kodo CLI adapter
-- Validation runner and retained artifact writer
-- Worker orchestrator for end-to-end run of one Plane task
-- Optional FastAPI entrypoint for health and dry-run task parsing
+- Run **one Plane work-item by id** via worker CLI.
+- Parse structured task body sections: `## Execution`, `## Goal`, optional `## Constraints`.
+- Use explicit repo/base branch metadata from the task.
+- Create an isolated ephemeral clone and task branch (`plane/<task_id>-<slug>`).
+- Generate Kodo goal file from Goal/Constraints only (Execution metadata is excluded).
+- Run Kodo, then repo-configured validation commands.
+- Enforce `allowed_paths` policy against changed files before commit/push.
+- Set repo-local git identity from config before committing.
+- Emit retained artifacts with a `run_id` under `tools/report/kodo_plane/`.
+- Update Plane state and add short result comments.
 
-## Layout
+## Not implemented yet
 
-```text
-control-plane/
-  README.md
-  pyproject.toml
-  src/
-    control_plane/
-      config/
-      domain/
-      application/
-      adapters/
-        plane/
-        git/
-        kodo/
-        workspace/
-        reporting/
-      entrypoints/
-        api/
-        worker/
-  docs/
-    design/
-      plane_kodo_wrapper.md
-```
+- PR creation.
+- Webhook consumer.
+- Polling scheduler.
+- Concurrency locking.
+- Retries/idempotency.
+- Multi-repo tasks.
 
 ## Quick start
 
@@ -47,12 +34,8 @@ control-plane/
 PYTHONPATH=src python -m control_plane.entrypoints.worker.main --config config/control_plane.yaml --task-id TASK-123
 ```
 
-4. Or run API:
+4. Optional API:
 
 ```bash
 PYTHONPATH=src uvicorn control_plane.entrypoints.api.main:app --reload
 ```
-
-## Config example
-
-See `docs/design/plane_kodo_wrapper.md` for full details.

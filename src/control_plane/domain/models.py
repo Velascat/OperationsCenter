@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field
 ExecutionMode = Literal["goal", "test", "improve"]
 
 
+class ParsedTaskBody(BaseModel):
+    execution_metadata: dict[str, object]
+    goal_text: str
+    constraints_text: str | None = None
+
+
 class BoardTask(BaseModel):
     task_id: str
     project_id: str
@@ -22,6 +28,8 @@ class BoardTask(BaseModel):
     allowed_paths: list[str] = Field(default_factory=list)
     validation_profile: str | None = None
     open_pr: bool = False
+    goal_text: str
+    constraints_text: str | None = None
 
 
 class RepoTarget(BaseModel):
@@ -35,6 +43,7 @@ class RepoTarget(BaseModel):
 
 
 class ExecutionRequest(BaseModel):
+    run_id: str
     task: BoardTask
     repo_target: RepoTarget
     workspace_path: Path
@@ -51,6 +60,7 @@ class ValidationResult(BaseModel):
 
 
 class ExecutionResult(BaseModel):
+    run_id: str
     success: bool
     changed_files: list[str] = Field(default_factory=list)
     validation_passed: bool = False
@@ -59,3 +69,4 @@ class ExecutionResult(BaseModel):
     pull_request_url: str | None = None
     summary: str
     artifacts: list[str] = Field(default_factory=list)
+    policy_violations: list[str] = Field(default_factory=list)
