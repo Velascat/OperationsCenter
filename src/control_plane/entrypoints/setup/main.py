@@ -64,6 +64,8 @@ class SetupAnswers:
     plane_project_id: str
     plane_api_token_env: str
     plane_api_token_value: str
+    plane_version: str | None
+    plane_setup_url: str | None
     plane_start_command: str | None
     plane_open_browser: bool
     git_provider: str
@@ -74,6 +76,7 @@ class SetupAnswers:
     git_sign_commits: bool
     git_signing_key: str | None
     kodo_binary: str
+    kodo_install_ref: str | None
     kodo_team: str
     kodo_cycles: int
     kodo_exchanges: int
@@ -83,6 +86,7 @@ class SetupAnswers:
     preferred_fast_provider: str | None
     allowed_providers: list[str]
     headless_required: bool
+    provider_versions: dict[str, str]
     repos: list[RepoSetupAnswers]
     default_repo_key: str
 
@@ -153,7 +157,7 @@ def ensure_uv_installed() -> None:
         raise typer.BadParameter("[kodo] ERROR: uv installation failed")
 
 
-def ensure_kodo_installed(binary: str) -> None:
+def ensure_kodo_installed(binary: str, install_ref: str | None = None) -> None:
     typer.echo("[kodo] Checking installation...")
     if check_command_installed(binary):
         typer.echo("[kodo] already installed")
@@ -164,8 +168,11 @@ def ensure_kodo_installed(binary: str) -> None:
         )
     ensure_uv_installed()
     typer.echo("[kodo] Installing via uv...")
+    target = "git+https://github.com/ikamensh/kodo"
+    if install_ref:
+        target = f"{target}@{install_ref}"
     proc = subprocess.run(
-        ["uv", "tool", "install", "git+https://github.com/ikamensh/kodo"],
+        ["uv", "tool", "install", target],
         check=False,
         env=os.environ.copy(),
     )
@@ -622,6 +629,21 @@ def render_env_file(answers: SetupAnswers) -> str:
     ]
     if answers.plane_start_command:
         lines.append(f"export CONTROL_PLANE_PLANE_START_COMMAND={shell_quote(answers.plane_start_command)}")
+    if answers.plane_version:
+        lines.append(f"export CONTROL_PLANE_PLANE_VERSION={shell_quote(answers.plane_version)}")
+    if answers.plane_setup_url:
+        lines.append(f"export CONTROL_PLANE_PLANE_SETUP_URL={shell_quote(answers.plane_setup_url)}")
+    if answers.kodo_install_ref:
+        lines.append(f"export CONTROL_PLANE_KODO_INSTALL_REF={shell_quote(answers.kodo_install_ref)}")
+    provider_env_keys = {
+        "claude": "CONTROL_PLANE_PROVIDER_CLAUDE_VERSION",
+        "codex": "CONTROL_PLANE_PROVIDER_CODEX_VERSION",
+        "gemini": "CONTROL_PLANE_PROVIDER_GEMINI_VERSION",
+    }
+    for key, env_key in provider_env_keys.items():
+        version = answers.provider_versions.get(key, "")
+        if version:
+            lines.append(f"export {env_key}={shell_quote(version)}")
     if answers.plane_open_browser:
         lines.append("export CONTROL_PLANE_PLANE_OPEN_BROWSER='1'")
     lines.append("# Provider auth is handled by provider-specific CLIs or env vars on this machine.")
@@ -808,6 +830,18 @@ def main(
     default_plane_start_command = resolve_default_plane_start_command(env_path)
     plane_start_command = default_plane_start_command
     plane_open_browser = False
+    plane_version = existing_env.get("CONTROL_PLANE_PLANE_VERSION") or None
+    plane_setup_url = existing_env.get("CONTROL_PLANE_PLANE_SETUP_URL") or None
+    if advanced_mode:
+        print_section("Version Pins", "Optional install refs or versions for Plane, Kodo, and provider CLIs.")
+        plane_version = typer.prompt(
+            "Plane release tag (optional; pins repo-managed setup download)",
+            default=plane_version or "",
+        ).strip() or None
+        plane_setup_url = typer.prompt(
+            "Plane setup URL override (optional; takes precedence over release tag)",
+            default=plane_setup_url or "",
+        ).strip() or None
     if advanced_mode and default_plane_start_command:
         typer.echo(f"Using saved Plane start command: {default_plane_start_command}")
         change_plane_start_command = typer.confirm(
@@ -951,16 +985,35 @@ def main(
     ensure_github_ssh_setup(git_author_email, Path.cwd())
 
     existing_kodo_binary = existing_config_value(existing_config, "kodo", "binary") or "kodo"
+    kodo_install_ref = existing_env.get("CONTROL_PLANE_KODO_INSTALL_REF") or None
     print_section("Kodo Install", "Ensure the Kodo CLI is available before writing config.")
     kodo_binary = prompt_with_default(
         "Kodo binary",
         existing_kodo_binary,
         note="Using saved value." if existing_kodo_binary != "kodo" or existing_config_value(existing_config, "kodo", "binary") else None,
     )
+    if advanced_mode:
+        kodo_install_ref = typer.prompt(
+            "Kodo git ref/tag/SHA for install (optional)",
+            default=kodo_install_ref or "",
+        ).strip() or None
 
     print_section("Providers", "Supported Kodo backends detected on this machine.")
     statuses = detect_all_provider_statuses()
     write_provider_summary(statuses)
+    provider_version_defaults = {
+        "claude": existing_env.get("CONTROL_PLANE_PROVIDER_CLAUDE_VERSION", ""),
+        "codex": existing_env.get("CONTROL_PLANE_PROVIDER_CODEX_VERSION", ""),
+        "gemini": existing_env.get("CONTROL_PLANE_PROVIDER_GEMINI_VERSION", ""),
+    }
+    provider_versions = dict(provider_version_defaults)
+    if advanced_mode:
+        for provider_key in ["claude", "codex", "gemini"]:
+            label = PROVIDER_SPECS[provider_key].label
+            provider_versions[provider_key] = typer.prompt(
+                f"{label} version pin (optional)",
+                default=provider_version_defaults[provider_key],
+            ).strip()
 
     for status in list(statuses):
         spec = PROVIDER_SPECS[status.key]
@@ -972,7 +1025,7 @@ def main(
         should_install = typer.confirm(f"Install {spec.label} via {spec.install_method}?", default=status.key in {"codex", "claude"})
         if should_install:
             typer.echo(f"[provider] Installing {spec.label}...")
-            install_provider(spec)
+            install_provider(spec, version=provider_versions.get(status.key) or None)
             typer.echo(f"[provider] Installed {spec.label}")
     statuses = detect_all_provider_statuses()
 
@@ -1009,7 +1062,7 @@ def main(
     typer.echo("[provider] Final provider summary:")
     typer.echo(summarize_provider_statuses(statuses))
 
-    ensure_kodo_installed(kodo_binary)
+    ensure_kodo_installed(kodo_binary, install_ref=kodo_install_ref)
     verify_kodo(kodo_binary)
 
     print_section("Kodo", "Execution defaults for the local coding engine.")
@@ -1083,6 +1136,8 @@ def main(
         plane_project_id=plane_project_id,
         plane_api_token_env=plane_api_token_env,
         plane_api_token_value=plane_api_token_value,
+        plane_version=plane_version,
+        plane_setup_url=plane_setup_url,
         plane_start_command=plane_start_command,
         plane_open_browser=plane_open_browser,
         git_provider=git_provider,
@@ -1093,6 +1148,7 @@ def main(
         git_sign_commits=git_sign_commits,
         git_signing_key=git_signing_key,
         kodo_binary=kodo_binary,
+        kodo_install_ref=kodo_install_ref,
         kodo_team=kodo_team,
         kodo_cycles=kodo_cycles,
         kodo_exchanges=kodo_exchanges,
@@ -1102,6 +1158,7 @@ def main(
         preferred_fast_provider=preferred_fast_provider,
         allowed_providers=usable_providers,
         headless_required=headless_required,
+        provider_versions={k: v for k, v in provider_versions.items() if v},
         repos=repos,
         default_repo_key=default_repo_key,
     )

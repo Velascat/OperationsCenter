@@ -7,6 +7,7 @@ CONFIG_PATH="${CONTROL_PLANE_CONFIG:-${ROOT_DIR}/config/control_plane.local.yaml
 ENV_PATH="${CONTROL_PLANE_ENV_FILE:-${ROOT_DIR}/.env.control-plane.local}"
 BOOTSTRAP_STAMP="${VENV_DIR}/.control-plane-bootstrap"
 LOG_DIR="${ROOT_DIR}/logs/local"
+WATCH_DIR="${LOG_DIR}/watch-all"
 PLANE_MANAGER="${ROOT_DIR}/deployment/plane/manage.sh"
 
 ensure_venv() {
@@ -61,9 +62,13 @@ Usage:
   scripts/control-plane.sh start
   scripts/control-plane.sh stop
   scripts/control-plane.sh run-next
+  scripts/control-plane.sh watch-all
+  scripts/control-plane.sh watch-all-stop
+  scripts/control-plane.sh watch-all-status
   scripts/control-plane.sh watch --role goal
   scripts/control-plane.sh run --task-id TASK-123
   scripts/control-plane.sh plane-doctor [--task-id TASK-123]
+  scripts/control-plane.sh dependency-check [--create-plane-tasks]
   scripts/control-plane.sh plane-up
   scripts/control-plane.sh plane-down
   scripts/control-plane.sh plane-status
@@ -80,6 +85,68 @@ Environment:
   CONTROL_PLANE_CONFIG   Override config path (default: ${CONFIG_PATH})
   CONTROL_PLANE_ENV_FILE Override env file path (default: ${ENV_PATH})
 EOF
+}
+
+watch_pid_file() {
+  local role="$1"
+  echo "${WATCH_DIR}/${role}.pid"
+}
+
+watch_log_file() {
+  local role="$1"
+  echo "${WATCH_DIR}/$(timestamp)_${role}.log"
+}
+
+start_watch_role() {
+  local role="$1"
+  local pid_file
+  pid_file="$(watch_pid_file "${role}")"
+  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
+    echo "watch-${role} already running with PID $(cat "${pid_file}")"
+    return 0
+  fi
+  rm -f "${pid_file}"
+  mkdir -p "${WATCH_DIR}"
+  local log_file
+  log_file="$(watch_log_file "${role}")"
+  "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main \
+    --config "${CONFIG_PATH}" \
+    --watch \
+    --role "${role}" \
+    >>"${log_file}" 2>&1 &
+  local pid=$!
+  echo "${pid}" > "${pid_file}"
+  echo "watch-${role} started: pid=${pid} log=${log_file}"
+}
+
+stop_watch_role() {
+  local role="$1"
+  local pid_file
+  pid_file="$(watch_pid_file "${role}")"
+  if [[ ! -f "${pid_file}" ]]; then
+    echo "watch-${role} is not running"
+    return 0
+  fi
+  local pid
+  pid="$(cat "${pid_file}")"
+  if kill -0 "${pid}" >/dev/null 2>&1; then
+    kill "${pid}" >/dev/null 2>&1 || true
+    echo "watch-${role} stopped: pid=${pid}"
+  else
+    echo "watch-${role} was not running"
+  fi
+  rm -f "${pid_file}"
+}
+
+status_watch_role() {
+  local role="$1"
+  local pid_file
+  pid_file="$(watch_pid_file "${role}")"
+  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
+    echo "watch-${role}: running (pid $(cat "${pid_file}"))"
+  else
+    echo "watch-${role}: stopped"
+  fi
 }
 
 cmd="${1:-}"
@@ -149,6 +216,23 @@ case "${cmd}" in
     load_env_file
     run_with_log worker "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main --config "${CONFIG_PATH}" --watch "$@"
     ;;
+  watch-all)
+    ensure_venv
+    load_env_file
+    start_watch_role goal
+    start_watch_role test
+    start_watch_role improve
+    ;;
+  watch-all-stop)
+    stop_watch_role goal
+    stop_watch_role test
+    stop_watch_role improve
+    ;;
+  watch-all-status)
+    status_watch_role goal
+    status_watch_role test
+    status_watch_role improve
+    ;;
   worker)
     ensure_venv
     load_env_file
@@ -163,6 +247,11 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log plane-doctor "${VENV_DIR}/bin/python" -m control_plane.entrypoints.smoke.plane_doctor --config "${CONFIG_PATH}" "$@"
+    ;;
+  dependency-check)
+    ensure_venv
+    load_env_file
+    run_with_log dependency-check "${VENV_DIR}/bin/python" -m control_plane.entrypoints.maintenance.dependency_check --config "${CONFIG_PATH}" "$@"
     ;;
   *)
     usage

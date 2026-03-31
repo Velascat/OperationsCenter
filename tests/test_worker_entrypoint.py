@@ -1,13 +1,29 @@
 import logging
+from types import SimpleNamespace
 
 import pytest
 
-from control_plane.entrypoints.worker.main import issue_status_name, issue_task_kind, run_watch_loop, select_ready_task_id
+from control_plane.domain.models import ExecutionResult
+from control_plane.entrypoints.worker.main import (
+    classify_blocked_issue,
+    issue_status_name,
+    issue_task_kind,
+    run_watch_loop,
+    select_ready_task_id,
+)
 
 
 class FakePlaneClient:
-    def __init__(self, issues: list[dict[str, object]]) -> None:
+    def __init__(
+        self,
+        issues: list[dict[str, object]],
+        comments: dict[str, list[dict[str, object]]] | None = None,
+    ) -> None:
         self._issues = issues
+        self._comments = comments or {}
+        self.transitions: list[tuple[str, str]] = []
+        self.created: list[dict[str, object]] = []
+        self.issue_comments: list[tuple[str, str]] = []
 
     def list_issues(self) -> list[dict[str, object]]:
         return self._issues
@@ -17,6 +33,68 @@ class FakePlaneClient:
             if issue["id"] == task_id:
                 return issue
         raise KeyError(task_id)
+
+    def transition_issue(self, task_id: str, state: str) -> None:
+        self.transitions.append((task_id, state))
+        for issue in self._issues:
+            if issue["id"] == task_id:
+                issue["state"] = {"name": state}
+
+    def list_comments(self, task_id: str) -> list[dict[str, object]]:
+        return self._comments.get(task_id, [])
+
+    def create_issue(
+        self,
+        *,
+        name: str,
+        description: str,
+        state: str | None = None,
+        label_names: list[str] | None = None,
+    ) -> dict[str, object]:
+        issue = {
+            "id": f"FOLLOWUP-{len(self.created) + 1}",
+            "name": name,
+            "description": description,
+            "state": {"name": state or "Backlog"},
+            "labels": [{"name": label} for label in (label_names or [])],
+        }
+        self.created.append(issue)
+        self._issues.append(issue)
+        return issue
+
+    def comment_issue(self, task_id: str, comment_markdown: str) -> None:
+        self.issue_comments.append((task_id, comment_markdown))
+        self._comments.setdefault(task_id, []).append({"comment_html": f"<p>{comment_markdown}</p>"})
+
+
+class FakeService:
+    def __init__(self, *, success: bool = True) -> None:
+        self.runs: list[str] = []
+        self.settings = SimpleNamespace(
+            repos={
+                "control-plane": SimpleNamespace(
+                    default_branch="main",
+                )
+            }
+        )
+        self._success = success
+
+    def run_task(self, client: FakePlaneClient, task_id: str) -> ExecutionResult:  # noqa: ARG002
+        self.runs.append(task_id)
+        return ExecutionResult(
+            run_id="run-123",
+            success=self._success,
+            changed_files=[],
+            validation_passed=self._success,
+            validation_results=[],
+            branch_pushed=False,
+            draft_branch_pushed=False,
+            push_reason=None,
+            pull_request_url=None,
+            summary="ok" if self._success else "failed",
+            artifacts=[],
+            policy_violations=[],
+        )
 
 
 def test_issue_status_name_prefers_state_name() -> None:
@@ -42,25 +120,17 @@ def test_issue_task_kind_extracts_label_value() -> None:
     assert issue_task_kind({"labels": [{"name": "task-kind: test"}]}) == "test"
 
 
-class FakeWatchPlaneClient(FakePlaneClient):
-    def __init__(self, issues: list[dict[str, object]]) -> None:
-        super().__init__(issues)
-        self.transitions: list[tuple[str, str]] = []
-
-    def transition_issue(self, task_id: str, state: str) -> None:
-        self.transitions.append((task_id, state))
-
-
-class FakeService:
-    def __init__(self) -> None:
-        self.runs: list[str] = []
-
-    def run_task(self, client: FakeWatchPlaneClient, task_id: str) -> None:  # noqa: ARG002
-        self.runs.append(task_id)
+def test_classify_blocked_issue_detects_validation_failure() -> None:
+    classification, rationale = classify_blocked_issue(
+        {"name": "Task"},
+        [{"comment_html": "<p>AI execution result</p><ul><li>validation_passed: False</li></ul>"}],
+    )
+    assert classification == "validation failure"
+    assert "Validation failed" in rationale
 
 
 def test_run_watch_loop_claims_and_runs_one_goal_task(caplog: pytest.LogCaptureFixture) -> None:
-    client = FakeWatchPlaneClient(
+    client = FakePlaneClient(
         [
             {"id": "TASK-1", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]},
         ]
@@ -79,3 +149,59 @@ def test_run_watch_loop_claims_and_runs_one_goal_task(caplog: pytest.LogCaptureF
 
     assert client.transitions == [("TASK-1", "Running")]
     assert service.runs == ["TASK-1"]
+
+
+def test_run_watch_loop_test_role_creates_follow_up_goal_task_on_failure() -> None:
+    client = FakePlaneClient(
+        [
+            {"id": "TEST-1", "name": "Verify watcher", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: test"}]},
+        ]
+    )
+    service = FakeService(success=False)
+
+    run_watch_loop(
+        client,
+        service,
+        role="test",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+    )
+
+    assert service.runs == ["TEST-1"]
+    assert client.created
+    assert client.created[0]["labels"] == [
+        {"name": "task-kind: goal"},
+        {"name": "source: test-worker"},
+    ]
+
+
+def test_run_watch_loop_improve_role_triages_blocked_task() -> None:
+    client = FakePlaneClient(
+        [
+            {"id": "BLOCKED-1", "name": "Broken task", "state": {"name": "Blocked"}, "labels": [{"name": "task-kind: goal"}]},
+        ],
+        comments={
+            "BLOCKED-1": [
+                {"comment_html": "<p>AI execution result</p><ul><li>validation_passed: False</li></ul>"},
+            ]
+        },
+    )
+    service = FakeService()
+
+    run_watch_loop(
+        client,
+        service,
+        role="improve",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+    )
+
+    assert service.runs == []
+    assert client.created
+    assert client.created[0]["labels"] == [
+        {"name": "task-kind: goal"},
+        {"name": "source: improve-worker"},
+    ]
+    assert any("Blocked triage result" in comment for _, comment in client.issue_comments)

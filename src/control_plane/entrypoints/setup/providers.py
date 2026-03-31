@@ -25,6 +25,7 @@ class ProviderSpec:
     auth_env_var: str | None
     interactive_login_command: str | None
     installable: bool
+    npm_package: str | None = None
 
 
 @dataclass
@@ -51,6 +52,7 @@ PROVIDER_SPECS = {
         auth_env_var=None,
         interactive_login_command="claude auth login",
         installable=True,
+        npm_package="@anthropic-ai/claude-code",
     ),
     "codex": ProviderSpec(
         key="codex",
@@ -62,6 +64,7 @@ PROVIDER_SPECS = {
         auth_env_var="CODEX_API_KEY",
         interactive_login_command="codex login",
         installable=True,
+        npm_package="@openai/codex",
     ),
     "gemini": ProviderSpec(
         key="gemini",
@@ -73,6 +76,7 @@ PROVIDER_SPECS = {
         auth_env_var="GEMINI_API_KEY",
         interactive_login_command="gemini --help",
         installable=True,
+        npm_package="@google/gemini-cli",
     ),
     "cursor": ProviderSpec(
         key="cursor",
@@ -186,16 +190,24 @@ def ensure_command_available(binary: str) -> None:
         raise typer.BadParameter(f"Required command '{binary}' is not available on PATH")
 
 
-def install_provider(spec: ProviderSpec) -> None:
+def install_provider(spec: ProviderSpec, version: str | None = None) -> None:
     if not spec.installable or not spec.install_command:
         raise typer.BadParameter(f"{spec.label} does not have an automated install path here")
-    if spec.install_method == "npm":
+    install_command = spec.install_command
+    install_method = spec.install_method
+    if version:
+        if spec.npm_package:
+            install_command = f"npm install -g {spec.npm_package}@{version}"
+            install_method = "npm (pinned)"
+        else:
+            raise typer.BadParameter(f"{spec.label} does not support version pinning with the configured install method")
+    if install_method.startswith("npm"):
         ensure_command_available("npm")
     elif spec.key == "claude":
         ensure_command_available("bash")
         ensure_command_available("curl")
 
-    proc = subprocess.run(spec.install_command, shell=True, check=False)
+    proc = subprocess.run(install_command, shell=True, check=False)
     if proc.returncode != 0:
         raise typer.BadParameter(f"{spec.label} install failed with exit code {proc.returncode}")
 

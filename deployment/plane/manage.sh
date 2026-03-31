@@ -9,6 +9,8 @@ SETUP_SH="${RUNTIME_DIR}/setup.sh"
 PLANE_APP_DIR="${RUNTIME_DIR}/plane-app"
 PLANE_ENV="${PLANE_APP_DIR}/plane.env"
 PLANE_URL="${CONTROL_PLANE_PLANE_URL:-http://localhost:8080}"
+PLANE_VERSION="${CONTROL_PLANE_PLANE_VERSION:-}"
+PLANE_SETUP_URL="${CONTROL_PLANE_PLANE_SETUP_URL:-}"
 LAST_RUNTIME_LOG=""
 
 timestamp() {
@@ -18,7 +20,16 @@ timestamp() {
 download_setup() {
   mkdir -p "${RUNTIME_DIR}"
   if [[ ! -x "${SETUP_SH}" ]]; then
-    curl -fsSL -o "${SETUP_SH}" https://github.com/makeplane/plane/releases/latest/download/setup.sh
+    local setup_url="${PLANE_SETUP_URL}"
+    if [[ -z "${setup_url}" ]]; then
+      if [[ -n "${PLANE_VERSION}" ]]; then
+        setup_url="https://github.com/makeplane/plane/releases/download/${PLANE_VERSION}/setup.sh"
+      else
+        setup_url="https://github.com/makeplane/plane/releases/latest/download/setup.sh"
+      fi
+    fi
+    echo "Using Plane setup source: ${setup_url}"
+    curl -fsSL -o "${SETUP_SH}" "${setup_url}"
     chmod +x "${SETUP_SH}"
   fi
 }

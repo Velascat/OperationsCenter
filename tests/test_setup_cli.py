@@ -23,6 +23,8 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
         plane_project_id="project-123",
         plane_api_token_env="PLANE_API_TOKEN",
         plane_api_token_value="plane-secret",
+        plane_version=None,
+        plane_setup_url=None,
         plane_start_command="docker compose up -d",
         plane_open_browser=True,
         git_provider="github",
@@ -33,6 +35,7 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
         git_sign_commits=True,
         git_signing_key="ABC12345",
         kodo_binary="kodo",
+        kodo_install_ref=None,
         kodo_team="full",
         kodo_cycles=3,
         kodo_exchanges=20,
@@ -42,6 +45,7 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
         preferred_fast_provider="codex",
         allowed_providers=["claude", "codex"],
         headless_required=False,
+        provider_versions={},
         repos=[
             RepoSetupAnswers(
                 repo_key="control-plane",
@@ -77,6 +81,8 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
         plane_project_id="project-123",
         plane_api_token_env="PLANE_API_TOKEN",
         plane_api_token_value="plane-secret",
+        plane_version="v1.2.3",
+        plane_setup_url=None,
         plane_start_command="docker compose up -d",
         plane_open_browser=True,
         git_provider="github",
@@ -87,6 +93,7 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
         git_sign_commits=False,
         git_signing_key=None,
         kodo_binary="kodo",
+        kodo_install_ref="v0.4.272",
         kodo_team="full",
         kodo_cycles=3,
         kodo_exchanges=20,
@@ -96,6 +103,7 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
         preferred_fast_provider="codex",
         allowed_providers=["claude", "codex"],
         headless_required=False,
+        provider_versions={"codex": "0.117.0"},
         repos=[
             RepoSetupAnswers(
                 repo_key="control-plane",
@@ -117,8 +125,11 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
     assert "export PLANE_API_TOKEN='plane-secret'" in rendered
     assert "export CONTROL_PLANE_PLANE_URL='http://plane.local'" in rendered
     assert "export CONTROL_PLANE_PLANE_START_COMMAND='docker compose up -d'" in rendered
+    assert "export CONTROL_PLANE_PLANE_VERSION='v1.2.3'" in rendered
     assert "export CONTROL_PLANE_PLANE_OPEN_BROWSER='1'" in rendered
+    assert "export CONTROL_PLANE_KODO_INSTALL_REF='v0.4.272'" in rendered
     assert "export GITHUB_TOKEN='gh-secret'" in rendered
+    assert "export CONTROL_PLANE_PROVIDER_CODEX_VERSION='0.117.0'" in rendered
     assert "export CONTROL_PLANE_PROVIDER_PREFERRED_SMART='claude'" in rendered
     assert "export CONTROL_PLANE_PROVIDER_PREFERRED_FAST='codex'" in rendered
     assert "export CONTROL_PLANE_ALLOWED_PROVIDERS='claude,codex'" in rendered
@@ -134,6 +145,8 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
         plane_project_id="project-123",
         plane_api_token_env="PLANE_API_TOKEN",
         plane_api_token_value="plane-secret",
+        plane_version=None,
+        plane_setup_url=None,
         plane_start_command=None,
         plane_open_browser=False,
         git_provider="github",
@@ -144,6 +157,7 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
         git_sign_commits=False,
         git_signing_key=None,
         kodo_binary="kodo",
+        kodo_install_ref=None,
         kodo_team="full",
         kodo_cycles=3,
         kodo_exchanges=20,
@@ -153,6 +167,7 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
         preferred_fast_provider="codex",
         allowed_providers=["claude", "codex"],
         headless_required=False,
+        provider_versions={},
         repos=[
             RepoSetupAnswers(
                 repo_key="control-plane",
@@ -195,6 +210,8 @@ def test_render_task_template_uses_default_repo() -> None:
         plane_project_id="project-123",
         plane_api_token_env="PLANE_API_TOKEN",
         plane_api_token_value="plane-secret",
+        plane_version=None,
+        plane_setup_url=None,
         plane_start_command=None,
         plane_open_browser=False,
         git_provider="github",
@@ -205,6 +222,7 @@ def test_render_task_template_uses_default_repo() -> None:
         git_sign_commits=False,
         git_signing_key=None,
         kodo_binary="kodo",
+        kodo_install_ref=None,
         kodo_team="full",
         kodo_cycles=3,
         kodo_exchanges=20,
@@ -214,6 +232,7 @@ def test_render_task_template_uses_default_repo() -> None:
         preferred_fast_provider="codex",
         allowed_providers=["claude", "codex"],
         headless_required=False,
+        provider_versions={},
         repos=[
             RepoSetupAnswers(
                 repo_key="control-plane",

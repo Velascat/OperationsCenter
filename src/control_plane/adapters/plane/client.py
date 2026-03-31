@@ -63,6 +63,32 @@ class PlaneClient:
                 return [item for item in results if isinstance(item, dict)]
         return []
 
+    def list_labels(self) -> list[dict[str, Any]]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/labels/"
+        response = self._client.get(url)
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict):
+            results = payload.get("results")
+            if isinstance(results, list):
+                return [item for item in results if isinstance(item, dict)]
+        return []
+
+    def list_comments(self, task_id: str) -> list[dict[str, Any]]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/comments/"
+        response = self._client.get(url)
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if isinstance(payload, dict):
+            results = payload.get("results")
+            if isinstance(results, list):
+                return [item for item in results if isinstance(item, dict)]
+        return []
+
     def to_board_task(self, issue: dict[str, Any]) -> BoardTask:
         description = self._issue_description_text(issue)
         parsed_body = self.task_parser.parse(description)
@@ -90,13 +116,31 @@ class PlaneClient:
 
     def transition_issue(self, task_id: str, state: str) -> None:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
-        state_value: str = state
-        for item in self.list_states():
-            if str(item.get("name", "")).strip().lower() == state.strip().lower():
-                state_value = str(item["id"])
-                break
+        state_value = self._resolve_state_value(state)
         response = self._client.patch(url, json={"state": state_value})
         response.raise_for_status()
+
+    def create_issue(
+        self,
+        *,
+        name: str,
+        description: str,
+        state: str | None = None,
+        label_names: list[str] | None = None,
+    ) -> dict[str, Any]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/"
+        payload: dict[str, Any] = {
+            "name": name,
+            "description_stripped": description,
+            "description_html": self._render_text_html(description),
+        }
+        if state:
+            payload["state"] = self._resolve_state_value(state)
+        if label_names:
+            payload["labels"] = self._ensure_label_ids(label_names)
+        response = self._client.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()
 
     def comment_issue(self, task_id: str, comment_markdown: str) -> None:
         url = (
@@ -105,6 +149,39 @@ class PlaneClient:
         )
         response = self._client.post(url, json={"comment_html": self._render_comment_html(comment_markdown)})
         response.raise_for_status()
+
+    def _resolve_state_value(self, state: str) -> str:
+        state_value: str = state
+        for item in self.list_states():
+            if str(item.get("name", "")).strip().lower() == state.strip().lower():
+                state_value = str(item["id"])
+                break
+        return state_value
+
+    def _ensure_label_ids(self, label_names: list[str]) -> list[str]:
+        existing = {
+            str(item.get("name", "")).strip().lower(): str(item["id"])
+            for item in self.list_labels()
+            if item.get("id") and item.get("name")
+        }
+        ids: list[str] = []
+        for label_name in label_names:
+            normalized = label_name.strip().lower()
+            if not normalized:
+                continue
+            label_id = existing.get(normalized)
+            if label_id is None:
+                created = self._create_label(label_name.strip())
+                label_id = str(created["id"])
+                existing[normalized] = label_id
+            ids.append(label_id)
+        return ids
+
+    def _create_label(self, label_name: str) -> dict[str, Any]:
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/labels/"
+        response = self._client.post(url, json={"name": label_name})
+        response.raise_for_status()
+        return response.json()
 
     @staticmethod
     def _render_comment_html(comment_markdown: str) -> str:
@@ -121,6 +198,17 @@ class PlaneClient:
         if items:
             return f"<p>{header}</p><ul>{''.join(items)}</ul>"
         return f"<p>{header}</p>"
+
+    @staticmethod
+    def _render_text_html(text: str) -> str:
+        blocks = [block.strip() for block in text.split("\n\n") if block.strip()]
+        if not blocks:
+            return "<p></p>"
+        rendered: list[str] = []
+        for block in blocks:
+            lines = [html.escape(line) for line in block.splitlines()]
+            rendered.append(f"<p>{'<br/>'.join(lines)}</p>")
+        return "".join(rendered)
 
     @staticmethod
     def _issue_description_text(issue: dict[str, Any]) -> str:

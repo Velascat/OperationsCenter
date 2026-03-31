@@ -12,6 +12,8 @@ def test_plane_comment_and_state_update_flow() -> None:
         payload = json.loads(request.content.decode()) if request.content else None
         calls.append((request.method, str(request.url), payload, dict(request.headers)))
 
+        if request.method == "GET" and "/states/" in str(request.url):
+            return httpx.Response(200, json={"results": []})
         if request.method == "GET":
             return httpx.Response(
                 200,
@@ -116,6 +118,69 @@ def test_plane_list_issues_supports_paginated_results() -> None:
 
     assert [issue["id"] for issue in issues] == ["TASK-1", "TASK-2"]
     assert calls == [("GET", "http://plane.local/api/v1/workspaces/ws/projects/proj/work-items/?expand=state")]
+
+
+def test_plane_create_issue_ensures_labels_and_state() -> None:
+    calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode()) if request.content else None
+        calls.append((request.method, str(request.url), payload))
+        url = str(request.url)
+        if request.method == "GET" and "/states/" in url:
+            return httpx.Response(200, json={"results": [{"id": "STATE-1", "name": "Ready for AI"}]})
+        if request.method == "GET" and "/labels/" in url:
+            return httpx.Response(200, json={"results": []})
+        if request.method == "POST" and url.endswith("/labels/"):
+            assert payload == {"name": "task-kind: goal"} or payload == {"name": "source: improve-worker"}
+            return httpx.Response(201, json={"id": f"LABEL-{len([c for c in calls if c[1].endswith('/labels/') and c[0] == 'POST'])}"})
+        if request.method == "POST" and url.endswith("/work-items/"):
+            return httpx.Response(201, json={"id": "TASK-NEW", "name": payload["name"]})
+        raise AssertionError(f"Unexpected call: {request.method} {url}")
+
+    transport = httpx.MockTransport(handler)
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    client._client = httpx.Client(  # type: ignore[attr-defined]
+        transport=transport,
+        base_url="http://plane.local",
+        headers={"X-API-Key": "token", "Content-Type": "application/json"},
+    )
+
+    try:
+        created = client.create_issue(
+            name="Follow-up",
+            description="## Goal\nDo thing.",
+            state="Ready for AI",
+            label_names=["task-kind: goal", "source: improve-worker"],
+        )
+    finally:
+        client.close()
+
+    assert created["id"] == "TASK-NEW"
+    work_item_payload = next(payload for method, url, payload in calls if method == "POST" and url.endswith("/work-items/"))
+    assert work_item_payload["state"] == "STATE-1"
+    assert work_item_payload["labels"] == ["LABEL-1", "LABEL-2"]
+    assert "description_html" in work_item_payload
+
+
+def test_plane_list_comments_supports_paginated_results() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": [{"id": "C-1", "comment_html": "<p>Hello</p>"}]})
+
+    transport = httpx.MockTransport(handler)
+    client = PlaneClient("http://plane.local", "token", "ws", "proj")
+    client._client = httpx.Client(  # type: ignore[attr-defined]
+        transport=transport,
+        base_url="http://plane.local",
+        headers={"X-API-Key": "token", "Content-Type": "application/json"},
+    )
+
+    try:
+        comments = client.list_comments("TASK-1")
+    finally:
+        client.close()
+
+    assert comments == [{"id": "C-1", "comment_html": "<p>Hello</p>"}]
 
 
 def test_plane_task_parses_from_description_html_when_plain_text_missing() -> None:

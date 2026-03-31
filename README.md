@@ -6,7 +6,8 @@ Self-hosted AI execution wrapper that uses **Plane** as the Jira-like board and 
 
 - Run one Plane work-item by id.
 - Run the next eligible Plane work-item from the configured project.
-- Run a polling watch loop for the `goal` worker role.
+- Run polling watch loops for the `goal`, `test`, and `improve` worker roles.
+- Run a local `watch-all` wrapper that launches the three role watchers together.
 - Parse structured task body sections: `## Execution`, `## Goal`, optional `## Constraints`.
 - Use explicit repo/base branch metadata from the task.
 - Create an isolated ephemeral clone and task branch (`plane/<task_id>-<slug>`).
@@ -22,11 +23,11 @@ Self-hosted AI execution wrapper that uses **Plane** as the Jira-like board and 
 
 - PR creation.
 - Webhook consumer.
-- `watch` roles beyond `goal`.
 - Concurrency locking.
 - Retries/idempotency.
 - Multi-repo tasks.
-- `watch-all` or worker supervision.
+- Distributed locking or multi-machine scheduling.
+- Automatic dependency update checking/re-pinning workflow.
 
 ## Quick start
 
@@ -42,15 +43,25 @@ This bootstraps the repo `.venv`, installs the repo in editable mode with dev de
 - `.env.control-plane.local`
 - `config/plane_task_template.local.md`
 
-Start the local dev stack:
+Fastest happy path:
 
 ```bash
+./scripts/control-plane.sh setup
 source .env.control-plane.local
 ./scripts/control-plane.sh start
 ./scripts/control-plane.sh plane-status
+./scripts/control-plane.sh plane-doctor
 ```
 
-Common commands:
+Then create a Plane work item, move it to `Ready for AI`, and run one of:
+
+```bash
+./scripts/control-plane.sh run --task-id TASK-123
+./scripts/control-plane.sh run-next
+./scripts/control-plane.sh watch-all
+```
+
+Local operation commands:
 
 ```bash
 ./scripts/control-plane.sh start
@@ -62,12 +73,27 @@ Common commands:
 ./scripts/control-plane.sh dev-down
 ./scripts/control-plane.sh providers-status
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
+./scripts/control-plane.sh dependency-check
+./scripts/control-plane.sh dependency-check --create-plane-tasks
 ./scripts/control-plane.sh test
 ./scripts/control-plane.sh api
 ./scripts/control-plane.sh run --task-id TASK-123
 ./scripts/control-plane.sh run-next
 ./scripts/control-plane.sh watch --role goal
+./scripts/control-plane.sh watch --role test
+./scripts/control-plane.sh watch --role improve
+./scripts/control-plane.sh watch-all
+./scripts/control-plane.sh watch-all-status
+./scripts/control-plane.sh watch-all-stop
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
+```
+
+Maintenance commands:
+
+```bash
+./scripts/control-plane.sh providers-status
+./scripts/control-plane.sh dependency-check
+./scripts/control-plane.sh dependency-check --create-plane-tasks
 ```
 
 Each helper command writes a local log file under `logs/local/`.
@@ -95,8 +121,9 @@ Typical local flow:
    - `./scripts/control-plane.sh run --task-id TASK_ID`
    - `./scripts/control-plane.sh run-next`
    - `./scripts/control-plane.sh watch --role goal`
+   - `./scripts/control-plane.sh watch-all`
 
-`run-next` and `watch --role goal` only pick tasks in `Ready for AI`.
+`run-next` and the role watchers only pick tasks in `Ready for AI`, except `improve`, which also triages `Blocked` tasks.
 
 ## Automation model
 
@@ -104,7 +131,12 @@ Board-facing execution modes:
 
 - Manual single-task run: `run --task-id TASK_ID`
 - First eligible task: `run-next`
-- Background polling loop: `watch --role goal`
+- Background polling loops:
+  - `watch --role goal`
+  - `watch --role test`
+  - `watch --role improve`
+- Local wrapper for all three:
+  - `watch-all`
 
 Current watch loop behavior:
 
@@ -114,12 +146,32 @@ Current watch loop behavior:
 - claims a task by moving it to `Running`
 - executes one task at a time
 - logs each poll cycle to `logs/local/`
+- uses the board itself for worker coordination through labels, comments, and follow-up tasks
 
 Current role support:
 
 - `goal`: implemented
-- `test`: not implemented
-- `improve`: not implemented
+- `test`: implemented
+- `improve`: implemented
+
+Role responsibilities:
+
+- `goal`
+  - consumes `task-kind: goal`
+  - runs implementation work
+  - moves successful tasks toward `Review`
+- `test`
+  - consumes `task-kind: test`
+  - runs verification work
+  - creates follow-up `goal` tasks when verification fails
+- `improve`
+  - triages `Blocked` tasks
+  - consumes explicit `task-kind: improve` tasks
+  - creates bounded follow-up tasks instead of leaving blocked work stuck
+
+Blocked-task handling currently lives inside `improve`, not in a separate `unblocker` lane.
+
+`watch-all` is only a local convenience wrapper. It launches three watcher processes with separate logs and PID files. It is not a queue, scheduler, or distributed supervisor.
 
 Control Plane operates at the board/task level. Kodo remains the multi-agent executor for a single run.
 
@@ -149,8 +201,11 @@ Notes:
 - `mode: goal` is the supported runtime mode today.
 - `allowed_paths` is enforced before commit/push.
 - Kodo receives Goal/Constraints, not the `## Execution` block.
+- Use labels such as `task-kind: goal`, `task-kind: test`, `task-kind: improve`, and `source: manual` when you want explicit board routing.
 
-## Plane smoke test
+## Diagnostics
+
+### Plane smoke test
 
 Use the smoke entrypoint to verify Plane fetch, parse, comment, and optional state transition behavior without running Kodo:
 
@@ -167,7 +222,7 @@ This writes retained smoke artifacts under `tools/report/kodo_plane/<timestamp>_
 - `plane_work_item.json`
 - `smoke_result.json`
 
-## Plane doctor
+### Plane doctor
 
 Use Plane doctor to verify API access and diagnose workspace/project/token mismatches:
 
@@ -191,12 +246,14 @@ For a safe end-to-end demo:
 1. Create a Plane work item with `mode: goal`, a known safe `repo`, a known `base_branch`, and tight `allowed_paths`.
 2. Use a low-risk goal that touches only that allowed path set.
 3. Move the task to `Ready for AI`.
-4. Run `run --task-id TASK_ID`, `run-next`, or `watch --role goal`.
+4. Run `run --task-id TASK_ID`, `run-next`, `watch --role <role>`, or `watch-all`.
 5. Inspect `result_summary.md`, `validation.json`, the worker log, and the Plane comment.
 
-The current autonomous path is a polling loop for the `goal` role only. There is no webhook consumer, concurrency lock manager, or improve/test watcher yet.
+The current autonomous path is a polling loop with `goal`, `test`, and `improve` roles. There is still no webhook consumer, concurrency lock manager, or distributed supervisor.
 
-## Kodo installation
+## Local tooling
+
+### Kodo installation
 
 Setup now manages Kodo installation for the local machine:
 
@@ -206,6 +263,62 @@ Setup now manages Kodo installation for the local machine:
 - verifies the install with `kodo --help`
 
 If setup cannot install or verify Kodo, it fails clearly.
+
+Optional version pin:
+
+- setup can record a Kodo git ref/tag/SHA in local env
+- if present, install uses:
+  - `uv tool install git+https://github.com/ikamensh/kodo@<ref>`
+
+### Version pinning
+
+Local setup supports optional pinning for the operator machine:
+
+- Plane
+  - release tag pin for the repo-managed `setup.sh` download
+  - optional direct setup URL override
+- Kodo
+  - git ref/tag/SHA pin for `uv tool install`
+- Providers
+  - optional version pins for Claude Code, Codex CLI, and Gemini CLI
+
+Pinning is intended to make local installs reproducible.
+
+What pinning does not do:
+
+- it does not automatically check for new upstream versions during normal task execution
+- it does not auto-upgrade pinned tools
+- it does not auto-repin after breakages are fixed
+
+That maintenance/update-check workflow should be handled by a separate operator command or scheduled maintenance path, not by `setup`, `run`, or `watch`.
+
+### Dependency check
+
+Use the maintenance checker to inspect pinned versions, installed versions, and upstream latest versions without changing any pins:
+
+```bash
+./scripts/control-plane.sh dependency-check
+```
+
+This command:
+
+- reads current local pins from `.env.control-plane.local`
+- checks installed/local health for Plane, Kodo, and provider CLIs
+- compares upstream latest where practical
+- writes a retained report under `tools/report/kodo_plane/...`
+
+Optional Plane task creation:
+
+```bash
+./scripts/control-plane.sh dependency-check --create-plane-tasks
+```
+
+When enabled, actionable drift or breakage creates Plane follow-up tasks labeled like:
+
+- `task-kind: improve`
+- `source: dependency-check`
+
+`dependency-check` is a maintenance surface. It is intentionally separate from normal `setup`, `run`, and `watch` execution.
 
 ## Repo-local Python environment
 
@@ -257,10 +370,12 @@ Provider CLIs:
 3. Setup then guides interactive auth or API-key/headless guidance per provider.
 4. At least one usable provider backend is required before setup finishes successfully.
 5. Recheck provider readiness anytime with `./scripts/control-plane.sh providers-status`.
+6. In advanced mode, setup can also record optional version pins for Plane, Kodo, and supported provider CLIs.
 
 Setup prompts for:
 
 - Plane base URL, Plane API workspace identifier, Plane API project id, and Plane API token
+- optional version pins for Plane, Kodo, and supported providers in advanced mode
 - Git provider, optional HTTPS auth token, bot identity, and GitHub SSH bootstrap
 - Kodo binary/orchestration defaults
 - Provider detection, install, auth guidance, and preferred-provider selection
