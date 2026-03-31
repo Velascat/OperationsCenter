@@ -18,7 +18,6 @@ from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService, TaskParser
 from control_plane.config import RepoPolicyStore, load_settings
 from control_plane.domain import ExecutionResult
-
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
 PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
@@ -30,6 +29,7 @@ MAX_PROPOSALS_PER_DAY = 6
 PROPOSAL_COOLDOWN_SECONDS = 30 * 60
 PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
 LOW_BACKLOG_THRESHOLD = 2
+EXECUTION_ACTIONS = {"execute", "improve_task"}
 
 
 @dataclass
@@ -216,6 +216,60 @@ def write_watch_status(
     path.write_text(json.dumps(payload, indent=2))
 
 
+def execution_gate_decision(
+    *,
+    service: ExecutionService,
+    role: str,
+    action: str,
+    issue: dict[str, Any],
+    now: datetime | None = None,
+) -> tuple[str, dict[str, object]] | None:
+    if action not in EXECUTION_ACTIONS:
+        return None
+    now = now or datetime.now(UTC)
+    store = service.usage_store
+    task_id = str(issue.get("id"))
+    signature = store.issue_signature(issue)
+    noop = store.noop_decision(role=role, task_id=task_id, signature=signature)
+    if noop.should_skip:
+        store.record_skip(
+            role=role,
+            task_id=task_id,
+            signature=signature,
+            reason=noop.reason or "no_op",
+            detail=noop.detail,
+            now=now,
+        )
+        return "skip_noop", {"reason": noop.reason, "detail": noop.detail}
+
+    if role in {"goal", "test"}:
+        retry = store.retry_decision(task_id=task_id)
+        if not retry.allowed:
+            store.record_retry_cap(role=role, task_id=task_id, now=now, attempts=retry.attempts, limit=retry.limit)
+            return "retry_cap_block", {"reason": retry.reason, "attempts": retry.attempts, "limit": retry.limit}
+
+    budget = store.budget_decision(now=now)
+    if not budget.allowed:
+        store.record_skip(
+            role=role,
+            task_id=task_id,
+            signature=signature,
+            reason=budget.reason or "budget_exceeded",
+            detail=budget.window,
+            now=now,
+            evidence={"limit": budget.limit, "current": budget.current},
+        )
+        return "skip_budget", {
+            "reason": budget.reason,
+            "window": budget.window,
+            "limit": budget.limit,
+            "current": budget.current,
+        }
+
+    store.record_execution(role=role, task_id=task_id, signature=signature, now=now)
+    return None
+
+
 def latest_run_dir(result: ExecutionResult) -> Path | None:
     for artifact in result.artifacts:
         artifact_path = Path(artifact)
@@ -226,9 +280,9 @@ def latest_run_dir(result: ExecutionResult) -> Path | None:
 
 def run_service_task(service: ExecutionService, client: PlaneClient, task_id: str, *, worker_role: str) -> ExecutionResult:
     try:
-        return service.run_task(client, task_id, worker_role=worker_role)
+        return service.run_task(client, task_id, worker_role=worker_role, preauthorized=True)
     except TypeError as exc:
-        if "worker_role" not in str(exc):
+        if "worker_role" not in str(exc) and "preauthorized" not in str(exc):
             raise
         return service.run_task(client, task_id)  # type: ignore[call-arg]
 
@@ -1051,6 +1105,23 @@ def handle_propose_cycle(
     now: datetime | None = None,
 ) -> ProposalCycleResult:
     now = now or datetime.now(UTC)
+    remaining = service.usage_store.remaining_exec_capacity(now=now)
+    min_remaining = service.settings.execution_controls().min_remaining_exec_for_proposals
+    if remaining < min_remaining:
+        service.usage_store.record_proposal_budget_suppression(
+            reason="proposal_budget_too_low",
+            now=now,
+            evidence={"remaining_exec_capacity": remaining, "min_required": min_remaining},
+        )
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="proposal_budget_too_low",
+            board_idle=board_is_idle_for_proposals(client),
+            reason_summary=(
+                f"Proposal creation suppressed because remaining execution budget is too low "
+                f"({remaining} remaining, minimum {min_remaining})."
+            ),
+        )
     memory = load_proposal_memory(status_dir)
     if proposal_cooldown_active(memory, now):
         return ProposalCycleResult(
@@ -1436,6 +1507,7 @@ def run_watch_loop(
     status_dir: Path | None = None,
 ) -> None:
     logger = logging.getLogger(__name__)
+    poll_interval_seconds = max(poll_interval_seconds, service.settings.execution_controls().min_watch_interval_seconds)
     cycle = 0
     known_triaged_blocked_ids: set[str] = set()
     counters = {"follow_up_tasks_created": 0, "blocked_tasks_triaged": 0}
@@ -1497,6 +1569,56 @@ def run_watch_loop(
                     counters=counters,
                 )
             else:
+                gate = execution_gate_decision(service=service, role=role, action=action, issue=issue)
+                if gate is not None:
+                    gate_action, evidence = gate
+                    logger.info(
+                        json.dumps(
+                            {
+                                "event": gate_action,
+                                "role": role,
+                                "cycle": cycle,
+                                "task_id": task_id,
+                                "task_kind": task_kind,
+                                "action": action,
+                                "evidence": evidence,
+                                "run_id": cycle_run_id,
+                            }
+                        )
+                    )
+                    if gate_action == "retry_cap_block":
+                        client.transition_issue(task_id, "Blocked")
+                        client.comment_issue(
+                            task_id,
+                            render_worker_comment(
+                                f"[{worker_title(role)}] Execution blocked by retry cap",
+                                [
+                                    f"task_id: {task_id}",
+                                    f"task_kind: {task_kind}",
+                                    "result_status: blocked",
+                                    f"reason: {evidence.get('reason')}",
+                                    f"attempts: {evidence.get('attempts')}",
+                                    f"limit: {evidence.get('limit')}",
+                                ],
+                            ),
+                        )
+                    write_watch_status(
+                        status_dir=status_dir,
+                        role=role,
+                        cycle=cycle,
+                        state="idle",
+                        run_id=cycle_run_id,
+                        last_action=gate_action,
+                        task_id=task_id,
+                        task_kind=task_kind,
+                        counters=counters,
+                    )
+                    if max_cycles is not None and cycle >= max_cycles:
+                        logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
+                        return
+                    logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
+                    time.sleep(poll_interval_seconds)
+                    continue
                 client.transition_issue(task_id, "Running")
                 logger.info(json.dumps(
                     {

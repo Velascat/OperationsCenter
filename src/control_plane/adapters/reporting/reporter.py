@@ -124,6 +124,8 @@ class Reporter:
             f"- run_id: {result.run_id}",
             f"- success: {result.success}",
             f"- final_status: {result.final_status}",
+            f"- outcome_status: {result.outcome_status}",
+            f"- outcome_reason: {result.outcome_reason}",
             f"- validation_passed: {result.validation_passed}",
             f"- branch_pushed: {result.branch_pushed}",
             f"- draft_branch_pushed: {result.draft_branch_pushed}",
@@ -142,4 +144,9 @@ class Reporter:
         lines.extend([f"- {f}" for f in result.policy_violations] or ["- (none)"])
         lines.extend(["", "## Summary", result.summary])
         path.write_text("\n".join(lines))
+        return str(path)
+
+    def write_control_outcome(self, run_dir: Path, payload: dict[str, object]) -> str:
+        path = run_dir / "control_outcome.json"
+        path.write_text(json.dumps(payload, indent=2))
         return str(path)

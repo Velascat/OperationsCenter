@@ -51,6 +51,7 @@ class ProposalCandidatesArtifact(BaseModel):
     generated_at: datetime
     decision_engine_version: int = DECISION_ENGINE_VERSION
     source_command: str
+    dry_run: bool = False
     repo: DecisionRepoRef
     source_insight_run_id: str
     candidates: list[ProposalCandidate] = Field(default_factory=list)

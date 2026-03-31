@@ -6,6 +6,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from control_plane.execution.models import ExecutionControlSettings
+
 
 class PlaneSettings(BaseModel):
     base_url: str
@@ -61,6 +63,9 @@ class Settings(BaseModel):
         if self.git.token_env is None:
             return None
         return os.environ.get(self.git.token_env)
+
+    def execution_controls(self) -> ExecutionControlSettings:
+        return ExecutionControlSettings.from_env()
 
 
 def load_settings(path: str | Path) -> Settings:

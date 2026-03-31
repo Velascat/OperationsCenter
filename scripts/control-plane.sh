@@ -135,10 +135,10 @@ start_watch_role() {
   local role="$1"
   local poll_interval=20
   case "${role}" in
-    goal) poll_interval="${CONTROL_PLANE_GOAL_POLL_SECONDS:-20}" ;;
-    test) poll_interval="${CONTROL_PLANE_TEST_POLL_SECONDS:-30}" ;;
-    improve) poll_interval="${CONTROL_PLANE_IMPROVE_POLL_SECONDS:-45}" ;;
-    propose) poll_interval="${CONTROL_PLANE_PROPOSE_POLL_SECONDS:-120}" ;;
+    goal) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_GOAL_SECONDS:-${CONTROL_PLANE_GOAL_POLL_SECONDS:-30}}" ;;
+    test) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS:-${CONTROL_PLANE_TEST_POLL_SECONDS:-60}}" ;;
+    improve) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS:-${CONTROL_PLANE_IMPROVE_POLL_SECONDS:-60}}" ;;
+    propose) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS:-${CONTROL_PLANE_PROPOSE_POLL_SECONDS:-120}}" ;;
   esac
   local pid_file
   pid_file="$(watch_pid_file "${role}")"

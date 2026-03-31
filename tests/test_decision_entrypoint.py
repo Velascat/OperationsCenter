@@ -70,3 +70,14 @@ def test_decide_proposals_cli_errors_without_insight(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr("sys.argv", ["decide-proposals"])
     with pytest.raises(ValueError):
         decision_main.main()
+
+
+def test_decide_proposals_cli_accepts_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    write_insight(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["decide-proposals", "--dry-run"])
+
+    decision_main.main()
+
+    output = capsys.readouterr().out
+    assert "Proposal candidates artifact written:" in output

@@ -64,6 +64,8 @@ class ExecutionResult(BaseModel):
     worker_role: str | None = None
     task_kind: str | None = None
     success: bool
+    outcome_status: str = "executed"
+    outcome_reason: str | None = None
     changed_files: list[str] = Field(default_factory=list)
     diff_stat_excerpt: str | None = None
     validation_passed: bool = False

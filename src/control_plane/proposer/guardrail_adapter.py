@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from control_plane.adapters.plane import PlaneClient
+from control_plane.execution import UsageStore
 from control_plane.proposer.result_models import ProposalResultsArtifact
 
 
@@ -26,6 +27,20 @@ class ProposerGuardrailAdapter:
         self.cooldown_minutes = cooldown_minutes
 
     def evaluate(self, *, client: PlaneClient, dedup_key: str, title: str, now: datetime) -> GuardrailResult:
+        usage_store = UsageStore()
+        remaining = usage_store.remaining_exec_capacity(now=now)
+        min_remaining = usage_store.settings.min_remaining_exec_for_proposals
+        if remaining < min_remaining:
+            usage_store.record_proposal_budget_suppression(
+                reason="proposal_budget_too_low",
+                now=now,
+                evidence={"remaining_exec_capacity": remaining, "min_required": min_remaining},
+            )
+            return GuardrailResult(
+                allowed=False,
+                reason="proposal_budget_too_low",
+                evidence={"remaining_exec_capacity": remaining, "min_required": min_remaining},
+            )
         open_match = self._find_open_task_match(client, dedup_key=dedup_key, title=title)
         if open_match is not None:
             return GuardrailResult(

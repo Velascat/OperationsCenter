@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,6 +8,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+from control_plane.execution import ExecutionControlSettings, UsageStore
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
     ProposalSpec,
@@ -79,6 +82,7 @@ class FakePlaneClient:
 
 class FakeService:
     def __init__(self, *, success: bool = True) -> None:
+        usage_path = Path(tempfile.mkdtemp()) / "usage.json"
         settings = SimpleNamespace(
             repos={
                 "control-plane": SimpleNamespace(
@@ -90,9 +94,21 @@ class FakeService:
             report_root="tools/report/kodo_plane",
         )
         settings.git_token = lambda: None
+        settings.execution_controls = lambda: ExecutionControlSettings(
+            max_exec_per_hour=max(0, int(os.environ.get("CONTROL_PLANE_MAX_EXEC_PER_HOUR", "10"))),
+            max_exec_per_day=max(0, int(os.environ.get("CONTROL_PLANE_MAX_EXEC_PER_DAY", "50"))),
+            max_retries_per_task=max(1, int(os.environ.get("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "3"))),
+            min_watch_interval_seconds=1,
+            min_remaining_exec_for_proposals=max(
+                0,
+                int(os.environ.get("CONTROL_PLANE_MIN_REMAINING_EXEC_FOR_PROPOSALS", "3")),
+            ),
+            usage_path=usage_path,
+        )
         self.runs: list[str] = []
         self.settings = settings
         self._success = success
+        self.usage_store = UsageStore(usage_path)
 
     def run_task(self, client: FakePlaneClient, task_id: str) -> ExecutionResult:  # noqa: ARG002
         self.runs.append(task_id)
@@ -229,6 +245,36 @@ def test_run_watch_loop_test_role_creates_follow_up_goal_task_on_failure() -> No
         {"name": "task-kind: goal"},
         {"name": "source: test-worker"},
     ]
+
+
+def test_run_watch_loop_goal_blocks_after_retry_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "1")
+    client = FakePlaneClient(
+        [
+            {"id": "TASK-RETRY", "name": "Retry me", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]},
+        ]
+    )
+    service = FakeService()
+    service.usage_store.record_execution(  # type: ignore[attr-defined]
+        role="goal",
+        task_id="TASK-RETRY",
+        signature="prior",
+        now=datetime(2026, 3, 31, 12, tzinfo=UTC),
+    )
+
+    run_watch_loop(
+        client,
+        service,
+        role="goal",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+    )
+
+    assert service.runs == []
+    assert ("TASK-RETRY", "Blocked") in client.transitions
+    assert any("retry cap" in comment.lower() for _, comment in client.issue_comments)
 
 
 def test_run_watch_loop_improve_role_triages_blocked_task() -> None:
@@ -794,3 +840,27 @@ def test_run_watch_loop_propose_role_creates_task_when_idle(tmp_path: Path, monk
         {"name": "source: proposer"},
         {"name": "reason: idle_board"},
     ]
+
+
+def test_handle_propose_cycle_suppresses_when_budget_too_low(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("CONTROL_PLANE_MAX_EXEC_PER_HOUR", "1")
+    monkeypatch.setenv("CONTROL_PLANE_MIN_REMAINING_EXEC_FOR_PROPOSALS", "1")
+    client = FakePlaneClient([])
+    service = FakeService()
+    service.usage_store.record_execution(  # type: ignore[attr-defined]
+        role="goal",
+        task_id="TASK-1",
+        signature="sig-1",
+        now=datetime(2026, 3, 31, 8, 0, tzinfo=UTC),
+    )
+
+    result = handle_propose_cycle(
+        client,
+        service,
+        status_dir=tmp_path,
+        now=datetime(2026, 3, 31, 8, 10, tzinfo=UTC),
+    )
+
+    assert result.created_task_ids == []
+    assert result.decision == "proposal_budget_too_low"

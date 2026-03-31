@@ -41,6 +41,25 @@ Do thing.
         return
 
 
+class ValidPlaneClient(FailingParsePlaneClient):
+    def fetch_issue(self, task_id: str) -> dict[str, object]:
+        return {
+            "id": task_id,
+            "name": "Task",
+            "project_id": "proj",
+            "description": """## Execution
+repo: repo_a
+base_branch: main
+mode: goal
+
+## Goal
+Do thing.
+""",
+            "state": {"name": "Ready for AI"},
+            "labels": [],
+        }
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings.model_validate(
@@ -120,3 +139,22 @@ def test_comment_markdown_includes_changed_files_and_diff_stat() -> None:
 
     assert "- changed_files: src/a.py, src/b.py, tests/test_a.py, tests/test_b.py, src/c.py, ... (+1 more)" in comment
     assert "- diff_stat: src/a.py | 2 +-" in comment
+
+
+def test_budget_skip_returns_without_repo_setup(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(settings.report_root / "execution" / "usage.json"))
+    monkeypatch.setenv("CONTROL_PLANE_MAX_EXEC_PER_HOUR", "0")
+    monkeypatch.setenv("CONTROL_PLANE_MAX_EXEC_PER_DAY", "0")
+    service = ExecutionService(settings)
+
+    def fail_clone(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("repo setup should not run when budget is exceeded")
+
+    service.git.clone = fail_clone  # type: ignore[assignment]
+    result = service.run_task(ValidPlaneClient(), "TASK-5")
+
+    assert result.outcome_status == "skipped"
+    assert result.outcome_reason == "budget_exceeded"
+    run_dirs = list(settings.report_root.glob("*_TASK-5_*"))
+    assert len(run_dirs) == 1
+    assert (run_dirs[0] / "control_outcome.json").exists()

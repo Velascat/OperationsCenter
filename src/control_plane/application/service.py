@@ -6,6 +6,7 @@ import os
 import re
 import traceback
 import uuid
+from datetime import UTC, datetime
 
 from control_plane.adapters.git import GitClient, branch_allowed
 from control_plane.adapters.kodo import KodoAdapter
@@ -16,6 +17,7 @@ from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
 from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget
+from control_plane.execution import UsageStore
 
 
 class ExecutionService:
@@ -29,6 +31,7 @@ class ExecutionService:
         self.scope_checker = ChangedFilePolicyChecker()
         self.bootstrapper = RepoEnvironmentBootstrapper()
         self.logger = logging.getLogger(__name__)
+        self.usage_store = UsageStore(settings.execution_controls().usage_path)
 
     @staticmethod
     def task_branch(task: BoardTask) -> str:
@@ -47,7 +50,14 @@ class ExecutionService:
             allowed_base_branches=repo_cfg.allowed_base_branches,
         )
 
-    def run_task(self, plane_client: PlaneClient, task_id: str, *, worker_role: str = "goal") -> ExecutionResult:
+    def run_task(
+        self,
+        plane_client: PlaneClient,
+        task_id: str,
+        *,
+        worker_role: str = "goal",
+        preauthorized: bool = False,
+    ) -> ExecutionResult:
         run_id = uuid.uuid4().hex[:12]
         workspace_path = self.workspace.create()
         run_dir = self.reporter.create_run_dir(task_id, run_id)
@@ -70,6 +80,127 @@ class ExecutionService:
                 base_branch=task.base_branch,
                 allowed_paths=task.allowed_paths,
             )
+            signature = self.usage_store.issue_signature(issue)
+            if not preauthorized:
+                noop = self.usage_store.noop_decision(role=worker_role, task_id=task.task_id, signature=signature)
+                if noop.should_skip:
+                    self.usage_store.record_skip(
+                        role=worker_role,
+                        task_id=task.task_id,
+                        signature=signature,
+                        reason=noop.reason or "no_op",
+                        detail=noop.detail,
+                        now=datetime.now(UTC),
+                    )
+                    result = ExecutionResult(
+                        run_id=run_id,
+                        worker_role=worker_role,
+                        task_kind=task.execution_mode,
+                        success=True,
+                        outcome_status="skipped",
+                        outcome_reason=noop.reason or "no_op",
+                        summary=f"run_id={run_id} status=skipped reason={noop.reason or 'no_op'} detail={noop.detail or 'none'}",
+                        final_status=task.status,
+                        artifacts=artifacts,
+                    )
+                    artifacts.append(
+                        self.reporter.write_control_outcome(
+                            run_dir,
+                            {
+                                "action": "execute_task",
+                                "status": "skipped",
+                                "reason": noop.reason or "no_op",
+                                "detail": noop.detail,
+                                "task_id": task.task_id,
+                                "worker_role": worker_role,
+                            },
+                        )
+                    )
+                    artifacts.append(self.reporter.write_summary(run_dir, result))
+                    return result
+
+                retry = self.usage_store.retry_decision(task_id=task.task_id) if worker_role in {"goal", "test"} else None
+                if retry is not None and not retry.allowed:
+                    self.usage_store.record_retry_cap(
+                        role=worker_role,
+                        task_id=task.task_id,
+                        now=datetime.now(UTC),
+                        attempts=retry.attempts,
+                        limit=retry.limit,
+                    )
+                    plane_client.transition_issue(task.task_id, "Blocked")
+                    result = ExecutionResult(
+                        run_id=run_id,
+                        worker_role=worker_role,
+                        task_kind=task.execution_mode,
+                        success=False,
+                        outcome_status="blocked",
+                        outcome_reason="retry_cap_exceeded",
+                        summary=f"run_id={run_id} status=blocked reason=retry_cap_exceeded attempts={retry.attempts} limit={retry.limit}",
+                        final_status="Blocked",
+                        blocked_classification="retry_cap_exceeded",
+                        artifacts=artifacts,
+                    )
+                    artifacts.append(
+                        self.reporter.write_control_outcome(
+                            run_dir,
+                            {
+                                "action": "execute_task",
+                                "status": "blocked",
+                                "reason": "retry_cap_exceeded",
+                                "attempts": retry.attempts,
+                                "limit": retry.limit,
+                                "task_id": task.task_id,
+                                "worker_role": worker_role,
+                            },
+                        )
+                    )
+                    artifacts.append(self.reporter.write_summary(run_dir, result))
+                    return result
+
+                budget = self.usage_store.budget_decision(now=datetime.now(UTC))
+                if not budget.allowed:
+                    self.usage_store.record_skip(
+                        role=worker_role,
+                        task_id=task.task_id,
+                        signature=signature,
+                        reason=budget.reason or "budget_exceeded",
+                        detail=budget.window,
+                        now=datetime.now(UTC),
+                        evidence={"limit": budget.limit, "current": budget.current},
+                    )
+                    result = ExecutionResult(
+                        run_id=run_id,
+                        worker_role=worker_role,
+                        task_kind=task.execution_mode,
+                        success=True,
+                        outcome_status="skipped",
+                        outcome_reason=budget.reason or "budget_exceeded",
+                        summary=(
+                            f"run_id={run_id} status=skipped reason={budget.reason or 'budget_exceeded'} "
+                            f"window={budget.window} current={budget.current} limit={budget.limit}"
+                        ),
+                        final_status=task.status,
+                        artifacts=artifacts,
+                    )
+                    artifacts.append(
+                        self.reporter.write_control_outcome(
+                            run_dir,
+                            {
+                                "action": "execute_task",
+                                "status": "skipped",
+                                "reason": budget.reason or "budget_exceeded",
+                                "window": budget.window,
+                                "limit": budget.limit,
+                                "current": budget.current,
+                                "task_id": task.task_id,
+                                "worker_role": worker_role,
+                            },
+                        )
+                    )
+                    artifacts.append(self.reporter.write_summary(run_dir, result))
+                    return result
+                self.usage_store.record_execution(role=worker_role, task_id=task.task_id, signature=signature, now=datetime.now(UTC))
 
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
                 raise ValueError(f"Base branch '{task.base_branch}' is not allowed by policy")
@@ -177,11 +308,29 @@ class ExecutionService:
             execution_success = kodo_result.exit_code == 0
             policy_success = not policy_violations
             success = execution_success and validation_ok and policy_success
+            push_reason: str | None = None
+            outcome_status = "executed"
+            outcome_reason = None
+            if execution_success and not changed_files:
+                success = True
+                outcome_status = "no_op"
+                outcome_reason = "no_material_change"
+                summary = (
+                    f"run_id={run_id} execution=passed validation={'passed' if validation_ok else 'failed'} "
+                    f"policy={'passed' if policy_success else 'failed'} branch_push=not_pushed changed_files=0 no_op=true"
+                )
+            else:
+                summary = (
+                    f"run_id={run_id} execution={'passed' if execution_success else 'failed'} "
+                    f"validation={'passed' if validation_ok else 'failed'} "
+                    f"policy={'passed' if policy_success else 'failed'} "
+                    f"branch_push={push_reason or 'not_pushed'} "
+                    f"changed_files={len(changed_files)}"
+                )
             execution_stderr_excerpt = self._stderr_excerpt(kodo_result.stderr)
 
             branch_pushed = False
             draft_branch_pushed = False
-            push_reason: str | None = None
             if changed_files and policy_success:
                 committed = self.git.commit_all(repo_path, f"chore: apply Plane task {task.task_id}")
                 if committed:
@@ -202,14 +351,6 @@ class ExecutionService:
                 push_reason=push_reason or "not_pushed",
             )
 
-            summary = (
-                f"run_id={run_id} execution={'passed' if execution_success else 'failed'} "
-                f"validation={'passed' if validation_ok else 'failed'} "
-                f"policy={'passed' if policy_success else 'failed'} "
-                f"branch_push={push_reason or 'not_pushed'} "
-                f"changed_files={len(changed_files)}"
-            )
-
             status = "Blocked" if policy_violations or not success else "Review"
 
             result = ExecutionResult(
@@ -217,6 +358,8 @@ class ExecutionService:
                 worker_role=worker_role,
                 task_kind=task.execution_mode,
                 success=success,
+                outcome_status=outcome_status,
+                outcome_reason=outcome_reason,
                 changed_files=changed_files,
                 diff_stat_excerpt=self._diff_stat_excerpt(diff_stat),
                 validation_passed=validation_ok,
@@ -232,6 +375,18 @@ class ExecutionService:
                 final_status=status,
             )
             artifacts.append(self.reporter.write_summary(run_dir, result))
+            artifacts.append(
+                self.reporter.write_control_outcome(
+                    run_dir,
+                    {
+                        "action": "execute_task",
+                        "status": result.outcome_status,
+                        "reason": result.outcome_reason,
+                        "task_id": task.task_id,
+                        "worker_role": worker_role,
+                    },
+                )
+            )
 
             plane_client.transition_issue(task.task_id, status)
             result.final_status = status
@@ -279,6 +434,8 @@ class ExecutionService:
             f"- task_kind: {task_kind}",
             f"- worker_role: {worker_role}",
             f"- result_status: {result.final_status or ('review' if result.success else 'blocked')}",
+            f"- outcome_status: {result.outcome_status}",
+            f"- outcome_reason: {result.outcome_reason or 'none'}",
             f"- success: {result.success}",
             f"- validation_passed: {result.validation_passed}",
             f"- policy_passed: {not result.policy_violations}",
