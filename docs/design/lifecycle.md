@@ -1,10 +1,11 @@
 # Lifecycle Contract
 
-Control Plane has three board-facing worker lanes:
+Control Plane has four board-facing worker lanes:
 
 - `goal`
 - `test`
 - `improve`
+- `propose`
 
 The lanes are not independent scripts. They are stages in a board-level workflow.
 
@@ -15,6 +16,7 @@ goal -> review
 goal -> test -> done
 goal -> blocked -> improve -> follow-up goal/test or human attention
 test -> goal when verification fails
+propose -> bounded goal/test/improve tasks when the board is quiet or recent signals justify it
 ```
 
 ## Lane Responsibilities
@@ -44,11 +46,19 @@ test -> goal when verification fails
 
 Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane.
 
+### `propose`
+
+- Monitors board/system state when normal implementation and verification lanes are quiet.
+- Uses bounded signals such as idle board state, repeated blocked patterns, and recent retained findings.
+- Creates bounded Plane tasks instead of directly editing the repo.
+- Places strong, high-confidence tasks in `Ready for AI` and lower-confidence tasks in `Backlog`.
+
 ## Handoff Rules
 
 - `goal` may create `test` follow-up tasks.
 - `test` may create `goal` follow-up tasks.
 - `improve` may create bounded `goal`, `test`, or explicit `improve` follow-up tasks.
+- `propose` may create bounded `goal`, `test`, or `improve` tasks when its guardrails allow it.
 - Every handoff should remain visible on the board through comments and child-task context.
 
 ## Task Lineage

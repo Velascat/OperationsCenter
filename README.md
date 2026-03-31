@@ -7,19 +7,20 @@ Local autonomous coding workflow system that uses **Plane** as the board, **Cont
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
 - **Control Plane** is the local autonomous wrapper that watches the board, prepares isolated workspaces, runs tasks, and writes results back.
 - **Kodo** is the execution engine used inside a single task run.
-- **goal**, **test**, and **improve** are the board-facing worker lanes.
+- **goal**, **test**, **improve**, and **propose** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
 ## What Works Today
 
 - Single-task execution from a Plane work item.
-- Background watchers for `goal`, `test`, and `improve`.
-- `watch-all` to launch the three local watcher lanes together.
+- Background watchers for `goal`, `test`, `improve`, and `propose`.
+- `watch-all` to launch the four local watcher lanes together.
 - Structured task parsing from `## Execution`, `## Goal`, and optional `## Constraints`.
 - Isolated ephemeral clone + task branch workflow.
 - Repo-local bootstrap and validation execution.
 - Worker comments, retained artifacts, and local heartbeat/status files.
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
+- Proposer idle-board task generation with cooldowns, quotas, and deduplication.
 - Dependency drift reporting with optional Plane improve-task creation.
 
 ## Lifecycle Contract
@@ -30,6 +31,7 @@ goal -> test -> done
 goal -> blocked -> improve -> follow-up goal/test or human attention
 test -> goal when verification fails
 improve -> bounded follow-up work, not open-ended rewrites
+propose -> bounded board tasks when the board is idle or recent signals justify it
 ```
 
 ## Fastest Happy Path
@@ -64,6 +66,7 @@ Then:
 ./scripts/control-plane.sh watch --role goal
 ./scripts/control-plane.sh watch --role test
 ./scripts/control-plane.sh watch --role improve
+./scripts/control-plane.sh watch --role propose
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
@@ -91,6 +94,7 @@ The wrapper runs `janitor` automatically before commands and keeps local logs/ar
 - No PR automation yet.
 - No multi-repo orchestration yet.
 - No production-grade supervisor beyond local `watch-all`.
+- No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
 
 ## Documentation

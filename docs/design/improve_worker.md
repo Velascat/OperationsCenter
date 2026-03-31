@@ -94,6 +94,7 @@ In these cases, improve comments should make clear:
 
 ## Relationship To Other Lanes
 
+- `propose` seeds new bounded board work when the system is otherwise quiet
 - `goal` implements
 - `test` verifies
 - `improve` interprets, stabilizes, and generates next work

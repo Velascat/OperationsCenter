@@ -1,4 +1,6 @@
 import logging
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -6,10 +8,12 @@ import pytest
 
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
+    ProposalSpec,
     build_improve_triage_result,
     classify_blocked_issue,
     handle_goal_task,
     handle_improve_task,
+    handle_propose_cycle,
     handle_blocked_triage,
     issue_status_name,
     issue_task_kind,
@@ -80,8 +84,10 @@ class FakeService:
             repos={
                 "control-plane": SimpleNamespace(
                     default_branch="main",
+                    clone_url="git@github.com:Velascat/ControlPlane.git",
                 )
-            }
+            },
+            report_root="tools/report/kodo_plane",
         )
         self._success = success
 
@@ -569,3 +575,180 @@ def test_run_watch_loop_uses_backoff_on_rate_limit(monkeypatch: pytest.MonkeyPat
 
     assert sleeps == [12]
     assert any("watch_rate_limited" in record.message for record in caplog.records)
+
+
+def test_handle_propose_cycle_creates_bounded_goal_task(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient([])
+    service = FakeService()
+    now = datetime(2026, 3, 31, 8, 0, tzinfo=UTC)
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda _client, _service: (
+            [
+                ProposalSpec(
+                    task_kind="goal",
+                    title="Address repeated validation failures",
+                    goal_text="Fix the repeated validation failure pattern.",
+                    reason_summary="Repeated blocked-task validation failures were observed.",
+                    source_signal="blocked_pattern:validation_failure",
+                    confidence="high",
+                    recommended_state="Ready for AI",
+                    handoff_reason="propose_pattern_validation_failure",
+                    dedup_key="blocked_pattern:validation_failure",
+                    constraints_text="- keep the task bounded",
+                )
+            ],
+            ["board_idle: true"],
+            True,
+        ),
+    )
+
+    result = handle_propose_cycle(client, service, status_dir=tmp_path, now=now)
+
+    assert result.decision == "tasks_created"
+    assert result.created_task_ids == ["FOLLOWUP-1"]
+    assert client.created[0]["state"] == {"name": "Ready for AI"}
+    assert client.created[0]["labels"] == [
+        {"name": "task-kind: goal"},
+        {"name": "source: proposer"},
+        {"name": "reason: blocked_pattern_validation_failure"},
+    ]
+    assert any("[Propose] Autonomous task created" in comment for _, comment in client.issue_comments)
+
+
+def test_handle_propose_cycle_respects_cooldown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient([])
+    service = FakeService()
+    first = datetime(2026, 3, 31, 8, 0, tzinfo=UTC)
+    second = first + timedelta(minutes=5)
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda _client, _service: (
+            [
+                ProposalSpec(
+                    task_kind="improve",
+                    title="Scan repo for next bounded improvements",
+                    goal_text="Inspect repo state and propose bounded tasks.",
+                    reason_summary="Idle board fallback.",
+                    source_signal="idle_board",
+                    confidence="medium",
+                    recommended_state="Backlog",
+                    handoff_reason="propose_idle_board_scan",
+                    dedup_key="idle_board:repo_scan",
+                )
+            ],
+            ["board_idle: true"],
+            True,
+        ),
+    )
+
+    first_result = handle_propose_cycle(client, service, status_dir=tmp_path, now=first)
+    second_result = handle_propose_cycle(client, service, status_dir=tmp_path, now=second)
+
+    assert first_result.decision == "tasks_created"
+    assert second_result.decision == "cooldown_active"
+    assert len(client.created) == 1
+
+
+def test_handle_propose_cycle_dedups_existing_open_proposal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    existing_description = """## Execution
+repo: control-plane
+base_branch: main
+mode: goal
+
+## Goal
+Existing proposal
+
+## Context
+- source_worker_role: propose
+- follow_up_task_kind: goal
+- handoff_reason: propose_pattern_validation_failure
+- source_signal: blocked_pattern:validation_failure
+- confidence: high
+- proposal_dedup_key: blocked_pattern:validation_failure
+"""
+    client = FakePlaneClient(
+        [
+            {
+                "id": "EXISTING-1",
+                "name": "Address repeated validation failures",
+                "description": existing_description,
+                "state": {"name": "Ready for AI"},
+                "labels": [{"name": "task-kind: goal"}, {"name": "source: proposer"}],
+            }
+        ]
+    )
+    service = FakeService()
+    now = datetime(2026, 3, 31, 8, 0, tzinfo=UTC)
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda _client, _service: (
+            [
+                ProposalSpec(
+                    task_kind="goal",
+                    title="Address repeated validation failures",
+                    goal_text="Fix the repeated validation failure pattern.",
+                    reason_summary="Repeated blocked-task validation failures were observed.",
+                    source_signal="blocked_pattern:validation_failure",
+                    confidence="high",
+                    recommended_state="Ready for AI",
+                    handoff_reason="propose_pattern_validation_failure",
+                    dedup_key="blocked_pattern:validation_failure",
+                )
+            ],
+            ["board_idle: true"],
+            True,
+        ),
+    )
+
+    result = handle_propose_cycle(client, service, status_dir=tmp_path, now=now)
+
+    assert result.decision == "deduped"
+    assert result.created_task_ids == []
+    assert client.created == []
+
+
+def test_run_watch_loop_propose_role_creates_task_when_idle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePlaneClient([])
+    service = FakeService()
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda _client, _service: (
+            [
+                ProposalSpec(
+                    task_kind="improve",
+                    title="Scan repo for next bounded improvements",
+                    goal_text="Inspect repo state and propose bounded tasks.",
+                    reason_summary="Idle board fallback.",
+                    source_signal="idle_board",
+                    confidence="medium",
+                    recommended_state="Backlog",
+                    handoff_reason="propose_idle_board_scan",
+                    dedup_key="idle_board:repo_scan",
+                )
+            ],
+            ["board_idle: true"],
+            True,
+        ),
+    )
+
+    run_watch_loop(
+        client,
+        service,
+        role="propose",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+        status_dir=tmp_path,
+    )
+
+    assert client.created
+    assert client.created[0]["labels"] == [
+        {"name": "task-kind: improve"},
+        {"name": "source: proposer"},
+        {"name": "reason: idle_board"},
+    ]

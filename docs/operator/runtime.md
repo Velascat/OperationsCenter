@@ -12,6 +12,7 @@ This repo runs as a local polling workflow.
 ./scripts/control-plane.sh watch --role goal
 ./scripts/control-plane.sh watch --role test
 ./scripts/control-plane.sh watch --role improve
+./scripts/control-plane.sh watch --role propose
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
@@ -35,9 +36,16 @@ This repo runs as a local polling workflow.
 - polls for explicit `task-kind: improve`
 - also inspects `Blocked` tasks for triage
 
+### `watch --role propose`
+
+- runs a bounded proposal cycle when the board is sufficiently idle or recent signals justify it
+- creates Plane tasks instead of executing open-ended repo changes
+- uses cooldowns, quotas, and deduplication to avoid board spam
+- prefers `Ready for AI` only for strong, bounded tasks; otherwise uses `Backlog`
+
 ### `watch-all`
 
-- local convenience wrapper that launches all three lanes together
+- local convenience wrapper that launches all four lanes together
 - writes separate logs and PID files
 - not a scheduler cluster or distributed supervisor
 
@@ -51,6 +59,7 @@ This repo runs as a local polling workflow.
 - current task id/task kind when present
 - follow-up counts for the current session
 - blocked tasks triaged for the current session
+- autonomous tasks proposed for the current session
 - last update time
 
 This is the quickest way to tell whether the local system is alive or stalled.
@@ -90,3 +99,4 @@ It is not:
 - a queue
 - a distributed scheduler
 - a multi-host supervisor
+- an unlimited autonomous planner

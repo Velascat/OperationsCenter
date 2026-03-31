@@ -79,6 +79,12 @@ Retained `result_summary.md` files align with board/log language and include:
 4. retained artifact directory in `tools/report/kodo_plane/`
 5. `plane-doctor` if the board/API contract looks wrong
 
+When the board is quiet, also check the proposer lane:
+
+- proposer heartbeat/status in `watch-all-status`
+- proposer log in `logs/local/watch-all/`
+- new tasks labeled `source: proposer`
+
 ## Maintenance Boundary
 
 Normal execution should stay pinned and stable.
@@ -90,3 +96,5 @@ Use diagnostics and maintenance commands to:
 - check version drift
 
 Do not treat normal `run` or `watch` cycles as the place to auto-upgrade tooling.
+
+Likewise, do not treat the proposer lane as unlimited self-directed work generation. It is intentionally bounded by cooldown, quota, and deduplication guardrails.

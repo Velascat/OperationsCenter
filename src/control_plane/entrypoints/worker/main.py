@@ -20,9 +20,15 @@ from control_plane.domain import ExecutionResult
 
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
+PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
 RATE_LIMIT_BACKOFF_MULTIPLIER = 4
 UNKNOWN_BLOCKED_CLASSIFICATION = "unknown"
 MAX_IMPROVE_FOLLOW_UPS_PER_CYCLE = 3
+MAX_PROPOSALS_PER_CYCLE = 2
+MAX_PROPOSALS_PER_DAY = 6
+PROPOSAL_COOLDOWN_SECONDS = 30 * 60
+PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
+LOW_BACKLOG_THRESHOLD = 2
 
 
 @dataclass
@@ -42,6 +48,30 @@ class ImproveTriageResult:
     recommended_action: str
     human_attention_required: bool
     follow_up: ImproveFollowUpSpec | None = None
+
+
+@dataclass
+class ProposalSpec:
+    task_kind: str
+    title: str
+    goal_text: str
+    reason_summary: str
+    source_signal: str
+    confidence: str
+    recommended_state: str
+    handoff_reason: str
+    dedup_key: str
+    constraints_text: str | None = None
+    human_attention_required: bool = False
+
+
+@dataclass
+class ProposalCycleResult:
+    created_task_ids: list[str]
+    decision: str
+    board_idle: bool
+    reason_summary: str
+    proposed_state: str | None = None
 
 
 def worker_title(role: str) -> str:
@@ -121,6 +151,34 @@ def status_file_path(status_dir: Path | None, role: str) -> Path | None:
         return None
     status_dir.mkdir(parents=True, exist_ok=True)
     return status_dir / f"{role}.status.json"
+
+
+def proposal_memory_path(status_dir: Path | None) -> Path | None:
+    if status_dir is None:
+        return None
+    status_dir.mkdir(parents=True, exist_ok=True)
+    return status_dir / "propose.memory.json"
+
+
+def load_proposal_memory(status_dir: Path | None) -> dict[str, Any]:
+    path = proposal_memory_path(status_dir)
+    if path is None or not path.exists():
+        return {"last_proposal_at": None, "proposal_timestamps": []}
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return {"last_proposal_at": None, "proposal_timestamps": []}
+    return {
+        "last_proposal_at": payload.get("last_proposal_at"),
+        "proposal_timestamps": list(payload.get("proposal_timestamps", [])),
+    }
+
+
+def save_proposal_memory(status_dir: Path | None, memory: dict[str, Any]) -> None:
+    path = proposal_memory_path(status_dir)
+    if path is None:
+        return
+    path.write_text(json.dumps(memory, indent=2))
 
 
 def write_watch_status(
@@ -231,6 +289,36 @@ def issue_is_unblock_chain(issue: dict[str, Any]) -> bool:
     return issue_is_improve_generated(issue) or title.startswith("unblock ")
 
 
+def is_open_issue(issue: dict[str, Any]) -> bool:
+    return issue_status_name(issue).strip().lower() not in {"done", "cancelled"}
+
+
+def open_goal_or_test_count(client: PlaneClient) -> int:
+    count = 0
+    for issue in client.list_issues():
+        if not is_open_issue(issue):
+            continue
+        if issue_task_kind(issue) in {"goal", "test"}:
+            count += 1
+    return count
+
+
+def ready_or_running_goal_or_test_count(client: PlaneClient) -> int:
+    count = 0
+    for issue in client.list_issues():
+        if not is_open_issue(issue):
+            continue
+        if issue_task_kind(issue) not in {"goal", "test"}:
+            continue
+        if issue_status_name(issue) in {"Ready for AI", "Running"}:
+            count += 1
+    return count
+
+
+def board_is_idle_for_proposals(client: PlaneClient) -> bool:
+    return ready_or_running_goal_or_test_count(client) == 0 and open_goal_or_test_count(client) <= LOW_BACKLOG_THRESHOLD
+
+
 def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI", role: str = "goal") -> str:
     issues = client.list_issues()
     for issue in issues:
@@ -317,6 +405,18 @@ def existing_follow_up_keys(client: PlaneClient) -> set[tuple[str, str, str]]:
         follow_up_task_kind = parse_context_value(description, "follow_up_task_kind") or task_kind_for_issue(issue)
         if source_task_id and handoff_reason and follow_up_task_kind:
             keys.add((source_task_id, follow_up_task_kind.strip().lower(), handoff_reason.strip().lower()))
+    return keys
+
+
+def existing_proposal_keys(client: PlaneClient) -> set[str]:
+    keys: set[str] = set()
+    for issue in client.list_issues():
+        if not is_open_issue(issue):
+            continue
+        description = str(issue.get("description") or issue.get("description_stripped") or "")
+        proposal_key = parse_context_value(description, "proposal_dedup_key")
+        if proposal_key:
+            keys.add(proposal_key.strip().lower())
     return keys
 
 
@@ -697,6 +797,289 @@ def discover_improvement_candidates(service: ExecutionService) -> tuple[list[dic
     for finding in findings:
         unique.setdefault(finding["title"].strip().lower(), finding)
     return list(unique.values())[:3], report_notes
+
+
+def proposal_specs_from_findings(
+    findings: list[dict[str, str]],
+    *,
+    signal_prefix: str,
+) -> list[ProposalSpec]:
+    proposals: list[ProposalSpec] = []
+    for finding in findings:
+        kind = finding["kind"]
+        normalized_title = re.sub(r"[^a-z0-9]+", "_", finding["title"].strip().lower()).strip("_")
+        confidence = "high" if "retained" in finding["constraints"] or "report" in finding["constraints"] else "medium"
+        state = "Ready for AI" if confidence == "high" else "Backlog"
+        proposals.append(
+            ProposalSpec(
+                task_kind=kind,
+                title=finding["title"],
+                goal_text=finding["goal"],
+                reason_summary=finding["note"].lstrip("- ").strip(),
+                source_signal=f"{signal_prefix}:{kind}",
+                confidence=confidence,
+                recommended_state=state,
+                handoff_reason=f"propose_{signal_prefix}_{kind}",
+                dedup_key=f"{signal_prefix}:{normalized_title}",
+                constraints_text=finding["constraints"],
+            )
+        )
+    return proposals
+
+
+def build_proposal_candidates(client: PlaneClient, service: ExecutionService) -> tuple[list[ProposalSpec], list[str], bool]:
+    board_idle = board_is_idle_for_proposals(client)
+    notes = [
+        f"board_idle: {str(board_idle).lower()}",
+        f"open_goal_or_test_count: {open_goal_or_test_count(client)}",
+        f"ready_or_running_goal_or_test_count: {ready_or_running_goal_or_test_count(client)}",
+    ]
+    proposals: list[ProposalSpec] = []
+
+    for classification, count in sorted(recent_classification_counts(client).items(), key=lambda item: item[1], reverse=True):
+        if count < 2:
+            continue
+        display_name = classification_display_name(classification)
+        if classification == "infra_tooling":
+            proposals.append(
+                ProposalSpec(
+                    task_kind="improve",
+                    title="Investigate repeated infrastructure/tooling blockers",
+                    goal_text="Investigate the recurring infrastructure/tooling blocker pattern and produce one bounded next step or explicit operator guidance.",
+                    reason_summary=f"Repeated blocked-task pattern detected: {display_name} ({count} recent occurrences).",
+                    source_signal=f"blocked_pattern:{classification}",
+                    confidence="medium",
+                    recommended_state="Backlog",
+                    handoff_reason=f"propose_pattern_{classification}",
+                    dedup_key=f"blocked_pattern:{classification}",
+                    constraints_text=f"- repeated_classification: {classification}\n- occurrence_count: {count}\n- prefer diagnosis and clear operator guidance over broad changes",
+                    human_attention_required=True,
+                )
+            )
+        else:
+            proposals.append(
+                ProposalSpec(
+                    task_kind="goal",
+                    title=f"Address repeated {display_name} failures",
+                    goal_text=f"Stabilize the local autonomous workflow by addressing the repeated {display_name} pattern showing up across recent work.",
+                    reason_summary=f"Repeated blocked-task pattern detected: {display_name} ({count} recent occurrences).",
+                    source_signal=f"blocked_pattern:{classification}",
+                    confidence="high",
+                    recommended_state="Ready for AI",
+                    handoff_reason=f"propose_pattern_{classification}",
+                    dedup_key=f"blocked_pattern:{classification}",
+                    constraints_text=f"- repeated_classification: {classification}\n- occurrence_count: {count}\n- keep the task focused on one bounded system-fix",
+                )
+            )
+        notes.append(f"repeated_pattern: {classification} x{count}")
+
+    if board_idle:
+        findings, report_notes = discover_improvement_candidates(service)
+        notes.extend(report_notes)
+        proposals.extend(proposal_specs_from_findings(findings, signal_prefix="idle_board"))
+
+    if board_idle and not proposals:
+        proposals.append(
+            ProposalSpec(
+                task_kind="improve",
+                title="Scan repo for next bounded improvements",
+                goal_text="Inspect the current repo and recent workflow signals, then propose one to three bounded follow-up tasks grounded in observed codebase or runtime evidence.",
+                reason_summary="The board is idle and no stronger grounded task signal is currently open.",
+                source_signal="idle_board",
+                confidence="medium",
+                recommended_state="Backlog",
+                handoff_reason="propose_idle_board_scan",
+                dedup_key="idle_board:repo_scan",
+                constraints_text="- keep analysis grounded in current repo and recent retained artifacts\n- create tasks first, code second",
+            )
+        )
+        notes.append("fallback_proposal: idle_board repo scan")
+
+    unique: dict[str, ProposalSpec] = {}
+    for proposal in proposals:
+        unique.setdefault(proposal.dedup_key.strip().lower(), proposal)
+    return list(unique.values()), notes, board_idle
+
+
+def build_proposal_description(
+    *,
+    service: ExecutionService,
+    proposal: ProposalSpec,
+) -> str:
+    repo_key = default_repo_key(service)
+    repo_cfg = service.settings.repos[repo_key]
+    lines = [
+        "## Execution",
+        f"repo: {repo_key}",
+        f"base_branch: {repo_cfg.default_branch}",
+        "mode: goal",
+    ]
+    allowed_paths = ["src/", "tests/"] if repo_key.lower() in {"controlplane", "control-plane"} else []
+    if allowed_paths and proposal.task_kind in {"goal", "test"}:
+        lines.append("allowed_paths:")
+        for path in allowed_paths:
+            lines.append(f"  - {path}")
+    lines.extend(["", "## Goal", proposal.goal_text])
+    if proposal.constraints_text:
+        lines.extend(["", "## Constraints", proposal.constraints_text])
+    lines.extend(
+        [
+            "",
+            "## Context",
+            "- source_worker_role: propose",
+            f"- follow_up_task_kind: {proposal.task_kind}",
+            f"- handoff_reason: {proposal.handoff_reason}",
+            f"- source_signal: {proposal.source_signal}",
+            f"- confidence: {proposal.confidence}",
+            f"- proposal_dedup_key: {proposal.dedup_key}",
+        ]
+    )
+    return "\n".join(lines).strip()
+
+
+def create_proposed_task_if_missing(
+    client: PlaneClient,
+    service: ExecutionService,
+    *,
+    proposal: ProposalSpec,
+    existing_names: set[str],
+    proposal_keys: set[str],
+) -> dict[str, Any] | None:
+    normalized_title = proposal.title.strip().lower()
+    normalized_key = proposal.dedup_key.strip().lower()
+    if normalized_title in existing_names or normalized_key in proposal_keys:
+        return None
+
+    description = build_proposal_description(service=service, proposal=proposal)
+    reason_label = re.sub(r"[^a-z0-9_]+", "_", proposal.source_signal.lower()).strip("_")
+    created = client.create_issue(
+        name=proposal.title,
+        description=description,
+        state=proposal.recommended_state,
+        label_names=[f"task-kind: {proposal.task_kind}", "source: proposer", f"reason: {reason_label}"],
+    )
+    client.comment_issue(
+        str(created.get("id")),
+        render_worker_comment(
+            PROPOSE_COMMENT_MARKER,
+            [
+                f"task_kind: {proposal.task_kind}",
+                f"result_status: {proposal.recommended_state.lower().replace(' ', '_')}",
+                f"source_signal: {proposal.source_signal}",
+                f"confidence: {proposal.confidence}",
+                f"dedup_key: {proposal.dedup_key}",
+                f"handoff_reason: {proposal.handoff_reason}",
+                f"human_attention_required: {str(proposal.human_attention_required).lower()}",
+                f"reason: {proposal.reason_summary}",
+            ],
+        ),
+    )
+    existing_names.add(normalized_title)
+    proposal_keys.add(normalized_key)
+    return created
+
+
+def proposal_cooldown_active(memory: dict[str, Any], now: datetime) -> bool:
+    raw = memory.get("last_proposal_at")
+    if not raw:
+        return False
+    try:
+        last = datetime.fromisoformat(raw)
+    except ValueError:
+        return False
+    return (now - last).total_seconds() < PROPOSAL_COOLDOWN_SECONDS
+
+
+def proposal_quota_exhausted(memory: dict[str, Any], now: datetime) -> bool:
+    cutoff = now.timestamp() - PROPOSAL_WINDOW_SECONDS
+    timestamps = []
+    for raw in memory.get("proposal_timestamps", []):
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if value >= cutoff:
+            timestamps.append(value)
+    memory["proposal_timestamps"] = timestamps
+    return len(timestamps) >= MAX_PROPOSALS_PER_DAY
+
+
+def handle_propose_cycle(
+    client: PlaneClient,
+    service: ExecutionService,
+    *,
+    status_dir: Path | None = None,
+    now: datetime | None = None,
+) -> ProposalCycleResult:
+    now = now or datetime.now(UTC)
+    memory = load_proposal_memory(status_dir)
+    if proposal_cooldown_active(memory, now):
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="cooldown_active",
+            board_idle=board_is_idle_for_proposals(client),
+            reason_summary="Proposal cooldown is still active.",
+        )
+    if proposal_quota_exhausted(memory, now):
+        save_proposal_memory(status_dir, memory)
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="quota_exhausted",
+            board_idle=board_is_idle_for_proposals(client),
+            reason_summary="Proposal quota for the current time window has been exhausted.",
+        )
+
+    proposals, notes, board_idle = build_proposal_candidates(client, service)
+    if not proposals:
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="no_proposal",
+            board_idle=board_idle,
+            reason_summary="No sufficiently grounded autonomous proposal was available.",
+        )
+
+    existing_names = existing_issue_names(client)
+    proposal_keys = existing_proposal_keys(client)
+    created_ids: list[str] = []
+    created_states: set[str] = set()
+
+    for proposal in proposals:
+        if len(created_ids) >= MAX_PROPOSALS_PER_CYCLE:
+            break
+        created = create_proposed_task_if_missing(
+            client,
+            service,
+            proposal=proposal,
+            existing_names=existing_names,
+            proposal_keys=proposal_keys,
+        )
+        if created is None:
+            continue
+        created_ids.append(str(created.get("id")))
+        created_states.add(proposal.recommended_state)
+
+    if created_ids:
+        memory["last_proposal_at"] = now.isoformat()
+        timestamps = list(memory.get("proposal_timestamps", []))
+        timestamps.extend([now.timestamp()] * len(created_ids))
+        memory["proposal_timestamps"] = timestamps
+        save_proposal_memory(status_dir, memory)
+        proposed_state = "Ready for AI" if created_states == {"Ready for AI"} else "Backlog"
+        return ProposalCycleResult(
+            created_task_ids=created_ids,
+            decision="tasks_created",
+            board_idle=board_idle,
+            reason_summary="; ".join(notes[:4]) if notes else "Autonomous proposal cycle created bounded tasks.",
+            proposed_state=proposed_state,
+        )
+
+    save_proposal_memory(status_dir, memory)
+    return ProposalCycleResult(
+        created_task_ids=[],
+        decision="deduped",
+        board_idle=board_idle,
+        reason_summary="Proposal candidates were already represented by open work.",
+    )
 
 
 def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
@@ -1103,11 +1486,43 @@ def run_watch_loop(
                         counters["follow_up_tasks_created"] += len(created_ids)
                         logger.info(json.dumps({"event": "watch_improve_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "created_task_ids": created_ids, "run_id": cycle_run_id}))
                         write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="improve_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, counters=counters)
+                elif role == "propose":
+                    raise ValueError("Propose role is handled outside task claiming")
                 else:
                     raise ValueError(f"Unsupported worker role '{role}'")
         except ValueError as exc:
-            logger.info(json.dumps({"event": "watch_no_task", "role": role, "cycle": cycle, "message": str(exc).replace('"', "'"), "run_id": cycle_run_id}))
-            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="no_task", counters=counters)
+            if role == "propose":
+                proposal_result = handle_propose_cycle(client, service, status_dir=status_dir)
+                counters["follow_up_tasks_created"] += len(proposal_result.created_task_ids)
+                event_name = "watch_propose_complete" if proposal_result.created_task_ids else "watch_propose_noop"
+                logger.info(
+                    json.dumps(
+                        {
+                            "event": event_name,
+                            "role": role,
+                            "cycle": cycle,
+                            "decision": proposal_result.decision,
+                            "board_idle": proposal_result.board_idle,
+                            "created_task_ids": proposal_result.created_task_ids,
+                            "reason_summary": proposal_result.reason_summary,
+                            "run_id": cycle_run_id,
+                        }
+                    )
+                )
+                write_watch_status(
+                    status_dir=status_dir,
+                    role=role,
+                    cycle=cycle,
+                    state="idle",
+                    run_id=cycle_run_id,
+                    last_action=proposal_result.decision,
+                    task_kind="propose",
+                    follow_up_task_ids=proposal_result.created_task_ids,
+                    counters=counters,
+                )
+            else:
+                logger.info(json.dumps({"event": "watch_no_task", "role": role, "cycle": cycle, "message": str(exc).replace('"', "'"), "run_id": cycle_run_id}))
+                write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="no_task", counters=counters)
         except httpx.HTTPStatusError as exc:
             response = exc.response
             if response.status_code == 429:
@@ -1142,7 +1557,7 @@ def main() -> None:
     target.add_argument("--first-ready", action="store_true")
     target.add_argument("--watch", action="store_true")
     parser.add_argument("--ready-state", default="Ready for AI")
-    parser.add_argument("--role", default="goal", choices=["goal", "test", "improve"])
+    parser.add_argument("--role", default="goal", choices=["goal", "test", "improve", "propose"])
     parser.add_argument("--poll-interval-seconds", type=int, default=15)
     parser.add_argument("--max-cycles", type=int)
     parser.add_argument("--status-dir")

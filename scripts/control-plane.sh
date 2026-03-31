@@ -89,6 +89,7 @@ Usage:
   scripts/control-plane.sh watch-all-stop
   scripts/control-plane.sh watch-all-status
   scripts/control-plane.sh watch --role goal
+  scripts/control-plane.sh watch --role propose
   scripts/control-plane.sh run --task-id TASK-123
   scripts/control-plane.sh plane-doctor [--task-id TASK-123]
   scripts/control-plane.sh dependency-check [--create-plane-tasks]
@@ -133,6 +134,7 @@ start_watch_role() {
     goal) poll_interval="${CONTROL_PLANE_GOAL_POLL_SECONDS:-20}" ;;
     test) poll_interval="${CONTROL_PLANE_TEST_POLL_SECONDS:-30}" ;;
     improve) poll_interval="${CONTROL_PLANE_IMPROVE_POLL_SECONDS:-45}" ;;
+    propose) poll_interval="${CONTROL_PLANE_PROPOSE_POLL_SECONDS:-120}" ;;
   esac
   local pid_file
   pid_file="$(watch_pid_file "${role}")"
@@ -296,16 +298,19 @@ case "${cmd}" in
     start_watch_role goal
     start_watch_role test
     start_watch_role improve
+    start_watch_role propose
     ;;
   watch-all-stop)
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
+    stop_watch_role propose
     ;;
   watch-all-status)
     status_watch_role goal
     status_watch_role test
     status_watch_role improve
+    status_watch_role propose
     ;;
   worker)
     ensure_venv
