@@ -1,0 +1,55 @@
+plane:
+  base_url: http://localhost:8080
+  api_token_env: PLANE_API_TOKEN        # env var name, not the value
+  workspace_slug: control-plane
+  project_id: <your-plane-project-uuid>
+
+git:
+  provider: github
+  token_env: GITHUB_TOKEN               # env var name — resolved at runtime
+  open_pr_default: false
+  push_on_validation_failure: true
+  author_name: Control Plane Bot
+  author_email: control-plane-bot@example.com
+  sign_commits: false
+  signing_key: null
+
+kodo:
+  binary: scripts/kodo-shim             # or: kodo
+  team: full
+  cycles: 3
+  exchanges: 20
+  orchestrator: claude-code:opus
+  effort: standard
+  timeout_seconds: 3600
+
+repos:
+  MyRepo:
+    clone_url: git@github.com:owner/MyRepo.git
+    default_branch: main
+    validation_commands:
+      - .venv/bin/pytest -q
+      - .venv/bin/ruff check .
+    allowed_base_branches:
+      - main
+    bootstrap_enabled: true
+    python_binary: python3
+    venv_dir: .venv
+    install_dev_command: .venv/bin/pip install -e .[dev]
+    # token_env: GITHUB_TOKEN_MYREPO   # per-repo token override (optional)
+    # auto_merge_on_success: false     # squash-merge PR into base branch on success
+
+  AnotherRepo:
+    clone_url: git@github.com:owner/AnotherRepo.git
+    default_branch: dev
+    validation_commands: []
+    allowed_base_branches:
+      - dev
+      - main
+    bootstrap_enabled: false
+    python_binary: python3
+    venv_dir: .venv
+    install_dev_command: null
+    auto_merge_on_success: true        # open + squash-merge PR after successful push
+
+report_root: tools/report/kodo_plane

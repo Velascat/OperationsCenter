@@ -113,6 +113,17 @@ improve -> bounded follow-up work, not open-ended rewrites
 propose -> bounded board tasks when the board is idle or recent signals justify it
 ```
 
+## Configuration
+
+Two files drive local setup — both are gitignored. Committed templates document all available keys:
+
+| Template | Copy to | Purpose |
+|----------|---------|---------|
+| `config/control_plane.example.yaml` | `config/control_plane.local.yaml` | Repos, branches, Plane connection, git behaviour, execution engine |
+| `.env.control-plane.example` | `.env.control-plane.local` | Secrets and runtime knobs — never commit real values |
+
+The split is intentional: config yaml holds structure and behaviour (safe to version), env file holds secrets (gitignored). `token_env` fields in the config yaml reference env var **names**, not values.
+
 ## Fastest Happy Path
 
 ```bash
