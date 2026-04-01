@@ -49,6 +49,7 @@ class RepoSettings(BaseModel):
     install_dev_command: str | None = None
     token_env: str | None = None
     auto_merge_on_success: bool = False
+    propose_enabled: bool = True
 
 
 class Settings(BaseModel):

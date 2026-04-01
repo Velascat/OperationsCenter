@@ -105,7 +105,8 @@ class PlaneClient:
 
     def to_board_task(self, issue: dict[str, Any]) -> BoardTask:
         description = self._issue_description_text(issue)
-        parsed_body = self.task_parser.parse(description)
+        label_names = [label.get("name", "") for label in issue.get("labels", []) if isinstance(label, dict)]
+        parsed_body = self.task_parser.parse(description, labels=label_names)
         metadata = parsed_body.execution_metadata
         state = issue.get("state")
         status_value = state.get("name", "Unknown") if isinstance(state, dict) else str(state or "Unknown")
@@ -115,7 +116,7 @@ class PlaneClient:
             title=issue.get("name", "Untitled"),
             description=description,
             status=status_value,
-            labels=[label.get("name", "") for label in issue.get("labels", []) if isinstance(label, dict)],
+            labels=label_names,
             repo_key=str(metadata["repo"]),
             base_branch=str(metadata["base_branch"]),
             execution_mode=metadata["mode"],

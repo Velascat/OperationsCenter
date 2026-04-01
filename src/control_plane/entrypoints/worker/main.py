@@ -16,7 +16,7 @@ import httpx
 
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService, TaskParser
-from control_plane.config import RepoPolicyStore, load_settings
+from control_plane.config import load_settings
 from control_plane.domain import ExecutionResult
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
@@ -729,7 +729,7 @@ def default_repo_key(service: ExecutionService) -> str:
 
 
 def proposal_repo_keys(service: ExecutionService) -> list[str]:
-    return RepoPolicyStore().enabled_propose_repo_keys(service.settings)
+    return [key for key, cfg in service.settings.repos.items() if getattr(cfg, "propose_enabled", True)]
 
 
 def allowed_paths_for_repo(repo_key: str) -> list[str]:

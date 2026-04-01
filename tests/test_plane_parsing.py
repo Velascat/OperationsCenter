@@ -29,18 +29,45 @@ Do the thing.
     assert parsed.constraints_text == "- Keep tests green."
 
 
-def test_parser_rejects_missing_required_execution_fields() -> None:
+def test_parser_rejects_missing_repo_with_no_label() -> None:
     parser = TaskParser()
 
     with pytest.raises(ValueError, match="Missing execution metadata fields"):
         parser.parse(
             """## Execution
-repo: repo_a
+base_branch: main
+mode: goal
 
 ## Goal
 Do the thing.
 """
         )
+
+
+def test_parser_fills_repo_from_label_when_execution_block_absent() -> None:
+    parser = TaskParser()
+
+    parsed = parser.parse("Fix the bug.", labels=["repo: repo_a", "task-kind: goal"])
+
+    assert parsed.execution_metadata["repo"] == "repo_a"
+    assert parsed.execution_metadata["base_branch"] == ""
+    assert parsed.execution_metadata["mode"] == "goal"
+    assert parsed.goal_text == "Fix the bug."
+
+
+def test_parser_base_branch_defaults_to_empty_when_omitted() -> None:
+    parser = TaskParser()
+
+    parsed = parser.parse(
+        """## Execution
+repo: repo_a
+
+## Goal
+Do the thing.
+"""
+    )
+
+    assert parsed.execution_metadata["base_branch"] == ""
 
 
 def test_parser_rejects_invalid_execution_mode() -> None:

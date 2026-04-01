@@ -38,6 +38,7 @@ repos:
     install_dev_command: .venv/bin/pip install -e .[dev]
     # token_env: GITHUB_TOKEN_MYREPO   # per-repo token override (optional)
     # auto_merge_on_success: false     # squash-merge PR into base branch on success
+    # propose_enabled: true            # include in proposer idle-board scans (default true)
 
   AnotherRepo:
     clone_url: git@github.com:owner/AnotherRepo.git
@@ -51,5 +52,6 @@ repos:
     venv_dir: .venv
     install_dev_command: null
     auto_merge_on_success: true        # open + squash-merge PR after successful push
+    propose_enabled: false             # set false to exclude from proposer scans
 
 report_root: tools/report/kodo_plane

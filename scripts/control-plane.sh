@@ -86,9 +86,6 @@ Usage:
   scripts/control-plane.sh setup
   scripts/control-plane.sh start
   scripts/control-plane.sh stop
-  scripts/control-plane.sh api-up
-  scripts/control-plane.sh api-down
-  scripts/control-plane.sh api-status
   scripts/control-plane.sh run-next
   scripts/control-plane.sh watch-all
   scripts/control-plane.sh watch-all-stop
@@ -109,7 +106,6 @@ Usage:
   scripts/control-plane.sh providers-status
   scripts/control-plane.sh doctor
   scripts/control-plane.sh test
-  scripts/control-plane.sh api
   scripts/control-plane.sh worker --task-id TASK-123
   scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
   scripts/control-plane.sh observe-repo [--repo /abs/path]
@@ -333,7 +329,6 @@ case "${cmd}" in
     run_janitor
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
-    start_api_service
     start_watch_role goal
     start_watch_role test
     start_watch_role improve
@@ -348,7 +343,6 @@ case "${cmd}" in
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
-    stop_api_service
     run_with_log plane-down "${PLANE_MANAGER}" down
     run_janitor
     ;;
@@ -366,7 +360,6 @@ case "${cmd}" in
     run_janitor
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
-    start_api_service
     start_watch_role goal
     start_watch_role test
     start_watch_role improve
@@ -377,7 +370,6 @@ case "${cmd}" in
   dev-status)
     load_env_file
     run_with_log plane-status "${PLANE_MANAGER}" status || true
-    status_api_service
     status_watch_role goal
     status_watch_role test
     status_watch_role improve
@@ -391,22 +383,6 @@ case "${cmd}" in
   test)
     ensure_venv
     run_with_log test "${VENV_DIR}/bin/pytest" -q "$@"
-    ;;
-  api)
-    ensure_venv
-    load_env_file
-    run_with_log api "${VENV_DIR}/bin/python" -m uvicorn control_plane.entrypoints.api.main:app --reload "$@"
-    ;;
-  api-up)
-    ensure_venv
-    load_env_file
-    start_api_service
-    ;;
-  api-down)
-    stop_api_service
-    ;;
-  api-status)
-    status_api_service
     ;;
   run)
     ensure_venv

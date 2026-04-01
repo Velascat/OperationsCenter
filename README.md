@@ -96,11 +96,11 @@ The naming is intentionally close because the second is the board adapter for th
 
 - Execution budget enforcement, retry caps, no-op suppression, and proposal suppression when execution budget is low.
 
-### Operator UI and Discovery
+### Repo and Branch Selection
 
-- Repo-control UI for repo discovery, repo import, branch selection, and proposer scope control.
-- GitHub-backed repo and branch discovery for configured owners, with private-repo support when `GITHUB_TOKEN` is set.
-- Live board polling view that reflects Plane work-item changes without manually refreshing the Plane issues page.
+- Repo is selected via a `repo: <key>` label on the Plane work item — no separate UI needed.
+- Branch defaults to the repo's `default_branch` from config when not specified in the task description.
+- Proposer scope is controlled by `propose_enabled: true/false` per repo in `config/control_plane.local.yaml`.
 
 ## Lifecycle Contract
 
@@ -136,8 +136,10 @@ source .env.control-plane.local
 Then:
 
 1. Create a Plane work item in the configured project.
-2. Move it to `Ready for AI`.
-3. Watch the local loop with:
+2. Add labels: `repo: <key>` (e.g. `repo: ControlPlane`) and `task-kind: goal`.
+3. Optionally write a `## Goal` section in the description, or just write the goal as plain text.
+4. Move it to `Ready for AI`.
+5. Watch the local loop with:
 
 ```bash
 ./scripts/control-plane.sh dev-status
@@ -150,9 +152,6 @@ Then:
 ./scripts/control-plane.sh start
 ./scripts/control-plane.sh stop
 ./scripts/control-plane.sh plane-status
-./scripts/control-plane.sh api-up
-./scripts/control-plane.sh api-down
-./scripts/control-plane.sh api-status
 ./scripts/control-plane.sh run --task-id TASK-123
 ./scripts/control-plane.sh run-next
 ./scripts/control-plane.sh watch --role goal
@@ -230,7 +229,6 @@ The easiest way to bring up the whole local system is:
 That starts:
 
 - Plane on `http://localhost:8080`
-- the Control Plane UI/API on `http://127.0.0.1:8787/`
 - all four watcher lanes: `goal`, `test`, `improve`, and `propose`
 
 Useful companions:
@@ -238,19 +236,6 @@ Useful companions:
 - `./scripts/control-plane.sh dev-status`
 - `./scripts/control-plane.sh dev-down`
 - `./scripts/control-plane.sh dev-restart`
-- `./scripts/control-plane.sh api-up`
-- `./scripts/control-plane.sh api-down`
-- `./scripts/control-plane.sh api-status`
-
-## Live Board
-
-The self-hosted Plane issues page does not reliably auto-refresh in this local setup, even though the Plane API reflects updates immediately.
-
-Use the Control Plane UI at `http://127.0.0.1:8787/` when you want a live-updating task view:
-
-- `Live Board` polls Plane every 5 seconds
-- shows work-item ids, titles, states, and update timestamps
-- useful for watching watcher/proposer activity without manually refreshing the Plane frontend
 
 ## Runtime Files
 
@@ -302,9 +287,6 @@ The repo-aware autonomy loop is behaving well when:
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
 - No automatic end-to-end `autonomy-cycle` wrapper yet; the repo-aware autonomy stages remain intentionally explicit and inspectable.
-- Repo discovery is GitHub-specific today.
-- Private repo discovery depends on `GITHUB_TOKEN`; SSH alone is not enough to enumerate all accessible GitHub repos.
-- Plane custom-field/native dropdown integration is not used in this local deployment; repo/branch selection is handled by Control Plane's local UI/API.
 
 ## Documentation
 
@@ -328,9 +310,20 @@ The repo-aware autonomy loop is behaving well when:
 
 ## Task Template
 
+The minimum required to create a task manually in Plane:
+
+**Labels:** `repo: ControlPlane`, `task-kind: goal`
+
+**Description (plain):**
+```text
+Fix the config parsing bug that causes repeated failures on startup.
+```
+
+Branch defaults to the repo's `default_branch` from config. For full control, use the `## Execution` block:
+
 ```text
 ## Execution
-repo: control-plane
+repo: ControlPlane
 base_branch: main
 mode: goal
 allowed_paths:
@@ -347,8 +340,8 @@ Improve the autonomous Plane watcher and local workflow.
 
 Notes:
 
-- Tasks may still be authored manually with the `## Execution` block, or created through the local repo-control UI/API. In both cases, Control Plane resolves the same structured execution contract before work runs.
-- The UI/API is a convenience input layer, not a separate execution model.
+- `repo: <key>` label is the primary way to set the target repo. The `## Execution` block is optional for manually created tasks.
+- `base_branch` defaults to the repo's `default_branch` in config when omitted.
 - `mode: goal` is the supported runtime mode today.
 - `allowed_paths` is enforced before commit/push.
 - Kodo receives Goal/Constraints, not the `## Execution` block.

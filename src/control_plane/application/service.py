@@ -72,6 +72,10 @@ class ExecutionService:
             self._log_event("phase", run_id, phase=phase)
             issue = plane_client.fetch_issue(task_id)
             task = plane_client.to_board_task(issue)
+            if not task.base_branch:
+                repo_cfg = self.settings.repos.get(task.repo_key)
+                default_branch = repo_cfg.default_branch if repo_cfg else "main"
+                task = task.model_copy(update={"base_branch": default_branch})
             repo_target = self._repo_target_for(task)
             self._log_event(
                 "task_resolved",
