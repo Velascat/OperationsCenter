@@ -47,6 +47,8 @@ class RepoSettings(BaseModel):
     python_binary: str = "python3"
     venv_dir: str = ".venv"
     install_dev_command: str | None = None
+    token_env: str | None = None
+    auto_merge_on_success: bool = False
 
 
 class Settings(BaseModel):
@@ -63,6 +65,12 @@ class Settings(BaseModel):
         if self.git.token_env is None:
             return None
         return os.environ.get(self.git.token_env)
+
+    def repo_git_token(self, repo_key: str) -> str | None:
+        repo = self.repos.get(repo_key)
+        if repo and repo.token_env:
+            return os.environ.get(repo.token_env)
+        return self.git_token()
 
     def execution_controls(self) -> ExecutionControlSettings:
         return ExecutionControlSettings.from_env()

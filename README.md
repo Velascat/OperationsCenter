@@ -85,6 +85,13 @@ The naming is intentionally close because the second is the board adapter for th
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
 - Dependency drift reporting with optional Plane improve-task creation.
 
+### PR Automation
+
+- After a successful push, Control Plane can automatically open a PR and squash-merge it into the task's base branch.
+- Opt-in per repo via `auto_merge_on_success: true` in `config/control_plane.local.yaml`.
+- Token resolution: per-repo `token_env` if set, otherwise falls back to the global `git.token_env`.
+- Merge method is squash. PR creation and merge failures are logged but do not block the task from completing.
+
 ### Execution Safety
 
 - Execution budget enforcement, retry caps, no-op suppression, and proposal suppression when execution budget is low.
@@ -278,7 +285,7 @@ The repo-aware autonomy loop is behaving well when:
 - Polling watchers, not webhooks.
 - No queue cluster or distributed scheduler.
 - No multi-machine lock manager or cross-host deduplication.
-- No PR automation yet.
+- PR automation is opt-in per repo; branch protection rules on GitHub may block auto-merge if required status checks are not satisfied.
 - No multi-repo orchestration yet.
 - No production-grade supervisor beyond local `watch-all`.
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.

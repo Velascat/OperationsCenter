@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime
 
 from control_plane.adapters.git import GitClient, branch_allowed
+from control_plane.adapters.github_pr import GitHubPRClient
 from control_plane.adapters.kodo import KodoAdapter
 from control_plane.adapters.plane import PlaneClient
 from control_plane.adapters.reporting import Reporter
@@ -337,6 +338,7 @@ class ExecutionService:
 
             branch_pushed = False
             draft_branch_pushed = False
+            pull_request_url: str | None = None
             if changed_files and policy_success:
                 committed = self.git.commit_all(repo_path, f"chore: apply Plane task {task.task_id}")
                 if committed:
@@ -344,6 +346,24 @@ class ExecutionService:
                         self.git.push_branch(repo_path, task_branch)
                         branch_pushed = True
                         push_reason = "success"
+                        repo_cfg = self.settings.repos.get(task.repo_key)
+                        if repo_cfg and repo_cfg.auto_merge_on_success:
+                            token = self.settings.repo_git_token(task.repo_key)
+                            if token:
+                                try:
+                                    owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+                                    pr_client = GitHubPRClient(token)
+                                    pull_request_url = pr_client.create_and_merge(
+                                        owner,
+                                        repo_name,
+                                        head=task_branch,
+                                        base=task.base_branch,
+                                        title=task.title,
+                                        body=f"Automated by Control Plane — task `{task.task_id}`",
+                                    )
+                                    self._log_event("pr_merged", run_id, pr_url=pull_request_url)
+                                except Exception as exc:
+                                    self._log_event("pr_merge_failed", run_id, error=str(exc))
                     elif self.settings.git.push_on_validation_failure:
                         self.git.push_branch(repo_path, task_branch)
                         branch_pushed = True
@@ -355,6 +375,7 @@ class ExecutionService:
                 branch_pushed=branch_pushed,
                 draft_branch_pushed=draft_branch_pushed,
                 push_reason=push_reason or "not_pushed",
+                pull_request_url=pull_request_url,
             )
 
             status = "Blocked" if outcome_status == "no_op" or policy_violations or not success else "Review"
@@ -374,7 +395,7 @@ class ExecutionService:
                 branch_pushed=branch_pushed,
                 draft_branch_pushed=draft_branch_pushed,
                 push_reason=push_reason,
-                pull_request_url=None,
+                pull_request_url=pull_request_url,
                 execution_stderr_excerpt=execution_stderr_excerpt,
                 summary=summary,
                 artifacts=artifacts,
