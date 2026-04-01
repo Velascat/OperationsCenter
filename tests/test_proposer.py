@@ -73,9 +73,9 @@ def write_config(tmp_path: Path) -> Path:
                 "  control-plane:",
                 "    clone_url: git@github.com:Velascat/ControlPlane.git",
                 "    default_branch: main",
-                "  code_youtube_shorts:",
-                "    clone_url: git@github.com:Velascat/code_youtube_shorts.git",
-                "    default_branch: new-feature",
+                "  ControlPlane:",
+                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]
         )
@@ -164,7 +164,7 @@ def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
 
 def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
     decision, insight = make_decision_artifact(tmp_path)
-    decision.repo.name = "code_youtube_shorts"
+    decision.repo.name = "ControlPlane"
     settings = load_settings(write_config(tmp_path))
     candidate = decision.candidates[0]
     mapper = ProposalCandidateMapper()
@@ -180,8 +180,8 @@ def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
         ),
     )
 
-    assert "repo: code_youtube_shorts" in draft.description
-    assert "base_branch: new-feature" in draft.description
+    assert "repo: ControlPlane" in draft.description
+    assert "base_branch: main" in draft.description
 
 
 def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_path: Path) -> None:

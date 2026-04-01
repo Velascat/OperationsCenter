@@ -22,11 +22,11 @@ def write_settings(tmp_path: Path) -> Path:
                 "kodo:",
                 "  binary: kodo",
                 "repos:",
-                "  code_youtube_shorts:",
-                "    clone_url: git@github.com:Velascat/code_youtube_shorts.git",
-                "    default_branch: new-feature",
+                "  ControlPlane:",
+                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "    default_branch: main",
                 "    allowed_base_branches:",
-                "    - new-feature",
+                "    - main",
             ]
         )
     )
@@ -40,9 +40,9 @@ def test_repos_endpoint_returns_repo_registry(tmp_path: Path, monkeypatch) -> No
         "control_plane.config.repo_policies.fetch_github_repositories",
         lambda owner, github_token=None: [
             {
-                "name": "code_youtube_shorts",
-                "default_branch": "new-feature",
-                "clone_url": "git@github.com:Velascat/code_youtube_shorts.git",
+                "name": "ControlPlane",
+                "default_branch": "main",
+                "clone_url": "git@github.com:Velascat/ControlPlane.git",
             },
             {
                 "name": "another_repo",
@@ -61,7 +61,7 @@ def test_repos_endpoint_returns_repo_registry(tmp_path: Path, monkeypatch) -> No
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["repos"][0]["repo_key"] == "code_youtube_shorts"
+    assert payload["repos"][0]["repo_key"] == "ControlPlane"
     assert payload["repos"][0]["branch_options"] == ["new-feature", "main"]
     assert payload["repos"][0]["propose_enabled"] is True
     assert payload["repos"][0]["branch_source"] == "github"
@@ -80,7 +80,7 @@ def test_repo_policy_update_persists_toggle(tmp_path: Path, monkeypatch) -> None
         "/repo-policies",
         json={
             "policies": [
-                {"repo_key": "code_youtube_shorts", "propose_enabled": False},
+                {"repo_key": "ControlPlane", "propose_enabled": False},
             ]
         },
     )

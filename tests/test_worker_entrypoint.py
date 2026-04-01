@@ -425,7 +425,7 @@ def test_handle_goal_task_does_not_create_test_follow_up_for_internal_only_no_op
             {
                 "id": "GOAL-NOOP",
                 "name": "Implement watcher fix",
-                "description": "## Execution\nrepo: code_youtube_shorts\nbase_branch: new-feature\nmode: goal\n\n## Evidence\n- recent commits: abc123 Fix prompt wiring\n- recently changed files: test/conftest.py, src/main.py",
+                "description": "## Execution\nrepo: ControlPlane\nbase_branch: main\nmode: goal\n\n## Evidence\n- recent commits: abc123 Fix prompt wiring\n- recently changed files: test/conftest.py, src/main.py",
                 "state": {"name": "Ready for AI"},
                 "labels": [{"name": "task-kind: goal"}],
             },
@@ -511,17 +511,17 @@ def test_handle_improve_task_preserves_source_repo_and_branch(monkeypatch: pytes
             {
                 "id": "IMPROVE-REPO",
                 "name": "Inspect shorts repo",
-                "description": "## Execution\nrepo: code_youtube_shorts\nbase_branch: new-feature\nmode: goal\n\n## Goal\nInspect repo",
+                "description": "## Execution\nrepo: ControlPlane\nbase_branch: main\nmode: goal\n\n## Goal\nInspect repo",
                 "state": {"name": "Ready for AI"},
                 "labels": [{"name": "task-kind: improve"}],
             },
         ]
     )
     service = FakeService()
-    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+    service.settings.repos["ControlPlane"] = SimpleNamespace(
         default_branch="main",
-        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
-        allowed_base_branches=["main", "new-feature"],
+        clone_url="git@github.com:Velascat/ControlPlane.git",
+        allowed_base_branches=["main"],
     )
     observed: dict[str, str | None] = {}
 
@@ -535,9 +535,9 @@ def test_handle_improve_task_preserves_source_repo_and_branch(monkeypatch: pytes
     created_ids = handle_improve_task(client, service, "IMPROVE-REPO")
 
     assert created_ids == []
-    assert observed == {"repo_key": "code_youtube_shorts", "base_branch": "new-feature"}
+    assert observed == {"repo_key": "ControlPlane", "base_branch": "main"}
     assert client.transitions[-1] == ("IMPROVE-REPO", "Done")
-    assert any("code_youtube_shorts @ new-feature" in comment for _, comment in client.issue_comments)
+    assert any("ControlPlane @ main" in comment for _, comment in client.issue_comments)
 
 
 def test_handle_improve_task_reads_execution_target_from_description_html(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -549,7 +549,7 @@ def test_handle_improve_task_reads_execution_target_from_description_html(monkey
                 "description": None,
                 "description_stripped": None,
                 "description_html": (
-                    "<div><p>## Execution<br>repo: code_youtube_shorts<br>base_branch: new-feature<br>mode: goal</p>"
+                    "<div><p>## Execution<br>repo: ControlPlane<br>base_branch: main<br>mode: goal</p>"
                     "<p>## Goal<br>Inspect repo</p></div>"
                 ),
                 "state": {"name": "Ready for AI"},
@@ -558,10 +558,10 @@ def test_handle_improve_task_reads_execution_target_from_description_html(monkey
         ]
     )
     service = FakeService()
-    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
+    service.settings.repos["ControlPlane"] = SimpleNamespace(
         default_branch="main",
-        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
-        allowed_base_branches=["main", "new-feature"],
+        clone_url="git@github.com:Velascat/ControlPlane.git",
+        allowed_base_branches=["main"],
     )
     observed: dict[str, str | None] = {}
 
@@ -575,7 +575,7 @@ def test_handle_improve_task_reads_execution_target_from_description_html(monkey
     created_ids = handle_improve_task(client, service, "IMPROVE-HTML")
 
     assert created_ids == []
-    assert observed == {"repo_key": "code_youtube_shorts", "base_branch": "new-feature"}
+    assert observed == {"repo_key": "ControlPlane", "base_branch": "main"}
     assert client.transitions[-1] == ("IMPROVE-HTML", "Done")
 
 
@@ -618,7 +618,7 @@ def test_handle_test_task_does_not_mark_done_for_internal_only_no_op() -> None:
             {
                 "id": "TEST-NOOP",
                 "name": "Verify watcher",
-                "description": "## Execution\nrepo: code_youtube_shorts\nbase_branch: new-feature\nmode: test\n\n## Evidence\n- recent commits: abc123 Fix prompt wiring\n- recently changed files: test/conftest.py, src/main.py",
+                "description": "## Execution\nrepo: ControlPlane\nbase_branch: main\nmode: test\n\n## Evidence\n- recent commits: abc123 Fix prompt wiring\n- recently changed files: test/conftest.py, src/main.py",
                 "state": {"name": "Ready for AI"},
                 "labels": [{"name": "task-kind: test"}],
             },
@@ -783,8 +783,8 @@ Existing follow-up
 
 def test_handle_blocked_triage_preserves_source_repo_and_branch_for_follow_up() -> None:
     blocked_description = """## Execution
-repo: code_youtube_shorts
-base_branch: new-feature
+repo: ControlPlane
+base_branch: main
 mode: goal
 
 ## Goal
@@ -807,17 +807,17 @@ Fix my shit
         },
     )
     service = FakeService()
-    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
-        default_branch="new-feature",
-        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
+    service.settings.repos["ControlPlane"] = SimpleNamespace(
+        default_branch="main",
+        clone_url="git@github.com:Velascat/ControlPlane.git",
     )
 
     classification, created_ids = handle_blocked_triage(client, service, "BLOCKED-5")
 
     assert classification == "validation_failure"
     assert created_ids == ["FOLLOWUP-1"]
-    assert "repo: code_youtube_shorts" in str(client.created[0]["description"])
-    assert "base_branch: new-feature" in str(client.created[0]["description"])
+    assert "repo: ControlPlane" in str(client.created[0]["description"])
+    assert "base_branch: main" in str(client.created[0]["description"])
 
 
 def test_build_improve_triage_result_detects_repeated_pattern() -> None:
@@ -923,12 +923,12 @@ def test_handle_propose_cycle_creates_bounded_goal_task(tmp_path: Path, monkeypa
 def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     client = FakePlaneClient([])
     service = FakeService()
-    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
-        default_branch="new-feature",
-        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
-        allowed_base_branches=["main", "new-feature"],
+    service.settings.repos["ControlPlane"] = SimpleNamespace(
+        default_branch="main",
+        clone_url="git@github.com:Velascat/ControlPlane.git",
+        allowed_base_branches=["main"],
     )
-    monkeypatch.setattr("control_plane.entrypoints.worker.main.proposal_repo_keys", lambda _service: ["code_youtube_shorts"])
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.proposal_repo_keys", lambda _service: ["ControlPlane"])
 
     def fake_build(
         _client: FakePlaneClient,
@@ -937,25 +937,25 @@ def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest
         repo_key: str | None = None,
         issues: list[dict[str, object]] | None = None,
     ) -> tuple[list[ProposalSpec], list[str], bool]:
-        assert repo_key == "code_youtube_shorts"
+        assert repo_key == "ControlPlane"
         assert issues == []
         return (
             [
                 ProposalSpec(
-                    repo_key="code_youtube_shorts",
+                    repo_key="ControlPlane",
                     task_kind="goal",
                     title="Implement next bounded repo improvement",
                     goal_text="Inspect the repo.",
                     reason_summary="Idle board.",
-                    source_signal="code_youtube_shorts:idle_board",
+                    source_signal="ControlPlane:idle_board",
                     confidence="medium",
                     recommended_state="Ready for AI",
                     handoff_reason="propose_idle_board_scan",
-                    dedup_key="code_youtube_shorts:idle_board:repo_scan",
+                    dedup_key="ControlPlane:idle_board:repo_scan",
                     evidence_lines=["recent commits: abc123 Fix prompt wiring"],
                 )
             ],
-            ["repo: code_youtube_shorts"],
+            ["repo: ControlPlane"],
             True,
         )
 
@@ -965,12 +965,12 @@ def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest
 
     assert result.decision == "tasks_created"
     assert result.created_task_ids == ["FOLLOWUP-1"]
-    assert "repo: code_youtube_shorts" in str(client.created[0]["description"])
-    assert "base_branch: new-feature" in str(client.created[0]["description"])
+    assert "repo: ControlPlane" in str(client.created[0]["description"])
+    assert "base_branch: main" in str(client.created[0]["description"])
     assert client.created[0]["labels"] == [
         {"name": "task-kind: goal"},
         {"name": "source: proposer"},
-        {"name": "reason: code_youtube_shorts_idle_board"},
+        {"name": "reason: controlplane_idle_board"},
     ]
     assert "## Evidence" in str(client.created[0]["description"])
     assert any("[Propose] Autonomous task created" in comment for _, comment in client.issue_comments)
@@ -1116,10 +1116,10 @@ def test_run_watch_loop_propose_role_creates_task_when_idle(tmp_path: Path, monk
 def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     client = FakePlaneClient([])
     service = FakeService()
-    service.settings.repos["code_youtube_shorts"] = SimpleNamespace(
-        default_branch="new-feature",
-        clone_url="git@github.com:Velascat/code_youtube_shorts.git",
-        allowed_base_branches=["new-feature"],
+    service.settings.repos["ControlPlane"] = SimpleNamespace(
+        default_branch="main",
+        clone_url="git@github.com:Velascat/ControlPlane.git",
+        allowed_base_branches=["main"],
     )
 
     def fake_discover(
@@ -1128,12 +1128,12 @@ def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(
         repo_key: str,
         base_branch: str | None = None,
     ) -> tuple[list[dict[str, str]], list[str]]:
-        assert repo_key == "code_youtube_shorts"
-        assert base_branch == "new-feature"
+        assert repo_key == "ControlPlane"
+        assert base_branch == "main"
         return (
             [],
             [
-                "- inspected repo: code_youtube_shorts @ new-feature",
+                "- inspected repo: ControlPlane @ main",
                 "- recent commits: abc123 Fix prompt wiring | def456 Add coverage",
                 "- recently changed files: test/conftest.py, src/main.py",
                 "- report signal: repeated pytest collection errors",
@@ -1143,7 +1143,7 @@ def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(
     monkeypatch.setattr("control_plane.entrypoints.worker.main.discover_improvement_candidates", fake_discover)
     from control_plane.entrypoints.worker.main import build_proposal_candidates
 
-    proposals, notes, board_idle = build_proposal_candidates(client, service, repo_key="code_youtube_shorts", issues=[])
+    proposals, notes, board_idle = build_proposal_candidates(client, service, repo_key="ControlPlane", issues=[])
 
     assert board_idle is True
     assert len(proposals) == 1
@@ -1155,7 +1155,7 @@ def test_build_proposal_candidates_idle_board_fallback_includes_recent_evidence(
         "report signal: repeated pytest collection errors",
         "recently changed files: test/conftest.py, src/main.py",
         "recent commits: abc123 Fix prompt wiring | def456 Add coverage",
-        "inspected repo: code_youtube_shorts @ new-feature",
+        "inspected repo: ControlPlane @ main",
     ]
     assert any("fallback_proposal: idle_board evidence-anchored repo improvement" == note for note in notes)
 
@@ -1165,7 +1165,7 @@ def test_evidence_lines_from_notes_prioritizes_actionable_signals() -> None:
 
     evidence_lines = evidence_lines_from_notes(
         [
-            "- inspected repo: code_youtube_shorts @ new-feature",
+            "- inspected repo: ControlPlane @ main",
             "- top-level entries: src, docs",
             "- recently changed files: test/conftest.py, src/main.py",
             "- recent commits: abc123 Fix prompt wiring | def456 Add coverage",
@@ -1177,7 +1177,7 @@ def test_evidence_lines_from_notes_prioritizes_actionable_signals() -> None:
         "report signal: repeated pytest collection errors",
         "recently changed files: test/conftest.py, src/main.py",
         "recent commits: abc123 Fix prompt wiring | def456 Add coverage",
-        "inspected repo: code_youtube_shorts @ new-feature",
+        "inspected repo: ControlPlane @ main",
         "top-level entries: src, docs",
     ]
 
