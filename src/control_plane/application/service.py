@@ -18,7 +18,7 @@ from control_plane.adapters.workspace import RepoEnvironmentBootstrapper, Worksp
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
-from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget
+from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget, ValidationResult
 from control_plane.execution import UsageStore
 
 
@@ -545,9 +545,28 @@ class ExecutionService:
             lines.append(f"- follow_up_task_ids: {', '.join(result.follow_up_task_ids)}")
         if result.blocked_classification:
             lines.append(f"- blocked_classification: {result.blocked_classification}")
+        if result.validation_passed is False and result.validation_results is not None:
+            excerpt = ExecutionService._validation_excerpt(result.validation_results)
+            if excerpt is not None:
+                lines.append(f"- validation_errors:\n```\n{excerpt}\n```")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 20) -> str | None:
+        failed = [r for r in validation_results if r.exit_code != 0]
+        if not failed:
+            return None
+        output_lines: list[str] = []
+        for r in failed:
+            output_lines.append(f"[{r.command}]")
+            text = r.stderr.strip() or r.stdout.strip()
+            if text:
+                output_lines.extend(text.splitlines())
+        if len(output_lines) > max_lines:
+            output_lines = output_lines[-max_lines:]
+        return "\n".join(output_lines) or None
 
     @staticmethod
     def _stderr_excerpt(stderr: str) -> str | None:

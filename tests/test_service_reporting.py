@@ -4,7 +4,7 @@ import pytest
 
 from control_plane.application.service import ExecutionService
 from control_plane.config.settings import Settings
-from control_plane.domain.models import ExecutionResult
+from control_plane.domain.models import ExecutionResult, ValidationResult
 
 
 class FailingParsePlaneClient:
@@ -223,3 +223,59 @@ def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path) -> N
     assert result.final_status == "Blocked"
     assert transitions[-1] == "Blocked"
     assert any("internal_changed_files: kodo/config.json, kodo/run-status.md" in comment for comment in comments)
+
+
+def test_comment_markdown_includes_validation_errors_on_failure() -> None:
+    task = type("Task", (), {"task_id": "TASK-V1"})
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr="FAILED test_foo.py::test_bar\nAssertionError: expected 1 got 2", duration_ms=500),
+        ValidationResult(command="mypy", exit_code=0, stdout="Success", stderr="", duration_ms=200),
+    ]
+    result = ExecutionResult(
+        run_id="val1",
+        success=False,
+        validation_passed=False,
+        validation_results=validation_results,
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        summary="run_id=val1 execution=passed validation=failed",
+    )
+
+    comment = ExecutionService._comment_markdown(task, result)
+    assert "validation_errors:" in comment
+    assert "```" in comment
+    assert "AssertionError: expected 1 got 2" in comment
+
+
+def test_comment_markdown_omits_validation_errors_on_success() -> None:
+    task = type("Task", (), {"task_id": "TASK-V2"})
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=300),
+        ValidationResult(command="mypy", exit_code=0, stdout="Success", stderr="", duration_ms=200),
+    ]
+    result = ExecutionResult(
+        run_id="val2",
+        success=True,
+        validation_passed=True,
+        validation_results=validation_results,
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        summary="run_id=val2 execution=passed validation=passed",
+    )
+
+    comment = ExecutionService._comment_markdown(task, result)
+    assert "validation_errors:" not in comment
+
+
+def test_validation_excerpt_truncates_long_output() -> None:
+    long_stderr = "\n".join(f"error line {i}" for i in range(35))
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr=long_stderr, duration_ms=100),
+    ]
+
+    excerpt = ExecutionService._validation_excerpt(validation_results, max_lines=10)
+    assert excerpt is not None
+    lines = excerpt.splitlines()
+    assert len(lines) == 10
