@@ -28,7 +28,7 @@ MAX_PROPOSALS_PER_CYCLE = 3
 MAX_PROPOSALS_PER_DAY = 24
 PROPOSAL_COOLDOWN_SECONDS = 30 * 60
 PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
-LOW_BACKLOG_THRESHOLD = 2
+LOW_BACKLOG_THRESHOLD = 4
 EXECUTION_ACTIONS = {"execute", "improve_task"}
 MAX_CLASSIFICATION_ISSUES = 20
 
@@ -907,6 +907,70 @@ def read_text_if_exists(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
+_SCAN_EXTENSIONS = {".py", ".ts", ".js", ".go", ".rs"}
+_WIP_COMMIT_WORDS = ("wip", "hack", "fixme", "todo", "temp", "workaround", "broken", "kludge", "bandaid")
+_ACTIONABLE_MARKERS = ("# TODO", "# FIXME", "# HACK", "# XXX", "// TODO", "// FIXME", "// HACK")
+
+
+def _scan_file_for_signals(repo_path: Path, rel_path: str) -> list[dict[str, str]]:
+    """Read a source file and return findings for actionable inline markers and stubs."""
+    findings: list[dict[str, str]] = []
+    file_path = repo_path / rel_path
+    if not file_path.is_file() or file_path.suffix not in _SCAN_EXTENSIONS:
+        return findings
+    try:
+        lines = file_path.read_text(errors="replace").splitlines()[:400]
+    except OSError:
+        return findings
+
+    todos: list[str] = []
+    stubs: list[int] = []
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if any(m in stripped.upper() for m in _ACTIONABLE_MARKERS):
+            todos.append(f"line {i}: {stripped[:80]}")
+        if stripped in ("raise NotImplementedError", "raise NotImplementedError()"):
+            stubs.append(i)
+
+    if todos:
+        findings.append({
+            "kind": "goal",
+            "title": f"Resolve TODO/FIXME markers in {Path(rel_path).name}",
+            "goal": f"Address the outstanding TODO/FIXME items in `{rel_path}`: {'; '.join(todos[:3])}",
+            "constraints": f"- source: retained code scan\n- focus only on {rel_path}\n- do not expand into unrelated changes",
+            "note": f"- code scan signal: {len(todos)} actionable marker(s) in {rel_path}",
+        })
+    if stubs:
+        findings.append({
+            "kind": "goal",
+            "title": f"Implement unfinished stub in {Path(rel_path).name}",
+            "goal": f"Implement the unfinished stub (`raise NotImplementedError`) at line(s) {', '.join(str(n) for n in stubs[:3])} in `{rel_path}`.",
+            "constraints": f"- source: retained code scan\n- implement the stub in {rel_path} and add tests\n- do not expand scope",
+            "note": f"- code scan signal: unimplemented stub in {rel_path}",
+        })
+    return findings
+
+
+def _find_untested_module(repo_path: Path) -> str | None:
+    """Return the first source module that has no corresponding test file, or None."""
+    test_root = next(
+        (repo_path / d for d in ("tests", "test") if (repo_path / d).is_dir()), None
+    )
+    if not test_root:
+        return None
+    tested: set[str] = {f.stem.removeprefix("test_") for f in test_root.rglob("test_*.py")}
+    for src_dir in ("src", "lib", "."):
+        sd = repo_path / src_dir
+        if not sd.is_dir():
+            continue
+        for src_file in sorted(sd.rglob("*.py")):
+            if src_file.name.startswith("_") or src_file.name == "conftest.py":
+                continue
+            if src_file.stem not in tested:
+                return str(src_file.relative_to(repo_path))
+    return None
+
+
 def discover_improvement_candidates(
     service: ExecutionService,
     *,
@@ -978,53 +1042,85 @@ def discover_improvement_candidates(
     if repo_cfg.local_path:
         repo_path = Path(repo_cfg.local_path)
         service.git.checkout_base(repo_path, target_branch)
-        top_level = sorted(
-            path.name
-            for path in repo_path.iterdir()
-            if path.name != ".git"
-        )
-        report_notes.append(f"- inspected repo: {repo_key} @ {target_branch} (local)")
-        recent_commits = service.git.recent_commits(repo_path, max_count=5)
-        if recent_commits:
-            report_notes.append(f"- recent commits: {' | '.join(recent_commits[:3])}")
-        recent_files = service.git.recent_changed_files(repo_path, max_count=3)
-        if recent_files:
-            report_notes.append(f"- recently changed files: {', '.join(recent_files[:5])}")
-        report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
-        report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
-        report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
+        _inspect_repo(service, repo_path, repo_key, target_branch, findings, report_notes, local=True)
     else:
         workspace_path = service.workspace.create()
         try:
             repo_path = service.git.clone(repo_cfg.clone_url, workspace_path)
             service.git.checkout_base(repo_path, target_branch)
-            top_level = sorted(
-                path.name
-                for path in repo_path.iterdir()
-                if path.name != ".git"
-            )
-            report_notes.append(f"- inspected repo: {repo_key} @ {target_branch}")
-            recent_commits = service.git.recent_commits(repo_path, max_count=5)
-            if recent_commits:
-                report_notes.append(f"- recent commits: {' | '.join(recent_commits[:3])}")
-            recent_files = service.git.recent_changed_files(repo_path, max_count=3)
-            if recent_files:
-                report_notes.append(f"- recently changed files: {', '.join(recent_files[:5])}")
-            report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
-            report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
-            report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
+            _inspect_repo(service, repo_path, repo_key, target_branch, findings, report_notes, local=False)
         finally:
             service.workspace.cleanup(workspace_path)
 
     unique: dict[str, dict[str, str]] = {}
     for finding in findings:
         unique.setdefault(finding["title"].strip().lower(), finding)
-    return list(unique.values())[:3], report_notes
+    return list(unique.values())[:5], report_notes
+
+
+def _inspect_repo(
+    service: ExecutionService,
+    repo_path: Path,
+    repo_key: str,
+    target_branch: str,
+    findings: list[dict[str, str]],
+    report_notes: list[str],
+    *,
+    local: bool,
+) -> None:
+    """Deep repo inspection: git history, file content scan, coverage gaps."""
+    label = f"{repo_key} @ {target_branch}" + (" (local)" if local else "")
+    report_notes.append(f"- inspected repo: {label}")
+
+    top_level = sorted(p.name for p in repo_path.iterdir() if p.name != ".git")
+    report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
+    report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
+    report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
+
+    # More commits — surface WIP/hack patterns
+    all_commits = service.git.recent_commits(repo_path, max_count=20)
+    if all_commits:
+        report_notes.append(f"- recent commits: {' | '.join(all_commits[:5])}")
+    wip_commits = [c for c in all_commits if any(w in c.lower() for w in _WIP_COMMIT_WORDS)]
+    if wip_commits:
+        report_notes.append(f"- wip/hack commits: {' | '.join(wip_commits[:3])}")
+        findings.append({
+            "kind": "goal",
+            "title": "Follow up on WIP/temporary commits",
+            "goal": f"Address the incomplete or temporary work signalled by recent commits: {'; '.join(wip_commits[:2])}",
+            "constraints": "- source: retained git analysis\n- complete or clean up the temporary work\n- do not expand scope beyond what the commits indicate",
+            "note": f"- git signal: WIP/hack pattern in recent commits ({len(wip_commits)} found)",
+        })
+
+    # More recently changed files — scan contents
+    recent_files = service.git.recent_changed_files(repo_path, max_count=8)
+    if recent_files:
+        report_notes.append(f"- recently changed files: {', '.join(recent_files[:6])}")
+    for rel_path in recent_files[:5]:
+        for finding in _scan_file_for_signals(repo_path, rel_path):
+            findings.append(finding)
+            report_notes.append(f"- {finding['note'].lstrip('- ')}")
+
+    # Test coverage gap — one untested module at a time
+    untested = _find_untested_module(repo_path)
+    if untested:
+        findings.append({
+            "kind": "test",
+            "title": f"Add tests for {Path(untested).name}",
+            "goal": f"Write meaningful tests for `{untested}` — no test file currently covers this module.",
+            "constraints": f"- source: retained code scan\n- focus on {untested}\n- verify actual behaviour, not just happy path",
+            "note": f"- coverage gap: no tests found for {untested}",
+        })
+        report_notes.append(f"- coverage gap: {untested}")
 
 
 def evidence_lines_from_notes(notes: list[str]) -> list[str]:
     values = [note.removeprefix("- ").strip() for note in notes if note.strip()]
     priorities = (
+        "code scan signal:",
+        "coverage gap:",
+        "git signal:",
+        "wip/hack commits:",
         "report signal:",
         "recently changed files:",
         "recent commits:",
