@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from dataclasses import dataclass, field
 import html
 import json
 import logging
 import os
 import re
+import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -910,6 +912,167 @@ def read_text_if_exists(path: Path) -> str:
 _SCAN_EXTENSIONS = {".py", ".ts", ".js", ".go", ".rs"}
 _WIP_COMMIT_WORDS = ("wip", "hack", "fixme", "todo", "temp", "workaround", "broken", "kludge", "bandaid")
 _ACTIONABLE_MARKERS = ("# TODO", "# FIXME", "# HACK", "# XXX", "// TODO", "// FIXME", "// HACK")
+_LARGE_FILE_LINES = 300
+_LARGE_FUNCTION_LINES = 50
+
+
+def _run_tool(cmd: list[str], cwd: Path, timeout: int = 30) -> str:
+    """Run a subprocess tool, return stdout. Empty string on any failure."""
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False)
+        return result.stdout
+    except Exception:
+        return ""
+
+
+def _ast_complexity_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Scan all Python source files for large files and long functions."""
+    findings: list[dict[str, str]] = []
+    candidates: list[tuple[int, Path, list[tuple[str, int]]]] = []
+
+    src_roots = [repo_path / d for d in ("src", "lib", ".") if (repo_path / d).is_dir()]
+    seen: set[Path] = set()
+    for root in src_roots:
+        for path in sorted(root.rglob("*.py")):
+            if path in seen or any(part.startswith(".") for part in path.parts):
+                continue
+            seen.add(path)
+            try:
+                source = path.read_text(errors="replace")
+                tree = ast.parse(source)
+            except (SyntaxError, OSError):
+                continue
+            line_count = len(source.splitlines())
+            large_fns: list[tuple[str, int]] = []
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    length = getattr(node, "end_lineno", node.lineno) - node.lineno
+                    if length >= _LARGE_FUNCTION_LINES:
+                        large_fns.append((node.name, length))
+            large_fns.sort(key=lambda x: -x[1])
+            if line_count >= _LARGE_FILE_LINES or large_fns:
+                candidates.append((line_count, path, large_fns))
+
+    candidates.sort(key=lambda x: -x[0])
+    for line_count, path, large_fns in candidates[:4]:
+        rel = str(path.relative_to(repo_path))
+        fn_desc = ", ".join(f"`{name}` ({lines}L)" for name, lines in large_fns[:3])
+        if line_count >= _LARGE_FILE_LINES and large_fns:
+            title = f"Decompose {path.name} ({line_count}L, {len(large_fns)} oversized function(s))"
+            goal = (
+                f"`{rel}` has grown to {line_count} lines. "
+                f"The largest functions are: {fn_desc}. "
+                "Identify the most cohesive subset of functionality and extract it into a dedicated module. "
+                "Choose one bounded extraction — not a full rewrite."
+            )
+            constraints = (
+                f"- source: ast complexity scan\n"
+                f"- target: {rel} ({line_count} lines)\n"
+                f"- extract one coherent concern into a new module\n"
+                f"- all existing tests must stay green\n"
+                f"- add tests for the extracted module"
+            )
+            note = f"- complexity: {path.name} {line_count}L, functions: {fn_desc}"
+        elif large_fns:
+            title = f"Simplify oversized functions in {path.name}"
+            goal = (
+                f"The following functions in `{rel}` are too long to reason about easily: {fn_desc}. "
+                "Refactor the longest one by extracting well-named helpers. Do not change observable behaviour."
+            )
+            constraints = (
+                f"- source: ast complexity scan\n"
+                f"- target: {rel}\n"
+                f"- refactor one function at a time\n"
+                f"- do not change public API or behaviour\n"
+                f"- tests must stay green"
+            )
+            note = f"- complexity: oversized functions in {path.name}: {fn_desc}"
+        else:
+            title = f"Reduce size of {path.name} ({line_count}L)"
+            goal = (
+                f"`{rel}` is {line_count} lines with no clear split yet. "
+                "Identify the best extraction boundary and move one cohesive section into its own module."
+            )
+            constraints = (
+                f"- source: ast complexity scan\n"
+                f"- target: {rel}\n"
+                f"- extract one cohesive section\n"
+                f"- tests must stay green"
+            )
+            note = f"- complexity: {path.name} {line_count}L"
+
+        findings.append({"kind": "goal", "title": title, "goal": goal, "constraints": constraints, "note": note})
+
+    return findings
+
+
+def _ruff_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Run ruff on the repo and surface files with the most violations."""
+    import collections
+    output = _run_tool(["ruff", "check", "--output-format=json", "."], cwd=repo_path, timeout=30)
+    if not output.strip():
+        return []
+    try:
+        violations = json.loads(output)
+    except json.JSONDecodeError:
+        return []
+    by_file: dict[str, list[dict]] = collections.defaultdict(list)
+    for v in violations:
+        filename = v.get("filename", "")
+        if filename:
+            rel = str(Path(filename).relative_to(repo_path)) if Path(filename).is_absolute() else filename
+            by_file[rel].append(v)
+
+    findings: list[dict[str, str]] = []
+    for rel, viols in sorted(by_file.items(), key=lambda x: -len(x[1]))[:3]:
+        count = len(viols)
+        codes = sorted({v.get("code", "") for v in viols if v.get("code")})[:6]
+        code_str = ", ".join(codes)
+        findings.append({
+            "kind": "goal",
+            "title": f"Fix {count} lint violation(s) in {Path(rel).name}",
+            "goal": f"Fix the {count} ruff violations in `{rel}`. Violation codes: {code_str}. Run `ruff check {rel}` to see the full list.",
+            "constraints": f"- source: ruff static analysis\n- target: {rel}\n- fix all violations in one pass\n- do not change behaviour, only style/correctness",
+            "note": f"- ruff: {count} violation(s) in {rel} ({code_str})",
+        })
+    return findings
+
+
+def _all_todo_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Scan ALL source files for TODO/FIXME, return worst offenders not already in recent-change findings."""
+    import collections
+    counts: collections.Counter[str] = collections.Counter()
+    samples: dict[str, list[str]] = {}
+    src_roots = [repo_path / d for d in ("src", "lib") if (repo_path / d).is_dir()]
+    if not src_roots:
+        src_roots = [repo_path]
+    seen: set[Path] = set()
+    for root in src_roots:
+        for path in sorted(root.rglob("*.py")):
+            if path in seen or any(part.startswith(".") for part in path.parts):
+                continue
+            seen.add(path)
+            try:
+                lines = path.read_text(errors="replace").splitlines()
+            except OSError:
+                continue
+            rel = str(path.relative_to(repo_path))
+            for i, line in enumerate(lines[:500], 1):
+                if any(m in line.upper() for m in ("# TODO", "# FIXME", "# HACK", "# XXX")):
+                    counts[rel] += 1
+                    samples.setdefault(rel, []).append(f"line {i}: {line.strip()[:70]}")
+
+    findings: list[dict[str, str]] = []
+    for rel, count in counts.most_common(2):
+        top = "; ".join(samples[rel][:3])
+        findings.append({
+            "kind": "goal",
+            "title": f"Address {count} TODO/FIXME marker(s) in {Path(rel).name}",
+            "goal": f"Resolve the {count} outstanding TODO/FIXME items in `{rel}`. Top markers: {top}.",
+            "constraints": f"- source: full codebase TODO scan\n- target: {rel}\n- address markers in order of impact\n- do not leave new TODOs behind",
+            "note": f"- todo scan: {count} marker(s) in {rel}",
+        })
+    return findings
 
 
 def _scan_file_for_signals(repo_path: Path, rel_path: str) -> list[dict[str, str]]:
@@ -1055,7 +1218,7 @@ def discover_improvement_candidates(
     unique: dict[str, dict[str, str]] = {}
     for finding in findings:
         unique.setdefault(finding["title"].strip().lower(), finding)
-    return list(unique.values())[:5], report_notes
+    return list(unique.values())[:8], report_notes
 
 
 def _inspect_repo(
@@ -1101,7 +1264,7 @@ def _inspect_repo(
             findings.append(finding)
             report_notes.append(f"- {finding['note'].lstrip('- ')}")
 
-    # Test coverage gap — one untested module at a time
+    # Test coverage gaps — scan all source modules
     untested = _find_untested_module(repo_path)
     if untested:
         findings.append({
@@ -1112,6 +1275,17 @@ def _inspect_repo(
             "note": f"- coverage gap: no tests found for {untested}",
         })
         report_notes.append(f"- coverage gap: {untested}")
+
+    # Deep static analysis: complexity, lint violations, full TODO scan
+    for finding in _ast_complexity_findings(repo_path):
+        findings.append(finding)
+        report_notes.append(f"- {finding['note'].lstrip('- ')}")
+    for finding in _ruff_findings(repo_path):
+        findings.append(finding)
+        report_notes.append(f"- {finding['note'].lstrip('- ')}")
+    for finding in _all_todo_findings(repo_path):
+        findings.append(finding)
+        report_notes.append(f"- {finding['note'].lstrip('- ')}")
 
 
 def evidence_lines_from_notes(notes: list[str]) -> list[str]:
