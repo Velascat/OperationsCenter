@@ -70,6 +70,7 @@ class ExecutionResult(BaseModel):
     internal_changed_files: list[str] = Field(default_factory=list)
     diff_stat_excerpt: str | None = None
     validation_passed: bool = False
+    validation_retried: bool = False
     validation_results: list[ValidationResult] = Field(default_factory=list)
     branch_pushed: bool = False
     draft_branch_pushed: bool = False

@@ -316,6 +316,25 @@ class ExecutionService:
             run_env.update(repo_target.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
             validation_ok = self.validation.passed(validation_results)
+
+            validation_retried = False
+            if not validation_ok:
+                error_text = self._validation_excerpt(validation_results)
+                if error_text:
+                    with open(goal_file, "a") as f:
+                        f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
+                kodo_result = self.kodo.run(goal_file, repo_path)
+                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+                validation_ok = self.validation.passed(validation_results)
+                validation_retried = True
+                self._log_event("validation_retry", run_id, retry_passed=validation_ok)
+                artifacts.append(
+                    self.reporter.write_validation(
+                        run_dir,
+                        [r.model_dump() for r in validation_results],
+                    )
+                )
+
             artifacts.append(
                 self.reporter.write_validation(
                     run_dir,
@@ -446,6 +465,7 @@ class ExecutionService:
                 internal_changed_files=internal_changed_files,
                 diff_stat_excerpt=self._diff_stat_excerpt(diff_stat),
                 validation_passed=validation_ok,
+                validation_retried=validation_retried,
                 validation_results=validation_results,
                 branch_pushed=branch_pushed,
                 draft_branch_pushed=draft_branch_pushed,
