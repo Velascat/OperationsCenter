@@ -654,9 +654,9 @@ def build_improve_triage_result(
 ) -> ImproveTriageResult:
     classification, rationale = classify_blocked_issue(issue, comments)
     classification_counts = recent_classification_counts(client)
-    # Treat one existing classified failure plus the current blocked task as a
-    # meaningful recurring pattern worth collapsing into a single system-fix task.
-    repeated_pattern = classification_counts.get(classification, 0) >= 1
+    # Only escalate to a system-fix follow-up task once the same classification
+    # has appeared at least 3 times in recent issues, giving retries time to work.
+    repeated_pattern = classification_counts.get(classification, 0) >= 3
     issue_title = str(issue.get("name", "task"))
     issue_kind = task_kind_for_issue(issue)
 

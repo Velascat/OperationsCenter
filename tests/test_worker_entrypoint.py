@@ -821,6 +821,7 @@ Fix my shit
 
 
 def test_build_improve_triage_result_detects_repeated_pattern() -> None:
+    """Follow-up goal is created when the same classification appears >= 3 times."""
     client = FakePlaneClient(
         [
             {
@@ -835,23 +836,77 @@ def test_build_improve_triage_result_detects_repeated_pattern() -> None:
                 "state": {"name": "Blocked"},
                 "labels": [{"name": "task-kind: goal"}],
             },
+            {
+                "id": "BLOCKED-C",
+                "name": "Broken task C",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+            {
+                "id": "BLOCKED-D",
+                "name": "Broken task D",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
         ],
         comments={
             "BLOCKED-A": [
                 {"comment_html": "<p>[Improve] Blocked triage</p><ul><li>blocked_classification: validation_failure</li></ul>"},
             ],
             "BLOCKED-B": [
+                {"comment_html": "<p>[Improve] Blocked triage</p><ul><li>blocked_classification: validation_failure</li></ul>"},
+            ],
+            "BLOCKED-C": [
+                {"comment_html": "<p>[Improve] Blocked triage</p><ul><li>blocked_classification: validation_failure</li></ul>"},
+            ],
+            "BLOCKED-D": [
                 {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
             ],
         },
     )
 
-    triage = build_improve_triage_result(client, client.fetch_issue("BLOCKED-B"), client.list_comments("BLOCKED-B"))
+    triage = build_improve_triage_result(client, client.fetch_issue("BLOCKED-D"), client.list_comments("BLOCKED-D"))
 
     assert triage.classification == "validation_failure"
     assert triage.follow_up is not None
     assert triage.follow_up.handoff_reason == "improve_pattern_validation_failure"
     assert "repeated" in triage.reason_summary.lower()
+
+
+def test_build_improve_triage_result_no_repeated_pattern_below_threshold() -> None:
+    """Counts of 1 and 2 should NOT trigger the repeated-pattern escalation path."""
+    for num_prior in (1, 2):
+        blocked_issues = [
+            {
+                "id": f"BLOCKED-{i}",
+                "name": f"Broken task {i}",
+                "state": {"name": "Blocked"},
+                "labels": [{"name": "task-kind: goal"}],
+            }
+            for i in range(num_prior + 1)  # num_prior classified + 1 current
+        ]
+        comments: dict[str, list[dict[str, str]]] = {}
+        for i in range(num_prior):
+            comments[f"BLOCKED-{i}"] = [
+                {"comment_html": "<p>[Improve] Blocked triage</p><ul><li>blocked_classification: validation_failure</li></ul>"},
+            ]
+        current_id = f"BLOCKED-{num_prior}"
+        comments[current_id] = [
+            {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
+        ]
+        client = FakePlaneClient(blocked_issues, comments=comments)
+
+        triage = build_improve_triage_result(client, client.fetch_issue(current_id), client.list_comments(current_id))
+
+        # The individual triage follow-up may still be created, but the
+        # repeated-pattern escalation (improve_pattern_*) must NOT fire.
+        if triage.follow_up is not None:
+            assert not triage.follow_up.handoff_reason.startswith("improve_pattern_"), (
+                f"Expected no repeated-pattern escalation with {num_prior} prior occurrences"
+            )
+        assert "repeated" not in (triage.reason_summary or "").lower(), (
+            f"Expected no 'repeated' language in reason_summary with {num_prior} prior occurrences"
+        )
 
 
 def test_run_watch_loop_uses_backoff_on_rate_limit(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
