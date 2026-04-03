@@ -94,3 +94,37 @@ def test_run_does_not_retry_on_non_quota_failure(
 
     assert len(calls) == 1
     assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# is_orchestrator_rate_limited tests
+# ---------------------------------------------------------------------------
+
+from control_plane.adapters.kodo.adapter import KodoRunResult, _ORCHESTRATOR_RATE_LIMIT_SIGNALS
+
+
+def _make_result(stdout: str = "", stderr: str = "") -> KodoRunResult:
+    return KodoRunResult(exit_code=1, stdout=stdout, stderr=stderr, command=[])
+
+
+@pytest.mark.parametrize("signal", _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
+def test_is_orchestrator_rate_limited_true_for_each_signal_in_stdout(signal: str) -> None:
+    result = _make_result(stdout=f"some output {signal} more text")
+    assert KodoAdapter.is_orchestrator_rate_limited(result) is True
+
+
+@pytest.mark.parametrize("signal", _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
+def test_is_orchestrator_rate_limited_true_for_each_signal_in_stderr(signal: str) -> None:
+    result = _make_result(stderr=f"error: {signal}")
+    assert KodoAdapter.is_orchestrator_rate_limited(result) is True
+
+
+def test_is_orchestrator_rate_limited_false_for_unrelated_output() -> None:
+    result = _make_result(stdout="everything went fine", stderr="no problems here")
+    assert KodoAdapter.is_orchestrator_rate_limited(result) is False
+
+
+@pytest.mark.parametrize("signal", _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
+def test_is_orchestrator_rate_limited_case_insensitive(signal: str) -> None:
+    result = _make_result(stdout=signal.upper())
+    assert KodoAdapter.is_orchestrator_rate_limited(result) is True
