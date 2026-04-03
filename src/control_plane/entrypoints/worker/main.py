@@ -1066,13 +1066,49 @@ def _dead_code_findings(repo_path: Path) -> list[dict[str, str]]:
 
 
 def _type_coverage_findings(repo_path: Path) -> list[dict[str, str]]:
-    """Find public functions missing return type annotations and # type: ignore debt."""
+    """Run ty for type errors; fall back to AST scan for annotation gaps and type: ignore debt."""
     import re as _re
     import collections as _col
 
+    findings: list[dict[str, str]] = []
+
+    # ty: fast Rust-based type checker (Astral, same team as ruff/uv)
+    ty_out = _run_tool(["ty", "check", "."], cwd=repo_path, timeout=60)
+    if ty_out.strip():
+        error_lines = [l for l in ty_out.splitlines() if "error[" in l]
+        if error_lines:
+            by_file: _col.Counter[str] = _col.Counter()
+            codes: _col.Counter[str] = _col.Counter()
+            for line in error_lines:
+                m = re.search(r"-->\s*([^:]+):", line)
+                if m:
+                    by_file[m.group(1).strip()] += 1
+                cm = re.search(r"error\[([^\]]+)\]", line)
+                if cm:
+                    codes[cm.group(1)] += 1
+            worst = [f for f, _ in by_file.most_common(3)]
+            top_codes = ", ".join(f"{c}({n})" for c, n in codes.most_common(4))
+            findings.append({
+                "kind": "goal",
+                "title": f"Fix {len(error_lines)} type error(s) found by ty",
+                "goal": (
+                    f"`ty check` found {len(error_lines)} type errors. "
+                    f"Top error codes: {top_codes}. "
+                    f"Most affected files: {', '.join(worst)}. "
+                    "Run `ty check .` for the full list and fix each error."
+                ),
+                "constraints": (
+                    "- source: ty static type analysis\n"
+                    "- fix type errors without changing runtime behaviour\n"
+                    "- run `ty check .` after each file to verify progress\n"
+                    "- do not suppress errors with # type: ignore unless genuinely unavoidable"
+                ),
+                "note": f"- type errors: ty found {len(error_lines)} error(s) ({top_codes})",
+            })
+
+    # AST: public functions without return annotations (ty doesn't report these as errors)
     untyped_by_file: dict[str, list[str]] = _col.defaultdict(list)
     type_ignore_by_file: dict[str, int] = {}
-
     for path in _py_source_files(repo_path):
         rel = str(path.relative_to(repo_path))
         try:
@@ -1088,30 +1124,29 @@ def _type_coverage_findings(repo_path: Path) -> list[dict[str, str]]:
         if count:
             type_ignore_by_file[rel] = count
 
-    findings: list[dict[str, str]] = []
     total_untyped = sum(len(v) for v in untyped_by_file.values())
     if total_untyped >= _MIN_UNTYPED_PUBLIC_FNS_TO_FLAG:
-        worst = sorted(untyped_by_file, key=lambda f: -len(untyped_by_file[f]))[:3]
-        sample = "; ".join(f for fns in [untyped_by_file[w] for w in worst] for f in fns[:2])
+        worst_u = sorted(untyped_by_file, key=lambda f: -len(untyped_by_file[f]))[:3]
+        sample = "; ".join(fn for w in worst_u for fn in untyped_by_file[w][:2])
         findings.append({
             "kind": "goal",
             "title": f"Add return type annotations to {total_untyped} public function(s)",
             "goal": (
                 f"{total_untyped} public functions are missing return type annotations across {len(untyped_by_file)} file(s). "
-                f"Top files: {', '.join(worst)}. Sample: {sample}. "
-                "Add return annotations to make the codebase mypy-clean and easier to refactor."
+                f"Top files: {', '.join(worst_u)}. Sample: {sample}. "
+                "Add return annotations and verify with `ty check .`."
             ),
-            "constraints": "- source: ast type coverage scan\n- add return type annotations only — do not change logic\n- run mypy after each file to verify\n- use Optional/Union where appropriate",
+            "constraints": "- source: ast type coverage scan\n- add return type annotations only — do not change logic\n- verify with `ty check .`\n- use Optional/Union where appropriate",
             "note": f"- type coverage: {total_untyped} public functions without return annotation",
         })
     total_ignores = sum(type_ignore_by_file.values())
     if total_ignores >= _MIN_TYPE_IGNORE_TO_FLAG:
-        worst_ignore = sorted(type_ignore_by_file, key=lambda f: -type_ignore_by_file[f])[:3]
+        worst_i = sorted(type_ignore_by_file, key=lambda f: -type_ignore_by_file[f])[:3]
         findings.append({
             "kind": "goal",
-            "title": f"Resolve {total_ignores} # type: ignore comment(s)",
-            "goal": f"Found {total_ignores} `# type: ignore` suppressions in: {', '.join(worst_ignore)}. Each represents a typing debt. Resolve the underlying type issue so the suppression can be removed.",
-            "constraints": "- source: ast type coverage scan\n- fix the root type issue for each suppression\n- do not simply broaden the type — fix the underlying mismatch\n- run mypy after to confirm",
+            "title": f"Resolve {total_ignores} # type: ignore suppression(s)",
+            "goal": f"Found {total_ignores} `# type: ignore` suppressions in: {', '.join(worst_i)}. Fix the underlying type issue for each so the suppression can be removed. Verify with `ty check .`.",
+            "constraints": "- source: ast type coverage scan\n- fix the root type issue for each suppression\n- do not simply broaden the type\n- verify with `ty check .`",
             "note": f"- type debt: {total_ignores} type: ignore suppression(s) in {len(type_ignore_by_file)} file(s)",
         })
     return findings
