@@ -56,6 +56,14 @@ class GitHubPRClient:
         resp.raise_for_status()
         return resp.json()
 
+    def delete_branch(self, owner: str, repo: str, branch: str) -> None:
+        resp = httpx.delete(
+            f"{self._API}/repos/{owner}/{repo}/git/refs/heads/{branch}",
+            headers=self._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+
     def create_and_merge(
         self,
         owner: str,
@@ -67,9 +75,10 @@ class GitHubPRClient:
         body: str = "",
         merge_method: str = "squash",
     ) -> str:
-        """Create a PR and immediately merge it. Returns the PR html_url."""
+        """Create a PR, merge it, then delete the head branch. Returns the PR html_url."""
         pr = self.create_pr(owner, repo, head=head, base=base, title=title, body=body)
         pr_number = pr["number"]
         pr_url = pr["html_url"]
         self.merge_pr(owner, repo, pr_number, merge_method=merge_method)
+        self.delete_branch(owner, repo, head)
         return pr_url
