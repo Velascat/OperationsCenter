@@ -7,6 +7,7 @@ import re
 import traceback
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from control_plane.adapters.git import GitClient, branch_allowed
 from control_plane.adapters.github_pr import GitHubPRClient
@@ -357,6 +358,7 @@ class ExecutionService:
             branch_pushed = False
             draft_branch_pushed = False
             pull_request_url: str | None = None
+            status: str | None = None
             if changed_files and policy_success:
                 committed = self.git.commit_all(repo_path, f"chore: apply Plane task {task.task_id}")
                 if committed:
@@ -365,13 +367,13 @@ class ExecutionService:
                         branch_pushed = True
                         push_reason = "success"
                         repo_cfg = self.settings.repos.get(task.repo_key)
-                        if repo_cfg and repo_cfg.auto_merge_on_success:
+                        if repo_cfg and repo_cfg.await_review:
                             token = self.settings.repo_git_token(task.repo_key)
                             if token:
                                 try:
                                     owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
                                     pr_client = GitHubPRClient(token)
-                                    pull_request_url = pr_client.create_and_merge(
+                                    pr = pr_client.create_pr(
                                         owner,
                                         repo_name,
                                         head=task_branch,
@@ -379,9 +381,13 @@ class ExecutionService:
                                         title=task.title,
                                         body=f"Automated by Control Plane — task `{task.task_id}`",
                                     )
-                                    self._log_event("pr_merged", run_id, pr_url=pull_request_url)
+                                    pull_request_url = pr["html_url"]
+                                    self._write_pr_review_state(task, task_branch, owner, repo_name, pr)
+                                    plane_client.transition_issue(task.task_id, "In Review")
+                                    status = "In Review"
+                                    self._log_event("pr_review_pending", run_id, pr_url=pull_request_url, pr_number=pr["number"])
                                 except Exception as exc:
-                                    self._log_event("pr_merge_failed", run_id, error=str(exc))
+                                    self._log_event("pr_create_failed", run_id, error=str(exc))
                     elif self.settings.git.push_on_validation_failure:
                         self.git.push_branch(repo_path, task_branch)
                         branch_pushed = True
@@ -396,7 +402,8 @@ class ExecutionService:
                 pull_request_url=pull_request_url,
             )
 
-            status = "Blocked" if outcome_status == "no_op" or policy_violations or not success else "Review"
+            if status is None:
+                status = "Blocked" if outcome_status == "no_op" or policy_violations or not success else "Review"
 
             result = ExecutionResult(
                 run_id=run_id,
@@ -535,3 +542,92 @@ class ExecutionService:
     @classmethod
     def _meaningful_changed_files(cls, changed_files: list[str]) -> list[str]:
         return [path for path in changed_files if not cls._is_internal_execution_path(path)]
+
+    _PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
+
+    def _write_pr_review_state(
+        self,
+        task: "BoardTask",
+        branch: str,
+        owner: str,
+        repo_name: str,
+        pr: dict,
+    ) -> None:
+        state_dir = self._PR_REVIEW_STATE_DIR
+        state_dir.mkdir(parents=True, exist_ok=True)
+        state = {
+            "owner": owner,
+            "repo": repo_name,
+            "repo_key": task.repo_key,
+            "pr_number": pr["number"],
+            "pr_url": pr["html_url"],
+            "task_id": task.task_id,
+            "branch": branch,
+            "base": task.base_branch,
+            "original_goal": task.goal_text,
+            "created_at": datetime.now(UTC).isoformat(),
+            "loop_count": 0,
+            "last_bot_comment_id": None,
+            "bot_comment_ids": [],
+            "processed_human_comment_ids": [],
+        }
+        (state_dir / f"{task.task_id}.json").write_text(json.dumps(state, indent=2))
+
+    def run_review_pass(
+        self,
+        repo_key: str,
+        clone_url: str,
+        branch: str,
+        base_branch: str,
+        original_goal: str,
+        review_comment: str,
+        task_id: str,
+    ) -> tuple[bool, list[str]]:
+        """Run kodo on an existing branch to address a review comment. Returns (success, changed_files)."""
+        workspace_path = self.workspace.create()
+        try:
+            repo_path = self.git.clone(clone_url, workspace_path)
+            self.git.add_local_exclude(repo_path, ".kodo/")
+            self.git.checkout_base(repo_path, branch)
+            self.git.set_identity(
+                repo_path,
+                author_name=self.settings.git.author_name,
+                author_email=self.settings.git.author_email,
+            )
+
+            goal_file = workspace_path / "goal.md"
+            combined_goal = f"{original_goal}\n\n## Review Comment\n{review_comment}"
+            self.kodo.write_goal_file(goal_file, combined_goal)
+
+            repo_cfg = self.settings.repos[repo_key]
+            bootstrap_result = self.bootstrapper.prepare(
+                repo_path,
+                python_binary=repo_cfg.python_binary,
+                venv_dir=repo_cfg.venv_dir,
+                install_dev_command=repo_cfg.install_dev_command,
+                base_env=os.environ.copy(),
+                enabled=repo_cfg.bootstrap_enabled,
+            )
+
+            kodo_result = self.kodo.run(goal_file, repo_path)
+
+            if self.kodo.is_orchestrator_rate_limited(kodo_result):
+                return False, []
+
+            run_env = dict(bootstrap_result.env)
+            run_env.update(repo_cfg.env)
+            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env)
+            validation_ok = self.validation.passed(validation_results)
+
+            all_changed = self.git.changed_files(repo_path)
+            changed_files = self._meaningful_changed_files(all_changed)
+
+            if kodo_result.exit_code == 0 and validation_ok and changed_files:
+                committed = self.git.commit_all(repo_path, f"chore: apply review revision for {task_id}")
+                if committed:
+                    self.git.push_branch(repo_path, branch)
+                    return True, changed_files
+
+            return False, changed_files
+        finally:
+            self.workspace.cleanup(workspace_path)

@@ -64,6 +64,61 @@ class GitHubPRClient:
         )
         resp.raise_for_status()
 
+    def get_pr_reactions(self, owner: str, repo: str, pr_number: int) -> list[dict]:
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/issues/{pr_number}/reactions",
+            headers=self._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_pr_comments(self, owner: str, repo: str, pr_number: int) -> list[dict]:
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+            headers=self._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_comment_reactions(self, owner: str, repo: str, comment_id: int) -> list[dict]:
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions",
+            headers=self._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def post_comment(self, owner: str, repo: str, pr_number: int, body: str) -> dict:
+        resp = httpx.post(
+            f"{self._API}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+            headers=self._headers,
+            json={"body": body},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_open_prs(self, owner: str, repo: str) -> list[dict]:
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/pulls",
+            headers=self._headers,
+            params={"state": "open", "per_page": 100},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    @staticmethod
+    def has_thumbs_up(reactions: list[dict]) -> bool:
+        return any(r["content"] == "+1" for r in reactions)
+
+    @staticmethod
+    def has_eyes(reactions: list[dict]) -> bool:
+        return any(r["content"] == "eyes" for r in reactions)
+
     def create_and_merge(
         self,
         owner: str,

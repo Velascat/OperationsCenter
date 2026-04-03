@@ -206,6 +206,7 @@ start_watch_role() {
     test) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS:-${CONTROL_PLANE_TEST_POLL_SECONDS:-60}}" ;;
     improve) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS:-${CONTROL_PLANE_IMPROVE_POLL_SECONDS:-60}}" ;;
     propose) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS:-${CONTROL_PLANE_PROPOSE_POLL_SECONDS:-120}}" ;;
+    review) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS:-60}" ;;
   esac
   local pid_file
   pid_file="$(watch_pid_file "${role}")"
@@ -217,17 +218,30 @@ start_watch_role() {
   mkdir -p "${WATCH_DIR}"
   local log_file
   log_file="$(watch_log_file "${role}")"
-  setsid /bin/bash -lc "
-    set -a
-    source '${ENV_PATH}'
-    set +a
-    exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.worker.main \
-      --config '${CONFIG_PATH}' \
-      --watch \
-      --role '${role}' \
-      --poll-interval-seconds '${poll_interval}' \
-      --status-dir '${WATCH_DIR}'
-  " >>"${log_file}" 2>&1 < /dev/null &
+  if [[ "${role}" == "review" ]]; then
+    setsid /bin/bash -lc "
+      set -a
+      source '${ENV_PATH}'
+      set +a
+      exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.reviewer.main \
+        --config '${CONFIG_PATH}' \
+        --watch \
+        --poll-interval-seconds '${poll_interval}' \
+        --status-dir '${WATCH_DIR}'
+    " >>"${log_file}" 2>&1 < /dev/null &
+  else
+    setsid /bin/bash -lc "
+      set -a
+      source '${ENV_PATH}'
+      set +a
+      exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.worker.main \
+        --config '${CONFIG_PATH}' \
+        --watch \
+        --role '${role}' \
+        --poll-interval-seconds '${poll_interval}' \
+        --status-dir '${WATCH_DIR}'
+    " >>"${log_file}" 2>&1 < /dev/null &
+  fi
   local pid=$!
   echo "${pid}" > "${pid_file}"
   echo "watch-${role} started: pid=${pid} poll_interval=${poll_interval}s log=${log_file}"
@@ -333,6 +347,7 @@ case "${cmd}" in
     start_watch_role test
     start_watch_role improve
     start_watch_role propose
+    start_watch_role review
     run_janitor
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
@@ -343,6 +358,7 @@ case "${cmd}" in
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
+    stop_watch_role review
     run_with_log plane-down "${PLANE_MANAGER}" down
     run_janitor
     ;;
@@ -353,6 +369,7 @@ case "${cmd}" in
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
+    stop_watch_role review
     stop_api_service
     run_with_log plane-down "${PLANE_MANAGER}" down
     run_janitor
@@ -364,6 +381,7 @@ case "${cmd}" in
     start_watch_role test
     start_watch_role improve
     start_watch_role propose
+    start_watch_role review
     run_janitor
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
@@ -374,6 +392,7 @@ case "${cmd}" in
     status_watch_role test
     status_watch_role improve
     status_watch_role propose
+    status_watch_role review
     ;;
   providers-status|doctor)
     ensure_venv
@@ -406,18 +425,21 @@ case "${cmd}" in
     start_watch_role test
     start_watch_role improve
     start_watch_role propose
+    start_watch_role review
     ;;
   watch-all-stop)
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
+    stop_watch_role review
     ;;
   watch-all-status)
     status_watch_role goal
     status_watch_role test
     status_watch_role improve
     status_watch_role propose
+    status_watch_role review
     ;;
   worker)
     ensure_venv
@@ -433,6 +455,11 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log observe-repo "${VENV_DIR}/bin/python" -m control_plane.entrypoints.observer.main --config "${CONFIG_PATH}" "$@"
+    ;;
+  backfill-pr-reviews)
+    ensure_venv
+    load_env_file
+    run_with_log backfill-pr-reviews "${VENV_DIR}/bin/python" -m control_plane.entrypoints.reviewer.main --config "${CONFIG_PATH}" --backfill "$@"
     ;;
   generate-insights)
     ensure_venv

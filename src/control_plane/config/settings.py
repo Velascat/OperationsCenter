@@ -48,7 +48,7 @@ class RepoSettings(BaseModel):
     venv_dir: str = ".venv"
     install_dev_command: str | None = None
     token_env: str | None = None
-    auto_merge_on_success: bool = False
+    await_review: bool = False
     propose_enabled: bool = True
     local_path: str | None = None
 
