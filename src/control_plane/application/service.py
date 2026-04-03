@@ -283,6 +283,20 @@ class ExecutionService:
                 )
             )
 
+            if self.kodo.is_orchestrator_rate_limited(kodo_result):
+                self._log_event("orchestrator_rate_limited", run_id, task_id=task_id)
+                return ExecutionResult(
+                    run_id=run_id,
+                    worker_role=worker_role,
+                    task_kind=task.task_kind,
+                    success=False,
+                    outcome_status="skipped",
+                    outcome_reason="orchestrator_rate_limited",
+                    summary=f"run_id={run_id} status=skipped reason=orchestrator_rate_limited",
+                    artifacts=artifacts,
+                    final_status=task.status,
+                )
+
             phase = "validation"
             self._log_event("phase", run_id, phase=phase)
             run_env = dict(bootstrap_result.env)

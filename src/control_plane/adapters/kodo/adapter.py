@@ -15,6 +15,15 @@ _CODEX_QUOTA_SIGNALS = (
     "too many requests",
 )
 
+# Strings that indicate the orchestrator (claude-code) has hit its usage limit.
+_ORCHESTRATOR_RATE_LIMIT_SIGNALS = (
+    "you've hit your limit",
+    "you have hit your limit",
+    "claude code error",
+    "resets 2am",
+    "usage limit reached",
+)
+
 # Fallback team used when codex quota is detected: claude CLI for both roles.
 _CLAUDE_FALLBACK_TEAM = {
     "agents": {
@@ -74,6 +83,11 @@ class KodoAdapter:
     def _is_codex_quota_error(result: KodoRunResult) -> bool:
         combined = (result.stdout + result.stderr).lower()
         return any(signal in combined for signal in _CODEX_QUOTA_SIGNALS)
+
+    @staticmethod
+    def is_orchestrator_rate_limited(result: KodoRunResult) -> bool:
+        combined = (result.stdout + result.stderr).lower()
+        return any(signal in combined for signal in _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
 
     def run(self, goal_file: Path, repo_path: Path) -> KodoRunResult:
         command = self.build_command(goal_file, repo_path)
