@@ -914,6 +914,24 @@ _WIP_COMMIT_WORDS = ("wip", "hack", "fixme", "todo", "temp", "workaround", "brok
 _ACTIONABLE_MARKERS = ("# TODO", "# FIXME", "# HACK", "# XXX", "// TODO", "// FIXME", "// HACK")
 _LARGE_FILE_LINES = 300
 _LARGE_FUNCTION_LINES = 50
+_MIN_TYPE_IGNORE_TO_FLAG = 3
+_MIN_UNTYPED_PUBLIC_FNS_TO_FLAG = 5
+
+
+def _py_source_files(repo_path: Path) -> list[Path]:
+    """All Python source files under src/, lib/, or root — excluding hidden dirs and tests."""
+    roots = [repo_path / d for d in ("src", "lib") if (repo_path / d).is_dir()]
+    if not roots:
+        roots = [repo_path]
+    seen: set[Path] = set()
+    result: list[Path] = []
+    for root in roots:
+        for p in sorted(root.rglob("*.py")):
+            if p in seen or any(part.startswith(".") for part in p.parts):
+                continue
+            seen.add(p)
+            result.append(p)
+    return result
 
 
 def _run_tool(cmd: list[str], cwd: Path, timeout: int = 30) -> str:
@@ -923,6 +941,229 @@ def _run_tool(cmd: list[str], cwd: Path, timeout: int = 30) -> str:
         return result.stdout
     except Exception:
         return ""
+
+
+def _safety_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Find runtime safety issues: subprocess without timeout, shell=True, eval/exec."""
+    import collections as _col
+
+    no_timeout: list[str] = []
+    shell_true: list[str] = []
+    eval_exec: list[str] = []
+
+    for path in _py_source_files(repo_path):
+        rel = str(path.relative_to(repo_path))
+        try:
+            tree = ast.parse(path.read_text(errors="replace"))
+        except (SyntaxError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = ast.unparse(node.func) if hasattr(ast, "unparse") else ""
+            kw_names = {k.arg for k in node.keywords}
+            if any(s in fn for s in ("subprocess.run", "subprocess.call", "subprocess.check", "Popen")):
+                if "timeout" not in kw_names:
+                    no_timeout.append(f"{rel}:{node.lineno}")
+            for kw in node.keywords:
+                if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                    shell_true.append(f"{rel}:{node.lineno}")
+            if fn in ("eval", "exec"):
+                eval_exec.append(f"{rel}:{node.lineno}")
+
+    findings: list[dict[str, str]] = []
+    if no_timeout:
+        by_file: dict[str, int] = _col.Counter(loc.split(":")[0] for loc in no_timeout)
+        worst = sorted(by_file, key=lambda f: -by_file[f])[:3]
+        sample = "; ".join(no_timeout[:4])
+        findings.append({
+            "kind": "goal",
+            "title": f"Add timeout to {len(no_timeout)} subprocess call(s) missing one",
+            "goal": (
+                f"Found {len(no_timeout)} `subprocess` calls without a `timeout=` argument — these can hang the worker loop indefinitely. "
+                f"Top offending files: {', '.join(worst)}. Sample locations: {sample}. "
+                "Add appropriate timeouts to all uncovered calls."
+            ),
+            "constraints": "- source: ast safety scan\n- add timeout to every subprocess call without one\n- choose timeouts appropriate to the operation (short for quick commands, longer for builds)\n- do not change call behaviour",
+            "note": f"- safety: {len(no_timeout)} subprocess calls without timeout in {len(by_file)} file(s)",
+        })
+    if shell_true:
+        sample = "; ".join(shell_true[:3])
+        findings.append({
+            "kind": "goal",
+            "title": f"Remove shell=True from {len(shell_true)} subprocess call(s)",
+            "goal": (
+                f"Found {len(shell_true)} subprocess calls with `shell=True` ({sample}). "
+                "This passes commands through the shell, enabling injection if any part of the command includes untrusted input. "
+                "Replace with list-form arguments where possible."
+            ),
+            "constraints": "- source: ast safety scan\n- convert shell=True calls to list-form args\n- verify behaviour is preserved after each change\n- only use shell=True where strictly necessary and document why",
+            "note": f"- safety: {len(shell_true)} shell=True subprocess call(s)",
+        })
+    if eval_exec:
+        findings.append({
+            "kind": "goal",
+            "title": f"Eliminate eval()/exec() usage ({len(eval_exec)} location(s))",
+            "goal": f"Found {len(eval_exec)} use(s) of `eval()`/`exec()`: {'; '.join(eval_exec[:3])}. Replace with safe alternatives.",
+            "constraints": "- source: ast safety scan\n- replace each with a safe alternative\n- document any case where dynamic execution is genuinely required",
+            "note": f"- safety: {len(eval_exec)} eval/exec usage(s)",
+        })
+    return findings
+
+
+def _dead_code_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Run vulture if available; otherwise detect private functions never called in their own file."""
+    # Try vulture first
+    vulture_out = _run_tool(["vulture", ".", "--min-confidence", "80"], cwd=repo_path, timeout=30)
+    if vulture_out.strip():
+        lines = [l for l in vulture_out.splitlines() if "unused" in l.lower()][:20]
+        if lines:
+            by_file: dict[str, int] = {}
+            for line in lines:
+                f = line.split(":")[0]
+                by_file[f] = by_file.get(f, 0) + 1
+            worst = sorted(by_file, key=lambda f: -by_file[f])[:3]
+            return [{
+                "kind": "goal",
+                "title": f"Remove dead code flagged by vulture ({len(lines)} item(s))",
+                "goal": f"Vulture found {len(lines)} unused code items. Top files: {', '.join(worst)}. Run `vulture . --min-confidence 80` for the full list and remove or justify each unused item.",
+                "constraints": "- source: vulture dead code scan\n- remove genuinely unused code\n- if an item is used dynamically (plugin, hook, __all__) add a vulture whitelist entry\n- do not remove public API used by external callers",
+                "note": f"- dead code: vulture flagged {len(lines)} item(s)",
+            }]
+
+    # Fallback: private functions in a file never called within that same file
+    dead: list[str] = []
+    for path in _py_source_files(repo_path):
+        rel = str(path.relative_to(repo_path))
+        try:
+            src = path.read_text(errors="replace")
+            tree = ast.parse(src)
+        except (SyntaxError, OSError):
+            continue
+        defined_private = {
+            node.name for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("_") and not node.name.startswith("__")
+        }
+        called = {
+            node.id for node in ast.walk(tree)
+            if isinstance(node, ast.Name)
+        } | {
+            node.attr for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute)
+        }
+        for name in sorted(defined_private - called):
+            dead.append(f"{rel}: {name}")
+
+    if len(dead) >= 3:
+        return [{
+            "kind": "goal",
+            "title": f"Remove {len(dead)} potentially dead private function(s)",
+            "goal": f"These private functions are defined but never referenced within their own file: {', '.join(dead[:6])}. Verify they are not used externally and remove the ones that are truly dead.",
+            "constraints": "- source: ast dead code scan\n- verify each function is not called via dynamic dispatch or test\n- remove confirmed dead code\n- install `vulture` for a more thorough scan",
+            "note": f"- dead code: {len(dead)} private function(s) unreferenced in own file",
+        }]
+    return []
+
+
+def _type_coverage_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Find public functions missing return type annotations and # type: ignore debt."""
+    import re as _re
+    import collections as _col
+
+    untyped_by_file: dict[str, list[str]] = _col.defaultdict(list)
+    type_ignore_by_file: dict[str, int] = {}
+
+    for path in _py_source_files(repo_path):
+        rel = str(path.relative_to(repo_path))
+        try:
+            src = path.read_text(errors="replace")
+            tree = ast.parse(src)
+        except (SyntaxError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if not node.name.startswith("_") and node.returns is None:
+                    untyped_by_file[rel].append(f"{node.name}():{node.lineno}")
+        count = len(_re.findall(r"#\s*type:\s*ignore", src))
+        if count:
+            type_ignore_by_file[rel] = count
+
+    findings: list[dict[str, str]] = []
+    total_untyped = sum(len(v) for v in untyped_by_file.values())
+    if total_untyped >= _MIN_UNTYPED_PUBLIC_FNS_TO_FLAG:
+        worst = sorted(untyped_by_file, key=lambda f: -len(untyped_by_file[f]))[:3]
+        sample = "; ".join(f for fns in [untyped_by_file[w] for w in worst] for f in fns[:2])
+        findings.append({
+            "kind": "goal",
+            "title": f"Add return type annotations to {total_untyped} public function(s)",
+            "goal": (
+                f"{total_untyped} public functions are missing return type annotations across {len(untyped_by_file)} file(s). "
+                f"Top files: {', '.join(worst)}. Sample: {sample}. "
+                "Add return annotations to make the codebase mypy-clean and easier to refactor."
+            ),
+            "constraints": "- source: ast type coverage scan\n- add return type annotations only — do not change logic\n- run mypy after each file to verify\n- use Optional/Union where appropriate",
+            "note": f"- type coverage: {total_untyped} public functions without return annotation",
+        })
+    total_ignores = sum(type_ignore_by_file.values())
+    if total_ignores >= _MIN_TYPE_IGNORE_TO_FLAG:
+        worst_ignore = sorted(type_ignore_by_file, key=lambda f: -type_ignore_by_file[f])[:3]
+        findings.append({
+            "kind": "goal",
+            "title": f"Resolve {total_ignores} # type: ignore comment(s)",
+            "goal": f"Found {total_ignores} `# type: ignore` suppressions in: {', '.join(worst_ignore)}. Each represents a typing debt. Resolve the underlying type issue so the suppression can be removed.",
+            "constraints": "- source: ast type coverage scan\n- fix the root type issue for each suppression\n- do not simply broaden the type — fix the underlying mismatch\n- run mypy after to confirm",
+            "note": f"- type debt: {total_ignores} type: ignore suppression(s) in {len(type_ignore_by_file)} file(s)",
+        })
+    return findings
+
+
+def _recursion_findings(repo_path: Path) -> list[dict[str, str]]:
+    """Find direct recursion without obvious base case, and while-True loops without break."""
+    risky_recursion: list[str] = []
+    infinite_loops: list[str] = []
+
+    for path in _py_source_files(repo_path):
+        rel = str(path.relative_to(repo_path))
+        try:
+            tree = ast.parse(path.read_text(errors="replace"))
+        except (SyntaxError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                calls_self = any(
+                    (isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id == node.name)
+                    for child in ast.walk(node)
+                )
+                has_return_with_value = any(
+                    isinstance(child, ast.Return) and child.value is not None
+                    for child in ast.walk(node)
+                )
+                if calls_self and not has_return_with_value:
+                    risky_recursion.append(f"{rel}:{node.lineno} {node.name}()")
+            if isinstance(node, ast.While):
+                is_infinite = isinstance(node.test, ast.Constant) and node.test.value is True
+                has_break = any(isinstance(child, ast.Break) for child in ast.walk(node))
+                if is_infinite and not has_break:
+                    infinite_loops.append(f"{rel}:{node.lineno}")
+
+    findings: list[dict[str, str]] = []
+    if risky_recursion:
+        findings.append({
+            "kind": "goal",
+            "title": f"Review {len(risky_recursion)} recursive function(s) without clear base case",
+            "goal": f"These functions call themselves but have no return-with-value path (possible missing base case or stack overflow risk): {'; '.join(risky_recursion[:4])}. Verify each has a correct termination condition or convert to iteration.",
+            "constraints": "- source: ast recursion scan\n- verify or add base case for each recursive function\n- consider converting deep recursion to iterative form\n- add tests that exercise the base case",
+            "note": f"- recursion: {len(risky_recursion)} function(s) with possible missing base case",
+        })
+    if infinite_loops:
+        findings.append({
+            "kind": "goal",
+            "title": f"Audit {len(infinite_loops)} while-True loop(s) without break",
+            "goal": f"`while True` loops without a `break` statement at: {'; '.join(infinite_loops[:4])}. Verify each has a reachable exit path (e.g. via exception, sys.exit, or return) or add an explicit break/termination condition.",
+            "constraints": "- source: ast loop scan\n- verify each loop has a clear exit path\n- add explicit termination condition where missing\n- add a comment explaining the exit mechanism",
+            "note": f"- runtime: {len(infinite_loops)} while-True loop(s) without break",
+        })
+    return findings
 
 
 def _ast_complexity_findings(repo_path: Path) -> list[dict[str, str]]:
@@ -1218,7 +1459,7 @@ def discover_improvement_candidates(
     unique: dict[str, dict[str, str]] = {}
     for finding in findings:
         unique.setdefault(finding["title"].strip().lower(), finding)
-    return list(unique.values())[:8], report_notes
+    return list(unique.values())[:10], report_notes
 
 
 def _inspect_repo(
@@ -1276,21 +1517,32 @@ def _inspect_repo(
         })
         report_notes.append(f"- coverage gap: {untested}")
 
-    # Deep static analysis: complexity, lint violations, full TODO scan
-    for finding in _ast_complexity_findings(repo_path):
-        findings.append(finding)
-        report_notes.append(f"- {finding['note'].lstrip('- ')}")
-    for finding in _ruff_findings(repo_path):
-        findings.append(finding)
-        report_notes.append(f"- {finding['note'].lstrip('- ')}")
-    for finding in _all_todo_findings(repo_path):
-        findings.append(finding)
-        report_notes.append(f"- {finding['note'].lstrip('- ')}")
+    # Deep static analysis
+    for scanner in (
+        _ast_complexity_findings,
+        _safety_findings,
+        _recursion_findings,
+        _dead_code_findings,
+        _type_coverage_findings,
+        _ruff_findings,
+        _all_todo_findings,
+    ):
+        for finding in scanner(repo_path):
+            findings.append(finding)
+            report_notes.append(f"- {finding['note'].lstrip('- ')}")
 
 
 def evidence_lines_from_notes(notes: list[str]) -> list[str]:
     values = [note.removeprefix("- ").strip() for note in notes if note.strip()]
     priorities = (
+        "safety:",
+        "dead code:",
+        "recursion:",
+        "runtime:",
+        "complexity:",
+        "ruff:",
+        "type coverage:",
+        "type debt:",
         "code scan signal:",
         "coverage gap:",
         "git signal:",
