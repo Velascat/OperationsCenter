@@ -19,7 +19,7 @@ kodo:
   team: full
   cycles: 3
   exchanges: 20
-  orchestrator: claude-code:opus
+  orchestrator: claude-code:opus         # orchestrator (claude-code CLI via subscription)
   effort: standard
   timeout_seconds: 3600
 

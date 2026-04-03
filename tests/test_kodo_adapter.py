@@ -21,3 +21,12 @@ def test_build_command_respects_configured_binary(tmp_path: Path) -> None:
     command = adapter.build_command(tmp_path / "goal.md", tmp_path / "repo")
 
     assert command[0] == "scripts/kodo-shim"
+
+
+def test_build_command_uses_configured_orchestrator(tmp_path: Path) -> None:
+    adapter = KodoAdapter(KodoSettings(orchestrator="claude-code:opus"))
+
+    command = adapter.build_command(tmp_path / "goal.md", tmp_path / "repo")
+
+    idx = command.index("--orchestrator")
+    assert command[idx + 1] == "claude-code:opus"
