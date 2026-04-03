@@ -39,6 +39,7 @@ repos:
     # token_env: GITHUB_TOKEN_MYREPO   # per-repo token override (optional)
     # auto_merge_on_success: false     # squash-merge PR into base branch on success
     # propose_enabled: true            # include in proposer idle-board scans (default true)
+    # local_path: /home/dev/Documents/GitHub/MyRepo  # use local checkout instead of cloning for proposer inspection
 
   AnotherRepo:
     clone_url: git@github.com:owner/AnotherRepo.git

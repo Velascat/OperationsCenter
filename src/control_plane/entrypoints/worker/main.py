@@ -974,16 +974,16 @@ def discover_improvement_candidates(
 
     repo_cfg = service.settings.repos[repo_key]
     target_branch = base_branch or repo_cfg.default_branch
-    workspace_path = service.workspace.create()
-    try:
-        repo_path = service.git.clone(repo_cfg.clone_url, workspace_path)
+
+    if repo_cfg.local_path:
+        repo_path = Path(repo_cfg.local_path)
         service.git.checkout_base(repo_path, target_branch)
         top_level = sorted(
             path.name
             for path in repo_path.iterdir()
             if path.name != ".git"
         )
-        report_notes.append(f"- inspected repo: {repo_key} @ {target_branch}")
+        report_notes.append(f"- inspected repo: {repo_key} @ {target_branch} (local)")
         recent_commits = service.git.recent_commits(repo_path, max_count=5)
         if recent_commits:
             report_notes.append(f"- recent commits: {' | '.join(recent_commits[:3])}")
@@ -993,8 +993,28 @@ def discover_improvement_candidates(
         report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
         report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
         report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
-    finally:
-        service.workspace.cleanup(workspace_path)
+    else:
+        workspace_path = service.workspace.create()
+        try:
+            repo_path = service.git.clone(repo_cfg.clone_url, workspace_path)
+            service.git.checkout_base(repo_path, target_branch)
+            top_level = sorted(
+                path.name
+                for path in repo_path.iterdir()
+                if path.name != ".git"
+            )
+            report_notes.append(f"- inspected repo: {repo_key} @ {target_branch}")
+            recent_commits = service.git.recent_commits(repo_path, max_count=5)
+            if recent_commits:
+                report_notes.append(f"- recent commits: {' | '.join(recent_commits[:3])}")
+            recent_files = service.git.recent_changed_files(repo_path, max_count=3)
+            if recent_files:
+                report_notes.append(f"- recently changed files: {', '.join(recent_files[:5])}")
+            report_notes.append(f"- top-level entries: {', '.join(top_level[:10]) or '(none)'}")
+            report_notes.append(f"- tests directory present: {'yes' if (repo_path / 'tests').exists() else 'no'}")
+            report_notes.append(f"- docs directory present: {'yes' if (repo_path / 'docs').exists() else 'no'}")
+        finally:
+            service.workspace.cleanup(workspace_path)
 
     unique: dict[str, dict[str, str]] = {}
     for finding in findings:

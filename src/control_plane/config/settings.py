@@ -50,6 +50,7 @@ class RepoSettings(BaseModel):
     token_env: str | None = None
     auto_merge_on_success: bool = False
     propose_enabled: bool = True
+    local_path: str | None = None
 
 
 class Settings(BaseModel):
