@@ -6,6 +6,30 @@ from pathlib import Path
 
 from control_plane.config.settings import KodoSettings
 
+# Strings in stdout/stderr that indicate the codex worker hit a quota/rate limit.
+_CODEX_QUOTA_SIGNALS = (
+    "429",
+    "quota exceeded",
+    "insufficient_quota",
+    "rate limit exceeded",
+    "too many requests",
+)
+
+# Fallback team used when codex quota is detected: claude CLI for both roles.
+_CLAUDE_FALLBACK_TEAM = {
+    "agents": {
+        "worker_fast": {
+            "backend": "claude",
+            "model": "sonnet",
+        },
+        "worker_smart": {
+            "backend": "claude",
+            "model": "opus",
+            "fallback_model": "sonnet",
+        },
+    }
+}
+
 
 class KodoRunResult:
     def __init__(self, exit_code: int, stdout: str, stderr: str, command: list[str]) -> None:
@@ -46,6 +70,11 @@ class KodoAdapter:
             "--yes",
         ]
 
+    @staticmethod
+    def _is_codex_quota_error(result: KodoRunResult) -> bool:
+        combined = (result.stdout + result.stderr).lower()
+        return any(signal in combined for signal in _CODEX_QUOTA_SIGNALS)
+
     def run(self, goal_file: Path, repo_path: Path) -> KodoRunResult:
         command = self.build_command(goal_file, repo_path)
         proc = subprocess.run(
@@ -55,7 +84,29 @@ class KodoAdapter:
             timeout=self.settings.timeout_seconds,
             check=False,
         )
-        return KodoRunResult(proc.returncode, proc.stdout, proc.stderr, command)
+        result = KodoRunResult(proc.returncode, proc.stdout, proc.stderr, command)
+
+        if result.exit_code != 0 and self._is_codex_quota_error(result):
+            result = self._run_with_claude_fallback(goal_file, repo_path)
+
+        return result
+
+    def _run_with_claude_fallback(self, goal_file: Path, repo_path: Path) -> KodoRunResult:
+        team_override = repo_path / ".kodo" / "team.json"
+        team_override.parent.mkdir(exist_ok=True)
+        team_override.write_text(json.dumps(_CLAUDE_FALLBACK_TEAM, indent=2))
+        try:
+            command = self.build_command(goal_file, repo_path)
+            proc = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self.settings.timeout_seconds,
+                check=False,
+            )
+            return KodoRunResult(proc.returncode, proc.stdout, proc.stderr, command)
+        finally:
+            team_override.unlink(missing_ok=True)
 
     @staticmethod
     def command_to_json(command: list[str]) -> str:
