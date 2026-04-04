@@ -46,7 +46,13 @@ class GitClient:
         self._run(["git", "checkout", branch], cwd=repo_path)
 
     def create_task_branch(self, repo_path: Path, task_branch: str) -> None:
-        self._run(["git", "checkout", "-b", task_branch], cwd=repo_path)
+        # If the branch already exists on remote (e.g. a prior retry), track it so
+        # subsequent pushes are fast-forwards rather than rejected non-fast-forwards.
+        out = self._run(["git", "ls-remote", "--heads", "origin", task_branch], cwd=repo_path)
+        if out:
+            self._run(["git", "checkout", "-b", task_branch, f"origin/{task_branch}"], cwd=repo_path)
+        else:
+            self._run(["git", "checkout", "-b", task_branch], cwd=repo_path)
 
     def recent_commits(self, repo_path: Path, max_count: int = 5) -> list[str]:
         output = self._run(
