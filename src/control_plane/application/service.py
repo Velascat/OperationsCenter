@@ -324,6 +324,15 @@ class ExecutionService:
                     with open(goal_file, "a") as f:
                         f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
                 kodo_result = self.kodo.run(goal_file, repo_path)
+                artifacts.extend(
+                    self.reporter.write_kodo(
+                        run_dir,
+                        self.kodo.command_to_json(kodo_result.command),
+                        kodo_result.stdout,
+                        kodo_result.stderr,
+                        prefix="kodo_retry",
+                    )
+                )
                 validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
                 validation_ok = self.validation.passed(validation_results)
                 validation_retried = True

@@ -300,7 +300,9 @@ def test_validation_retry_succeeds_moves_to_review(tmp_path: Path) -> None:
     def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
-        return type("KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]})()
+        stdout = f"kodo_stdout_run{kodo_call_count}"
+        stderr = f"kodo_stderr_run{kodo_call_count}"
+        return type("KodoResult", (), {"exit_code": 0, "stdout": stdout, "stderr": stderr, "command": ["kodo"]})()
 
     validation_call_count = 0
 
@@ -350,6 +352,24 @@ def test_validation_retry_succeeds_moves_to_review(tmp_path: Path) -> None:
     assert kodo_call_count == 2
     assert validation_call_count == 2
 
+    # Verify both initial and retry kodo logs exist in the run directory
+    report_root = tmp_path / "reports"
+    run_dirs = list(report_root.iterdir())
+    assert len(run_dirs) == 1
+    run_dir = run_dirs[0]
+    assert (run_dir / "kodo_stdout.log").exists()
+    assert (run_dir / "kodo_stderr.log").exists()
+    assert (run_dir / "kodo_command.json").exists()
+    assert (run_dir / "kodo_retry_stdout.log").exists()
+    assert (run_dir / "kodo_retry_stderr.log").exists()
+    assert (run_dir / "kodo_retry_command.json").exists()
+    # Verify content distinguishes initial vs retry
+    assert (run_dir / "kodo_stdout.log").read_text() == "kodo_stdout_run1"
+    assert (run_dir / "kodo_retry_stdout.log").read_text() == "kodo_stdout_run2"
+    # Verify artifacts list includes both sets of paths
+    retry_artifacts = [a for a in result.artifacts if "kodo_retry" in a]
+    assert len(retry_artifacts) == 3
+
 
 def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
     settings = Settings.model_validate(
@@ -382,7 +402,9 @@ def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
     def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
-        return type("KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]})()
+        stdout = f"kodo_stdout_run{kodo_call_count}"
+        stderr = f"kodo_stderr_run{kodo_call_count}"
+        return type("KodoResult", (), {"exit_code": 0, "stdout": stdout, "stderr": stderr, "command": ["kodo"]})()
 
     validation_call_count = 0
 
@@ -423,6 +445,23 @@ def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
     assert result.final_status == "Blocked"
     assert kodo_call_count == 2
     assert validation_call_count == 2
+
+    # Verify both initial and retry kodo logs exist in the run directory
+    report_root = tmp_path / "reports"
+    run_dirs = list(report_root.iterdir())
+    assert len(run_dirs) == 1
+    run_dir = run_dirs[0]
+    assert (run_dir / "kodo_stdout.log").exists()
+    assert (run_dir / "kodo_stderr.log").exists()
+    assert (run_dir / "kodo_retry_stdout.log").exists()
+    assert (run_dir / "kodo_retry_stderr.log").exists()
+    assert (run_dir / "kodo_retry_command.json").exists()
+    # Verify content distinguishes initial vs retry
+    assert (run_dir / "kodo_stdout.log").read_text() == "kodo_stdout_run1"
+    assert (run_dir / "kodo_retry_stdout.log").read_text() == "kodo_stdout_run2"
+    # Verify artifacts list includes retry paths
+    retry_artifacts = [a for a in result.artifacts if "kodo_retry" in a]
+    assert len(retry_artifacts) == 3
 
 
 def test_validation_excerpt_truncates_long_output() -> None:

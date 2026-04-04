@@ -42,10 +42,10 @@ class Reporter:
         path.write_text(json.dumps(payload, indent=2))
         return str(path)
 
-    def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str) -> list[str]:
-        cmd = run_dir / "kodo_command.json"
-        out = run_dir / "kodo_stdout.log"
-        err = run_dir / "kodo_stderr.log"
+    def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str, *, prefix: str = "kodo") -> list[str]:
+        cmd = run_dir / f"{prefix}_command.json"
+        out = run_dir / f"{prefix}_stdout.log"
+        err = run_dir / f"{prefix}_stderr.log"
         cmd.write_text(command_json)
         out.write_text(stdout)
         err.write_text(stderr)
