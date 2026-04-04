@@ -400,6 +400,14 @@ def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]]) -> boo
     return ready_or_running_count == 0 and open_count <= LOW_BACKLOG_THRESHOLD
 
 
+_PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
+
+
+def _has_active_pr_review(task_id: str) -> bool:
+    """Return True if a PR review state file exists for this task — reviewer watcher owns it."""
+    return (_PR_REVIEW_STATE_DIR / f"{task_id}.json").exists()
+
+
 def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI", role: str = "goal") -> str:
     issues = client.list_issues()
     for issue in issues:
@@ -411,6 +419,8 @@ def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI",
             status_name = issue_status_name(detailed_issue)
             task_kind = issue_task_kind(detailed_issue)
         if task_kind != role:
+            continue
+        if _has_active_pr_review(task_id):
             continue
         if status_name == ready_state:
             return task_id

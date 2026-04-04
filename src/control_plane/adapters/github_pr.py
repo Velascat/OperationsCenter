@@ -46,6 +46,15 @@ class GitHubPRClient:
         resp.raise_for_status()
         return resp.json()
 
+    def get_pr(self, owner: str, repo: str, pr_number: int) -> dict:
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
+            headers=self._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def merge_pr(self, owner: str, repo: str, pr_number: int, *, merge_method: str = "squash") -> dict:
         resp = httpx.put(
             f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/merge",

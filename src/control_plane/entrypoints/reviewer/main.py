@@ -72,6 +72,31 @@ def _merge_and_finalize(
     task_id = state["task_id"]
     pr_url = state["pr_url"]
 
+    # Check current PR state before attempting merge — it may already be merged or closed.
+    try:
+        pr_data = gh.get_pr(owner, repo, pr_number)
+        pr_state = pr_data.get("state", "")
+        merged = pr_data.get("merged", False)
+        if merged or pr_state == "closed":
+            logger.info(json.dumps({
+                "event": "pr_already_closed",
+                "task_id": task_id,
+                "pr_number": pr_number,
+                "pr_state": pr_state,
+                "merged": merged,
+            }))
+            # PR is gone — clean up state and mark task Done anyway
+            try:
+                plane_client.transition_issue(task_id, "Done")
+                plane_client.comment_issue(task_id, f"[Review] PR already {'merged' if merged else 'closed'} — marking Done.\n- pr_url: {pr_url}")
+            except Exception as exc:
+                logger.warning(json.dumps({"event": "plane_update_failed", "task_id": task_id, "error": str(exc)}))
+            state_file.unlink(missing_ok=True)
+            return
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "pr_state_check_failed", "task_id": task_id, "error": str(exc)}))
+        # Continue and attempt merge anyway; merge_pr will fail if PR is gone
+
     try:
         gh.merge_pr(owner, repo, pr_number)
         logger.info(json.dumps({"event": "pr_merged", "task_id": task_id, "pr_number": pr_number, "reason": reason}))
@@ -202,6 +227,18 @@ def _process_self_review(
         "success": success,
         "changed_files": len(changed_files),
     }))
+
+    # If the revision pass made no changes, further loops will not help — escalate now.
+    if not changed_files:
+        concerns_text = "\n".join(f"- {c}" for c in verdict.concerns)
+        escalation_msg = (
+            f"Self-review flagged concerns but the revision pass produced no changes:\n"
+            f"{concerns_text}\n\nPlease review and comment, or react with 👍 to merge as-is."
+        )
+        logger.info(json.dumps({"event": "self_review_no_progress_escalate", "task_id": task_id}))
+        _escalate_to_human(gh, state, state_file, plane_client, logger, service.settings,
+                           reason=escalation_msg)
+        return 1
 
     state["self_review_loops"] = self_review_loops + 1
     state_file.write_text(json.dumps(state, indent=2))
@@ -357,13 +394,34 @@ def _process_human_review(
         "changed_files": len(changed_files),
     }))
 
-    reply_body = (
-        "Revision applied. React with 👍 to merge, or leave another comment for further changes."
-        if success
-        else "Revision attempted but no changes were committed. React with 👍 to merge as-is, or leave another comment."
-    )
+    # Zero-change revision: don't burn a loop count — the comment was processed but
+    # nothing was committed, so further loops are unlikely to help either.
+    if not changed_files:
+        reply_body = (
+            "Revision attempted but kodo made no changes. This may mean the request "
+            "is already addressed, or kodo needs more specific instructions. "
+            "React with 👍 to merge as-is, or leave a more detailed comment."
+        )
+        logger.info(json.dumps({"event": "human_revision_no_changes", "task_id": task_id}))
+        new_bot_comment_id: int | None = None
+        try:
+            bot_reply = _post_bot_comment(gh, owner, repo, pr_number, reply_body, marker)
+            new_bot_comment_id = bot_reply["id"]
+        except Exception as exc:
+            logger.warning(json.dumps({"event": "pr_reply_failed", "task_id": task_id, "error": str(exc)}))
+        updated_bot_ids = list(bot_comment_ids)
+        if new_bot_comment_id:
+            updated_bot_ids.append(new_bot_comment_id)
+        # Mark comment as processed but do NOT increment loop_count
+        state["last_bot_comment_id"] = new_bot_comment_id
+        state["bot_comment_ids"] = updated_bot_ids
+        state["processed_human_comment_ids"] = list(processed_human_ids | {latest_id})
+        state_file.write_text(json.dumps(state, indent=2))
+        return 1
 
-    new_bot_comment_id: int | None = None
+    reply_body = "Revision applied. React with 👍 to merge, or leave another comment for further changes."
+
+    new_bot_comment_id = None
     try:
         bot_reply = _post_bot_comment(gh, owner, repo, pr_number, reply_body, marker)
         new_bot_comment_id = bot_reply["id"]

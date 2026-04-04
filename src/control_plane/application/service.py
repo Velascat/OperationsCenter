@@ -552,10 +552,21 @@ class ExecutionService:
                                 except Exception as exc:
                                     self._log_event("pr_create_failed", run_id, error=str(exc))
                     elif self.settings.git.push_on_validation_failure:
-                        self.git.push_branch(repo_path, task_branch)
-                        branch_pushed = True
-                        draft_branch_pushed = True
-                        push_reason = "draft_on_validation_failure"
+                        # Skip draft push if a PR review loop is already active for this
+                        # task — pushing would pollute the open PR with a broken commit.
+                        pr_state_file = self._PR_REVIEW_STATE_DIR / f"{task.task_id}.json"
+                        if pr_state_file.exists():
+                            self._log_event(
+                                "draft_push_skipped",
+                                run_id,
+                                reason="pr_review_active",
+                                task_id=task.task_id,
+                            )
+                        else:
+                            self.git.push_branch(repo_path, task_branch)
+                            branch_pushed = True
+                            draft_branch_pushed = True
+                            push_reason = "draft_on_validation_failure"
             self._log_event(
                 "push_evaluated",
                 run_id,
