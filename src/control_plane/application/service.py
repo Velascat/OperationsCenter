@@ -358,6 +358,16 @@ class ExecutionService:
 
             if self.kodo.is_orchestrator_rate_limited(kodo_result):
                 self._log_event("orchestrator_rate_limited", run_id, task_id=task_id)
+                plane_client.transition_issue(task_id, "Ready for AI")
+                plane_client.comment_issue(
+                    task_id,
+                    f"[{worker_role.capitalize()}] Execution skipped — orchestrator rate limited\n"
+                    f"- run_id: {run_id}\n"
+                    f"- outcome_status: skipped\n"
+                    f"- outcome_reason: orchestrator_rate_limited\n"
+                    "- result_status: ready_for_ai\n"
+                    "- next_action: task reset to Ready for AI; will be retried on next poll",
+                )
                 return ExecutionResult(
                     run_id=run_id,
                     worker_role=worker_role,
@@ -367,7 +377,7 @@ class ExecutionService:
                     outcome_reason="orchestrator_rate_limited",
                     summary=f"run_id={run_id} status=skipped reason=orchestrator_rate_limited",
                     artifacts=artifacts,
-                    final_status=task.status,
+                    final_status="Ready for AI",
                 )
 
             phase = "validation"
