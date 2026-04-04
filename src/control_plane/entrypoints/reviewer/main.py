@@ -21,7 +21,27 @@ _BRANCH_TASK_ID_RE = re.compile(
 
 PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 REVIEW_TIMEOUT_SECONDS = 86400  # 1 day
-MAX_REVISION_LOOPS = 3
+
+
+def _bot_marker(settings) -> str:
+    return settings.reviewer.bot_comment_marker
+
+
+def _post_bot_comment(gh: GitHubPRClient, owner: str, repo: str, pr_number: int, body: str, marker: str) -> dict:
+    """Post a comment tagged with the bot marker so future cycles can filter it out."""
+    return gh.post_comment(owner, repo, pr_number, f"{body}\n\n{marker}")
+
+
+def _is_bot_comment(comment: dict, bot_comment_ids: set[int], bot_logins: set[str], marker: str) -> bool:
+    """Return True if this comment should be ignored as a bot comment."""
+    if comment["id"] in bot_comment_ids:
+        return True
+    login = (comment.get("user") or {}).get("login", "")
+    if login in bot_logins:
+        return True
+    if marker in (comment.get("body") or ""):
+        return True
+    return False
 
 
 def _load_pr_states() -> list[tuple[Path, dict]]:
@@ -77,14 +97,14 @@ def _merge_and_finalize(
     logger.info(json.dumps({"event": "pr_state_removed", "task_id": task_id, "state_file": str(state_file)}))
 
 
-def _process_pr_state(
+def _process_self_review(
     state_file: Path,
     state: dict,
     plane_client: PlaneClient,
     service: ExecutionService,
     logger: logging.Logger,
 ) -> int:
-    """Process a single PR review state. Returns 1 if an action was taken, 0 otherwise."""
+    """Self-review phase: kodo reviews its own diff and either merges or escalates."""
     repo_key = state["repo_key"]
     token = service.settings.repo_git_token(repo_key)
     if not token:
@@ -96,8 +116,155 @@ def _process_pr_state(
     repo = state["repo"]
     pr_number = state["pr_number"]
     task_id = state["task_id"]
+    marker = _bot_marker(service.settings)
 
-    # Timeout: merge after 1 day without approval
+    # Timeout: escalate to human rather than merge blindly from self-review
+    created_at = datetime.fromisoformat(state["created_at"])
+    elapsed = (datetime.now(UTC) - created_at).total_seconds()
+    if elapsed > REVIEW_TIMEOUT_SECONDS:
+        logger.info(json.dumps({"event": "pr_self_review_timeout", "task_id": task_id}))
+        _escalate_to_human(gh, state, state_file, plane_client, logger, service.settings,
+                           reason="Self-review timed out — please review manually.")
+        return 1
+
+    max_loops = service.settings.reviewer.max_self_review_loops
+    self_review_loops = state.get("self_review_loops", 0)
+
+    repo_cfg = service.settings.repos[repo_key]
+
+    logger.info(json.dumps({
+        "event": "self_review_start",
+        "task_id": task_id,
+        "loop": self_review_loops,
+    }))
+
+    verdict = service.run_self_review_pass(
+        repo_key=repo_key,
+        clone_url=repo_cfg.clone_url,
+        branch=state["branch"],
+        base_branch=state["base"],
+        original_goal=state.get("original_goal", ""),
+        task_id=task_id,
+    )
+
+    logger.info(json.dumps({
+        "event": "self_review_verdict",
+        "task_id": task_id,
+        "verdict": verdict.verdict,
+        "concerns": verdict.concerns,
+        "loop": self_review_loops,
+    }))
+
+    if verdict.verdict == "lgtm":
+        try:
+            _post_bot_comment(gh, owner, repo, pr_number,
+                              "Self-review passed — merging.", marker)
+        except Exception:
+            pass
+        _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="self_review_lgtm")
+        return 1
+
+    # CONCERNS or error
+    if self_review_loops >= max_loops:
+        concerns_text = "\n".join(f"- {c}" for c in verdict.concerns)
+        escalation_msg = (
+            f"Self-review flagged concerns after {self_review_loops} revision attempt(s) "
+            f"and could not resolve them:\n{concerns_text}\n\nPlease review and comment, "
+            f"or react with 👍 to merge as-is."
+        )
+        _escalate_to_human(gh, state, state_file, plane_client, logger, service.settings,
+                           reason=escalation_msg)
+        return 1
+
+    # Run a revision pass to address the concerns
+    concerns_comment = "Address the following self-review concerns:\n" + "\n".join(
+        f"- {c}" for c in verdict.concerns
+    )
+    logger.info(json.dumps({
+        "event": "self_review_revision_start",
+        "task_id": task_id,
+        "loop": self_review_loops,
+    }))
+
+    success, changed_files = service.run_review_pass(
+        repo_key=repo_key,
+        clone_url=repo_cfg.clone_url,
+        branch=state["branch"],
+        base_branch=state["base"],
+        original_goal=state.get("original_goal", ""),
+        review_comment=concerns_comment,
+        task_id=task_id,
+    )
+
+    logger.info(json.dumps({
+        "event": "self_review_revision_end",
+        "task_id": task_id,
+        "success": success,
+        "changed_files": len(changed_files),
+    }))
+
+    state["self_review_loops"] = self_review_loops + 1
+    state_file.write_text(json.dumps(state, indent=2))
+    return 1
+
+
+def _escalate_to_human(
+    gh: GitHubPRClient,
+    state: dict,
+    state_file: Path,
+    plane_client: PlaneClient,
+    logger: logging.Logger,
+    settings,
+    *,
+    reason: str,
+) -> None:
+    """Transition state to human_review phase and post a comment on the PR."""
+    marker = settings.reviewer.bot_comment_marker
+    owner = state["owner"]
+    repo = state["repo"]
+    pr_number = state["pr_number"]
+    task_id = state["task_id"]
+
+    try:
+        reply = _post_bot_comment(gh, owner, repo, pr_number, reason, marker)
+        bot_ids = list(state.get("bot_comment_ids", []))
+        bot_ids.append(reply["id"])
+        state["bot_comment_ids"] = bot_ids
+        state["last_bot_comment_id"] = reply["id"]
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "escalation_comment_failed", "task_id": task_id, "error": str(exc)}))
+
+    state["phase"] = "human_review"
+    state_file.write_text(json.dumps(state, indent=2))
+    logger.info(json.dumps({"event": "escalated_to_human_review", "task_id": task_id}))
+
+
+def _process_human_review(
+    state_file: Path,
+    state: dict,
+    plane_client: PlaneClient,
+    service: ExecutionService,
+    logger: logging.Logger,
+) -> int:
+    """Human review phase: respond to reviewer comments, merge on 👍."""
+    repo_key = state["repo_key"]
+    token = service.settings.repo_git_token(repo_key)
+    if not token:
+        logger.warning(json.dumps({"event": "pr_review_no_token", "repo_key": repo_key}))
+        return 0
+
+    gh = GitHubPRClient(token)
+    owner = state["owner"]
+    repo = state["repo"]
+    pr_number = state["pr_number"]
+    task_id = state["task_id"]
+    marker = _bot_marker(service.settings)
+
+    reviewer_cfg = service.settings.reviewer
+    bot_logins: set[str] = set(reviewer_cfg.bot_logins)
+    allowed_logins: set[str] = set(reviewer_cfg.allowed_reviewer_logins)
+
+    # Timeout: merge after 1 day with no action
     created_at = datetime.fromisoformat(state["created_at"])
     elapsed = (datetime.now(UTC) - created_at).total_seconds()
     if elapsed > REVIEW_TIMEOUT_SECONDS:
@@ -105,10 +272,10 @@ def _process_pr_state(
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="timeout")
         return 1
 
-    # 👍 on the PR itself → merge
+    # 👍 on the PR → merge
     pr_reactions = gh.get_pr_reactions(owner, repo, pr_number)
     if gh.has_thumbs_up(pr_reactions):
-        logger.info(json.dumps({"event": "pr_approved", "task_id": task_id}))
+        logger.info(json.dumps({"event": "pr_approved_thumbs_up", "task_id": task_id}))
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="approved")
         return 1
 
@@ -117,60 +284,60 @@ def _process_pr_state(
     if last_bot_comment_id:
         comment_reactions = gh.get_comment_reactions(owner, repo, last_bot_comment_id)
         if gh.has_thumbs_up(comment_reactions):
-            logger.info(json.dumps({"event": "pr_comment_approved", "task_id": task_id, "comment_id": last_bot_comment_id}))
+            logger.info(json.dumps({"event": "pr_comment_approved", "task_id": task_id}))
             _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="comment_approved")
             return 1
 
-    # Check for new comments to trigger a revision (both conversation and inline review comments)
+    # Collect new human comments (conversation + inline review)
+    bot_comment_ids: set[int] = set(state.get("bot_comment_ids", []))
+    processed_human_ids: set[int] = set(state.get("processed_human_comment_ids", []))
+
     all_comments = gh.list_pr_comments(owner, repo, pr_number)
     try:
         review_comments = gh.list_pr_review_comments(owner, repo, pr_number)
-        # Tag review comments so we can distinguish them when building the revision prompt
         for rc in review_comments:
             rc.setdefault("_source", "review")
         all_comments = all_comments + review_comments
     except Exception as exc:
         logger.warning(json.dumps({"event": "pr_review_comments_failed", "task_id": task_id, "error": str(exc)}))
 
-    bot_comment_ids: set[int] = set(state.get("bot_comment_ids", []))
-    processed_human_ids: set[int] = set(state.get("processed_human_comment_ids", []))
     new_human_comments = [
         c for c in all_comments
-        if c["id"] not in bot_comment_ids and c["id"] not in processed_human_ids
+        if not _is_bot_comment(c, bot_comment_ids, bot_logins, marker)
+        and c["id"] not in processed_human_ids
+        and (not allowed_logins or (c.get("user") or {}).get("login", "") in allowed_logins)
     ]
 
     if not new_human_comments:
-        # 👀 on the PR and no comments yet → reviewer bot is still looking, wait
-        if gh.has_eyes(pr_reactions):
-            logger.info(json.dumps({"event": "pr_review_in_progress", "task_id": task_id, "reason": "eyes_reaction_present"}))
         return 0
 
     latest_comment = new_human_comments[-1]
     latest_id = latest_comment["id"]
     loop_count = state.get("loop_count", 0)
+    max_loops = 3
 
-    # Hit max loops → merge with notice
-    if loop_count >= MAX_REVISION_LOOPS:
+    if loop_count >= max_loops:
         logger.info(json.dumps({"event": "pr_max_loops_reached", "task_id": task_id, "loop_count": loop_count}))
         try:
-            notice = gh.post_comment(owner, repo, pr_number, "Maximum revision loops (3) reached — merging as-is.")
+            notice = _post_bot_comment(gh, owner, repo, pr_number,
+                                       "Maximum revision loops (3) reached — merging as-is.", marker)
             bot_comment_ids.add(notice["id"])
         except Exception:
             pass
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="max_loops")
         return 1
 
-    # Run kodo revision pass — include file/line context for inline review comments
     review_comment = latest_comment["body"]
     if latest_comment.get("_source") == "review" and latest_comment.get("path"):
         review_comment = f"[{latest_comment['path']}]\n{review_comment}"
-    repo_cfg = service.settings.repos[repo_key]
 
+    repo_cfg = service.settings.repos[repo_key]
     logger.info(json.dumps({
-        "event": "pr_revision_start",
+        "event": "human_revision_start",
         "task_id": task_id,
         "loop_count": loop_count,
         "comment_id": latest_id,
+        "from_login": (latest_comment.get("user") or {}).get("login", ""),
     }))
 
     success, changed_files = service.run_review_pass(
@@ -184,37 +351,50 @@ def _process_pr_state(
     )
 
     logger.info(json.dumps({
-        "event": "pr_revision_end",
+        "event": "human_revision_end",
         "task_id": task_id,
         "success": success,
         "changed_files": len(changed_files),
     }))
 
-    if success:
-        reply = "Revision applied. React with 👍 to merge, or leave another comment for further changes."
-    else:
-        reply = "Revision attempted but no changes were committed. React with 👍 to merge as-is, or leave another comment."
+    reply_body = (
+        "Revision applied. React with 👍 to merge, or leave another comment for further changes."
+        if success
+        else "Revision attempted but no changes were committed. React with 👍 to merge as-is, or leave another comment."
+    )
 
     new_bot_comment_id: int | None = None
     try:
-        bot_reply = gh.post_comment(owner, repo, pr_number, reply)
+        bot_reply = _post_bot_comment(gh, owner, repo, pr_number, reply_body, marker)
         new_bot_comment_id = bot_reply["id"]
     except Exception as exc:
         logger.warning(json.dumps({"event": "pr_reply_failed", "task_id": task_id, "error": str(exc)}))
 
-    # Persist updated state
     updated_bot_ids = list(bot_comment_ids)
     if new_bot_comment_id:
         updated_bot_ids.append(new_bot_comment_id)
-    updated_processed = list(processed_human_ids | {latest_id})
 
     state["loop_count"] = loop_count + 1
     state["last_bot_comment_id"] = new_bot_comment_id
     state["bot_comment_ids"] = updated_bot_ids
-    state["processed_human_comment_ids"] = updated_processed
+    state["processed_human_comment_ids"] = list(processed_human_ids | {latest_id})
     state_file.write_text(json.dumps(state, indent=2))
-
     return 1
+
+
+def _process_pr_state(
+    state_file: Path,
+    state: dict,
+    plane_client: PlaneClient,
+    service: ExecutionService,
+    logger: logging.Logger,
+) -> int:
+    """Dispatch to the appropriate phase handler. Returns 1 if an action was taken."""
+    phase = state.get("phase", "self_review")
+    if phase == "self_review":
+        return _process_self_review(state_file, state, plane_client, service, logger)
+    else:
+        return _process_human_review(state_file, state, plane_client, service, logger)
 
 
 def backfill_pr_reviews(
@@ -256,7 +436,6 @@ def backfill_pr_reviews(
             if state_file.exists():
                 continue
 
-            # Fetch task from Plane to get goal and base branch
             try:
                 issue = plane_client.fetch_issue(task_id)
                 task = plane_client.to_board_task(issue)
@@ -267,6 +446,7 @@ def backfill_pr_reviews(
                 base = pr.get("base", {}).get("ref", repo_cfg.default_branch)
 
             state = {
+                "phase": "self_review",
                 "owner": owner,
                 "repo": repo_name,
                 "repo_key": repo_key,
@@ -277,6 +457,7 @@ def backfill_pr_reviews(
                 "base": base,
                 "original_goal": original_goal,
                 "created_at": pr.get("created_at") or datetime.now(UTC).isoformat(),
+                "self_review_loops": 0,
                 "loop_count": 0,
                 "last_bot_comment_id": None,
                 "bot_comment_ids": [],
@@ -301,7 +482,6 @@ def run_review_loop(
     logger = logging.getLogger(__name__)
     cycle = 0
 
-    # Backfill any existing open PRs that predate this watcher
     backfill_pr_reviews(plane_client, service, logger)
 
     while True:
@@ -351,7 +531,7 @@ def run_review_loop(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Poll open PRs for review reactions and run revision loops")
+    parser = argparse.ArgumentParser(description="Poll open PRs for self-review and human review loops")
     parser.add_argument("--config", required=True)
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--backfill", action="store_true", help="Backfill state files for existing open PRs then exit")

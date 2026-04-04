@@ -26,6 +26,17 @@ class TaskContractError(ValueError):
     """Raised when a task fails contract validation before execution begins."""
 
 
+class _SelfReviewVerdict:
+    """Result of a kodo self-review pass."""
+
+    __slots__ = ("verdict", "concerns")
+
+    def __init__(self, *, verdict: str, concerns: list[str]) -> None:
+        # verdict: "lgtm" | "concerns" | "error"
+        self.verdict = verdict
+        self.concerns = concerns
+
+
 class _BaselineResult:
     """Outcome of validation run on the clean checkout before kodo executes."""
 
@@ -882,5 +893,63 @@ class ExecutionService:
                     return True, changed_files
 
             return False, changed_files
+        finally:
+            self.workspace.cleanup(workspace_path)
+
+    def run_self_review_pass(
+        self,
+        repo_key: str,
+        clone_url: str,
+        branch: str,
+        base_branch: str,
+        original_goal: str,
+        task_id: str,
+    ) -> "_SelfReviewVerdict":
+        """Run kodo as a self-reviewer: read the diff vs base, emit a verdict file. Returns verdict."""
+        workspace_path = self.workspace.create()
+        try:
+            repo_path = self.git.clone(clone_url, workspace_path)
+            self.git.add_local_exclude(repo_path, ".kodo/")
+            self.git.checkout_base(repo_path, branch)
+
+            goal_file = workspace_path / "goal.md"
+            goal_text = (
+                f"## Goal\n"
+                f"Self-review: evaluate whether the changes on branch `{branch}` fully satisfy the original goal.\n\n"
+                f"## Original Goal\n"
+                f"{original_goal}\n\n"
+                f"## Instructions\n"
+                f"1. Run `git diff origin/{base_branch}..HEAD` to see what was changed\n"
+                f"2. Evaluate whether all requirements in the Original Goal section are addressed\n"
+                f"3. Write ONLY to `review_verdict.txt` in the repo root:\n"
+                f"   - If everything correctly satisfies the goal: write exactly `LGTM` on the first line\n"
+                f"   - If there are specific issues: write `CONCERNS` on the first line, then one issue per line starting with `- `\n"
+                f"4. CRITICAL: Do NOT modify any source files, tests, or configuration. "
+                f"Your only permitted output is `review_verdict.txt`.\n"
+            )
+            self.kodo.write_goal_file(goal_file, goal_text)
+            self.kodo.run(goal_file, repo_path)
+
+            verdict_file = repo_path / "review_verdict.txt"
+            if not verdict_file.exists():
+                return _SelfReviewVerdict(verdict="error", concerns=["Self-review did not produce review_verdict.txt"])
+
+            content = verdict_file.read_text().strip()
+            lines = [l for l in content.splitlines() if l.strip()]
+            if not lines:
+                return _SelfReviewVerdict(verdict="error", concerns=["review_verdict.txt was empty"])
+
+            first = lines[0].strip().upper()
+            if first == "LGTM":
+                return _SelfReviewVerdict(verdict="lgtm", concerns=[])
+            elif first == "CONCERNS":
+                concerns = [l.lstrip("- ").strip() for l in lines[1:] if l.strip()]
+                return _SelfReviewVerdict(verdict="concerns", concerns=concerns or ["(no details)"])
+            else:
+                # Fuzzy fallback: if LGTM appears anywhere without CONCERN, treat as lgtm
+                upper = content.upper()
+                if "LGTM" in upper and "CONCERN" not in upper:
+                    return _SelfReviewVerdict(verdict="lgtm", concerns=[])
+                return _SelfReviewVerdict(verdict="concerns", concerns=[content[:500]])
         finally:
             self.workspace.cleanup(workspace_path)

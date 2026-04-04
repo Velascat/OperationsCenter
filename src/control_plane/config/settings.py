@@ -37,6 +37,17 @@ class KodoSettings(BaseModel):
     timeout_seconds: int = 3600
 
 
+class ReviewerSettings(BaseModel):
+    # GitHub logins whose comments are always ignored (bots, CI accounts)
+    bot_logins: list[str] = Field(default_factory=list)
+    # If non-empty, only comments from these logins trigger human revisions
+    allowed_reviewer_logins: list[str] = Field(default_factory=list)
+    # Max kodo self-review+revision cycles before escalating to human
+    max_self_review_loops: int = 2
+    # HTML marker appended to every bot-posted comment — belt-and-suspenders filter
+    bot_comment_marker: str = "<!-- controlplane:bot -->"
+
+
 class RepoSettings(BaseModel):
     clone_url: str
     default_branch: str
@@ -59,6 +70,7 @@ class Settings(BaseModel):
     git: GitSettings
     kodo: KodoSettings
     repos: dict[str, RepoSettings]
+    reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")
 
     def plane_token(self) -> str:
