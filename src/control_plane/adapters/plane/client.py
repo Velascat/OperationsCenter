@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import re
 import time
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import httpx
@@ -132,7 +133,13 @@ class PlaneClient:
     def transition_issue(self, task_id: str, state: str) -> None:
         url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
         state_value = self._resolve_state_value(state)
-        response = self._request("PATCH", url, json={"state": state_value})
+        today = datetime.now(UTC).date().isoformat()
+        payload: dict[str, Any] = {"state": state_value}
+        if state == "Running":
+            payload["start_date"] = today
+        elif state in ("Done", "Review", "In Review", "Blocked"):
+            payload["target_date"] = today
+        response = self._request("PATCH", url, json=payload)
         response.raise_for_status()
 
     def create_issue(

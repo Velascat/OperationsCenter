@@ -53,7 +53,8 @@ Do thing.
 
     assert any("/work-items/TASK-1/" in url for _, url, _, _ in calls)
     patch_call = next(payload for method, _, payload, _ in calls if method == "PATCH")
-    assert patch_call == {"state": "Running"}
+    assert patch_call.get("state") == "Running"
+    assert "start_date" in patch_call
 
     post_call = next(payload for method, _, payload, _ in calls if method == "POST")
     assert isinstance(post_call, dict)
