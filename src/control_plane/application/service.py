@@ -22,6 +22,10 @@ from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, R
 from control_plane.execution import UsageStore
 
 
+class TaskContractError(ValueError):
+    """Raised when a task fails contract validation before execution begins."""
+
+
 class ExecutionService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -77,6 +81,10 @@ class ExecutionService:
                 repo_cfg = self.settings.repos.get(task.repo_key)
                 default_branch = repo_cfg.default_branch if repo_cfg else "main"
                 task = task.model_copy(update={"base_branch": default_branch})
+
+            phase = "contract_validation"
+            self._validate_task_contract(task)
+
             repo_target = self._repo_target_for(task)
             self._log_event(
                 "task_resolved",
@@ -209,7 +217,10 @@ class ExecutionService:
                 self.usage_store.record_execution(role=worker_role, task_id=task.task_id, signature=signature, now=datetime.now(UTC))
 
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
-                raise ValueError(f"Base branch '{task.base_branch}' is not allowed by policy")
+                raise TaskContractError(
+                    f"Base branch '{task.base_branch}' is not in the allowed list for repo "
+                    f"'{task.repo_key}'. Allowed: {repo_target.allowed_base_branches or ['(any)']}"
+                )
 
             phase = "running"
             self._log_event("phase", run_id, phase=phase)
@@ -369,7 +380,17 @@ class ExecutionService:
                         repo_cfg = self.settings.repos.get(task.repo_key)
                         if repo_cfg and repo_cfg.await_review:
                             token = self.settings.repo_git_token(task.repo_key)
-                            if token:
+                            controls = self.settings.execution_controls()
+                            if controls.pr_dry_run:
+                                self._log_event(
+                                    "pr_dry_run",
+                                    run_id,
+                                    task_id=task.task_id,
+                                    head=task_branch,
+                                    base=task.base_branch,
+                                    reason="CONTROL_PLANE_PR_DRY_RUN=1",
+                                )
+                            elif token:
                                 try:
                                     owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
                                     pr_client = GitHubPRClient(token)
@@ -385,7 +406,15 @@ class ExecutionService:
                                     self._write_pr_review_state(task, task_branch, owner, repo_name, pr)
                                     plane_client.transition_issue(task.task_id, "In Review")
                                     status = "In Review"
-                                    self._log_event("pr_review_pending", run_id, pr_url=pull_request_url, pr_number=pr["number"])
+                                    self._log_event(
+                                        "pr_review_pending",
+                                        run_id,
+                                        pr_url=pull_request_url,
+                                        pr_number=pr["number"],
+                                        head=task_branch,
+                                        base=task.base_branch,
+                                        repo=f"{owner}/{repo_name}",
+                                    )
                                 except Exception as exc:
                                     self._log_event("pr_create_failed", run_id, error=str(exc))
                     elif self.settings.git.push_on_validation_failure:
@@ -542,6 +571,28 @@ class ExecutionService:
     @classmethod
     def _meaningful_changed_files(cls, changed_files: list[str]) -> list[str]:
         return [path for path in changed_files if not cls._is_internal_execution_path(path)]
+
+    def _validate_task_contract(self, task: "BoardTask") -> None:
+        """Fail early and clearly when task metadata violates known contracts."""
+        if not task.repo_key:
+            raise TaskContractError(
+                "Task has no repo key. Add a 'repo: <key>' label matching a configured repo."
+            )
+        if task.repo_key not in self.settings.repos:
+            known = sorted(self.settings.repos.keys())
+            raise TaskContractError(
+                f"Unknown repo key '{task.repo_key}'. "
+                f"Add a 'repo: <key>' label with one of the configured repos: {known}"
+            )
+        repo_cfg = self.settings.repos[task.repo_key]
+        if not repo_cfg.clone_url:
+            raise TaskContractError(
+                f"Repo '{task.repo_key}' has no clone_url configured."
+            )
+        if not task.goal_text or not task.goal_text.strip():
+            raise TaskContractError(
+                "Task has no goal text. Add a '## Goal' section or write the goal as plain description text."
+            )
 
     _PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 

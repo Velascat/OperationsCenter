@@ -14,6 +14,8 @@ class ExecutionControlSettings:
     min_remaining_exec_for_proposals: int
     usage_path: Path
 
+    pr_dry_run: bool = False
+
     @classmethod
     def from_env(cls) -> "ExecutionControlSettings":
         return cls(
@@ -31,6 +33,7 @@ class ExecutionControlSettings:
                     "tools/report/control_plane/execution/usage.json",
                 )
             ),
+            pr_dry_run=os.environ.get("CONTROL_PLANE_PR_DRY_RUN", "0").strip() in ("1", "true", "yes"),
         )
 
 

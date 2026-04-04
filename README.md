@@ -2,6 +2,21 @@
 
 Local autonomous coding workflow system that uses **Plane** as the board, **Control Plane** as the worker wrapper, and **Kodo** as the single-run coding engine.
 
+## Primary Operator Model
+
+Control Plane is operated through **Plane + CLI**:
+
+1. Create and label work items in the Plane board.
+2. Use `./scripts/control-plane.sh dev-up` to start the local stack.
+3. Watchers poll the board and execute tasks automatically.
+4. Results are written back to Plane as comments and state transitions.
+
+The **local API/UI** (`http://127.0.0.1:8787`) is a helper surface — useful for repo import and a live board view, but not required for day-to-day operation. All control happens through the CLI and the Plane board.
+
+For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**.
+
+---
+
 ## What This System Is
 
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
@@ -85,22 +100,32 @@ The naming is intentionally close because the second is the board adapter for th
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
 - Dependency drift reporting with optional Plane improve-task creation.
 
-### PR Automation
+### PR Automation with Review Loop
 
-- After a successful push, Control Plane can automatically open a PR and squash-merge it into the task's base branch.
-- Opt-in per repo via `auto_merge_on_success: true` in `config/control_plane.local.yaml`.
+- After a successful push, Control Plane opens a PR and enters a review loop.
+- Opt-in per repo via `await_review: true` in `config/control_plane.local.yaml`.
+- A dedicated `review` watcher polls GitHub reactions and comments every 60 seconds:
+  - 👍 on the PR → squash-merge + delete branch + task marked Done
+  - 👀 on the PR → another reviewer bot is looking; watcher holds off this cycle
+  - Comment posted on PR → kodo runs a revision pass on the same branch; bot replies when done; repeat up to 3 times
+  - 👍 on the bot reply → merge
+  - No reaction after 1 day → merge automatically (timeout fallback)
 - Token resolution: per-repo `token_env` if set, otherwise falls back to the global `git.token_env`.
-- Merge method is squash. PR creation and merge failures are logged but do not block the task from completing.
+- PR creation and merge failures are logged but do not block the task from completing.
+- Set `CONTROL_PLANE_PR_DRY_RUN=1` to log intended PR actions without touching GitHub.
+- Existing open PRs are backfilled into the review loop on watcher startup: `./scripts/control-plane.sh backfill-pr-reviews`.
 
 ### Execution Safety
 
 - Execution budget enforcement, retry caps, no-op suppression, and proposal suppression when execution budget is low.
+- Contract validation rejects unknown repo keys, missing goal text, and disallowed base branches early with clear Plane comments — no silent fallback.
 
 ### Repo and Branch Selection
 
 - Repo is selected via a `repo: <key>` label on the Plane work item — no separate UI needed.
 - Branch defaults to the repo's `default_branch` from config when not specified in the task description.
 - Proposer scope is controlled by `propose_enabled: true/false` per repo in `config/control_plane.local.yaml`.
+- Unknown repo keys and disallowed branches are rejected at task-start with a Plane comment explaining the failure.
 
 ## Lifecycle Contract
 
@@ -158,6 +183,7 @@ Then:
 ./scripts/control-plane.sh watch --role test
 ./scripts/control-plane.sh watch --role improve
 ./scripts/control-plane.sh watch --role propose
+./scripts/control-plane.sh watch --role review
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
@@ -171,6 +197,7 @@ Then:
 ./scripts/control-plane.sh decide-proposals --dry-run
 ./scripts/control-plane.sh propose-from-candidates
 ./scripts/control-plane.sh propose-from-candidates --dry-run
+./scripts/control-plane.sh backfill-pr-reviews
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ./scripts/control-plane.sh dependency-check
@@ -201,9 +228,10 @@ Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/Gi
 
 Skipping is treated as a valid outcome when execution is not justified. Budget skips, no-op skips, retry-cap blocks, and proposal suppression are written to retained artifacts and surfaced in watcher logs.
 
-## Repo Control UI
+## Local API/UI (Helper Surface)
 
-Control Plane now exposes a small local UI and API for repo operations:
+Control Plane exposes a small local helper UI and API for repo operations.
+This is secondary to the CLI + Plane board model — it is not required for normal operation.
 
 - Repo control page: `http://127.0.0.1:8787/`
 - Live board: available in the same UI, with a polling work-item table
@@ -229,7 +257,8 @@ The easiest way to bring up the whole local system is:
 That starts:
 
 - Plane on `http://localhost:8080`
-- all four watcher lanes: `goal`, `test`, `improve`, and `propose`
+- all five watcher lanes: `goal`, `test`, `improve`, `propose`, and `review`
+- local API/UI on `http://127.0.0.1:8787` (repo import, live board view)
 
 Useful companions:
 
@@ -304,9 +333,14 @@ The repo-aware autonomy loop is behaving well when:
 
 ### Operator Guides
 
-- [Setup Guide](/home/dev/Documents/GitHub/ControlPlane/docs/operator/setup.md)
-- [Runtime Guide](/home/dev/Documents/GitHub/ControlPlane/docs/operator/runtime.md)
-- [Diagnostics and Maintenance](/home/dev/Documents/GitHub/ControlPlane/docs/operator/diagnostics.md)
+- [Golden-Path Demo](docs/demo.md)
+- [Setup Guide](docs/operator/setup.md)
+- [Runtime Guide](docs/operator/runtime.md)
+- [Diagnostics and Maintenance](docs/operator/diagnostics.md)
+
+### Roadmap
+
+- [Backlog — Hardening and Trust Phase](docs/backlog.md)
 
 ## Task Template
 
