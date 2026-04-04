@@ -26,6 +26,16 @@ class TaskContractError(ValueError):
     """Raised when a task fails contract validation before execution begins."""
 
 
+class _BaselineResult:
+    """Outcome of validation run on the clean checkout before kodo executes."""
+
+    __slots__ = ("failed", "error_text")
+
+    def __init__(self, *, failed: bool, error_text: str | None) -> None:
+        self.failed = failed
+        self.error_text = error_text
+
+
 class ExecutionService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -284,6 +294,19 @@ class ExecutionService:
             )
             artifacts.append(self.reporter.write_request(run_dir, req))
 
+            # Build run_env once — used for baseline validation and post-kodo validation
+            run_env = dict(bootstrap_result.env)
+            run_env.update(repo_target.env)
+
+            phase = "baseline_validation"
+            self._log_event("phase", run_id, phase=phase)
+            baseline = self._run_baseline_validation(repo_target, repo_path, run_env, run_id)
+            fix_validation_task_id: str | None = None
+            if baseline.failed and baseline.error_text:
+                fix_validation_task_id = self._maybe_create_fix_validation_task(
+                    plane_client, task, baseline.error_text, run_id
+                )
+
             phase = "kodo"
             self._log_event("phase", run_id, phase=phase)
             kodo_result = self.kodo.run(goal_file, repo_path)
@@ -312,8 +335,6 @@ class ExecutionService:
 
             phase = "validation"
             self._log_event("phase", run_id, phase=phase)
-            run_env = dict(bootstrap_result.env)
-            run_env.update(repo_target.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
             validation_ok = self.validation.passed(validation_results)
 
@@ -322,8 +343,25 @@ class ExecutionService:
                 initial_validation_results = validation_results
                 error_text = self._validation_excerpt(validation_results)
                 if error_text:
-                    with open(goal_file, "a") as f:
-                        f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
+                    if baseline.failed:
+                        # Pre-existing failure: make fixing validation the primary goal
+                        self.kodo.write_goal_file(
+                            goal_file,
+                            (
+                                "Fix the pre-existing validation failure in this repository.\n\n"
+                                "The validation suite was already broken before your changes were applied.\n"
+                                "Your primary job is to make all validation commands pass.\n\n"
+                                f"Original task context (secondary):\n{task.goal_text}"
+                            ),
+                            (
+                                f"Validation error output:\n```\n{error_text}\n```\n\n"
+                                + (task.constraints_text or "")
+                            ),
+                        )
+                    else:
+                        # Kodo introduced the failure: keep original goal, append as feedback
+                        with open(goal_file, "a") as f:
+                            f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
                 kodo_result = self.kodo.run(goal_file, repo_path)
                 artifacts.extend(
                     self.reporter.write_kodo(
@@ -487,6 +525,7 @@ class ExecutionService:
                 artifacts=artifacts,
                 policy_violations=policy_violations,
                 final_status=status,
+                follow_up_task_ids=[fix_validation_task_id] if fix_validation_task_id else [],
             )
             artifacts.append(self.reporter.write_summary(run_dir, result))
             artifacts.append(
@@ -622,6 +661,82 @@ class ExecutionService:
     @classmethod
     def _meaningful_changed_files(cls, changed_files: list[str]) -> list[str]:
         return [path for path in changed_files if not cls._is_internal_execution_path(path)]
+
+    def _run_baseline_validation(
+        self,
+        repo_target: "RepoTarget",
+        repo_path: Path,
+        run_env: dict[str, str],
+        run_id: str,
+    ) -> _BaselineResult:
+        """Run validation on the clean checkout before kodo executes.
+
+        A failure here means the repo was already broken — not kodo's fault.
+        The result drives both the retry strategy and fix-task auto-creation.
+        """
+        if not repo_target.validation_commands:
+            return _BaselineResult(failed=False, error_text=None)
+        results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+        if self.validation.passed(results):
+            return _BaselineResult(failed=False, error_text=None)
+        error_text = self._validation_excerpt(results)
+        self._log_event("baseline_validation_failed", run_id, error_text=error_text or "")
+        return _BaselineResult(failed=True, error_text=error_text)
+
+    def _maybe_create_fix_validation_task(
+        self,
+        plane_client: "PlaneClient",
+        task: "BoardTask",
+        baseline_error_text: str,
+        run_id: str,
+    ) -> str | None:
+        """Best-effort: create a dedicated fix-validation task if one isn't already open.
+
+        Returns the new task ID on success, None on any error or duplicate.
+        """
+        dedup_prefix = f"Fix pre-existing validation failure in {task.repo_key}"
+        try:
+            for issue in plane_client.list_issues():
+                name = str(issue.get("name", ""))
+                s = issue.get("state", {})
+                state_name = s.get("name", "") if isinstance(s, dict) else str(s)
+                if name.startswith(dedup_prefix) and state_name not in ("Done", "Blocked", "Cancelled"):
+                    self._log_event(
+                        "fix_validation_task_exists",
+                        run_id,
+                        existing_id=str(issue.get("id", "")),
+                        repo_key=task.repo_key,
+                    )
+                    return None
+
+            description = "\n".join([
+                f"repo: {task.repo_key}",
+                "",
+                "## Goal",
+                f"Fix a pre-existing validation failure in the `{task.repo_key}` repository.",
+                "The validation suite was already failing on the base branch before any changes were applied.",
+                "",
+                "## Validation Error",
+                "```",
+                baseline_error_text,
+                "```",
+                "",
+                "## Constraints",
+                "- Only modify files necessary to make the validation commands pass.",
+                "- Do not introduce new failures.",
+                f"- Target repo: {task.repo_key}",
+            ])
+            created = plane_client.create_issue(
+                name=dedup_prefix,
+                description=description,
+                state="Backlog",
+            )
+            new_id = str(created.get("id", ""))
+            self._log_event("fix_validation_task_created", run_id, new_id=new_id, repo_key=task.repo_key)
+            return new_id or None
+        except Exception as exc:
+            self._log_event("fix_validation_task_error", run_id, error=str(exc), repo_key=task.repo_key)
+            return None
 
     def _validate_task_contract(self, task: "BoardTask") -> None:
         """Fail early and clearly when task metadata violates known contracts."""
