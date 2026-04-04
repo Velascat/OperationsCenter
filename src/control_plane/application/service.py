@@ -17,6 +17,7 @@ from control_plane.adapters.reporting import Reporter
 from control_plane.adapters.workspace import RepoEnvironmentBootstrapper, WorkspaceManager
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
+from control_plane.application.validation_history import ValidationHistory
 from control_plane.config import Settings
 from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget, ValidationResult
 from control_plane.execution import UsageStore
@@ -52,6 +53,7 @@ class ExecutionService:
             default_branch=repo_cfg.default_branch,
             workdir_name=task.repo_key,
             validation_commands=repo_cfg.validation_commands,
+            validation_profiles=repo_cfg.validation_profiles,
             env=repo_cfg.env,
             allowed_base_branches=repo_cfg.allowed_base_branches,
         )
@@ -314,36 +316,52 @@ class ExecutionService:
             self._log_event("phase", run_id, phase=phase)
             run_env = dict(bootstrap_result.env)
             run_env.update(repo_target.env)
-            validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+
+            # Resolve validation commands: prefer profile if set and available
+            validation_commands = self._resolve_validation_commands(task, repo_target)
+
+            validation_results = self.validation.run(validation_commands, repo_path, env=run_env)
             validation_ok = self.validation.passed(validation_results)
 
             validation_retried = False
+            recurring_failure = False
             if not validation_ok:
                 initial_validation_results = validation_results
-                error_text = self._validation_excerpt(validation_results)
-                if error_text:
-                    with open(goal_file, "a") as f:
-                        f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
-                kodo_result = self.kodo.run(goal_file, repo_path)
-                artifacts.extend(
-                    self.reporter.write_kodo(
-                        run_dir,
-                        self.kodo.command_to_json(kodo_result.command),
-                        kodo_result.stdout,
-                        kodo_result.stderr,
-                        prefix="kodo_retry",
+
+                # Check for recurring failure pattern
+                val_history = ValidationHistory(self.settings.report_root)
+                failure_sigs = ValidationHistory.compute_signatures(validation_results)
+                if val_history.check_recurring(task_id, failure_sigs):
+                    recurring_failure = True
+                    val_history.record_signatures(task_id, failure_sigs)
+                    self._log_event("recurring_validation_failure", run_id, task_id=task_id)
+                else:
+                    error_text = self._validation_excerpt(validation_results)
+                    if error_text:
+                        with open(goal_file, "a") as f:
+                            f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
+                    kodo_result = self.kodo.run(goal_file, repo_path)
+                    artifacts.extend(
+                        self.reporter.write_kodo(
+                            run_dir,
+                            self.kodo.command_to_json(kodo_result.command),
+                            kodo_result.stdout,
+                            kodo_result.stderr,
+                            prefix="kodo_retry",
+                        )
                     )
-                )
-                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
-                validation_ok = self.validation.passed(validation_results)
-                validation_retried = True
-                self._log_event("validation_retry", run_id, retry_passed=validation_ok)
-                artifacts.append(
-                    self.reporter.write_initial_validation(
-                        run_dir,
-                        [r.model_dump() for r in initial_validation_results],
+                    retry_commands = self._narrow_retry_commands(validation_commands, initial_validation_results)
+                    validation_results = self.validation.run(retry_commands, repo_path, env=run_env)
+                    validation_ok = self.validation.passed(validation_results)
+                    validation_retried = True
+                    self._log_event("validation_retry", run_id, retry_passed=validation_ok)
+                    val_history.record_signatures(task_id, ValidationHistory.compute_signatures(validation_results))
+                    artifacts.append(
+                        self.reporter.write_initial_validation(
+                            run_dir,
+                            [r.model_dump() for r in initial_validation_results],
+                        )
                     )
-                )
 
             artifacts.append(
                 self.reporter.write_validation(
@@ -376,11 +394,12 @@ class ExecutionService:
             success = execution_success and validation_ok and policy_success
             push_reason: str | None = None
             outcome_status = "executed"
-            outcome_reason = None
+            outcome_reason: str | None = "recurring_validation_failure" if recurring_failure else None
             if execution_success and not changed_files:
                 success = True
                 outcome_status = "no_op"
-                outcome_reason = "internal_only_change" if internal_changed_files else "no_material_change"
+                if not recurring_failure:
+                    outcome_reason = "internal_only_change" if internal_changed_files else "no_material_change"
                 summary = (
                     f"run_id={run_id} execution=passed validation={'passed' if validation_ok else 'failed'} "
                     f"policy={'passed' if policy_success else 'failed'} branch_push=not_pushed "
@@ -580,9 +599,40 @@ class ExecutionService:
             excerpt = ExecutionService._validation_excerpt(result.validation_results)
             if excerpt is not None:
                 lines.append(f"- validation_errors:\n```\n{excerpt}\n```")
+        if result.outcome_reason == "recurring_validation_failure":
+            lines.append("- note: recurring_validation_failure — retry skipped due to repeated failure pattern")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
         return "\n".join(lines)
+
+    _LINT_KEYWORDS = ("ruff", "black", "isort")
+
+    @staticmethod
+    def _resolve_validation_commands(task: BoardTask, repo_target: RepoTarget) -> list[str]:
+        """Return the validation commands for this task, using profile if available."""
+        if (
+            task.validation_profile
+            and task.validation_profile in repo_target.validation_profiles
+        ):
+            return repo_target.validation_profiles[task.validation_profile]
+        return repo_target.validation_commands
+
+    @classmethod
+    def _narrow_retry_commands(
+        cls,
+        full_commands: list[str],
+        initial_results: list[ValidationResult],
+    ) -> list[str]:
+        """If every failure is a lint/format command, retry only those commands."""
+        failed = [r for r in initial_results if r.exit_code != 0]
+        if not failed:
+            return full_commands
+        all_lint = all(
+            any(kw in r.command for kw in cls._LINT_KEYWORDS) for r in failed
+        )
+        if all_lint:
+            return [r.command for r in failed]
+        return full_commands
 
     @staticmethod
     def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 40) -> str | None:

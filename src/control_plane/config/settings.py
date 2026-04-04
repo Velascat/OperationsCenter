@@ -41,6 +41,7 @@ class RepoSettings(BaseModel):
     clone_url: str
     default_branch: str
     validation_commands: list[str] = Field(default_factory=list)
+    validation_profiles: dict[str, list[str]] = Field(default_factory=dict)
     allowed_base_branches: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     bootstrap_enabled: bool = True
