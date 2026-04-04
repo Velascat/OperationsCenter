@@ -339,12 +339,12 @@ class ExecutionService:
                     threshold=self.settings.recurring_failure_threshold,
                 ):
                     recurring_failure = True
-                    val_history.record_signatures(task_id, failure_sigs)
+                    val_history.record_signatures(task_id, failure_sigs, run_dir=run_dir)
                     self._log_event("recurring_validation_failure", run_id, task_id=task_id)
                 else:
                     # Record initial failure signatures so future runs can
                     # detect recurring patterns even if this is the first failure.
-                    val_history.record_signatures(task_id, failure_sigs)
+                    val_history.record_signatures(task_id, failure_sigs, run_dir=run_dir)
 
                     error_text = self._validation_excerpt(validation_results)
                     if error_text:
@@ -365,7 +365,7 @@ class ExecutionService:
                     validation_ok = self.validation.passed(validation_results)
                     validation_retried = True
                     self._log_event("validation_retry", run_id, retry_passed=validation_ok)
-                    val_history.record_signatures(task_id, ValidationHistory.compute_signatures(validation_results))
+                    val_history.record_signatures(task_id, ValidationHistory.compute_signatures(validation_results), run_dir=run_dir)
                     artifacts.append(
                         self.reporter.write_initial_validation(
                             run_dir,

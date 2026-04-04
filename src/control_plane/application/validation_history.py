@@ -35,11 +35,29 @@ class ValidationHistory:
             sigs.append((r.command, digest))
         return sigs
 
-    def record_signatures(self, task_id: str, signatures: list[tuple[str, str]]) -> None:
-        """Persist *signatures* into the most recent run directory for *task_id*."""
-        run_dir = self._latest_run_dir(task_id)
+    def record_signatures(
+        self,
+        task_id: str,
+        signatures: list[tuple[str, str]],
+        *,
+        run_dir: Path | None = None,
+    ) -> None:
+        """Persist *signatures* into *run_dir* (or the latest run directory for *task_id*).
+
+        Parameters
+        ----------
+        task_id:
+            The task identifier used to locate run directories.
+        signatures:
+            List of ``(command, md5_hex)`` pairs to persist.
+        run_dir:
+            If provided, write directly to this directory.  When ``None``
+            (deprecated), falls back to :meth:`_latest_run_dir`.
+        """
         if run_dir is None:
-            return
+            run_dir = self._latest_run_dir(task_id)
+            if run_dir is None:
+                return
         path = run_dir / "validation_signatures.json"
         path.write_text(json.dumps(signatures, indent=2))
 

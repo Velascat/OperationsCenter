@@ -83,18 +83,44 @@ class TestRecordAndCheckRecurring:
         assert history.check_recurring(task_id, sigs, window=5, threshold=2) is False
 
     def test_record_signatures_writes_file(self, tmp_path: Path) -> None:
-        """record_signatures creates validation_signatures.json in the latest run dir."""
+        """record_signatures creates validation_signatures.json when run_dir is passed explicitly."""
         report_root = tmp_path / "reports"
         task_id = "TASK-3"
         run_dir = self._make_run_dir(report_root, task_id, 0)
         sigs = [("pytest -q", "deadbeef")]
 
         history = ValidationHistory(report_root)
-        history.record_signatures(task_id, sigs)
+        history.record_signatures(task_id, sigs, run_dir=run_dir)
 
         sig_file = run_dir / "validation_signatures.json"
         assert sig_file.exists()
         assert json.loads(sig_file.read_text()) == [list(s) for s in sigs]
+
+    def test_concurrent_runs_write_to_correct_directories(self, tmp_path: Path) -> None:
+        """Explicit run_dir keeps overlapping executions isolated."""
+        report_root = tmp_path / "reports"
+        task_id = "TASK-CONCURRENT"
+        run_dir_1 = self._make_run_dir(report_root, task_id, 1)
+        run_dir_2 = self._make_run_dir(report_root, task_id, 2)
+        sigs_1 = [("pytest -q", "sig-one")]
+        sigs_2 = [("ruff check .", "sig-two")]
+
+        history = ValidationHistory(report_root)
+
+        # Regression test for the race where _latest_run_dir could resolve to the wrong directory.
+        history.record_signatures(task_id, sigs_1, run_dir=run_dir_1)
+        history.record_signatures(task_id, sigs_2, run_dir=run_dir_2)
+
+        sig_file_1 = run_dir_1 / "validation_signatures.json"
+        sig_file_2 = run_dir_2 / "validation_signatures.json"
+
+        assert json.loads(sig_file_1.read_text()) == [list(s) for s in sigs_1]
+        assert json.loads(sig_file_2.read_text()) == [list(s) for s in sigs_2]
+
+        assert history.check_recurring(task_id, sigs_1, window=5, threshold=1) is True
+        assert history.check_recurring(task_id, sigs_2, window=5, threshold=1) is True
+        assert history.check_recurring(task_id, sigs_1, window=5, threshold=2) is False
+        assert history.check_recurring(task_id, sigs_2, window=5, threshold=2) is False
 
     def test_check_recurring_no_dirs(self, tmp_path: Path) -> None:
         """Returns False when there are no run directories."""
