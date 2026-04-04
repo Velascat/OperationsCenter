@@ -18,7 +18,7 @@ from control_plane.adapters.workspace import RepoEnvironmentBootstrapper, Worksp
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
-from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget
+from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget, ValidationResult
 from control_plane.execution import UsageStore
 
 
@@ -316,6 +316,35 @@ class ExecutionService:
             run_env.update(repo_target.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
             validation_ok = self.validation.passed(validation_results)
+
+            validation_retried = False
+            if not validation_ok:
+                initial_validation_results = validation_results
+                error_text = self._validation_excerpt(validation_results)
+                if error_text:
+                    with open(goal_file, "a") as f:
+                        f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
+                kodo_result = self.kodo.run(goal_file, repo_path)
+                artifacts.extend(
+                    self.reporter.write_kodo(
+                        run_dir,
+                        self.kodo.command_to_json(kodo_result.command),
+                        kodo_result.stdout,
+                        kodo_result.stderr,
+                        prefix="kodo_retry",
+                    )
+                )
+                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+                validation_ok = self.validation.passed(validation_results)
+                validation_retried = True
+                self._log_event("validation_retry", run_id, retry_passed=validation_ok)
+                artifacts.append(
+                    self.reporter.write_initial_validation(
+                        run_dir,
+                        [r.model_dump() for r in initial_validation_results],
+                    )
+                )
+
             artifacts.append(
                 self.reporter.write_validation(
                     run_dir,
@@ -446,7 +475,9 @@ class ExecutionService:
                 internal_changed_files=internal_changed_files,
                 diff_stat_excerpt=self._diff_stat_excerpt(diff_stat),
                 validation_passed=validation_ok,
+                validation_retried=validation_retried,
                 validation_results=validation_results,
+                initial_validation_results=initial_validation_results if validation_retried else [],
                 branch_pushed=branch_pushed,
                 draft_branch_pushed=draft_branch_pushed,
                 push_reason=push_reason,
@@ -545,9 +576,28 @@ class ExecutionService:
             lines.append(f"- follow_up_task_ids: {', '.join(result.follow_up_task_ids)}")
         if result.blocked_classification:
             lines.append(f"- blocked_classification: {result.blocked_classification}")
+        if result.validation_passed is False and result.validation_results is not None:
+            excerpt = ExecutionService._validation_excerpt(result.validation_results)
+            if excerpt is not None:
+                lines.append(f"- validation_errors:\n```\n{excerpt}\n```")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 20) -> str | None:
+        failed = [r for r in validation_results if r.exit_code != 0]
+        if not failed:
+            return None
+        output_lines: list[str] = []
+        for r in failed:
+            output_lines.append(f"[{r.command}]")
+            text = r.stderr.strip() or r.stdout.strip()
+            if text:
+                output_lines.extend(text.splitlines())
+        if len(output_lines) > max_lines:
+            output_lines = output_lines[-max_lines:]
+        return "\n".join(output_lines) or None
 
     @staticmethod
     def _stderr_excerpt(stderr: str) -> str | None:

@@ -42,10 +42,10 @@ class Reporter:
         path.write_text(json.dumps(payload, indent=2))
         return str(path)
 
-    def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str) -> list[str]:
-        cmd = run_dir / "kodo_command.json"
-        out = run_dir / "kodo_stdout.log"
-        err = run_dir / "kodo_stderr.log"
+    def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str, *, prefix: str = "kodo") -> list[str]:
+        cmd = run_dir / f"{prefix}_command.json"
+        out = run_dir / f"{prefix}_stdout.log"
+        err = run_dir / f"{prefix}_stderr.log"
         cmd.write_text(command_json)
         out.write_text(stdout)
         err.write_text(stderr)
@@ -58,6 +58,11 @@ class Reporter:
 
     def write_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
         path = run_dir / "validation.json"
+        path.write_text(json.dumps(data, indent=2))
+        return str(path)
+
+    def write_initial_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
+        path = run_dir / "validation_initial.json"
         path.write_text(json.dumps(data, indent=2))
         return str(path)
 
@@ -144,6 +149,12 @@ class Reporter:
             lines.extend([f"- {line}" for line in result.diff_stat_excerpt.splitlines()] or ["- (none)"])
         lines.extend(["", "## Policy Violations"])
         lines.extend([f"- {f}" for f in result.policy_violations] or ["- (none)"])
+        if result.validation_retried and result.initial_validation_results:
+            lines.extend(["", "## Initial Validation (pre-retry)"])
+            for vr in result.initial_validation_results:
+                lines.append(f"- `{vr.command}`: exit_code={vr.exit_code}, duration={vr.duration_ms}ms")
+                if vr.stderr.strip():
+                    lines.append(f"  stderr: {vr.stderr.strip()[:200]}")
         lines.extend(["", "## Summary", result.summary])
         path.write_text("\n".join(lines))
         return str(path)
