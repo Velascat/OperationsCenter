@@ -36,6 +36,28 @@ def test_changed_files_handles_rename_delete_and_untracked_output() -> None:
     ]
 
 
+def test_changed_files_returns_empty_when_no_changes() -> None:
+    """changed_files returns [] when both diff and ls-files produce empty output."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+    assert client.changed_files(Path(".")) == []
+
+
+def test_diff_stat_returns_empty_when_no_changes() -> None:
+    """diff_stat returns empty string when no tracked changes and no untracked files."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--stat", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+    assert client.diff_stat(Path(".")) == ""
+
+
 def test_diff_stat_includes_untracked_files() -> None:
     client = FakeGitClient(
         {
@@ -207,6 +229,20 @@ def test_run_raises_runtime_error_on_nonzero_exit(monkeypatch: pytest.MonkeyPatc
         client._run(["git", "status"])
 
 
+def test_run_error_message_includes_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess as sp
+
+    class FakeProc:
+        returncode = 1
+        stdout = ""
+        stderr = "fatal: not a git repository"
+
+    monkeypatch.setattr(sp, "run", lambda *a, **kw: FakeProc())  # type: ignore[attr-defined]
+    client = GitClient()
+    with pytest.raises(RuntimeError, match="fatal: not a git repository"):
+        client._run(["git", "status"])
+
+
 def test_run_bytes_raises_runtime_error_on_nonzero_exit(monkeypatch: pytest.MonkeyPatch) -> None:
     import subprocess as sp
 
@@ -218,6 +254,21 @@ def test_run_bytes_raises_runtime_error_on_nonzero_exit(monkeypatch: pytest.Monk
     monkeypatch.setattr(sp, "run", lambda *a, **kw: FakeProc())  # type: ignore[attr-defined]
     client = GitClient()
     with pytest.raises(RuntimeError, match="git command failed"):
+        client._run_bytes(["git", "diff"])
+
+
+def test_run_bytes_error_decodes_non_utf8_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_run_bytes should decode non-UTF-8 stderr gracefully using replacement chars."""
+    import subprocess as sp
+
+    class FakeProc:
+        returncode = 1
+        stdout = b""
+        stderr = b"error: \xff\xfe bad bytes"
+
+    monkeypatch.setattr(sp, "run", lambda *a, **kw: FakeProc())  # type: ignore[attr-defined]
+    client = GitClient()
+    with pytest.raises(RuntimeError, match="error:.*bad bytes"):
         client._run_bytes(["git", "diff"])
 
 
@@ -373,6 +424,28 @@ def test_create_task_branch_new_branch() -> None:
     assert ("git", "checkout", "-b", "task-2", "origin/task-2") not in calls
 
 
+def test_create_task_branch_returns_true_when_remote_exists() -> None:
+    """create_task_branch returns True when the branch already exists on remote."""
+    class FakeRemoteExists(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            if args[:4] == ["git", "ls-remote", "--heads", "origin"]:
+                return "abc123\trefs/heads/task-1"
+            return ""
+
+    client = FakeRemoteExists()
+    assert client.create_task_branch(Path("."), "task-1") is True
+
+
+def test_create_task_branch_returns_false_when_new() -> None:
+    """create_task_branch returns False when the branch does not exist on remote."""
+    class FakeNoRemote(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            return ""
+
+    client = FakeNoRemote()
+    assert client.create_task_branch(Path("."), "task-2") is False
+
+
 # ---------------------------------------------------------------------------
 # verify_remote_branch_exists
 # ---------------------------------------------------------------------------
@@ -454,3 +527,58 @@ def test_push_branch_calls_push() -> None:
     client = TrackingFake()
     client.push_branch(Path("."), "feature-1")
     assert ("git", "push", "-u", "origin", "feature-1") in calls
+
+
+# ---------------------------------------------------------------------------
+# checkout_base
+# ---------------------------------------------------------------------------
+
+def test_checkout_base_delegates_to_git_checkout() -> None:
+    calls: list[tuple[str, ...]] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            calls.append(tuple(args))
+            return ""
+
+    client = TrackingFake()
+    client.checkout_base(Path("/repo"), "main")
+    assert ("git", "checkout", "main") in calls
+
+
+# ---------------------------------------------------------------------------
+# try_merge_base
+# ---------------------------------------------------------------------------
+
+def test_try_merge_base_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is True
+    assert conflicts == []
+
+
+def test_try_merge_base_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="merge conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=0, stdout="src/a.py\nsrc/b.py\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == ["src/a.py", "src/b.py"]
