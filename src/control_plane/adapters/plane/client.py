@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import re
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -119,8 +119,8 @@ class PlaneClient:
             labels=label_names,
             repo_key=str(metadata["repo"]),
             base_branch=str(metadata["base_branch"]),
-            execution_mode=metadata["mode"],
-            allowed_paths=[str(path) for path in metadata.get("allowed_paths", [])],
+            execution_mode=cast("Any", metadata.get("mode", "goal")),
+            allowed_paths=[str(path) for path in cast(list[object], metadata.get("allowed_paths") or [])],
             validation_profile=(
                 str(metadata.get("validation_profile")) if metadata.get("validation_profile") else None
             ),

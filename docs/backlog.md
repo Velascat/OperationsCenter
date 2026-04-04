@@ -85,5 +85,6 @@ allowing non-Python repos to declare their own install steps.
 ### config — Per-repo execution budget overrides
 Allow repos to declare their own hourly/daily caps rather than sharing the global budget.
 
-### ci — Add type checking to CI
-Integrate `ty check` (or mypy) into the CI workflow once the type coverage baseline is clean.
+### ci — Type checking with `ty`
+`ty` is the active type-checking contract. `ty check src/` passes clean and runs in CI.
+**Status**: done (`.github/workflows/ci.yml`, `pyproject.toml`)

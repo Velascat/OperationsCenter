@@ -3,6 +3,7 @@ from pathlib import Path
 from control_plane.application.service import ExecutionService
 from control_plane.config.settings import Settings
 from control_plane.domain.models import BoardTask, ValidationResult
+from control_plane.execution.models import NoOpDecision, RetryDecision
 
 
 class DummyPlaneClient:
@@ -93,6 +94,10 @@ def test_service_uses_bootstrap_environment_for_validation(tmp_path: Path) -> No
         ]
 
     service.validation.run = fake_run  # type: ignore[assignment]
+    service.usage_store.noop_decision = lambda **kwargs: NoOpDecision(should_skip=False)  # type: ignore[assignment]
+    service.usage_store.retry_decision = lambda **kwargs: RetryDecision(allowed=True)  # type: ignore[assignment]
+    service.usage_store.budget_decision = lambda **kwargs: type("B", (), {"allowed": True})()  # type: ignore[assignment]
+    service.usage_store.record_execution = lambda **kwargs: None  # type: ignore[assignment]
 
     result = service.run_task(DummyPlaneClient(), "TASK-7")
 

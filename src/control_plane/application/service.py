@@ -301,7 +301,7 @@ class ExecutionService:
                 return ExecutionResult(
                     run_id=run_id,
                     worker_role=worker_role,
-                    task_kind=task.task_kind,
+                    task_kind=task.execution_mode,
                     success=False,
                     outcome_status="skipped",
                     outcome_reason="orchestrator_rate_limited",

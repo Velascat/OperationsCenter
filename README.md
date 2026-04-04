@@ -22,7 +22,7 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**.
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
 - **Control Plane** is the local autonomous wrapper that watches the board, prepares isolated workspaces, runs tasks, and writes results back.
 - **Kodo** is the execution engine used inside a single task run.
-- **goal**, **test**, **improve**, and **propose** are the board-facing worker lanes.
+- **goal**, **test**, **improve**, **propose**, and **review** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
 ## System Boundaries
@@ -220,6 +220,26 @@ Then:
 ./scripts/control-plane.sh janitor
 ./scripts/control-plane.sh api
 ```
+
+## CI and Local Validation
+
+Three checks run on every push and PR (`.github/workflows/ci.yml`):
+
+- **ruff** — lint and style
+- **ty** — type checking (`ty check src/`)
+- **pytest** — tests
+
+Local equivalent:
+
+```bash
+ruff check .
+ty check src/
+pytest -q
+```
+
+`ty` is the active type-checking tool. `mypy` is not used or required.
+
+---
 
 ## Execution Controls
 

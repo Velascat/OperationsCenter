@@ -24,7 +24,7 @@ control-plane-setup = "control_plane.entrypoints.setup.main:main"
 dev = [
   "pytest>=8.0",
   "ruff>=0.5",
-  "mypy>=1.10",
+  "ty>=0.0.28",
 ]
 
 [tool.setuptools.packages.find]
@@ -38,7 +38,5 @@ testpaths = ["tests"]
 line-length = 100
 target-version = "py311"
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
-mypy_path = "src"
+[tool.ty.environment]
+python-version = "3.11"

@@ -1016,7 +1016,7 @@ def _dead_code_findings(repo_path: Path) -> list[dict[str, str]]:
     # Try vulture first
     vulture_out = _run_tool(["vulture", ".", "--min-confidence", "80"], cwd=repo_path, timeout=30)
     if vulture_out.strip():
-        lines = [l for l in vulture_out.splitlines() if "unused" in l.lower()][:20]
+        lines = [ln for ln in vulture_out.splitlines() if "unused" in ln.lower()][:20]
         if lines:
             by_file: dict[str, int] = {}
             for line in lines:
@@ -1075,7 +1075,7 @@ def _type_coverage_findings(repo_path: Path) -> list[dict[str, str]]:
     # ty: fast Rust-based type checker (Astral, same team as ruff/uv)
     ty_out = _run_tool(["ty", "check", "."], cwd=repo_path, timeout=60)
     if ty_out.strip():
-        error_lines = [l for l in ty_out.splitlines() if "error[" in l]
+        error_lines = [ln for ln in ty_out.splitlines() if "error[" in ln]
         if error_lines:
             by_file: _col.Counter[str] = _col.Counter()
             codes: _col.Counter[str] = _col.Counter()

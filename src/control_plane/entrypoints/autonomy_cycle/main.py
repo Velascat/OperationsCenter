@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 from pathlib import Path
@@ -10,11 +9,6 @@ from control_plane.adapters.plane import PlaneClient
 from control_plane.config import load_settings
 from control_plane.decision.artifact_writer import DecisionArtifactWriter
 from control_plane.decision.loader import DecisionLoader
-from control_plane.decision.rules.dependency_drift import DependencyDriftRule
-from control_plane.decision.rules.hotspot_concentration import HotspotConcentrationRule
-from control_plane.decision.rules.observation_coverage import ObservationCoverageRule
-from control_plane.decision.rules.test_visibility import TestVisibilityRule
-from control_plane.decision.rules.todo_accumulation import TodoAccumulationRule
 from control_plane.decision.service import ALL_FAMILIES, DecisionEngineService, _DEFAULT_ALLOWED_FAMILIES, new_decision_context
 from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver

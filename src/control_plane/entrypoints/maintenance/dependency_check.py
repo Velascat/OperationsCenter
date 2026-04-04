@@ -145,7 +145,8 @@ def collect_dependency_statuses(settings: Settings, env: dict[str, str]) -> list
     for key in ["claude", "codex", "gemini"]:
         provider = provider_statuses[key]
         pinned = normalize_version(env.get(provider_pin_env[key]))
-        latest = fetch_npm_latest(PROVIDER_SPECS[key].npm_package) if PROVIDER_SPECS[key].npm_package else None
+        npm_pkg = PROVIDER_SPECS[key].npm_package
+        latest = fetch_npm_latest(npm_pkg) if npm_pkg else None
         notes: list[str] = []
         if not provider.installed:
             notes.append("Provider CLI is not installed.")

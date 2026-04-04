@@ -26,7 +26,7 @@ class HotspotConcentrationRule:
         for subject, appearances in sorted(repeated_by_subject.items()):
             if appearances < self.min_repeated_runs:
                 continue
-            evidence = {"appears_in_recent_snapshots": appearances}
+            evidence: dict[str, object] = {"appears_in_recent_snapshots": appearances}
             evidence.update(dominant_by_subject.get(subject, {}))
             candidates.append(
                 CandidateSpec(

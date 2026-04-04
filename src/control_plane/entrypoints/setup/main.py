@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+from typing import cast
 import webbrowser
 
 from rich.console import Console
@@ -318,10 +319,11 @@ def discover_repo_choices(existing_config: dict[str, object], repo_root: Path) -
         for repo_key, raw in existing_repos.items():
             if not isinstance(raw, dict):
                 continue
-            clone_url = str(raw.get("clone_url", "")).strip()
+            raw_d = cast(dict[str, object], raw)
+            clone_url = str(raw_d.get("clone_url") or "").strip()
             if not clone_url or clone_url in seen:
                 continue
-            default_branch = str(raw.get("default_branch", "main"))
+            default_branch = str(raw_d.get("default_branch") or "main")
             choices.append(
                 RepoDiscoveryChoice(
                     label=f"Saved config: {repo_key}",
@@ -431,7 +433,7 @@ def existing_config_value(config: dict[str, object], *keys: str) -> str | None:
     for key in keys:
         if not isinstance(current, dict) or key not in current:
             return None
-        current = current[key]
+        current = cast(dict[str, object], current)[key]
     if current is None:
         return None
     return str(current)
@@ -910,6 +912,7 @@ def main(
         start_plane_now = False
 
     if start_plane_now:
+        assert plane_start_command is not None
         typer.echo("Starting Plane...")
         run_local_command(plane_start_command)
         typer.echo("Plane start command finished.")
