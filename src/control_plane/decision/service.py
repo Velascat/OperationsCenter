@@ -47,10 +47,12 @@ class DecisionEngineService:
         loader: DecisionLoaderProtocol,
         policy: DecisionPolicy | None = None,
         artifact_writer: DecisionArtifactWriter | None = None,
+        usage_store: UsageStore | None = None,
     ) -> None:
         self.loader = loader
         self.policy = policy or DecisionPolicy(config=DecisionPolicyConfig())
         self.artifact_writer = artifact_writer or DecisionArtifactWriter()
+        self._usage_store = usage_store
         self.rules = [
             ObservationCoverageRule(min_consecutive_runs=2),
             TestVisibilityRule(min_consecutive_runs=3),
@@ -88,7 +90,7 @@ class DecisionEngineService:
                 )
             )
 
-        usage_store = UsageStore()
+        usage_store = self._usage_store or UsageStore()
         remaining = usage_store.remaining_exec_capacity(now=context.generated_at)
         min_remaining = usage_store.settings.min_remaining_exec_for_proposals
         if remaining < min_remaining:

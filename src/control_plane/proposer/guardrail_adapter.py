@@ -22,12 +22,14 @@ class ProposerGuardrailAdapter:
         *,
         proposer_root: Path | None = None,
         cooldown_minutes: int = 120,
+        usage_store: UsageStore | None = None,
     ) -> None:
         self.proposer_root = proposer_root or Path("tools/report/control_plane/proposer")
         self.cooldown_minutes = cooldown_minutes
+        self._usage_store = usage_store
 
     def evaluate(self, *, client: PlaneClient, dedup_key: str, title: str, now: datetime) -> GuardrailResult:
-        usage_store = UsageStore()
+        usage_store = self._usage_store or UsageStore()
         remaining = usage_store.remaining_exec_capacity(now=now)
         min_remaining = usage_store.settings.min_remaining_exec_for_proposals
         if remaining < min_remaining:

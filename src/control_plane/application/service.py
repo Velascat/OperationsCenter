@@ -235,8 +235,6 @@ class ExecutionService:
                     )
                     artifacts.append(self.reporter.write_summary(run_dir, result))
                     return result
-                self.usage_store.record_execution(role=worker_role, task_id=task.task_id, signature=signature, now=datetime.now(UTC))
-
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
                 raise TaskContractError(
                     f"Base branch '{task.base_branch}' is not in the allowed list for repo "
@@ -379,6 +377,10 @@ class ExecutionService:
                     artifacts=artifacts,
                     final_status="Ready for AI",
                 )
+
+            # Record execution only after kodo has actually run (not rate-limited).
+            # This ensures rate-limited retries don't consume budget slots.
+            self.usage_store.record_execution(role=worker_role, task_id=task.task_id, signature=signature, now=datetime.now(UTC))
 
             phase = "validation"
             self._log_event("phase", run_id, phase=phase)

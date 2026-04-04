@@ -8,6 +8,7 @@ from control_plane.decision.loader import DecisionLoader
 from control_plane.decision.models import ProposalCandidatesArtifact, ProposalOutline
 from control_plane.decision.policy import DecisionPolicy, DecisionPolicyConfig
 from control_plane.decision.service import DecisionEngineService, new_decision_context
+from control_plane.execution import UsageStore
 from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
@@ -190,7 +191,7 @@ def test_service_emits_and_suppresses_candidates(tmp_path: Path) -> None:
     insights_root = tmp_path / "insights"
     InsightArtifactWriter(insights_root).write(insight)
 
-    service = DecisionEngineService(loader=DecisionLoader(insights_root=insights_root, decision_root=tmp_path / "decision"))
+    service = DecisionEngineService(loader=DecisionLoader(insights_root=insights_root, decision_root=tmp_path / "decision"), usage_store=UsageStore(tmp_path / "usage.json"))
     artifact, artifacts = service.decide(
         new_decision_context(
             repo_filter=None,
@@ -225,7 +226,7 @@ def test_zero_candidate_run_is_valid(tmp_path: Path) -> None:
     )
     insights_root = tmp_path / "insights"
     InsightArtifactWriter(insights_root).write(insight)
-    service = DecisionEngineService(loader=DecisionLoader(insights_root=insights_root, decision_root=tmp_path / "decision"))
+    service = DecisionEngineService(loader=DecisionLoader(insights_root=insights_root, decision_root=tmp_path / "decision"), usage_store=UsageStore(tmp_path / "usage.json"))
 
     artifact, _ = service.decide(
         new_decision_context(

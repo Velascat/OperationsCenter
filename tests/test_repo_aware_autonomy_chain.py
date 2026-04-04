@@ -34,6 +34,7 @@ from control_plane.proposer.candidate_integration import (
     new_proposer_integration_context,
 )
 from control_plane.proposer.candidate_loader import ProposalCandidateLoader
+from control_plane.execution import UsageStore
 from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
 
 
@@ -180,6 +181,7 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     decision_service = DecisionEngineService(
         loader=DecisionLoader(insights_root=insights_root, decision_root=decision_root),
         artifact_writer=DecisionArtifactWriter(decision_root),
+        usage_store=UsageStore(tmp_path / "usage.json"),
     )
     decision_artifact, decision_paths = decision_service.decide(
         new_decision_context(
@@ -198,7 +200,7 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
         settings=settings,
         client=plane_client,  # type: ignore[arg-type]
         loader=ProposalCandidateLoader(decision_root=decision_root, insights_root=insights_root),
-        guardrails=ProposerGuardrailAdapter(proposer_root=proposer_root),
+        guardrails=ProposerGuardrailAdapter(proposer_root=proposer_root, usage_store=UsageStore(tmp_path / "usage.json")),
         artifact_writer=ProposerArtifactWriter(proposer_root),
     )
     proposal_artifact, proposal_paths = proposer_service.run(

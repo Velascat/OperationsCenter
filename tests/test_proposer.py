@@ -21,6 +21,7 @@ from control_plane.proposer.candidate_integration import (
 from control_plane.proposer.artifact_writer import ProposerArtifactWriter
 from control_plane.proposer.candidate_loader import ProposalCandidateLoader
 from control_plane.proposer.candidate_mapper import ProposalCandidateMapper
+from control_plane.execution import UsageStore
 from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
 from control_plane.proposer.provenance import build_provenance
 
@@ -195,7 +196,7 @@ def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_
             decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
             insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
         ),
-        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
         artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
     )
 
@@ -236,7 +237,7 @@ def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Pat
             decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
             insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
         ),
-        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
         artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
     )
 
@@ -288,7 +289,7 @@ def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> 
             decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
             insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
         ),
-        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
         artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
     )
 
