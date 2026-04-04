@@ -164,6 +164,16 @@ def test_branch_allowed_no_match() -> None:
     assert branch_allowed("hotfix/bar", ["main", "develop"]) is False
 
 
+def test_branch_allowed_matches_later_pattern() -> None:
+    """branch_allowed returns True when the first pattern fails but a later one matches."""
+    assert branch_allowed("feature/abc", ["main", "develop", "feature/*"]) is True
+
+
+def test_branch_allowed_star_pattern_matches_everything() -> None:
+    """A single '*' pattern allows any branch."""
+    assert branch_allowed("release/v2.0", ["*"]) is True
+
+
 # ---------------------------------------------------------------------------
 # add_local_exclude
 # ---------------------------------------------------------------------------
@@ -362,6 +372,17 @@ def test_recent_changed_files_empty() -> None:
         }
     )
     assert client.recent_changed_files(Path(".")) == []
+
+
+def test_recent_changed_files_custom_max_count() -> None:
+    """recent_changed_files forwards a custom max_count into the git log command."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n7", "--name-only", "--pretty=format:"): b"\nsrc/x.py\nsrc/y.py\n",
+        }
+    )
+    result = client.recent_changed_files(Path("."), max_count=7)
+    assert result == ["src/x.py", "src/y.py"]
 
 
 # ---------------------------------------------------------------------------
@@ -582,3 +603,177 @@ def test_try_merge_base_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
     success, conflicts = client.try_merge_base(Path("/repo"), "main")
     assert success is False
     assert conflicts == ["src/a.py", "src/b.py"]
+
+
+# ===========================================================================
+# COVERAGE GAP AUDIT — untested behaviours per method in client.py
+# ===========================================================================
+#
+# changed_files (line 103)
+#   GAP: Deduplication when the same file appears in BOTH the tracked diff
+#        output and untracked ls-files output.  The method uses sorted(set(...))
+#        but no test exercises this overlap path.
+#
+# _parse_name_status_output (line 137)
+#   GAP: Copy status ("C") tested only alongside Rename in a combined test.
+#        No isolated test for a Copy entry verifying only the destination file
+#        is returned (not the source).
+#
+# add_local_exclude (line 27)
+#   GAP: Leading/trailing whitespace in pattern argument.  The method calls
+#        pattern.strip() for both the dedup check and the written value, but no
+#        test passes e.g. "  pattern  " to verify whitespace is stripped on
+#        write and dedup still works against a clean existing line.
+#
+# try_merge_base (line 57)
+#   GAP: Merge fails (returncode != 0) but git diff returns NO unmerged paths
+#        (empty stdout).  Current conflict test always supplies file names.
+#        This edge case should return (False, []).
+#
+# commit_all (line 126)
+#   GAP: The exact commit message string is forwarded to _run.  Existing test
+#        only checks the return value (True); no assertion that the message
+#        argument reaches the git commit command.
+#
+# clone (line 22)
+#   GAP: clone_url is correctly forwarded as an argument to _run.  Existing
+#        test only checks the returned Path; no assertion that _run received
+#        ["git", "clone", <url>, ...].
+#
+# _run / _run_bytes (lines 9, 15)
+#   GAP: cwd parameter is forwarded to subprocess.run.  Current monkeypatch
+#        tests ignore kwargs; no assertion verifies cwd reaches subprocess.
+#
+# checkout_base (line 45)
+#   GAP: cwd parameter is forwarded to _run.  The TrackingFake records args
+#        but ignores the cwd keyword; no assertion that cwd=repo_path is
+#        passed through.
+
+
+# ===========================================================================
+# Tests for coverage gaps
+# ===========================================================================
+
+
+def test_changed_files_dedup_overlap_diff_and_untracked() -> None:
+    """Same file in both diff output and untracked output appears only once."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): b"M\x00src/main.py\x00",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"src/main.py\x00",
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert result == ["src/main.py"]
+
+
+def test_parse_name_status_output_copy_returns_destination() -> None:
+    """Isolated Copy entry returns only destination, not source."""
+    client = GitClient()
+    raw = b"C100\x00src.py\x00dest.py\x00"
+    assert client._parse_name_status_output(raw) == ["dest.py"]
+
+
+def test_add_local_exclude_strips_whitespace_from_pattern(tmp_path: Path) -> None:
+    """Whitespace-padded pattern is stripped on write and dedup still works."""
+    client = GitClient()
+
+    client.add_local_exclude(tmp_path, "  pattern  ")
+
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    assert exclude_path.read_text() == "pattern\n"
+
+    # Call again — should be deduped against the already-written stripped value
+    client.add_local_exclude(tmp_path, "  pattern  ")
+    assert exclude_path.read_text() == "pattern\n"
+
+
+def test_try_merge_base_conflict_no_unmerged_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Merge fails but git diff returns no unmerged paths → (False, [])."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="merge conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == []
+
+
+def test_commit_all_forwards_message_to_git_commit() -> None:
+    """The exact commit message is forwarded to the git commit command."""
+    calls: list[tuple[str, ...]] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            calls.append(tuple(args))
+            if args == ["git", "status", "--porcelain"]:
+                return "M  src/main.py"
+            return ""
+
+    client = TrackingFake()
+    client.commit_all(Path("."), "my message")
+    assert ("git", "commit", "-m", "my message") in calls
+
+
+def test_clone_forwards_url_to_run() -> None:
+    """clone_url is forwarded as an argument to _run."""
+    calls: list[tuple[str, ...]] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            calls.append(tuple(args))
+            return ""
+
+    client = TrackingFake()
+    client.clone("https://example.com/repo.git", Path("/ws"))
+    assert ("git", "clone", "https://example.com/repo.git", "/ws/repo") in calls
+
+
+def test_run_forwards_cwd_to_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_run passes the cwd keyword argument through to subprocess.run."""
+    import subprocess as sp
+
+    captured: dict[str, object] = {}
+
+    class FakeProc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(*args: object, **kwargs: object) -> FakeProc:
+        captured.update(kwargs)
+        return FakeProc()
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    client._run(["git", "status"], cwd=Path("/myrepo"))
+    assert captured["cwd"] == Path("/myrepo")
+
+
+def test_run_bytes_forwards_cwd_to_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_run_bytes passes the cwd keyword argument through to subprocess.run."""
+    import subprocess as sp
+
+    captured: dict[str, object] = {}
+
+    class FakeProc:
+        returncode = 0
+        stdout = b""
+        stderr = b""
+
+    def fake_run(*args: object, **kwargs: object) -> FakeProc:
+        captured.update(kwargs)
+        return FakeProc()
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    client._run_bytes(["git", "diff"], cwd=Path("/myrepo"))
+    assert captured["cwd"] == Path("/myrepo")
