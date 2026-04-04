@@ -1988,6 +1988,19 @@ def handle_propose_cycle(
         proposals.extend(repo_proposals)
         notes.extend(repo_notes)
         board_idle = board_idle and repo_board_idle
+    # Interleave proposals by repo so each enabled repo gets a fair turn within
+    # the per-cycle cap (avoids a high-signal repo always crowding out others).
+    if len(repo_keys) > 1:
+        by_repo: dict[str, list[ProposalSpec]] = {}
+        for p in proposals:
+            by_repo.setdefault(p.repo_key, []).append(p)
+        interleaved: list[ProposalSpec] = []
+        buckets = [by_repo[k] for k in repo_keys if k in by_repo]
+        while any(buckets):
+            for bucket in buckets:
+                if bucket:
+                    interleaved.append(bucket.pop(0))
+        proposals = interleaved
     if not proposals:
         return ProposalCycleResult(
             created_task_ids=[],
