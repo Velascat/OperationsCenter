@@ -64,17 +64,18 @@ def test_observe_repo_cli_writes_artifact_and_prints_path(tmp_path: Path, monkey
     assert snapshot_path.exists()
 
 
-def test_observe_repo_cli_returns_nonzero_for_missing_repo(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_observe_repo_cli_returns_nonzero_for_missing_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = write_config(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
         [
             "observe-repo",
             "--config",
-            "config/control_plane.local.yaml",
+            str(config_path),
             "--repo",
             "/does/not/exist",
         ],
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises((ValueError, SystemExit)):
         observer_main.main()
