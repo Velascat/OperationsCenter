@@ -82,6 +82,16 @@ class GitHubPRClient:
         resp.raise_for_status()
         return resp.json()
 
+    def list_pr_review_comments(self, owner: str, repo: str, pr_number: int) -> list[dict]:
+        """Fetch inline/line-level review comments from the PR review comments API."""
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/comments",
+            headers=self._headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def get_comment_reactions(self, owner: str, repo: str, comment_id: int) -> list[dict]:
         resp = httpx.get(
             f"{self._API}/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions",

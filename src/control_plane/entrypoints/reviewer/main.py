@@ -121,8 +121,17 @@ def _process_pr_state(
             _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="comment_approved")
             return 1
 
-    # Check for new comments to trigger a revision
+    # Check for new comments to trigger a revision (both conversation and inline review comments)
     all_comments = gh.list_pr_comments(owner, repo, pr_number)
+    try:
+        review_comments = gh.list_pr_review_comments(owner, repo, pr_number)
+        # Tag review comments so we can distinguish them when building the revision prompt
+        for rc in review_comments:
+            rc.setdefault("_source", "review")
+        all_comments = all_comments + review_comments
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "pr_review_comments_failed", "task_id": task_id, "error": str(exc)}))
+
     bot_comment_ids: set[int] = set(state.get("bot_comment_ids", []))
     processed_human_ids: set[int] = set(state.get("processed_human_comment_ids", []))
     new_human_comments = [
@@ -151,8 +160,10 @@ def _process_pr_state(
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="max_loops")
         return 1
 
-    # Run kodo revision pass
+    # Run kodo revision pass — include file/line context for inline review comments
     review_comment = latest_comment["body"]
+    if latest_comment.get("_source") == "review" and latest_comment.get("path"):
+        review_comment = f"[{latest_comment['path']}]\n{review_comment}"
     repo_cfg = service.settings.repos[repo_key]
 
     logger.info(json.dumps({
