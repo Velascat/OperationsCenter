@@ -59,16 +59,21 @@ observe -> analyze -> decide -> propose
 [Board-Facing Proposer Lane] -> proposal_results.json -> Plane tasks
 ```
 
-## Autonomy Execution Model (Current)
+## Autonomy Execution Model
 
-The repo-aware autonomy loop is currently stage-driven and explicit.
+The repo-aware autonomy loop can be run stage-by-stage or as a single chained command.
 
+**Stage commands (explicit, inspectable):**
 - `observe-repo` writes a retained repo-state snapshot.
 - `generate-insights` reads retained snapshots and emits normalized insights.
 - `decide-proposals` reads retained insights and emits guarded proposal candidates.
 - `propose-from-candidates` routes emitted candidates through existing proposer protections and may create bounded Plane tasks.
 
-Today, these stages are run explicitly rather than through an automatic end-to-end wrapper. That is intentional: it keeps the autonomy loop inspectable, easy to validate, and easy to tune before a future chained wrapper exists.
+**Chained command (dry-run first):**
+- `autonomy-cycle` runs all four stages in sequence. Dry-run by default — shows what would be proposed without creating tasks. Pass `--execute` to create real Plane tasks. Pass `--all-families` to include all five decision families.
+
+**Threshold tuning:**
+- `analyze-artifacts` reads retained decision + proposer artifacts, computes per-family emit/suppress/create rates, and prints recommendations when suppression is too high or emitted candidates never reach the board.
 
 ## `Propose` Means Two Related Things
 
@@ -149,6 +154,12 @@ Two files drive local setup — both are gitignored. Committed templates documen
 
 The split is intentional: config yaml holds structure and behaviour (safe to version), env file holds secrets (gitignored). `token_env` fields in the config yaml reference env var **names**, not values.
 
+Key per-repo config options:
+
+- `await_review: true` — open a PR and enter the review loop instead of auto-merging
+- `bootstrap_commands: [...]` — custom install steps for non-Python repos (replaces Python venv setup when set)
+- `propose_enabled: true/false` — controls whether the proposer watcher targets this repo
+
 ## Fastest Happy Path
 
 ```bash
@@ -197,6 +208,11 @@ Then:
 ./scripts/control-plane.sh decide-proposals --dry-run
 ./scripts/control-plane.sh propose-from-candidates
 ./scripts/control-plane.sh propose-from-candidates --dry-run
+./scripts/control-plane.sh autonomy-cycle
+./scripts/control-plane.sh autonomy-cycle --execute
+./scripts/control-plane.sh autonomy-cycle --execute --all-families
+./scripts/control-plane.sh analyze-artifacts
+./scripts/control-plane.sh analyze-artifacts --repo ControlPlane --limit 20
 ./scripts/control-plane.sh backfill-pr-reviews
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
@@ -225,6 +241,8 @@ Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/Gi
 - `CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS`
 - `CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS`
 - `CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS`
+- `CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS`
+- `CONTROL_PLANE_PR_DRY_RUN` — set to `1` to log intended PR actions without touching GitHub
 
 Skipping is treated as a valid outcome when execution is not justified. Budget skips, no-op skips, retry-cap blocks, and proposal suppression are written to retained artifacts and surfaced in watcher logs.
 
@@ -315,7 +333,6 @@ The repo-aware autonomy loop is behaving well when:
 - No production-grade supervisor beyond local `watch-all`.
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
-- No automatic end-to-end `autonomy-cycle` wrapper yet; the repo-aware autonomy stages remain intentionally explicit and inspectable.
 
 ## Documentation
 
@@ -340,7 +357,7 @@ The repo-aware autonomy loop is behaving well when:
 
 ### Roadmap
 
-- [Backlog — Hardening and Trust Phase](docs/backlog.md)
+- [Backlog](docs/backlog.md)
 
 ## Task Template
 
