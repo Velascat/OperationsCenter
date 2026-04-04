@@ -660,3 +660,377 @@ def test_commit_all_forwards_repo_path_as_cwd() -> None:
     # All three calls (add, status, commit) should have cwd=repo
     assert all(c == repo for c in cwds)
     assert len(cwds) == 3
+
+
+# ---------------------------------------------------------------------------
+# changed_files — only untracked files (no diff output)
+# ---------------------------------------------------------------------------
+
+def test_changed_files_only_untracked() -> None:
+    """When there are no tracked changes but untracked files exist."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"new1.py\x00new2.py\x00",
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert result == ["new1.py", "new2.py"]
+
+
+def test_changed_files_sorted_output() -> None:
+    """Results should be sorted alphabetically."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): b"M\x00z_last.py\x00M\x00a_first.py\x00",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"m_middle.py\x00",
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert result == ["a_first.py", "m_middle.py", "z_last.py"]
+
+
+# ---------------------------------------------------------------------------
+# diff_stat — no tracked changes, only untracked
+# ---------------------------------------------------------------------------
+
+def test_diff_stat_empty_tracked_only_untracked() -> None:
+    """When there are no tracked diffs but untracked files exist."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--stat", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"new_file.py\x00another.py\x00",
+        }
+    )
+    stat = client.diff_stat(Path("."))
+    assert "untracked | new_file.py" in stat
+    assert "untracked | another.py" in stat
+    # No tracked stat lines
+    assert "file changed" not in stat
+
+
+# ---------------------------------------------------------------------------
+# _parse_name_status_output — copy-only entries
+# ---------------------------------------------------------------------------
+
+def test_parse_name_status_output_copy_only() -> None:
+    """Copy entries should return only the destination path."""
+    client = GitClient()
+    raw = b"C100\x00src/original.py\x00src/copy.py\x00"
+    result = client._parse_name_status_output(raw)
+    assert result == ["src/copy.py"]
+
+
+def test_parse_name_status_output_mixed_rename_copy_modify() -> None:
+    """Mixed sequence: modify, rename, copy, add."""
+    client = GitClient()
+    raw = (
+        b"M\x00src/modified.py\x00"
+        b"R090\x00old_name.py\x00new_name.py\x00"
+        b"C050\x00template.py\x00derived.py\x00"
+        b"A\x00brand_new.py\x00"
+    )
+    result = client._parse_name_status_output(raw)
+    assert result == ["src/modified.py", "new_name.py", "derived.py", "brand_new.py"]
+
+
+# ---------------------------------------------------------------------------
+# recent_commits — blank lines in output
+# ---------------------------------------------------------------------------
+
+def test_recent_commits_filters_blank_lines() -> None:
+    """Blank/whitespace-only lines should be excluded from results."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n5", "--pretty=format:%h %s"): b"abc1234 First\n\n  \ndef5678 Second\n",
+        }
+    )
+    result = client.recent_commits(Path("."))
+    assert result == ["abc1234 First", "def5678 Second"]
+
+
+# ---------------------------------------------------------------------------
+# recent_changed_files — dedup across normalization variants
+# ---------------------------------------------------------------------------
+
+def test_recent_changed_files_dedup_across_normalization() -> None:
+    """./src/a.py and src/a.py should collapse to one entry after normalization."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n3", "--name-only", "--pretty=format:"): b"\n./src/a.py\nsrc/a.py\nsrc/b.py\n",
+        }
+    )
+    result = client.recent_changed_files(Path("."))
+    assert result == ["src/a.py", "src/b.py"]
+
+
+# ---------------------------------------------------------------------------
+# add_local_exclude — edge cases
+# ---------------------------------------------------------------------------
+
+def test_add_local_exclude_empty_existing_file(tmp_path: Path) -> None:
+    """When the exclude file exists but is empty, pattern should be written."""
+    client = GitClient()
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text("")
+
+    client.add_local_exclude(tmp_path, "newpattern")
+
+    assert exclude_path.read_text() == "newpattern\n"
+
+
+def test_add_local_exclude_whitespace_only_content(tmp_path: Path) -> None:
+    """When the exclude file has only whitespace lines, new pattern should be added."""
+    client = GitClient()
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text("  \n  \n")
+
+    client.add_local_exclude(tmp_path, "realpattern")
+
+    content = exclude_path.read_text()
+    assert "realpattern\n" in content
+
+
+def test_add_local_exclude_pattern_with_leading_trailing_whitespace_stored_stripped(tmp_path: Path) -> None:
+    """The stored pattern should be stripped of surrounding whitespace."""
+    client = GitClient()
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text("")
+
+    client.add_local_exclude(tmp_path, "  spaced_pattern  ")
+
+    content = exclude_path.read_text()
+    assert "spaced_pattern\n" in content
+    assert "  spaced_pattern  " not in content
+
+
+# ---------------------------------------------------------------------------
+# cwd forwarding — verify_remote_branch_exists & checkout_base
+# ---------------------------------------------------------------------------
+
+def test_verify_remote_branch_exists_forwards_cwd() -> None:
+    """verify_remote_branch_exists should pass repo_path as cwd to _run."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return "abc123\trefs/heads/main"
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.verify_remote_branch_exists(repo, "main")
+    assert cwds == [repo]
+
+
+def test_checkout_base_forwards_cwd() -> None:
+    """checkout_base should pass repo_path as cwd to _run."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.checkout_base(repo, "develop")
+    assert cwds == [repo]
+
+
+def test_create_task_branch_forwards_cwd() -> None:
+    """create_task_branch should pass repo_path as cwd to all _run calls."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/my/repo")
+    client.create_task_branch(repo, "feat-x")
+    assert all(c == repo for c in cwds)
+    assert len(cwds) >= 2  # ls-remote + checkout
+
+
+def test_set_identity_forwards_cwd() -> None:
+    """set_identity should pass repo_path as cwd to both config calls."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.set_identity(repo, "Bot", "bot@example.com")
+    assert all(c == repo for c in cwds)
+    assert len(cwds) == 2
+
+
+def test_push_branch_forwards_cwd() -> None:
+    """push_branch should pass repo_path as cwd to _run."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.push_branch(repo, "main")
+    assert cwds == [repo]
+
+
+def test_recent_commits_forwards_cwd() -> None:
+    """recent_commits should pass repo_path as cwd to _run."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.recent_commits(repo)
+    assert cwds == [repo]
+
+
+def test_recent_changed_files_forwards_cwd() -> None:
+    """recent_changed_files should pass repo_path as cwd to _run."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.recent_changed_files(repo)
+    assert cwds == [repo]
+
+
+def test_changed_files_forwards_cwd() -> None:
+    """changed_files should pass repo_path as cwd to both _run_bytes calls."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run_bytes(self, args: list[str], cwd: Path | None = None) -> bytes:
+            cwds.append(cwd)
+            return b""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.changed_files(repo)
+    assert all(c == repo for c in cwds)
+    assert len(cwds) == 2  # diff + ls-files
+
+
+def test_diff_stat_forwards_cwd() -> None:
+    """diff_stat should pass repo_path as cwd to _run and _run_bytes."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+        def _run_bytes(self, args: list[str], cwd: Path | None = None) -> bytes:
+            cwds.append(cwd)
+            return b""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.diff_stat(repo)
+    assert all(c == repo for c in cwds)
+    assert len(cwds) == 2
+
+
+def test_diff_patch_forwards_cwd() -> None:
+    """diff_patch should pass repo_path as cwd to _run."""
+    cwds: list[Path | None] = []
+
+    class TrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            cwds.append(cwd)
+            return ""
+
+    client = TrackingFake()
+    repo = Path("/some/repo")
+    client.diff_patch(repo)
+    assert cwds == [repo]
+
+
+# ---------------------------------------------------------------------------
+# Error propagation in commit_all
+# ---------------------------------------------------------------------------
+
+def test_commit_all_propagates_add_failure() -> None:
+    """If 'git add -A' fails, the error should propagate."""
+
+    class FailingAdd(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            if args == ["git", "add", "-A"]:
+                raise RuntimeError("git command failed: git add -A\nfatal: error")
+            return ""
+
+    client = FailingAdd()
+    with pytest.raises(RuntimeError, match="git add"):
+        client.commit_all(Path("."), "msg")
+
+
+def test_commit_all_propagates_commit_failure() -> None:
+    """If 'git commit' fails after staging, the error should propagate."""
+
+    class FailingCommit(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            if args[:2] == ["git", "add"]:
+                return ""
+            if args[:2] == ["git", "status"]:
+                return "M  file.py"
+            if args[:2] == ["git", "commit"]:
+                raise RuntimeError("git command failed: git commit\nfatal: error")
+            return ""
+
+    client = FailingCommit()
+    with pytest.raises(RuntimeError, match="git commit"):
+        client.commit_all(Path("."), "msg")
+
+
+# ---------------------------------------------------------------------------
+# verify_remote_branch_exists — network error propagation
+# ---------------------------------------------------------------------------
+
+def test_verify_remote_branch_exists_propagates_runtime_error() -> None:
+    """If _run raises RuntimeError (e.g. network failure), it should propagate."""
+
+    class NetworkFail(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            raise RuntimeError("git command failed: git ls-remote\nfatal: Could not read from remote")
+
+    client = NetworkFail()
+    with pytest.raises(RuntimeError, match="Could not read from remote"):
+        client.verify_remote_branch_exists(Path("."), "main")
+
+
+# ---------------------------------------------------------------------------
+# branch_allowed — wildcard-all pattern
+# ---------------------------------------------------------------------------
+
+def test_branch_allowed_wildcard_all_matches_any_branch() -> None:
+    """A '*' pattern should match any branch name."""
+    assert branch_allowed("anything/goes", ["*"]) is True
+    assert branch_allowed("main", ["*"]) is True
+
+
+def test_branch_allowed_single_non_matching_pattern() -> None:
+    """A single pattern that doesn't match should return False."""
+    assert branch_allowed("main", ["develop"]) is False
