@@ -331,11 +331,20 @@ class ExecutionService:
                 # Check for recurring failure pattern
                 val_history = ValidationHistory(self.settings.report_root)
                 failure_sigs = ValidationHistory.compute_signatures(validation_results)
-                if val_history.check_recurring(task_id, failure_sigs):
+                if val_history.check_recurring(
+                    task_id,
+                    failure_sigs,
+                    window=self.settings.recurring_failure_window,
+                    threshold=self.settings.recurring_failure_threshold,
+                ):
                     recurring_failure = True
                     val_history.record_signatures(task_id, failure_sigs)
                     self._log_event("recurring_validation_failure", run_id, task_id=task_id)
                 else:
+                    # Record initial failure signatures so future runs can
+                    # detect recurring patterns even if this is the first failure.
+                    val_history.record_signatures(task_id, failure_sigs)
+
                     error_text = self._validation_excerpt(validation_results)
                     if error_text:
                         with open(goal_file, "a") as f:

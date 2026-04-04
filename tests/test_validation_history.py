@@ -101,6 +101,19 @@ class TestRecordAndCheckRecurring:
         history = ValidationHistory(tmp_path / "nonexistent")
         assert history.check_recurring("TASK-X", [("cmd", "hash")]) is False
 
+    def test_check_recurring_empty_signatures(self, tmp_path: Path) -> None:
+        """Empty signature list short-circuits to False without scanning run dirs."""
+        report_root = tmp_path / "reports"
+        task_id = "TASK-EMPTY"
+
+        # Create run dirs with signatures — would match if scanned
+        for i in range(3):
+            d = self._make_run_dir(report_root, task_id, i)
+            (d / "validation_signatures.json").write_text(json.dumps([("cmd", "hash")]))
+
+        history = ValidationHistory(report_root)
+        assert history.check_recurring(task_id, [], window=5, threshold=1) is False
+
 
 # ---------------------------------------------------------------------------
 # Integration test: service skips retry on recurring failure
@@ -222,3 +235,135 @@ def test_skip_retry_on_recurring_failure(tmp_path: Path) -> None:
     assert result.validation_passed is False
     assert result.validation_retried is False
     assert result.outcome_reason == "recurring_validation_failure"
+
+
+def test_first_failure_records_signatures(tmp_path: Path) -> None:
+    """After a single failed run with no prior history, validation_signatures.json is created."""
+    settings = _make_settings(tmp_path)
+    service = ExecutionService(settings)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+
+    service.workspace.create = lambda: tmp_path / "workspace"  # type: ignore[assignment]
+    service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+    service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    service.git.add_local_exclude = lambda repo_path, pattern: None  # type: ignore[assignment]
+    service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+    service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+    service.git.changed_files = lambda repo_path: []  # type: ignore[assignment]
+    service.git.commit_all = lambda repo_path, message: False  # type: ignore[assignment]
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    goal_file = workspace_dir / "goal.md"
+    goal_file.write_text("Do thing.")
+
+    service.kodo.write_goal_file = lambda path, goal_text, constraints_text: goal_file  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path: type(  # type: ignore[assignment]
+        "KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},
+    )()
+    service.bootstrapper.prepare = lambda *args, **kwargs: type(  # type: ignore[assignment]
+        "BootstrapResult", (), {"env": {}, "commands": []},
+    )()
+    service.usage_store.noop_decision = lambda **kwargs: NoOpDecision(should_skip=False)  # type: ignore[assignment]
+    service.usage_store.retry_decision = lambda **kwargs: RetryDecision(allowed=True)  # type: ignore[assignment]
+    service.usage_store.budget_decision = lambda **kwargs: type("B", (), {"allowed": True})()  # type: ignore[assignment]
+    service.usage_store.record_execution = lambda **kwargs: None  # type: ignore[assignment]
+
+    # Validation always fails — both initial and retry
+    def failing_validation(commands, cwd, env=None, **kwargs):  # noqa: ARG001
+        return [
+            ValidationResult(command=cmd, exit_code=1, stdout="", stderr="first fail", duration_ms=1)
+            for cmd in commands
+        ]
+
+    service.validation.run = failing_validation  # type: ignore[assignment]
+
+    # No prior history — this is the very first run
+    result = service.run_task(DummyPlaneClient(_make_task()), "TASK-REC")
+
+    assert result.validation_passed is False
+
+    # Verify that validation_signatures.json was created in the run directory
+    report_root = Path(settings.report_root)
+    sig_files = list(report_root.glob("*TASK-REC*/validation_signatures.json"))
+    assert len(sig_files) >= 1, "Expected validation_signatures.json to be created on first failure"
+    # Verify the file contains valid signature data
+    content = json.loads(sig_files[0].read_text())
+    assert isinstance(content, list)
+    assert len(content) > 0
+
+
+def test_recurring_failure_skips_retry_e2e(tmp_path: Path) -> None:
+    """End-to-end: two consecutive runs with identical validation failures.
+
+    Run 1 → fails validation, records signatures (no recurring history yet, so retry happens).
+    Run 2 → fails with same output, detects recurring pattern, skips retry,
+             sets outcome_reason='recurring_validation_failure'.
+    """
+    settings = _make_settings(tmp_path)
+    # With threshold=1, a single prior run with matching signatures triggers detection.
+    settings.recurring_failure_threshold = 1
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+
+    validation_call_counts: list[int] = []
+
+    def _run_once(run_index: int) -> object:
+        """Execute one service.run_task cycle, return the result."""
+        service = ExecutionService(settings)
+
+        service.workspace.create = lambda: tmp_path / f"workspace_{run_index}"  # type: ignore[assignment]
+        (tmp_path / f"workspace_{run_index}").mkdir(exist_ok=True)
+        service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+        service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+        service.git.add_local_exclude = lambda repo_path, pattern: None  # type: ignore[assignment]
+        service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+        service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+        service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+        service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+        service.git.changed_files = lambda repo_path: []  # type: ignore[assignment]
+        service.git.commit_all = lambda repo_path, message: False  # type: ignore[assignment]
+
+        goal_file = tmp_path / f"workspace_{run_index}" / "goal.md"
+        goal_file.write_text("Do thing.")
+        service.kodo.write_goal_file = lambda path, goal_text, constraints_text: goal_file  # type: ignore[assignment]
+        service.kodo.run = lambda goal_file, repo_path: type(  # type: ignore[assignment]
+            "KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},
+        )()
+        service.bootstrapper.prepare = lambda *args, **kwargs: type(  # type: ignore[assignment]
+            "BootstrapResult", (), {"env": {}, "commands": []},
+        )()
+        service.usage_store.noop_decision = lambda **kwargs: NoOpDecision(should_skip=False)  # type: ignore[assignment]
+        service.usage_store.retry_decision = lambda **kwargs: RetryDecision(allowed=True)  # type: ignore[assignment]
+        service.usage_store.budget_decision = lambda **kwargs: type("B", (), {"allowed": True})()  # type: ignore[assignment]
+        service.usage_store.record_execution = lambda **kwargs: None  # type: ignore[assignment]
+
+        call_count = 0
+
+        def failing_validation(commands, cwd, env=None, **kwargs):  # noqa: ARG001
+            nonlocal call_count
+            call_count += 1
+            return [
+                ValidationResult(command=cmd, exit_code=1, stdout="", stderr="error: E501 line too long", duration_ms=1)
+                for cmd in commands
+            ]
+
+        service.validation.run = failing_validation  # type: ignore[assignment]
+
+        result = service.run_task(DummyPlaneClient(_make_task()), "TASK-REC")
+        validation_call_counts.append(call_count)
+        return result
+
+    # Run 1: first failure — no recurring history, so retry happens (validation called twice)
+    result1 = _run_once(0)
+    assert result1.validation_passed is False
+    assert validation_call_counts[0] == 2  # initial + retry
+
+    # Run 2: same failure — recurring pattern detected, retry skipped (validation called once)
+    result2 = _run_once(1)
+    assert result2.validation_passed is False
+    assert result2.validation_retried is False
+    assert result2.outcome_reason == "recurring_validation_failure"
+    assert validation_call_counts[1] == 1  # only initial, no retry

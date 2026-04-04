@@ -61,6 +61,8 @@ class Settings(BaseModel):
     kodo: KodoSettings
     repos: dict[str, RepoSettings]
     report_root: Path = Path("tools/report/kodo_plane")
+    recurring_failure_threshold: int = 2
+    recurring_failure_window: int = 5
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]

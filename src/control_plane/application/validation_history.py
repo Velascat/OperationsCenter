@@ -51,6 +51,8 @@ class ValidationHistory:
         threshold: int = 2,
     ) -> bool:
         """Return ``True`` if any signature appears in >= *threshold* of the last *window* runs."""
+        if not signatures:
+            return False
         run_dirs = self._recent_run_dirs(task_id, window)
         if not run_dirs:
             return False
