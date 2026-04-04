@@ -13,9 +13,11 @@ This repo runs as a local polling workflow.
 ./scripts/control-plane.sh watch --role test
 ./scripts/control-plane.sh watch --role improve
 ./scripts/control-plane.sh watch --role propose
+./scripts/control-plane.sh watch --role review
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
+./scripts/control-plane.sh backfill-pr-reviews
 ./scripts/control-plane.sh observe-repo
 ./scripts/control-plane.sh generate-insights
 ./scripts/control-plane.sh decide-proposals
@@ -47,9 +49,23 @@ This repo runs as a local polling workflow.
 - uses cooldowns, quotas, and deduplication to avoid board spam
 - prefers `Ready for AI` only for strong, bounded tasks; otherwise uses `Backlog`
 
+### `watch --role review`
+
+- polls open PRs tracked in `state/pr_reviews/` every 60 seconds (configurable via `CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS`)
+- only active for repos with `await_review: true` in config
+- drives the two-phase review loop:
+  - **self-review phase**: kodo evaluates its own diff and either merges (LGTM) or revises and retries
+  - **human review phase**: responds to human comments with kodo revision passes; merges on 👍 or 1-day timeout
+- ignores comments from accounts listed in `reviewer.bot_logins` and comments carrying the `<!-- controlplane:bot -->` marker
+- on startup, backfills state files for any open PRs that pre-date the watcher
+
+### `backfill-pr-reviews`
+
+Scans GitHub for open PRs on all `await_review`-enabled repos and creates missing state files. Run this after a watcher restart to recover any PRs that were opened before the watcher started.
+
 ### `watch-all`
 
-- local convenience wrapper that launches all four lanes together
+- local convenience wrapper that launches all five lanes together: `goal`, `test`, `improve`, `propose`, `review`
 - writes separate logs and PID files
 - not a scheduler cluster or distributed supervisor
 

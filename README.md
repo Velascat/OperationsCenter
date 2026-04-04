@@ -87,8 +87,8 @@ The naming is intentionally close because the second is the board adapter for th
 ### Core Workflow
 
 - Single-task execution from a Plane work item.
-- Background watchers for `goal`, `test`, `improve`, and `propose`.
-- `watch-all` to launch the four local watcher lanes together.
+- Background watchers for `goal`, `test`, `improve`, `propose`, and `review`.
+- `watch-all` to launch all five local watcher lanes together.
 - Structured task parsing from `## Execution`, `## Goal`, and optional `## Constraints`.
 - Isolated ephemeral clone + task branch workflow.
 - Repo-local bootstrap and validation execution.
@@ -107,23 +107,39 @@ The naming is intentionally close because the second is the board adapter for th
 
 ### PR Automation with Review Loop
 
-- After a successful push, Control Plane opens a PR and enters a review loop.
+- After a successful push, Control Plane opens a PR and enters a two-phase review loop.
 - Opt-in per repo via `await_review: true` in `config/control_plane.local.yaml`.
-- A dedicated `review` watcher polls GitHub reactions and comments every 60 seconds:
-  - 👍 on the PR → squash-merge + delete branch + task marked Done
-  - 👀 on the PR → another reviewer bot is looking; watcher holds off this cycle
-  - Comment posted on PR → kodo runs a revision pass on the same branch; bot replies when done; repeat up to 3 times
-  - 👍 on the bot reply → merge
-  - No reaction after 1 day → merge automatically (timeout fallback)
+- A dedicated `review` watcher polls GitHub every 60 seconds and drives the loop:
+
+**Phase 1 — Self-review (automatic):**
+  - Kodo reads the diff against the base branch and writes a verdict (`LGTM` or `CONCERNS`).
+  - `LGTM` → squash-merge, delete branch, task marked Done.
+  - `CONCERNS` → kodo runs a revision pass on the branch, then re-reviews (up to `max_self_review_loops`, default 2).
+  - If still unresolved after all loops → escalate to Phase 2.
+
+**Phase 2 — Human review (escalated):**
+  - Watcher posts a comment on the PR explaining what it couldn't resolve.
+  - 👍 on the PR or the latest bot reply → squash-merge + done.
+  - Human comment → kodo runs a revision pass; bot replies when done; repeat up to 3 times.
+  - 👍 on bot reply → merge.
+  - No action after 1 day → merge automatically (timeout fallback).
+
+**Bot safety contract:**
+  - All bot-posted comments carry a `<!-- controlplane:bot -->` marker so they are never mistaken for human review requests.
+  - `reviewer.bot_logins` in config lists GitHub accounts whose comments are always ignored.
+  - `reviewer.allowed_reviewer_logins` optionally restricts human-phase revisions to a whitelist of logins.
+
 - Token resolution: per-repo `token_env` if set, otherwise falls back to the global `git.token_env`.
 - PR creation and merge failures are logged but do not block the task from completing.
 - Set `CONTROL_PLANE_PR_DRY_RUN=1` to log intended PR actions without touching GitHub.
 - Existing open PRs are backfilled into the review loop on watcher startup: `./scripts/control-plane.sh backfill-pr-reviews`.
 
-### Execution Safety
+### Execution Safety and Self-Healing
 
 - Execution budget enforcement, retry caps, no-op suppression, and proposal suppression when execution budget is low.
 - Contract validation rejects unknown repo keys, missing goal text, and disallowed base branches early with clear Plane comments — no silent fallback.
+- Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
+- Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
 ### Repo and Branch Selection
 

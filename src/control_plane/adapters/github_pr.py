@@ -125,10 +125,6 @@ class GitHubPRClient:
     def has_thumbs_up(reactions: list[dict]) -> bool:
         return any(r["content"] == "+1" for r in reactions)
 
-    @staticmethod
-    def has_eyes(reactions: list[dict]) -> bool:
-        return any(r["content"] == "eyes" for r in reactions)
-
     def create_and_merge(
         self,
         owner: str,

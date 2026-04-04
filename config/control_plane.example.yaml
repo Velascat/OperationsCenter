@@ -81,11 +81,12 @@ repos:
 #     # Per-repo GitHub token override (must match token_env in this block):
 #     token_env: GITHUB_TOKEN_FRONTEND
 #
-#     # PR review loop: create PR and wait for 👍 reaction before merging.
-#     # Codex will react with 👀 while reviewing, then 👍 to approve or post
-#     # a comment with suggestions. Control Plane will run a kodo revision
-#     # pass for each comment (max 3 loops) then merge on 👍.
-#     # Falls back to merge after 1 day if no reaction is received.
+#     # PR review loop: create PR and enter a two-phase review loop before merging.
+#     # Phase 1 (automatic): kodo self-reviews its own diff. LGTM → merge.
+#     # CONCERNS → kodo revises and re-reviews (up to reviewer.max_self_review_loops times).
+#     # Phase 2 (escalated): if self-review can't resolve, posts a comment for human review.
+#     # Human 👍 on PR or bot reply → merge. Human comment → kodo revision pass (max 3).
+#     # No action after 1 day → merge automatically (timeout fallback).
 #     await_review: true
 #
 #     # Include this repo in idle-board proposer scans (default: true).
@@ -99,6 +100,20 @@ repos:
 #     # creating or merging the PR. Useful for testing the automation path.
 #     # Can also be set globally via CONTROL_PLANE_PR_DRY_RUN=1 in .env.
 #     # pr_dry_run: false
+
+# ---------------------------------------------------------------------------
+# Reviewer settings (optional — all fields have safe defaults)
+# ---------------------------------------------------------------------------
+# reviewer:
+#   # GitHub logins whose comments are always ignored (CI bots, integration accounts, etc.)
+#   bot_logins: []
+#   # If non-empty, only comments from these logins trigger human-phase revisions.
+#   # Leave empty to accept comments from any non-bot login.
+#   allowed_reviewer_logins: []
+#   # Max kodo self-review + revision cycles before escalating to human review (default: 2).
+#   max_self_review_loops: 2
+#   # HTML marker appended to every bot-posted comment — prevents re-processing own comments.
+#   bot_comment_marker: "<!-- controlplane:bot -->"
 
 # ---------------------------------------------------------------------------
 # Artifact storage root
