@@ -42,9 +42,8 @@ Cleaner structured audit log events around every PR action (`pr_review_pending`,
 ---
 
 ### docs — Clarify primary operator surface in README
-Plane + CLI is the primary control model.
-Local API/UI (`http://127.0.0.1:8787`) is a helper surface for repo import and live board view.
-**Status**: done (README updated)
+Plane + CLI is the primary control model. All board management happens through the Plane UI directly.
+**Status**: done
 
 ---
 

@@ -54,7 +54,6 @@ source .env.control-plane.local
 This starts:
 - **Plane** on `http://localhost:8080`
 - **Watchers**: `goal`, `test`, `improve`, `propose`, `review`
-- **Local API/UI** on `http://127.0.0.1:8787`
 
 Confirm everything is running:
 

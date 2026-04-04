@@ -11,8 +11,6 @@ WATCH_DIR="${LOG_DIR}/watch-all"
 REPORT_DIR="${ROOT_DIR}/tools/report/kodo_plane"
 PLANE_MANAGER="${ROOT_DIR}/deployment/plane/manage.sh"
 JANITOR_MAX_AGE_DAYS="${CONTROL_PLANE_RETENTION_DAYS:-1}"
-API_HOST="${CONTROL_PLANE_API_HOST:-127.0.0.1}"
-API_PORT="${CONTROL_PLANE_API_PORT:-8787}"
 
 ensure_venv() {
   if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
@@ -119,70 +117,6 @@ Environment:
   CONTROL_PLANE_CONFIG   Override config path (default: ${CONFIG_PATH})
   CONTROL_PLANE_ENV_FILE Override env file path (default: ${ENV_PATH})
 EOF
-}
-
-api_pid_file() {
-  echo "${LOG_DIR}/api.pid"
-}
-
-api_status_file() {
-  echo "${LOG_DIR}/api.status.json"
-}
-
-api_log_file() {
-  echo "${LOG_DIR}/$(timestamp)_api.log"
-}
-
-start_api_service() {
-  local pid_file
-  pid_file="$(api_pid_file)"
-  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
-    echo "api already running with PID $(cat "${pid_file}")"
-    return 0
-  fi
-  rm -f "${pid_file}"
-  mkdir -p "${LOG_DIR}"
-  local log_file
-  log_file="$(api_log_file)"
-  setsid /bin/bash -lc "
-    set -a
-    source '${ENV_PATH}'
-    set +a
-    exec '${VENV_DIR}/bin/python' -m uvicorn control_plane.entrypoints.api.main:app \
-      --host '${API_HOST}' \
-      --port '${API_PORT}'
-  " >>"${log_file}" 2>&1 < /dev/null &
-  local pid=$!
-  echo "${pid}" > "${pid_file}"
-  echo "api started: pid=${pid} url=http://${API_HOST}:${API_PORT} log=${log_file}"
-}
-
-stop_api_service() {
-  local pid_file
-  pid_file="$(api_pid_file)"
-  if [[ ! -f "${pid_file}" ]]; then
-    echo "api is not running"
-    return 0
-  fi
-  local pid
-  pid="$(cat "${pid_file}")"
-  if kill -0 "${pid}" >/dev/null 2>&1; then
-    kill "${pid}" >/dev/null 2>&1 || true
-    echo "api stopped: pid=${pid}"
-  else
-    echo "api was not running"
-  fi
-  rm -f "${pid_file}"
-}
-
-status_api_service() {
-  local pid_file
-  pid_file="$(api_pid_file)"
-  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
-    echo "api: running (pid $(cat "${pid_file}")) url=http://${API_HOST}:${API_PORT}"
-  else
-    echo "api: stopped"
-  fi
 }
 
 watch_pid_file() {
@@ -372,7 +306,6 @@ case "${cmd}" in
     stop_watch_role improve
     stop_watch_role propose
     stop_watch_role review
-    stop_api_service
     run_with_log plane-down "${PLANE_MANAGER}" down
     run_janitor
     ensure_venv

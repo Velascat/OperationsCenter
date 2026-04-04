@@ -11,8 +11,6 @@ Control Plane is operated through **Plane + CLI**:
 3. Watchers poll the board and execute tasks automatically.
 4. Results are written back to Plane as comments and state transitions.
 
-The **local API/UI** (`http://127.0.0.1:8787`) is a helper surface — useful for repo import and a live board view, but not required for day-to-day operation. All control happens through the CLI and the Plane board.
-
 For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**.
 
 ---
@@ -234,7 +232,6 @@ Then:
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
 ./scripts/control-plane.sh dependency-check
 ./scripts/control-plane.sh janitor
-./scripts/control-plane.sh api
 ```
 
 ## CI and Local Validation
@@ -282,24 +279,6 @@ Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/Gi
 
 Skipping is treated as a valid outcome when execution is not justified. Budget skips, no-op skips, retry-cap blocks, and proposal suppression are written to retained artifacts and surfaced in watcher logs.
 
-## Local API/UI (Helper Surface)
-
-Control Plane exposes a small local helper UI and API for repo operations.
-This is secondary to the CLI + Plane board model — it is not required for normal operation.
-
-- Repo control page: `http://127.0.0.1:8787/`
-- Live board: available in the same UI, with a polling work-item table
-- Repo list source: GitHub discovery for the owner(s) inferred from configured repos
-- Branch list source: GitHub branch API for each discovered/configured repo
-- Propose watcher scope: controlled by per-repo `propose_enabled` policy
-- Repo import: discovered repos can be imported into local Control Plane config directly from the UI
-
-Notes:
-
-- The watcher only operates on repos that are actually configured in `config/control_plane.local.yaml`.
-- Discovered repos are visible before import, but remain read-only/unconfigured until imported.
-- Private repos require a valid `GITHUB_TOKEN` in `.env.control-plane.local`.
-
 ## Local Stack Startup
 
 The easiest way to bring up the whole local system is:
@@ -312,7 +291,6 @@ That starts:
 
 - Plane on `http://localhost:8080`
 - all five watcher lanes: `goal`, `test`, `improve`, `propose`, and `review`
-- local API/UI on `http://127.0.0.1:8787` (repo import, live board view)
 
 Useful companions:
 
