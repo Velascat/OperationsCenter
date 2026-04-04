@@ -8,21 +8,48 @@ from control_plane.domain import ValidationResult
 
 
 class ValidationRunner:
-    def run(self, commands: list[str], cwd: Path, env: dict[str, str] | None = None) -> list[ValidationResult]:
+    def run(
+        self,
+        commands: list[str],
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout_seconds: int = 300,
+    ) -> list[ValidationResult]:
         results: list[ValidationResult] = []
         for command in commands:
             start = time.monotonic()
-            proc = subprocess.run(command, cwd=cwd, shell=True, capture_output=True, text=True, env=env, check=False)
-            duration_ms = int((time.monotonic() - start) * 1000)
-            results.append(
-                ValidationResult(
-                    command=command,
-                    exit_code=proc.returncode,
-                    stdout=proc.stdout,
-                    stderr=proc.stderr,
-                    duration_ms=duration_ms,
+            try:
+                proc = subprocess.run(
+                    command,
+                    cwd=cwd,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    check=False,
+                    timeout=timeout_seconds,
                 )
-            )
+                duration_ms = int((time.monotonic() - start) * 1000)
+                results.append(
+                    ValidationResult(
+                        command=command,
+                        exit_code=proc.returncode,
+                        stdout=proc.stdout,
+                        stderr=proc.stderr,
+                        duration_ms=duration_ms,
+                    )
+                )
+            except subprocess.TimeoutExpired:
+                duration_ms = int((time.monotonic() - start) * 1000)
+                results.append(
+                    ValidationResult(
+                        command=command,
+                        exit_code=-1,
+                        stdout="",
+                        stderr=f"Command timed out after {timeout_seconds} seconds: {command}",
+                        duration_ms=duration_ms,
+                    )
+                )
         return results
 
     @staticmethod
