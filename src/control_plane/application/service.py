@@ -585,13 +585,13 @@ class ExecutionService:
         return "\n".join(lines)
 
     @staticmethod
-    def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 20) -> str | None:
+    def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 40) -> str | None:
         failed = [r for r in validation_results if r.exit_code != 0]
         if not failed:
             return None
         output_lines: list[str] = []
         for r in failed:
-            output_lines.append(f"[{r.command}]")
+            output_lines.append(f"### Command: {r.command} (exit {r.exit_code})")
             text = r.stderr.strip() or r.stdout.strip()
             if text:
                 output_lines.extend(text.splitlines())

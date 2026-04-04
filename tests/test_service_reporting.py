@@ -581,3 +581,44 @@ def test_validation_excerpt_truncates_long_output() -> None:
     assert excerpt is not None
     lines = excerpt.splitlines()
     assert len(lines) == 10
+
+
+def test_validation_excerpt_header_format_includes_command_and_exit_code() -> None:
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr="FAILED test_foo.py", duration_ms=100),
+    ]
+
+    excerpt = ExecutionService._validation_excerpt(validation_results)
+    assert excerpt is not None
+    lines = excerpt.splitlines()
+    assert lines[0] == "### Command: pytest (exit 1)"
+    assert "FAILED test_foo.py" in excerpt
+
+
+def test_validation_excerpt_default_max_lines_is_40() -> None:
+    long_stderr = "\n".join(f"error line {i}" for i in range(50))
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr=long_stderr, duration_ms=100),
+    ]
+
+    excerpt = ExecutionService._validation_excerpt(validation_results)
+    assert excerpt is not None
+    lines = excerpt.splitlines()
+    # 1 header line + 50 stderr lines = 51, truncated to default 40
+    assert len(lines) == 40
+
+
+def test_validation_excerpt_multiple_failing_commands() -> None:
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr="test failed", duration_ms=100),
+        ValidationResult(command="mypy", exit_code=2, stdout="", stderr="type error found", duration_ms=200),
+        ValidationResult(command="ruff", exit_code=0, stdout="ok", stderr="", duration_ms=50),
+    ]
+
+    excerpt = ExecutionService._validation_excerpt(validation_results)
+    assert excerpt is not None
+    assert "### Command: pytest (exit 1)" in excerpt
+    assert "### Command: mypy (exit 2)" in excerpt
+    assert "ruff" not in excerpt
+    assert "test failed" in excerpt
+    assert "type error found" in excerpt
