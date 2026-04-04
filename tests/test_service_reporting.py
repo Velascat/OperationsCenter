@@ -581,3 +581,237 @@ def test_validation_excerpt_truncates_long_output() -> None:
     assert excerpt is not None
     lines = excerpt.splitlines()
     assert len(lines) == 10
+
+
+def test_validation_retry_with_baseline_failed_rewrites_goal(tmp_path: Path) -> None:
+    settings = Settings.model_validate(
+        {
+            "plane": {
+                "base_url": "http://plane.local",
+                "api_token_env": "PLANE_API_TOKEN",
+                "workspace_slug": "ws",
+                "project_id": "proj",
+            },
+            "git": {"provider": "github", "push_on_validation_failure": False},
+            "kodo": {},
+            "repos": {
+                "repo_a": {
+                    "clone_url": "git@github.com:you/repo_a.git",
+                    "default_branch": "main",
+                    "validation_commands": ["pytest"],
+                }
+            },
+            "report_root": str(tmp_path / "reports"),
+        }
+    )
+    service = ExecutionService(settings)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    kodo_call_count = 0
+
+    def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
+        nonlocal kodo_call_count
+        kodo_call_count += 1
+        return type("KodoResult", (), {"exit_code": 0, "stdout": f"out{kodo_call_count}", "stderr": f"err{kodo_call_count}", "command": ["kodo"]})()
+
+    goal_calls: list[tuple[object, str, str | None]] = []
+
+    def write_goal_file(path, goal_text, constraints_text):  # type: ignore[no-untyped-def]
+        goal_calls.append((path, goal_text, constraints_text))
+        return path
+
+    def validation_run(commands, cwd, env=None):  # type: ignore[no-untyped-def]  # noqa: ARG001
+        return [ValidationResult(command="pytest", exit_code=1, stdout="", stderr="FAILED test_foo.py", duration_ms=100)]
+
+    def validation_passed(results):  # type: ignore[no-untyped-def]
+        return False
+
+    service.workspace.create = lambda: workspace  # type: ignore[assignment]
+    service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+    service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    service.git.add_local_exclude = lambda repo_path, pattern: None  # type: ignore[assignment]
+    service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+    service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+    service.git.changed_files = lambda repo_path: ["src/a.py"]  # type: ignore[assignment]
+    service.git.diff_stat = lambda repo_path: "src/a.py | 2 +-"  # type: ignore[assignment]
+    service.git.diff_patch = lambda repo_path: "diff --git a/src/a.py b/src/a.py"  # type: ignore[assignment]
+    service.git.commit_all = lambda repo_path, message: True  # type: ignore[assignment]
+    service.git.push_branch = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.kodo.write_goal_file = write_goal_file  # type: ignore[assignment]
+    service.kodo.run = kodo_run  # type: ignore[assignment]
+    service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
+    service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
+    service.validation.run = validation_run  # type: ignore[assignment]
+    service.validation.passed = validation_passed  # type: ignore[assignment]
+    service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
+
+    result = service.run_task(ValidPlaneClient(), "TASK-BASELINE", preauthorized=True)
+
+    assert result.validation_retried is True
+    assert len(goal_calls) == 2
+    # Second call rewrites the goal for fixing pre-existing validation failure
+    assert "Fix the pre-existing validation failure" in goal_calls[1][1]
+
+
+def test_validation_excerpt_empty_output_returns_command_header() -> None:
+    # exit_code=1, both stderr and stdout empty → output_lines is ["[pytest]"], returns "[pytest]"
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr="", duration_ms=100),
+    ]
+    excerpt = ExecutionService._validation_excerpt(validation_results)
+    assert excerpt == "[pytest]"
+
+
+def test_validation_excerpt_all_passing_returns_none() -> None:
+    # All results have exit_code=0 → no failed results → returns None
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=100),
+        ValidationResult(command="mypy", exit_code=0, stdout="Success", stderr="", duration_ms=200),
+    ]
+    excerpt = ExecutionService._validation_excerpt(validation_results)
+    assert excerpt is None
+
+
+def test_no_retry_when_excerpt_is_none(tmp_path: Path) -> None:
+    """When validation.passed returns False but all results have exit_code=0,
+    kodo still retries but the goal file is NOT modified (error_text is None)."""
+    settings = Settings.model_validate(
+        {
+            "plane": {
+                "base_url": "http://plane.local",
+                "api_token_env": "PLANE_API_TOKEN",
+                "workspace_slug": "ws",
+                "project_id": "proj",
+            },
+            "git": {"provider": "github", "push_on_validation_failure": False},
+            "kodo": {},
+            "repos": {
+                "repo_a": {
+                    "clone_url": "git@github.com:you/repo_a.git",
+                    "default_branch": "main",
+                }
+            },
+            "report_root": str(tmp_path / "reports"),
+        }
+    )
+    service = ExecutionService(settings)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    kodo_call_count = 0
+
+    def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
+        nonlocal kodo_call_count
+        kodo_call_count += 1
+        return type("KodoResult", (), {"exit_code": 0, "stdout": f"out{kodo_call_count}", "stderr": f"err{kodo_call_count}", "command": ["kodo"]})()
+
+    goal_write_count = 0
+
+    def write_goal_file(path, goal_text, constraints_text):  # type: ignore[no-untyped-def]
+        nonlocal goal_write_count
+        goal_write_count += 1
+        return path
+
+    validation_passed_count = 0
+
+    def validation_passed(results):  # type: ignore[no-untyped-def]
+        nonlocal validation_passed_count
+        validation_passed_count += 1
+        if validation_passed_count <= 1:
+            return False
+        return True
+
+    service.workspace.create = lambda: workspace  # type: ignore[assignment]
+    service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+    service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    service.git.add_local_exclude = lambda repo_path, pattern: None  # type: ignore[assignment]
+    service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+    service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+    service.git.changed_files = lambda repo_path: ["src/a.py"]  # type: ignore[assignment]
+    service.git.diff_stat = lambda repo_path: "src/a.py | 2 +-"  # type: ignore[assignment]
+    service.git.diff_patch = lambda repo_path: "diff --git a/src/a.py b/src/a.py"  # type: ignore[assignment]
+    service.git.commit_all = lambda repo_path, message: True  # type: ignore[assignment]
+    service.git.push_branch = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.kodo.write_goal_file = write_goal_file  # type: ignore[assignment]
+    service.kodo.run = kodo_run  # type: ignore[assignment]
+    service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
+    service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
+    # All results pass with exit_code=0, but validation.passed says False
+    service.validation.run = lambda commands, cwd, env=None: [ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=100)]  # type: ignore[assignment]
+    service.validation.passed = validation_passed  # type: ignore[assignment]
+    service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
+
+    result = service.run_task(ValidPlaneClient(), "TASK-NOEXCERPT", preauthorized=True)
+
+    assert result.validation_retried is True
+    assert kodo_call_count == 2  # kodo still retries
+    assert goal_write_count == 1  # goal file written only once (initial), NOT modified before retry
+
+
+def test_validation_retry_kodo_raises_exception(tmp_path: Path) -> None:
+    settings = Settings.model_validate(
+        {
+            "plane": {
+                "base_url": "http://plane.local",
+                "api_token_env": "PLANE_API_TOKEN",
+                "workspace_slug": "ws",
+                "project_id": "proj",
+            },
+            "git": {"provider": "github", "push_on_validation_failure": False},
+            "kodo": {},
+            "repos": {
+                "repo_a": {
+                    "clone_url": "git@github.com:you/repo_a.git",
+                    "default_branch": "main",
+                }
+            },
+            "report_root": str(tmp_path / "reports"),
+        }
+    )
+    service = ExecutionService(settings)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    kodo_call_count = 0
+
+    def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
+        nonlocal kodo_call_count
+        kodo_call_count += 1
+        if kodo_call_count == 2:
+            raise RuntimeError("kodo retry exploded")
+        return type("KodoResult", (), {"exit_code": 0, "stdout": "out", "stderr": "err", "command": ["kodo"]})()
+
+    service.workspace.create = lambda: workspace  # type: ignore[assignment]
+    service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+    service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    service.git.add_local_exclude = lambda repo_path, pattern: None  # type: ignore[assignment]
+    service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+    service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+    service.git.changed_files = lambda repo_path: ["src/a.py"]  # type: ignore[assignment]
+    service.git.diff_stat = lambda repo_path: "src/a.py | 2 +-"  # type: ignore[assignment]
+    service.git.diff_patch = lambda repo_path: "diff --git a/src/a.py b/src/a.py"  # type: ignore[assignment]
+    service.git.commit_all = lambda repo_path, message: True  # type: ignore[assignment]
+    service.git.push_branch = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
+    service.kodo.run = kodo_run  # type: ignore[assignment]
+    service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
+    service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
+    service.validation.run = lambda commands, cwd, env=None: [ValidationResult(command="pytest", exit_code=1, stdout="", stderr="FAILED test_foo.py", duration_ms=100)]  # type: ignore[assignment]
+    service.validation.passed = lambda results: False  # type: ignore[assignment]
+    service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="kodo retry exploded"):
+        service.run_task(ValidPlaneClient(), "TASK-RETRYERR", preauthorized=True)

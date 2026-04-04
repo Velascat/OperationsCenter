@@ -909,6 +909,36 @@ def test_build_improve_triage_result_no_repeated_pattern_below_threshold() -> No
         )
 
 
+def test_build_improve_triage_result_escalates_at_exactly_three() -> None:
+    """Boundary test: exactly 3 prior occurrences of the same classification triggers escalation."""
+    blocked_issues = [
+        {
+            "id": f"BLOCKED-{i}",
+            "name": f"Broken task {i}",
+            "state": {"name": "Blocked"},
+            "labels": [{"name": "task-kind: goal"}],
+        }
+        for i in range(4)  # 3 prior classified + 1 current
+    ]
+    comments: dict[str, list[dict[str, object]]] = {}
+    for i in range(3):
+        comments[f"BLOCKED-{i}"] = [
+            {"comment_html": "<p>[Improve] Blocked triage</p><ul><li>blocked_classification: validation_failure</li></ul>"},
+        ]
+    current_id = "BLOCKED-3"
+    comments[current_id] = [
+        {"comment_html": "<p>[Goal] Execution result</p><ul><li>validation_passed: False</li></ul>"},
+    ]
+    client = FakePlaneClient(blocked_issues, comments=comments)
+
+    triage = build_improve_triage_result(client, client.fetch_issue(current_id), client.list_comments(current_id))
+
+    assert triage.classification == "validation_failure"
+    assert triage.follow_up is not None
+    assert triage.follow_up.handoff_reason == "improve_pattern_validation_failure"
+    assert "repeated" in triage.reason_summary.lower()
+
+
 def test_run_watch_loop_uses_backoff_on_rate_limit(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     request = httpx.Request("GET", "http://plane.local/work-items/")
     response = httpx.Response(429, request=request)
