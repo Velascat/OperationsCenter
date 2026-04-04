@@ -993,7 +993,7 @@ class ExecutionService:
                 return _SelfReviewVerdict(verdict="error", concerns=["Self-review did not produce review_verdict.txt"])
 
             content = verdict_file.read_text().strip()
-            lines = [l for l in content.splitlines() if l.strip()]
+            lines = [line for line in content.splitlines() if line.strip()]
             if not lines:
                 return _SelfReviewVerdict(verdict="error", concerns=["review_verdict.txt was empty"])
 
@@ -1001,7 +1001,7 @@ class ExecutionService:
             if first == "LGTM":
                 return _SelfReviewVerdict(verdict="lgtm", concerns=[])
             elif first == "CONCERNS":
-                concerns = [l.lstrip("- ").strip() for l in lines[1:] if l.strip()]
+                concerns = [line.lstrip("- ").strip() for line in lines[1:] if line.strip()]
                 return _SelfReviewVerdict(verdict="concerns", concerns=concerns or ["(no details)"])
             else:
                 # Fuzzy fallback: if LGTM appears anywhere without CONCERN, treat as lgtm
