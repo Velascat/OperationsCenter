@@ -78,6 +78,19 @@ repos:
 #     venv_dir: .venv
 #     install_dev_command: null
 #
+#     # Custom bootstrap commands (replaces the default Python venv setup).
+#     # Use this for non-Python repos or repos with unusual build steps.
+#     # When set, bootstrap_enabled/python_binary/venv_dir are ignored.
+#     bootstrap_commands:
+#       - npm ci
+#       - npm run build
+#
+#     # Per-repo environment variable overrides passed to kodo during execution.
+#     # Useful for setting tool paths, feature flags, or locale for this repo.
+#     env:
+#       NODE_ENV: development
+#       CI: "true"
+#
 #     # Per-repo GitHub token override (must match token_env in this block):
 #     token_env: GITHUB_TOKEN_FRONTEND
 #
