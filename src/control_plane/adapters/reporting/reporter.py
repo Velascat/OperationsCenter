@@ -61,6 +61,11 @@ class Reporter:
         path.write_text(json.dumps(data, indent=2))
         return str(path)
 
+    def write_initial_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
+        path = run_dir / "validation_initial.json"
+        path.write_text(json.dumps(data, indent=2))
+        return str(path)
+
     def write_policy_violation(self, run_dir: Path, violations: list[str]) -> str:
         path = run_dir / "policy_violation.json"
         path.write_text(json.dumps({"violations": violations}, indent=2))
@@ -144,6 +149,12 @@ class Reporter:
             lines.extend([f"- {line}" for line in result.diff_stat_excerpt.splitlines()] or ["- (none)"])
         lines.extend(["", "## Policy Violations"])
         lines.extend([f"- {f}" for f in result.policy_violations] or ["- (none)"])
+        if result.validation_retried and result.initial_validation_results:
+            lines.extend(["", "## Initial Validation (pre-retry)"])
+            for vr in result.initial_validation_results:
+                lines.append(f"- `{vr.command}`: exit_code={vr.exit_code}, duration={vr.duration_ms}ms")
+                if vr.stderr.strip():
+                    lines.append(f"  stderr: {vr.stderr.strip()[:200]}")
         lines.extend(["", "## Summary", result.summary])
         path.write_text("\n".join(lines))
         return str(path)

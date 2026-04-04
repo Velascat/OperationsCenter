@@ -370,6 +370,28 @@ def test_validation_retry_succeeds_moves_to_review(tmp_path: Path) -> None:
     retry_artifacts = [a for a in result.artifacts if "kodo_retry" in a]
     assert len(retry_artifacts) == 3
 
+    # Verify initial failing validation is persisted separately
+    assert (run_dir / "validation_initial.json").exists()
+    import json
+
+    initial_data = json.loads((run_dir / "validation_initial.json").read_text())
+    assert len(initial_data) == 1
+    assert initial_data[0]["exit_code"] == 1
+    assert initial_data[0]["stderr"] == "FAILED test_foo.py"
+
+    # Verify validation.json contains post-retry (passing) results
+    assert (run_dir / "validation.json").exists()
+    final_data = json.loads((run_dir / "validation.json").read_text())
+    assert len(final_data) == 1
+    assert final_data[0]["exit_code"] == 0
+    assert final_data[0]["stdout"] == "all passed"
+
+    # Verify both artifacts appear in the artifacts list
+    initial_artifacts = [a for a in result.artifacts if "validation_initial" in a]
+    assert len(initial_artifacts) == 1
+    final_validation_artifacts = [a for a in result.artifacts if a.endswith("validation.json")]
+    assert len(final_validation_artifacts) == 1
+
 
 def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
     settings = Settings.model_validate(
@@ -462,6 +484,91 @@ def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
     # Verify artifacts list includes retry paths
     retry_artifacts = [a for a in result.artifacts if "kodo_retry" in a]
     assert len(retry_artifacts) == 3
+
+    # Verify initial failing validation is persisted separately
+    assert (run_dir / "validation_initial.json").exists()
+    import json
+
+    initial_data = json.loads((run_dir / "validation_initial.json").read_text())
+    assert len(initial_data) == 1
+    assert initial_data[0]["exit_code"] == 1
+    assert initial_data[0]["stderr"] == "FAILED test_foo.py"
+
+    # Verify validation.json contains post-retry (still failing) results
+    assert (run_dir / "validation.json").exists()
+    final_data = json.loads((run_dir / "validation.json").read_text())
+    assert len(final_data) == 1
+    assert final_data[0]["exit_code"] == 1
+
+    # Verify both artifacts appear in the artifacts list
+    initial_artifacts = [a for a in result.artifacts if "validation_initial" in a]
+    assert len(initial_artifacts) == 1
+
+
+def test_no_retry_skips_initial_validation_artifact(tmp_path: Path) -> None:
+    settings = Settings.model_validate(
+        {
+            "plane": {
+                "base_url": "http://plane.local",
+                "api_token_env": "PLANE_API_TOKEN",
+                "workspace_slug": "ws",
+                "project_id": "proj",
+            },
+            "git": {"provider": "github"},
+            "kodo": {},
+            "repos": {
+                "repo_a": {
+                    "clone_url": "git@github.com:you/repo_a.git",
+                    "default_branch": "main",
+                }
+            },
+            "report_root": str(tmp_path / "reports"),
+        }
+    )
+    service = ExecutionService(settings)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    service.workspace.create = lambda: workspace  # type: ignore[assignment]
+    service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+    service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    service.git.add_local_exclude = lambda repo_path, pattern: None  # type: ignore[assignment]
+    service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+    service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+    service.git.changed_files = lambda repo_path: ["src/a.py"]  # type: ignore[assignment]
+    service.git.diff_stat = lambda repo_path: "src/a.py | 2 +-"  # type: ignore[assignment]
+    service.git.diff_patch = lambda repo_path: "diff --git a/src/a.py b/src/a.py"  # type: ignore[assignment]
+    service.git.commit_all = lambda repo_path, message: True  # type: ignore[assignment]
+    service.git.push_branch = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path: type("KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]})()  # type: ignore[assignment]
+    service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
+    service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
+    service.validation.run = lambda commands, cwd, env=None: [ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=100)]  # type: ignore[assignment]
+    service.validation.passed = lambda results: True  # type: ignore[assignment]
+    service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
+
+    result = service.run_task(ValidPlaneClient(), "TASK-NORETRY", preauthorized=True)
+
+    assert result.validation_retried is False
+    assert result.validation_passed is True
+
+    report_root = tmp_path / "reports"
+    run_dirs = list(report_root.iterdir())
+    assert len(run_dirs) == 1
+    run_dir = run_dirs[0]
+
+    # No initial validation artifact when validation passes first time
+    assert not (run_dir / "validation_initial.json").exists()
+    # But validation.json should still exist
+    assert (run_dir / "validation.json").exists()
+    # No initial validation artifacts in the list
+    initial_artifacts = [a for a in result.artifacts if "validation_initial" in a]
+    assert len(initial_artifacts) == 0
 
 
 def test_validation_excerpt_truncates_long_output() -> None:

@@ -319,6 +319,7 @@ class ExecutionService:
 
             validation_retried = False
             if not validation_ok:
+                initial_validation_results = validation_results
                 error_text = self._validation_excerpt(validation_results)
                 if error_text:
                     with open(goal_file, "a") as f:
@@ -338,9 +339,9 @@ class ExecutionService:
                 validation_retried = True
                 self._log_event("validation_retry", run_id, retry_passed=validation_ok)
                 artifacts.append(
-                    self.reporter.write_validation(
+                    self.reporter.write_initial_validation(
                         run_dir,
-                        [r.model_dump() for r in validation_results],
+                        [r.model_dump() for r in initial_validation_results],
                     )
                 )
 
@@ -476,6 +477,7 @@ class ExecutionService:
                 validation_passed=validation_ok,
                 validation_retried=validation_retried,
                 validation_results=validation_results,
+                initial_validation_results=initial_validation_results if validation_retried else [],
                 branch_pushed=branch_pushed,
                 draft_branch_pushed=draft_branch_pushed,
                 push_reason=push_reason,
