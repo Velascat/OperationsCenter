@@ -34,6 +34,7 @@ from control_plane.proposer import CandidateProposerIntegrationService
 from control_plane.proposer.candidate_integration import new_proposer_integration_context
 
 from control_plane.entrypoints.observer.main import configured_repo_match, ensure_git_repo, resolve_repo_path
+from control_plane.observer.collectors.git_context import run_git
 
 
 def build_observer_service() -> RepoObserverService:
@@ -112,6 +113,12 @@ def main() -> None:
     repo_path, repo_name = resolve_repo_path(args.repo, settings)
     ensure_git_repo(repo_path)
     configured_key, configured_base_branch = configured_repo_match(settings, repo_path)
+
+    # Pull latest before observing so the snapshot reflects merged PRs
+    try:
+        run_git(["pull", "--ff-only"], repo_path)
+    except Exception as exc:
+        print(f"      [warn] git pull --ff-only failed: {exc} (observing local state as-is)")
 
     observer = build_observer_service()
     obs_context = new_observer_context(
