@@ -261,8 +261,21 @@ class ExecutionService:
             )
 
             task_branch = self.task_branch(task)
-            self.git.create_task_branch(repo_path, task_branch)
-            self._log_event("task_branch_created", run_id, task_branch=task_branch, repo_path=str(repo_path))
+            remote_existed = self.git.create_task_branch(repo_path, task_branch)
+            self._log_event("task_branch_created", run_id, task_branch=task_branch, repo_path=str(repo_path), remote_existed=remote_existed)
+
+            # If the branch existed on remote it may be behind main — merge to surface
+            # any conflicts as working-tree markers so kodo can resolve them.
+            merge_conflict_files: list[str] = []
+            if remote_existed:
+                merge_ok, merge_conflict_files = self.git.try_merge_base(repo_path, task.base_branch)
+                self._log_event(
+                    "merge_base",
+                    run_id,
+                    base=task.base_branch,
+                    success=merge_ok,
+                    conflict_files=merge_conflict_files,
+                )
 
             phase = "bootstrap"
             self._log_event("phase", run_id, phase=phase)
@@ -293,7 +306,20 @@ class ExecutionService:
             )
 
             goal_file = workspace_path / "goal.md"
-            self.kodo.write_goal_file(goal_file, task.goal_text, task.constraints_text)
+            goal_text = task.goal_text
+            if merge_conflict_files:
+                conflict_list = "\n".join(f"- `{f}`" for f in merge_conflict_files)
+                goal_text = (
+                    f"## Merge Conflict Resolution Required\n\n"
+                    f"This branch has conflicts with `{task.base_branch}` that must be resolved "
+                    f"before the original goal can be completed. Conflict markers (`<<<<<<<`, "
+                    f"`=======`, `>>>>>>>`) are present in:\n\n"
+                    f"{conflict_list}\n\n"
+                    f"Resolve all conflict markers in those files, keeping the changes that best "
+                    f"satisfy the original goal below.\n\n"
+                    f"---\n\n"
+                ) + goal_text
+            self.kodo.write_goal_file(goal_file, goal_text, task.constraints_text)
 
             req = ExecutionRequest(
                 run_id=run_id,
@@ -858,8 +884,19 @@ class ExecutionService:
                 author_email=self.settings.git.author_email,
             )
 
+            # Sync with base branch; surface conflicts as markers if present
+            merge_ok, conflict_files = self.git.try_merge_base(repo_path, base_branch)
+
             goal_file = workspace_path / "goal.md"
             combined_goal = f"{original_goal}\n\n## Review Comment\n{review_comment}"
+            if not merge_ok and conflict_files:
+                conflict_list = "\n".join(f"- `{f}`" for f in conflict_files)
+                combined_goal = (
+                    f"## Merge Conflict Resolution Required\n\n"
+                    f"Conflict markers are present in:\n{conflict_list}\n\n"
+                    f"Resolve them, then address the review comment below.\n\n"
+                    f"---\n\n"
+                ) + combined_goal
             self.kodo.write_goal_file(goal_file, combined_goal)
 
             repo_cfg = self.settings.repos[repo_key]
@@ -911,6 +948,16 @@ class ExecutionService:
             repo_path = self.git.clone(clone_url, workspace_path)
             self.git.add_local_exclude(repo_path, ".kodo/")
             self.git.checkout_base(repo_path, branch)
+
+            # If the branch has drifted from base, merge so the self-review sees current state
+            merge_ok, conflict_files = self.git.try_merge_base(repo_path, base_branch)
+            if not merge_ok:
+                # Branch has unresolved conflicts — self-review cannot proceed cleanly
+                conflict_list = ", ".join(conflict_files) or "unknown files"
+                return _SelfReviewVerdict(
+                    verdict="concerns",
+                    concerns=[f"Branch has unresolved merge conflicts with `{base_branch}` in: {conflict_list}"],
+                )
 
             goal_file = workspace_path / "goal.md"
             goal_text = (

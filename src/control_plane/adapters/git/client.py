@@ -45,14 +45,36 @@ class GitClient:
     def checkout_base(self, repo_path: Path, branch: str) -> None:
         self._run(["git", "checkout", branch], cwd=repo_path)
 
-    def create_task_branch(self, repo_path: Path, task_branch: str) -> None:
-        # If the branch already exists on remote (e.g. a prior retry), track it so
-        # subsequent pushes are fast-forwards rather than rejected non-fast-forwards.
+    def create_task_branch(self, repo_path: Path, task_branch: str) -> bool:
+        """Create or checkout the task branch. Returns True if branch already existed on remote."""
         out = self._run(["git", "ls-remote", "--heads", "origin", task_branch], cwd=repo_path)
         if out:
             self._run(["git", "checkout", "-b", task_branch, f"origin/{task_branch}"], cwd=repo_path)
-        else:
-            self._run(["git", "checkout", "-b", task_branch], cwd=repo_path)
+            return True
+        self._run(["git", "checkout", "-b", task_branch], cwd=repo_path)
+        return False
+
+    def try_merge_base(self, repo_path: Path, base_branch: str) -> tuple[bool, list[str]]:
+        """Merge origin/base_branch into the current branch.
+
+        Returns (success, conflicting_files).  On conflict the merge is left
+        in-progress so conflict markers are visible in the working tree — the
+        caller is responsible for resolving them (e.g. via kodo) and then
+        committing.
+        """
+        proc = subprocess.run(
+            ["git", "merge", "--no-edit", f"origin/{base_branch}"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        if proc.returncode == 0:
+            return True, []
+        # Collect unmerged paths
+        status = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=U"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        conflict_files = [f.strip() for f in status.stdout.splitlines() if f.strip()]
+        return False, conflict_files
 
     def recent_commits(self, repo_path: Path, max_count: int = 5) -> list[str]:
         output = self._run(
