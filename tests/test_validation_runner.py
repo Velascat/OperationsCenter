@@ -13,8 +13,8 @@ from control_plane.domain import ValidationResult
 class TestValidationRunnerTimeout:
     """Tests for the timeout_seconds parameter on ValidationRunner.run()."""
 
-    def test_default_timeout_is_300(self, tmp_path: Path) -> None:
-        """subprocess.run is called with timeout=300 by default."""
+    def test_default_timeout_is_600(self, tmp_path: Path) -> None:
+        """subprocess.run is called with timeout=600 by default."""
         runner = ValidationRunner()
         with patch("control_plane.application.validation.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
@@ -22,7 +22,7 @@ class TestValidationRunnerTimeout:
             )
             runner.run(["echo ok"], cwd=tmp_path)
             mock_run.assert_called_once()
-            assert mock_run.call_args.kwargs["timeout"] == 300
+            assert mock_run.call_args.kwargs["timeout"] == 600
 
     def test_custom_timeout_is_forwarded(self, tmp_path: Path) -> None:
         """A caller-supplied timeout_seconds value reaches subprocess.run."""

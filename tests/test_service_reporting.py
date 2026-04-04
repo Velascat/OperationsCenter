@@ -211,7 +211,7 @@ def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path) -> N
         (),
         {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},
     )()
-    service.validation.run = lambda commands, cwd, env=None: []  # type: ignore[assignment]
+    service.validation.run = lambda commands, cwd, env=None, **kwargs: []  # type: ignore[assignment]
     service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
 
     result = service.run_task(Client(), "TASK-8", preauthorized=True)
@@ -306,7 +306,7 @@ def test_validation_retry_succeeds_moves_to_review(tmp_path: Path) -> None:
 
     validation_call_count = 0
 
-    def validation_run(commands, cwd, env=None):  # type: ignore[no-untyped-def]  # noqa: ARG001
+    def validation_run(commands, cwd, env=None, **kwargs):  # type: ignore[no-untyped-def]  # noqa: ARG001
         nonlocal validation_call_count
         validation_call_count += 1
         if validation_call_count == 1:
@@ -430,7 +430,7 @@ def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
 
     validation_call_count = 0
 
-    def validation_run(commands, cwd, env=None):  # type: ignore[no-untyped-def]  # noqa: ARG001
+    def validation_run(commands, cwd, env=None, **kwargs):  # type: ignore[no-untyped-def]  # noqa: ARG001
         nonlocal validation_call_count
         validation_call_count += 1
         return [ValidationResult(command="pytest", exit_code=1, stdout="", stderr="FAILED test_foo.py", duration_ms=100)]
@@ -548,7 +548,7 @@ def test_no_retry_skips_initial_validation_artifact(tmp_path: Path) -> None:
     service.kodo.run = lambda goal_file, repo_path: type("KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]})()  # type: ignore[assignment]
     service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
     service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
-    service.validation.run = lambda commands, cwd, env=None: [ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=100)]  # type: ignore[assignment]
+    service.validation.run = lambda commands, cwd, env=None, **kwargs: [ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=100)]  # type: ignore[assignment]
     service.validation.passed = lambda results: True  # type: ignore[assignment]
     service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
 

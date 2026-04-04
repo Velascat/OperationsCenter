@@ -320,7 +320,8 @@ class ExecutionService:
             # Resolve validation commands: prefer profile if set and available
             validation_commands = self._resolve_validation_commands(task, repo_target)
 
-            validation_results = self.validation.run(validation_commands, repo_path, env=run_env)
+            repo_timeout = self.settings.repos[task.repo_key].validation_timeout_seconds
+            validation_results = self.validation.run(validation_commands, repo_path, env=run_env, timeout_seconds=repo_timeout)
             validation_ok = self.validation.passed(validation_results)
 
             validation_retried = False
@@ -360,7 +361,7 @@ class ExecutionService:
                         )
                     )
                     retry_commands = self._narrow_retry_commands(validation_commands, initial_validation_results)
-                    validation_results = self.validation.run(retry_commands, repo_path, env=run_env)
+                    validation_results = self.validation.run(retry_commands, repo_path, env=run_env, timeout_seconds=repo_timeout)
                     validation_ok = self.validation.passed(validation_results)
                     validation_retried = True
                     self._log_event("validation_retry", run_id, retry_passed=validation_ok)
@@ -778,7 +779,7 @@ class ExecutionService:
 
             run_env = dict(bootstrap_result.env)
             run_env.update(repo_cfg.env)
-            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env)
+            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env, timeout_seconds=repo_cfg.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
             all_changed = self.git.changed_files(repo_path)

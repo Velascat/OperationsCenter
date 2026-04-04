@@ -55,6 +55,7 @@ repos:
     validation_commands:               # all must exit 0 for a push to be allowed
       - .venv/bin/pytest -q
       - .venv/bin/ruff check .
+    validation_timeout_seconds: 600    # per-command timeout in seconds (default: 600)
     allowed_base_branches:             # only these branches may be used as PR base
       - main
     bootstrap_enabled: true            # create venv + install deps before each run

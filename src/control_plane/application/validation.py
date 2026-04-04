@@ -13,7 +13,7 @@ class ValidationRunner:
         commands: list[str],
         cwd: Path,
         env: dict[str, str] | None = None,
-        timeout_seconds: int = 300,
+        timeout_seconds: int = 600,
     ) -> list[ValidationResult]:
         results: list[ValidationResult] = []
         for command in commands:
