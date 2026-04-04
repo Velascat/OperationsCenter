@@ -220,8 +220,8 @@ def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path) -> N
     assert result.outcome_reason == "internal_only_change"
     assert result.changed_files == []
     assert result.internal_changed_files == ["kodo/config.json", "kodo/run-status.md"]
-    assert result.final_status == "Blocked"
-    assert transitions[-1] == "Blocked"
+    assert result.final_status == "Done"
+    assert transitions[-1] == "Done"
     assert any("internal_changed_files: kodo/config.json, kodo/run-status.md" in comment for comment in comments)
 
 

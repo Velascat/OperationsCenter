@@ -262,7 +262,7 @@ def test_run_watch_loop_goal_blocks_after_retry_cap(tmp_path: Path, monkeypatch:
         role="goal",
         task_id="TASK-RETRY",
         signature="prior",
-        now=datetime(2026, 3, 31, 12, tzinfo=UTC),
+        now=datetime.now(UTC) - timedelta(minutes=5),  # recent — within the 1h auto-reset window
     )
 
     run_watch_loop(

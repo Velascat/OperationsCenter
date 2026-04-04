@@ -37,8 +37,12 @@ def test_usage_store_tracks_retry_and_noop_state(monkeypatch, tmp_path: Path) ->
     store.record_execution(role="goal", task_id="T1", signature="sig-1", now=now)
     assert store.noop_decision(role="goal", task_id="T1", signature="sig-1").should_skip is True
 
-    assert store.retry_decision(task_id="T1").allowed is True
+    assert store.retry_decision(task_id="T1", now=now + timedelta(minutes=1)).allowed is True
     store.record_execution(role="goal", task_id="T1", signature="sig-2", now=now + timedelta(minutes=1))
-    retry = store.retry_decision(task_id="T1")
+    # Cap exceeded and last attempt was recent (<1h) → still blocked
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=2))
     assert retry.allowed is False
     assert retry.attempts == 2
+    # After >1h gap (human unblocked it) → auto-reset, allowed again
+    retry_after_gap = store.retry_decision(task_id="T1", now=now + timedelta(hours=2))
+    assert retry_after_gap.allowed is True

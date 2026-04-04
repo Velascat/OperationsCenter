@@ -398,6 +398,35 @@ class ExecutionService:
             if all_changed_files:
                 artifacts.extend(self.reporter.write_diff(run_dir, diff_stat=diff_stat, diff_patch=diff_patch))
             policy_violations = self.scope_checker.find_violations(changed_files, task.allowed_paths)
+
+            # Policy retry: if kodo touched out-of-scope files, give it one more pass
+            # with explicit constraints so it can revert or avoid those files.
+            if policy_violations and task.allowed_paths:
+                violated_files = ", ".join(f"`{f}`" for f in policy_violations)
+                with open(goal_file, "a") as gf:
+                    gf.write(
+                        f"\n\n## Scope Constraint Violation\n\n"
+                        f"You modified files outside the allowed scope: {violated_files}\n"
+                        f"Allowed paths: {', '.join(task.allowed_paths)}\n"
+                        f"Revert all changes to out-of-scope files. Keep only changes within the allowed paths.\n"
+                    )
+                self._log_event("policy_retry_start", run_id, violations=policy_violations)
+                kodo_result = self.kodo.run(goal_file, repo_path)
+                artifacts.extend(
+                    self.reporter.write_kodo(
+                        run_dir,
+                        self.kodo.command_to_json(kodo_result.command),
+                        kodo_result.stdout,
+                        kodo_result.stderr,
+                        prefix="kodo_policy_retry",
+                    )
+                )
+                all_changed_files = self.git.changed_files(repo_path)
+                changed_files = self._meaningful_changed_files(all_changed_files)
+                internal_changed_files = [p for p in all_changed_files if p not in changed_files]
+                policy_violations = self.scope_checker.find_violations(changed_files, task.allowed_paths)
+                self._log_event("policy_retry_end", run_id, violations=policy_violations)
+
             if policy_violations:
                 artifacts.append(self.reporter.write_policy_violation(run_dir, policy_violations))
             self._log_event(
@@ -500,7 +529,13 @@ class ExecutionService:
             )
 
             if status is None:
-                status = "Blocked" if outcome_status == "no_op" or policy_violations or not success else "Review"
+                if outcome_status == "no_op":
+                    # No material changes — task is done if validation passed, blocked if pre-existing issue remains
+                    status = "Done" if validation_ok else "Blocked"
+                elif policy_violations or not success:
+                    status = "Blocked"
+                else:
+                    status = "Review"
 
             result = ExecutionResult(
                 run_id=run_id,

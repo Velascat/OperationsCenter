@@ -76,17 +76,58 @@ class UsageStore:
         daily = self.settings.max_exec_per_day - self._exec_count(events, since=now - timedelta(days=1))
         return min(hourly, daily)
 
-    def retry_decision(self, *, task_id: str) -> RetryDecision:
+    def retry_decision(self, *, task_id: str, now: datetime | None = None) -> RetryDecision:
         data = self.load()
         attempts = int(data.get("task_attempts", {}).get(task_id, 0))
         if attempts >= self.settings.max_retries_per_task:
-            return RetryDecision(
-                allowed=False,
-                reason="retry_cap_exceeded",
-                attempts=attempts,
-                limit=self.settings.max_retries_per_task,
-            )
+            # Auto-reset if the last attempt was >1h ago — indicates a human manually
+            # unblocked the task and expects another try with a clean slate.
+            last_attempt_ts = self._last_attempt_timestamp(data, task_id)
+            ref = now or datetime.now(last_attempt_ts.tzinfo if last_attempt_ts else None)
+            if last_attempt_ts is None or (ref - last_attempt_ts) > timedelta(hours=1):
+                self._reset_task_attempts(data, task_id)
+                attempts = 0
+            else:
+                return RetryDecision(
+                    allowed=False,
+                    reason="retry_cap_exceeded",
+                    attempts=attempts,
+                    limit=self.settings.max_retries_per_task,
+                )
         return RetryDecision(allowed=True, attempts=attempts, limit=self.settings.max_retries_per_task)
+
+    def _last_attempt_timestamp(self, data: dict[str, object], task_id: str) -> datetime | None:
+        """Return the timestamp of the most recent execution event for this task_id."""
+        events = data.get("events", [])
+        assert isinstance(events, list)
+        for event in reversed(events):
+            if not isinstance(event, dict):
+                continue
+            if event.get("task_id") == task_id and event.get("kind") in ("execution", "retry_cap_block"):
+                ts = event.get("timestamp")
+                if ts:
+                    try:
+                        from datetime import timezone
+                        dt = datetime.fromisoformat(str(ts))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        return dt
+                    except ValueError:
+                        pass
+        return None
+
+    def _reset_task_attempts(self, data: dict[str, Any], task_id: str) -> None:
+        """Clear attempt count and last signature for task_id, then persist."""
+        attempts = dict(data.get("task_attempts", {}))
+        attempts.pop(task_id, None)
+        data["task_attempts"] = attempts
+        sigs = dict(data.get("last_task_signatures", {}))
+        for key in list(sigs.keys()):
+            if key.endswith(f":{task_id}"):
+                del sigs[key]
+        data["last_task_signatures"] = sigs
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(data, indent=2))
 
     def noop_decision(
         self,
