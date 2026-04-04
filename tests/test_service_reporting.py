@@ -815,3 +815,26 @@ def test_validation_retry_kodo_raises_exception(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="kodo retry exploded"):
         service.run_task(ValidPlaneClient(), "TASK-RETRYERR", preauthorized=True)
+
+
+def test_validation_excerpt_empty_list_returns_none() -> None:
+    """An empty validation_results list should return None (no failures to report)."""
+    excerpt = ExecutionService._validation_excerpt([])
+    assert excerpt is None
+
+
+def test_validation_excerpt_stderr_empty_falls_back_to_stdout() -> None:
+    """When stderr is empty but stdout has content, the excerpt uses stdout."""
+    validation_results = [
+        ValidationResult(
+            command="mypy",
+            exit_code=1,
+            stdout="src/foo.py:10: error: Incompatible types",
+            stderr="",
+            duration_ms=150,
+        ),
+    ]
+    excerpt = ExecutionService._validation_excerpt(validation_results)
+    assert excerpt is not None
+    assert "Incompatible types" in excerpt
+    assert "[mypy]" in excerpt
