@@ -77,5 +77,5 @@ def test_observe_repo_cli_returns_nonzero_for_missing_repo(tmp_path: Path, monke
         ],
     )
 
-    with pytest.raises((ValueError, SystemExit)):
+    with pytest.raises(ValueError, match="not found"):
         observer_main.main()

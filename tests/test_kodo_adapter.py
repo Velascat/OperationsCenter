@@ -2,6 +2,7 @@ import pytest
 from pathlib import Path
 
 from control_plane.adapters.kodo import KodoAdapter
+from control_plane.adapters.kodo.adapter import KodoRunResult, _ORCHESTRATOR_RATE_LIMIT_SIGNALS
 from control_plane.config.settings import KodoSettings
 
 
@@ -99,8 +100,6 @@ def test_run_does_not_retry_on_non_quota_failure(
 # ---------------------------------------------------------------------------
 # is_orchestrator_rate_limited tests
 # ---------------------------------------------------------------------------
-
-from control_plane.adapters.kodo.adapter import KodoRunResult, _ORCHESTRATOR_RATE_LIMIT_SIGNALS
 
 
 def _make_result(stdout: str = "", stderr: str = "") -> KodoRunResult:
