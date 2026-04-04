@@ -11,7 +11,14 @@ from pathlib import Path
 
 import yaml
 
-from control_plane.config.settings import Settings, load_settings
+from control_plane.config.settings import (
+    GitSettings,
+    KodoSettings,
+    PlaneSettings,
+    RepoSettings,
+    Settings,
+    load_settings,
+)
 
 EXAMPLE_YAML = Path(__file__).resolve().parent.parent / "config" / "control_plane.example.yaml"
 
@@ -46,6 +53,35 @@ def test_example_yaml_model_validate() -> None:
     assert settings.git.provider == "github"
     assert settings.kodo.team == "full"
     assert len(settings.repos) >= 1
+
+
+def test_yaml_template_covers_all_model_fields() -> None:
+    """Every Pydantic model field must appear in the YAML template.
+
+    This catches drift: if a developer adds a field to settings.py but
+    forgets to document it in the example YAML, this test fails.
+    Fields may appear as active YAML keys or inside comments.
+    """
+    yaml_text = EXAMPLE_YAML.read_text()
+
+    # Settings top-level fields are section headers (plane, git, kodo, repos, report_root).
+    # Sub-model fields must appear inside their respective sections or comments.
+    models = [PlaneSettings, GitSettings, KodoSettings, RepoSettings, Settings]
+
+    missing: list[str] = []
+    for model in models:
+        for field_name in model.model_fields:
+            # Check the field name appears as a YAML key or in a comment.
+            # We look for the field name followed by a colon (active key) or
+            # preceded by "# " (commented key). A simple substring check on
+            # "field_name:" covers both "  field_name:" and "#     field_name:".
+            if f"{field_name}:" not in yaml_text and f"{field_name} :" not in yaml_text:
+                missing.append(f"{model.__name__}.{field_name}")
+
+    assert not missing, (
+        f"Model fields missing from {EXAMPLE_YAML.name}:\n"
+        + "\n".join(f"  - {m}" for m in missing)
+    )
 
 
 def test_example_yaml_repo_fields_match_model() -> None:
