@@ -253,6 +253,7 @@ class ExecutionService:
                 install_dev_command=repo_cfg.install_dev_command,
                 base_env=os.environ.copy(),
                 enabled=repo_cfg.bootstrap_enabled,
+                bootstrap_commands=repo_cfg.bootstrap_commands,
             )
             artifacts.append(
                 self.reporter.write_bootstrap(
@@ -658,6 +659,7 @@ class ExecutionService:
                 install_dev_command=repo_cfg.install_dev_command,
                 base_env=os.environ.copy(),
                 enabled=repo_cfg.bootstrap_enabled,
+                bootstrap_commands=repo_cfg.bootstrap_commands,
             )
 
             kodo_result = self.kodo.run(goal_file, repo_path)

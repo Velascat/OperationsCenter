@@ -81,7 +81,11 @@ class ProposalCandidateMapper:
         for repo_key in settings.repos:
             if repo_key.strip().lower() == provenance.repo_name.strip().lower():
                 return repo_key
-        return next(iter(settings.repos.keys()))
+        known = sorted(settings.repos.keys())
+        raise ValueError(
+            f"Proposal candidate references repo '{provenance.repo_name}' which is not in the configured repos: {known}. "
+            f"Update the candidate provenance or add the repo to config."
+        )
 
     @staticmethod
     def _task_kind_for_candidate(candidate: ProposalCandidate) -> str:

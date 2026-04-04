@@ -32,12 +32,20 @@ class RepoEnvironmentBootstrapper:
         install_dev_command: str | None,
         base_env: dict[str, str] | None = None,
         enabled: bool = True,
+        bootstrap_commands: list[str] | None = None,
     ) -> BootstrapResult:
         venv_path = repo_path / venv_dir
         commands: list[BootstrapCommandResult] = []
+        base = dict(base_env or {})
 
         if not enabled:
-            return BootstrapResult(venv_path=venv_path, env=dict(base_env or {}), commands=commands)
+            return BootstrapResult(venv_path=venv_path, env=base, commands=commands)
+
+        # Custom bootstrap commands override Python venv setup (for non-Python repos)
+        if bootstrap_commands:
+            for cmd in bootstrap_commands:
+                commands.append(self._run_shell(cmd, cwd=repo_path, env=base))
+            return BootstrapResult(venv_path=venv_path, env=base, commands=commands)
 
         env = self.environment_for(repo_path, venv_dir, base_env=base_env)
         if not venv_path.exists():

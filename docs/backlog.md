@@ -48,19 +48,39 @@ Local API/UI (`http://127.0.0.1:8787`) is a helper surface for repo import and l
 
 ---
 
-## Next (after hardening)
+## Phase C (complete)
 
-### autonomy — Tune initial decision thresholds from real retained artifacts
-Use observer snapshots and insight artifacts from real runs to calibrate proposer
-signal weights and candidate confidence thresholds.
+### autonomy — `analyze-artifacts` threshold tuning tool
+Reads all retained decision + proposer artifacts and computes per-family stats
+(emitted, suppressed, created, guardrail-skipped, suppression reasons).
+Prints recommendations when suppression rate ≥ 90% or emitted tasks never created.
+**Status**: done (`src/control_plane/entrypoints/analyze/main.py`, `scripts/control-plane.sh analyze-artifacts`)
 
-### autonomy — Design a dry-run-first `autonomy-cycle` wrapper
-Chain `observe → insights → decide → propose` into a single inspectable loop.
-Implement as dry-run-first: emit what would be proposed before creating tasks.
+---
+
+### autonomy — `autonomy-cycle` dry-run-first wrapper
+Chains `observe → insights → decide → propose` in one command.
+Dry-run by default (shows what would be proposed); `--execute` creates real Plane tasks.
+`--all-families` enables hotspot_concentration and todo_accumulation families.
+**Status**: done (`src/control_plane/entrypoints/autonomy_cycle/main.py`, `scripts/control-plane.sh autonomy-cycle`)
+
+---
 
 ### validation — Contract validation for proposer candidates
-Apply the same early-rejection model to autonomy-generated tasks:
-verify repo key, branch policy, and goal text before board submission.
+Proposer `candidate_mapper` raises `ValueError` with clear message instead of silently
+falling back to the first known repo when a candidate has no matching repo key.
+**Status**: done (`proposer/candidate_mapper.py`)
+
+---
+
+### config — Non-Python repo bootstrap support
+`bootstrap_commands` list in `RepoSettings` replaces Python venv setup when set,
+allowing non-Python repos to declare their own install steps.
+**Status**: done (`config/settings.py`, `adapters/workspace/bootstrap.py`)
+
+---
+
+## Next
 
 ### config — Per-repo execution budget overrides
 Allow repos to declare their own hourly/daily caps rather than sharing the global budget.

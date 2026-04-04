@@ -51,6 +51,7 @@ class RepoSettings(BaseModel):
     await_review: bool = False
     propose_enabled: bool = True
     local_path: str | None = None
+    bootstrap_commands: list[str] | None = None  # custom bootstrap (replaces Python venv setup for non-Python repos)
 
 
 class Settings(BaseModel):

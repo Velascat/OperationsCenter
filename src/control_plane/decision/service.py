@@ -22,6 +22,10 @@ class DecisionLoaderProtocol(Protocol):
         ...
 
 
+_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift"})
+ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "hotspot_concentration", "todo_accumulation"})
+
+
 @dataclass(frozen=True)
 class DecisionContext:
     repo_filter: str | None
@@ -33,6 +37,7 @@ class DecisionContext:
     generated_at: datetime
     source_command: str
     dry_run: bool = False
+    allowed_families: frozenset[str] = _DEFAULT_ALLOWED_FAMILIES
 
 
 class DecisionEngineService:
@@ -66,7 +71,7 @@ class DecisionEngineService:
             candidate_specs.extend(rule.evaluate(insight_artifact.insights))
 
         suppressed: list[SuppressedCandidate] = []
-        allowed_families = {"observation_coverage", "test_visibility", "dependency_drift"}
+        allowed_families = context.allowed_families
         filtered_specs = []
         for spec in candidate_specs:
             if spec.family in allowed_families:
@@ -140,6 +145,7 @@ def new_decision_context(
     cooldown_minutes: int,
     source_command: str,
     dry_run: bool = False,
+    allowed_families: frozenset[str] | None = None,
 ) -> DecisionContext:
     generated_at = datetime.now(UTC)
     run_id = f"dec_{generated_at.strftime('%Y%m%dT%H%M%SZ')}_{generated_at.microsecond:06x}"[-31:]
@@ -153,4 +159,5 @@ def new_decision_context(
         generated_at=generated_at,
         source_command=source_command,
         dry_run=dry_run,
+        allowed_families=allowed_families if allowed_families is not None else _DEFAULT_ALLOWED_FAMILIES,
     )

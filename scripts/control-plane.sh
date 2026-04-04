@@ -112,6 +112,8 @@ Usage:
   scripts/control-plane.sh generate-insights [--repo /abs/path]
   scripts/control-plane.sh decide-proposals [--repo /abs/path]
   scripts/control-plane.sh propose-from-candidates [--repo /abs/path] [--dry-run]
+  scripts/control-plane.sh autonomy-cycle --config FILE [--repo PATH] [--execute] [--all-families]
+  scripts/control-plane.sh analyze-artifacts [--repo NAME] [--limit N] [--json]
 
 Environment:
   CONTROL_PLANE_CONFIG   Override config path (default: ${CONFIG_PATH})
@@ -475,6 +477,16 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log propose-from-candidates "${VENV_DIR}/bin/python" -m control_plane.entrypoints.proposer.main --config "${CONFIG_PATH}" "$@"
+    ;;
+  autonomy-cycle)
+    ensure_venv
+    load_env_file
+    run_with_log autonomy-cycle "${VENV_DIR}/bin/python" -m control_plane.entrypoints.autonomy_cycle.main --config "${CONFIG_PATH}" "$@"
+    ;;
+  analyze-artifacts)
+    ensure_venv
+    load_env_file
+    run_with_log analyze-artifacts "${VENV_DIR}/bin/python" -m control_plane.entrypoints.analyze.main "$@"
     ;;
   plane-doctor)
     ensure_venv
