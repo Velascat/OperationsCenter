@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from control_plane.application.service import ExecutionService
@@ -438,3 +439,114 @@ class TestMaybeCreateFixValidationTask:
 
         tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
         assert tid is None
+
+
+# ---------------------------------------------------------------------------
+# Integration-level tests: baseline validation → fix-task creation
+# ---------------------------------------------------------------------------
+
+
+class TestBaselineValidationIntegration:
+    """End-to-end flow through _run_baseline_validation → _maybe_create_fix_validation_task."""
+
+    @staticmethod
+    def _build_service() -> ExecutionService:
+        svc = _make_service()
+        svc.validation = MagicMock()
+        svc.event_logger = MagicMock()
+        return svc
+
+    @staticmethod
+    def _build_repo_target() -> MagicMock:
+        rt = MagicMock()
+        rt.repo_key = "org/repo"
+        rt.validation_commands = ["ruff check", "pytest"]
+        rt.validation_timeout_seconds = 300
+        return rt
+
+    def test_baseline_failure_creates_enriched_fix_task(self) -> None:
+        # -- setup --
+        svc = self._build_service()
+
+        failing_result = _make_validation_result("ruff check", exit_code=1, stderr="lint error found")
+        passing_result = _make_validation_result("pytest", exit_code=0)
+        svc.validation.run.return_value = [failing_result, passing_result]
+        svc.validation.passed.return_value = False
+
+        repo_target = self._build_repo_target()
+        repo_path = Path("/tmp/fake")
+        run_env: dict[str, str] = {}
+        run_id = "run-1"
+
+        pc = _make_plane_client()  # list_issues=[], create_issue returns {"id": "new-task-123"}
+        task = _make_task("org/repo")
+
+        # -- exercise baseline validation --
+        baseline = svc._run_baseline_validation(repo_target, repo_path, run_env, run_id)
+
+        assert baseline.failed is True
+        assert baseline.error_text is not None
+        assert baseline.validation_results is not None
+        assert len(baseline.validation_results) == 2
+
+        # -- exercise fix-task creation --
+        tid = svc._maybe_create_fix_validation_task(
+            pc, task, baseline.error_text, run_id,
+            validation_results=baseline.validation_results,
+            repo_target=repo_target,
+        )
+
+        assert tid == "new-task-123"
+        pc.create_issue.assert_called_once()
+
+        call_kwargs = pc.create_issue.call_args[1]
+        desc = call_kwargs["description"]
+        assert "ruff check" in desc
+        assert "exit code: 1" in desc
+        assert "lint error found" in desc
+        assert "occurrence #1" in desc
+
+    def test_dedup_prevents_second_creation(self) -> None:
+        # -- setup --
+        svc = self._build_service()
+
+        failing_result = _make_validation_result("ruff check", exit_code=1, stderr="lint error found")
+        passing_result = _make_validation_result("pytest", exit_code=0)
+        svc.validation.run.return_value = [failing_result, passing_result]
+        svc.validation.passed.return_value = False
+
+        repo_target = self._build_repo_target()
+        repo_path = Path("/tmp/fake")
+        run_env: dict[str, str] = {}
+        run_id = "run-1"
+
+        task = _make_task("org/repo")
+
+        # First call — no existing issues, creates a task
+        pc = _make_plane_client()
+        baseline = svc._run_baseline_validation(repo_target, repo_path, run_env, run_id)
+        tid1 = svc._maybe_create_fix_validation_task(
+            pc, task, baseline.error_text, run_id,
+            validation_results=baseline.validation_results,
+            repo_target=repo_target,
+        )
+        assert tid1 == "new-task-123"
+        pc.create_issue.assert_called_once()
+
+        # Second call — an open issue already exists, should be deduped
+        pc.create_issue.reset_mock()
+        pc.list_issues.return_value = [
+            {
+                "id": "new-task-123",
+                "name": "Fix pre-existing validation failure in org/repo",
+                "state": {"name": "In Progress"},
+            },
+        ]
+
+        tid2 = svc._maybe_create_fix_validation_task(
+            pc, task, baseline.error_text, run_id,
+            validation_results=baseline.validation_results,
+            repo_target=repo_target,
+        )
+        assert tid2 is None
+        pc.create_issue.assert_not_called()
