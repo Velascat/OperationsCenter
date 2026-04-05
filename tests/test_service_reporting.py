@@ -160,7 +160,8 @@ def test_budget_skip_returns_without_repo_setup(settings: Settings, monkeypatch:
     assert (run_dirs[0] / "control_outcome.json").exists()
 
 
-def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path) -> None:
+def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
     settings = Settings.model_validate(
         {
             "plane": {
@@ -269,7 +270,8 @@ def test_comment_markdown_omits_validation_errors_on_success() -> None:
     assert "validation_errors:" not in comment
 
 
-def test_validation_retry_succeeds_moves_to_review(tmp_path: Path) -> None:
+def test_validation_retry_succeeds_moves_to_review(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
     settings = Settings.model_validate(
         {
             "plane": {
@@ -393,7 +395,8 @@ def test_validation_retry_succeeds_moves_to_review(tmp_path: Path) -> None:
     assert len(final_validation_artifacts) == 1
 
 
-def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
+def test_validation_retry_fails_moves_to_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
     settings = Settings.model_validate(
         {
             "plane": {
@@ -505,7 +508,8 @@ def test_validation_retry_fails_moves_to_blocked(tmp_path: Path) -> None:
     assert len(initial_artifacts) == 1
 
 
-def test_no_retry_skips_initial_validation_artifact(tmp_path: Path) -> None:
+def test_no_retry_skips_initial_validation_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
     settings = Settings.model_validate(
         {
             "plane": {
