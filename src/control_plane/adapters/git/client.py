@@ -47,6 +47,10 @@ class GitClient:
 
     def checkout_base(self, repo_path: Path, branch: str) -> None:
         self._run(["git", "checkout", branch], cwd=repo_path)
+        try:
+            self._run(["git", "pull", "--ff-only"], cwd=repo_path)
+        except RuntimeError:
+            pass  # not a fatal error — proceed with local state as-is
 
     def create_task_branch(self, repo_path: Path, task_branch: str) -> bool:
         """Create or checkout the task branch. Returns True if branch already existed on remote."""
