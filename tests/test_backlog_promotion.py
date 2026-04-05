@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import datetime, UTC
 from pathlib import Path
 
-import pytest
 
 from control_plane.observer.collectors.backlog import (
     BacklogCollector,
