@@ -73,6 +73,9 @@ class TypeSignalCollector:
         if not isinstance(diagnostics, list):
             return TypeSignal(status="unavailable", source="ty_unexpected_format")
 
+        total = len(diagnostics)
+        distinct_file_count = len({item.get("file", "") for item in diagnostics if item.get("file")})
+
         errors: list[TypeError] = []
         for item in diagnostics[:_MAX_ERRORS]:
             try:
@@ -89,10 +92,10 @@ class TypeSignalCollector:
             except Exception:
                 continue
 
-        total = len(diagnostics)
         return TypeSignal(
             status="errors" if errors else "clean",
             error_count=total,
+            distinct_file_count=distinct_file_count,
             top_errors=errors,
             source="ty",
         )
@@ -104,35 +107,39 @@ class TypeSignalCollector:
         if not lines:
             return TypeSignal(status="clean", error_count=0, source="mypy")
 
-        errors: list[TypeError] = []
-        total = 0
+        all_error_files: set[str] = set()
+        error_items: list[dict] = []
         for line in lines:
             try:
                 item = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if item.get("severity") not in ("error", "note"):
-                continue
             if item.get("severity") != "error":
                 continue
-            total += 1
-            if len(errors) < _MAX_ERRORS:
-                try:
-                    errors.append(
-                        TypeError(
-                            path=str(item.get("file", "")),
-                            line=int(item.get("line", 0)),
-                            col=int(item.get("column", 0)),
-                            code=str(item.get("error_code", "")),
-                            message=str(item.get("message", "")),
-                        )
+            f = item.get("file", "")
+            if f:
+                all_error_files.add(f)
+            error_items.append(item)
+
+        errors: list[TypeError] = []
+        for item in error_items[:_MAX_ERRORS]:
+            try:
+                errors.append(
+                    TypeError(
+                        path=str(item.get("file", "")),
+                        line=int(item.get("line", 0)),
+                        col=int(item.get("column", 0)),
+                        code=str(item.get("error_code", "")),
+                        message=str(item.get("message", "")),
                     )
-                except Exception:
-                    continue
+                )
+            except Exception:
+                continue
 
         return TypeSignal(
             status="errors" if errors else "clean",
-            error_count=total,
+            error_count=len(error_items),
+            distinct_file_count=len(all_error_files),
             top_errors=errors,
             source="mypy",
         )

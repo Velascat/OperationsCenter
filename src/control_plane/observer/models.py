@@ -92,6 +92,7 @@ class LintViolation(BaseModel):
 class LintSignal(BaseModel):
     status: str  # "clean", "violations", "unavailable"
     violation_count: int = 0
+    distinct_file_count: int = 0
     top_violations: list[LintViolation] = Field(default_factory=list)
     source: str | None = None
 
@@ -107,6 +108,7 @@ class TypeError(BaseModel):
 class TypeSignal(BaseModel):
     status: str  # "clean", "errors", "unavailable"
     error_count: int = 0
+    distinct_file_count: int = 0
     top_errors: list[TypeError] = Field(default_factory=list)
     source: str | None = None
 

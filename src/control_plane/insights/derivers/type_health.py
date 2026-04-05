@@ -38,7 +38,7 @@ class TypeHealthDeriver:
                 if len(top_codes) >= 5:
                     break
 
-            distinct_file_count = len({e.path for e in current_type.top_errors})
+            distinct_file_count = current_type.distinct_file_count or len({e.path for e in current_type.top_errors})
             insights.append(
                 self.normalizer.normalize(
                     kind="type_health",

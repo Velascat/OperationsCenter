@@ -38,7 +38,7 @@ class LintDriftDeriver:
                 if len(top_codes) >= 5:
                     break
 
-            distinct_file_count = len({v.path for v in current_lint.top_violations})
+            distinct_file_count = current_lint.distinct_file_count or len({v.path for v in current_lint.top_violations})
             insights.append(
                 self.normalizer.normalize(
                     kind="lint_drift",

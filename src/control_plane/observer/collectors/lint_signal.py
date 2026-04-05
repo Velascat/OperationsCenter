@@ -28,6 +28,10 @@ class LintSignalCollector:
             return LintSignal(status="unavailable", source=f"ruff_error: {exc}")
 
         raw = result.stdout.strip()
+        return self._parse_ruff_output(raw)
+
+    @staticmethod
+    def _parse_ruff_output(raw: str) -> LintSignal:
         if not raw:
             return LintSignal(status="clean", violation_count=0, source="ruff")
 
@@ -38,6 +42,8 @@ class LintSignalCollector:
 
         if not isinstance(items, list):
             return LintSignal(status="unavailable", source="ruff_unexpected_format")
+
+        distinct_file_count = len({item.get("filename", "") for item in items if item.get("filename")})
 
         violations: list[LintViolation] = []
         for item in items[:_MAX_VIOLATIONS]:
@@ -58,6 +64,7 @@ class LintSignalCollector:
         return LintSignal(
             status="violations" if violations else "clean",
             violation_count=len(items),
+            distinct_file_count=distinct_file_count,
             top_violations=violations,
             source="ruff",
         )
