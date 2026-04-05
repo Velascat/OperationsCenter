@@ -26,11 +26,11 @@ PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
 RATE_LIMIT_BACKOFF_MULTIPLIER = 4
 UNKNOWN_BLOCKED_CLASSIFICATION = "unknown"
 MAX_IMPROVE_FOLLOW_UPS_PER_CYCLE = 3
-MAX_PROPOSALS_PER_CYCLE = 2
-MAX_PROPOSALS_PER_DAY = 18
-PROPOSAL_COOLDOWN_SECONDS = 30 * 60
+MAX_PROPOSALS_PER_CYCLE = 4
+MAX_PROPOSALS_PER_DAY = 30
+PROPOSAL_COOLDOWN_SECONDS = 20 * 60
 PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
-LOW_BACKLOG_THRESHOLD = 4
+LOW_BACKLOG_THRESHOLD = 6
 EXECUTION_ACTIONS = {"execute", "improve_task"}
 MAX_CLASSIFICATION_ISSUES = 20
 
@@ -386,7 +386,13 @@ def board_is_idle_for_proposals(client: PlaneClient) -> bool:
     return ready_or_running_goal_or_test_count(client) == 0 and open_goal_or_test_count(client) <= LOW_BACKLOG_THRESHOLD
 
 
-def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]]) -> bool:
+def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]], *, repo_key: str | None = None) -> bool:
+    """Return True when the board has capacity for new proposals.
+
+    When repo_key is given, only tasks belonging to that repo count toward the
+    active-work gate — so a busy ControlPlane board no longer blocks
+    code_youtube_shorts proposals and vice versa.
+    """
     open_count = 0
     ready_or_running_count = 0
     for issue in issues:
@@ -394,6 +400,15 @@ def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]]) -> boo
             continue
         if issue_task_kind(issue) not in {"goal", "test"}:
             continue
+        if repo_key is not None:
+            # Only count tasks whose repo label matches this repo.
+            labels = issue_label_names(issue)
+            issue_repo = next(
+                (lbl.split(":", 1)[1].strip() for lbl in labels if lbl.lower().startswith("repo:")),
+                None,
+            )
+            if issue_repo is not None and issue_repo.lower() != repo_key.lower():
+                continue
         open_count += 1
         if issue_status_name(issue) in {"Ready for AI", "Running"}:
             ready_or_running_count += 1
@@ -437,6 +452,7 @@ def select_watch_candidate(
     ready_state: str,
     role: str,
     known_triaged_blocked_ids: set[str] | None = None,
+    skip_ids: set[str] | None = None,
 ) -> tuple[str, str]:
     issues = client.list_issues()
     if role == "improve":
@@ -462,8 +478,23 @@ def select_watch_candidate(
                 known_triaged_blocked_ids.add(task_id)
         raise ValueError("No improve work item found for blocked triage or improve task routing")
 
-    task_id = select_ready_task_id(client, ready_state=ready_state, role=role)
-    return task_id, "execute"
+    for issue in issues:
+        task_id = str(issue["id"])
+        if skip_ids and task_id in skip_ids:
+            continue
+        status_name = issue_status_name(issue)
+        task_kind = issue_task_kind(issue)
+        if issue_needs_detail(issue):
+            detailed_issue = client.fetch_issue(task_id)
+            status_name = issue_status_name(detailed_issue)
+            task_kind = issue_task_kind(detailed_issue)
+        if task_kind != role:
+            continue
+        if _has_active_pr_review(task_id):
+            continue
+        if status_name == ready_state:
+            return task_id, "execute"
+    raise ValueError(f"No work item found in state '{ready_state}'")
 
 
 def extract_comment_text(comment: dict[str, Any]) -> str:
@@ -1726,7 +1757,7 @@ def build_proposal_candidates(
 ) -> tuple[list[ProposalSpec], list[str], bool]:
     repo_key = repo_key or default_repo_key(service)
     issues = issues or client.list_issues()
-    board_idle = board_is_idle_for_proposals_from_issues(issues)
+    board_idle = board_is_idle_for_proposals_from_issues(issues, repo_key=repo_key)
     open_goal_or_test = 0
     ready_or_running_goal_or_test = 0
     for issue in issues:
@@ -1785,14 +1816,13 @@ def build_proposal_candidates(
             )
         notes.append(f"repeated_pattern: {classification} x{count}")
 
-    if board_idle:
-        findings, report_notes = discover_improvement_candidates(
-            service,
-            repo_key=repo_key,
-            base_branch=service.settings.repos[repo_key].default_branch,
-        )
-        notes.extend(report_notes)
-        proposals.extend(proposal_specs_from_findings(findings, repo_key=repo_key, signal_prefix="idle_board"))
+    findings, report_notes = discover_improvement_candidates(
+        service,
+        repo_key=repo_key,
+        base_branch=service.settings.repos[repo_key].default_branch,
+    )
+    notes.extend(report_notes)
+    proposals.extend(proposal_specs_from_findings(findings, repo_key=repo_key, signal_prefix="repo_scan"))
 
     if board_idle and not proposals:
         evidence_lines = evidence_lines_from_notes(report_notes[:6])
