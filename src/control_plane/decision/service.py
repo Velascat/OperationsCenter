@@ -9,6 +9,7 @@ from control_plane.decision.artifact_writer import DecisionArtifactWriter
 from control_plane.decision.models import DecisionRepoRef, ProposalCandidatesArtifact, SuppressedCandidate
 from control_plane.decision.policy import DecisionPolicy, DecisionPolicyConfig
 from control_plane.decision.rules.dependency_drift import DependencyDriftRule
+from control_plane.decision.rules.execution_health import ExecutionHealthRule
 from control_plane.decision.rules.hotspot_concentration import HotspotConcentrationRule
 from control_plane.decision.rules.observation_coverage import ObservationCoverageRule
 from control_plane.decision.rules.test_visibility import TestVisibilityRule
@@ -22,8 +23,8 @@ class DecisionLoaderProtocol(Protocol):
         ...
 
 
-_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift"})
-ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "hotspot_concentration", "todo_accumulation"})
+_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup"})
+ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "hotspot_concentration", "todo_accumulation"})
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,7 @@ class DecisionEngineService:
             DependencyDriftRule(min_consecutive_runs=2),
             HotspotConcentrationRule(min_repeated_runs=2),
             TodoAccumulationRule(),
+            ExecutionHealthRule(),
         ]
         self.builder = CandidateBuilder()
 

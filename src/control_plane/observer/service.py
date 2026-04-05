@@ -9,6 +9,7 @@ from control_plane.config import Settings
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.models import (
     DependencyDriftSignal,
+    ExecutionHealthSignal,
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
@@ -48,6 +49,7 @@ class RepoObserverService:
         test_signal_collector: RepoSignalCollector,
         dependency_drift_collector: RepoSignalCollector,
         todo_signal_collector: RepoSignalCollector,
+        execution_health_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -57,6 +59,7 @@ class RepoObserverService:
         self.test_signal_collector = test_signal_collector
         self.dependency_drift_collector = dependency_drift_collector
         self.todo_signal_collector = todo_signal_collector
+        self.execution_health_collector = execution_health_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -86,6 +89,17 @@ class RepoObserverService:
             collector_errors,
             default=TodoSignal(),
         )
+        execution_health = (
+            self._collect_optional(
+                self.execution_health_collector,
+                context,
+                "execution_health",
+                collector_errors,
+                default=ExecutionHealthSignal(),
+            )
+            if self.execution_health_collector is not None
+            else ExecutionHealthSignal()
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -93,6 +107,7 @@ class RepoObserverService:
             test_signal=test_signal,
             dependency_drift=dependency_drift,
             todo_signal=todo_signal,
+            execution_health=execution_health,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

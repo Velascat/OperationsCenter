@@ -14,6 +14,7 @@ from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
 from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
 from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
+from control_plane.insights.derivers.execution_health import ExecutionHealthDeriver
 from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
 from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
 from control_plane.insights.derivers.test_continuity import TestContinuityDeriver
@@ -23,6 +24,7 @@ from control_plane.insights.normalizer import InsightNormalizer
 from control_plane.insights.service import InsightEngineService, new_generation_context
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.collectors.dependency_drift import DependencyDriftCollector
+from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
@@ -45,6 +47,7 @@ def build_observer_service() -> RepoObserverService:
         test_signal_collector=TestSignalCollector(),
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
+        execution_health_collector=ExecutionArtifactCollector(),
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )
@@ -62,6 +65,7 @@ def build_insight_service() -> InsightEngineService:
             DependencyDriftDeriver(normalizer),
             TodoConcentrationDeriver(normalizer),
             ObservationCoverageDeriver(normalizer),
+            ExecutionHealthDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )

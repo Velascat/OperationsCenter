@@ -54,12 +54,30 @@ class TodoSignal(BaseModel):
     top_files: list[TodoFileCount] = Field(default_factory=list)
 
 
+class ExecutionRunRecord(BaseModel):
+    run_id: str
+    task_id: str
+    worker_role: str
+    outcome_status: str  # executed, no_op, skipped, or other
+    outcome_reason: str | None = None
+    validation_passed: bool | None = None
+
+
+class ExecutionHealthSignal(BaseModel):
+    total_runs: int = 0
+    executed_count: int = 0
+    no_op_count: int = 0
+    validation_failed_count: int = 0
+    recent_runs: list[ExecutionRunRecord] = Field(default_factory=list)
+
+
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
     test_signal: TestSignal
     dependency_drift: DependencyDriftSignal
     todo_signal: TodoSignal
+    execution_health: ExecutionHealthSignal = Field(default_factory=ExecutionHealthSignal)
 
 
 class RepoStateSnapshot(BaseModel):
