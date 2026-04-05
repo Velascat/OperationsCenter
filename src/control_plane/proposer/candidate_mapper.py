@@ -58,6 +58,7 @@ class ProposalCandidateMapper:
         lines.extend(self._constraints_for_candidate(candidate))
         expires_at = (datetime.now(UTC) + timedelta(days=candidate.expires_after_runs * 2)).strftime("%Y-%m-%d")
         lines.extend(["", "## Provenance"])
+        requires_human_approval = state == "Backlog"
         lines.extend(
             [
                 f"source: {provenance.source}",
@@ -67,6 +68,8 @@ class ProposalCandidateMapper:
                 f"confidence: {candidate.confidence}",
                 f"risk_class: {candidate.risk_class}",
                 f"autonomy_tier: {tier}",
+                f"validation_profile: {candidate.validation_profile}",
+                f"requires_human_approval: {'true' if requires_human_approval else 'false'}",
                 f"expires_at: {expires_at}",
                 "observer_run_ids:",
             ]

@@ -1,0 +1,220 @@
+"""Tests for validation profile assignment and task body inclusion.
+
+Covers:
+- Every named family resolves to the correct profile constant.
+- Unknown families fall back to TESTS_PASS without raising.
+- CandidateBuilder populates validation_profile from profile_for_family() by default.
+- CandidateSpec can override the profile explicitly; the override is respected.
+- candidate_mapper includes validation_profile in the task body Provenance block.
+- candidate_mapper includes requires_human_approval based on tier + risk_class.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from control_plane.decision.candidate_builder import CandidateBuilder, CandidateSpec
+from control_plane.decision.models import (
+    CandidateRationale,
+    DecisionRepoRef,
+    ProposalCandidate,
+    ProposalOutline,
+)
+from control_plane.decision.validation_profiles import (
+    CI_GREEN,
+    MANUAL_REVIEW,
+    RUFF_CLEAN,
+    TESTS_PASS,
+    TY_CLEAN,
+    profile_for_family,
+)
+from control_plane.proposer.candidate_mapper import ProposalCandidateMapper
+from control_plane.proposer.provenance import ProposalProvenance
+
+
+# ── profile_for_family ───────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "family,expected",
+    [
+        ("lint_fix", RUFF_CLEAN),
+        ("type_fix", TY_CLEAN),
+        ("test_visibility", TESTS_PASS),
+        ("execution_health_followup", TESTS_PASS),
+        ("observation_coverage", TESTS_PASS),
+        ("dependency_drift_followup", TESTS_PASS),
+        ("ci_pattern", CI_GREEN),
+        ("validation_pattern_followup", TESTS_PASS),
+        ("hotspot_concentration", TESTS_PASS),
+        ("todo_accumulation", TESTS_PASS),
+        ("backlog_promotion", TESTS_PASS),
+        ("arch_promotion", MANUAL_REVIEW),
+    ],
+)
+def test_profile_for_known_family(family: str, expected: str) -> None:
+    assert profile_for_family(family) == expected
+
+
+def test_profile_for_unknown_family_falls_back_to_tests_pass() -> None:
+    assert profile_for_family("some_future_family") == TESTS_PASS
+
+
+# ── CandidateBuilder ─────────────────────────────────────────────────────────
+
+
+def _spec(family: str, validation_profile: str = "") -> CandidateSpec:
+    return CandidateSpec(
+        family=family,
+        subject="test",
+        pattern_key="present",
+        evidence={},
+        matched_rules=["test"],
+        confidence="high",
+        risk_class="style",
+        expires_after_runs=3,
+        validation_profile=validation_profile,
+        proposal_outline=ProposalOutline(
+            title_hint=f"Fix {family}",
+            summary_hint=f"Fix {family} issues.",
+        ),
+        priority=(1, 1, family),
+    )
+
+
+def test_builder_auto_assigns_profile_from_family() -> None:
+    builder = CandidateBuilder()
+    candidate = builder.build(_spec("lint_fix"))
+    assert candidate.validation_profile == RUFF_CLEAN
+
+
+def test_builder_auto_assigns_profile_type_fix() -> None:
+    builder = CandidateBuilder()
+    candidate = builder.build(_spec("type_fix"))
+    assert candidate.validation_profile == TY_CLEAN
+
+
+def test_builder_respects_explicit_override() -> None:
+    """A rule can explicitly set validation_profile; the builder must not override it."""
+    builder = CandidateBuilder()
+    candidate = builder.build(_spec("lint_fix", validation_profile=TESTS_PASS))
+    assert candidate.validation_profile == TESTS_PASS
+
+
+def test_builder_unknown_family_gets_tests_pass() -> None:
+    builder = CandidateBuilder()
+    candidate = builder.build(_spec("brand_new_family"))
+    assert candidate.validation_profile == TESTS_PASS
+
+
+# ── candidate_mapper task body ───────────────────────────────────────────────
+
+
+def _candidate(
+    family: str = "lint_fix",
+    risk_class: str = "style",
+    validation_profile: str = RUFF_CLEAN,
+) -> ProposalCandidate:
+    return ProposalCandidate(
+        candidate_id="cand:test",
+        dedup_key="candidate|test|subject|present",
+        family=family,
+        subject="subject",
+        status="emit",
+        confidence="high",
+        risk_class=risk_class,
+        expires_after_runs=4,
+        validation_profile=validation_profile,
+        rationale=CandidateRationale(),
+        proposal_outline=ProposalOutline(
+            title_hint="Fix lint",
+            summary_hint="Fix lint violations.",
+        ),
+        evidence_lines=["47 violations detected"],
+    )
+
+
+def _provenance(repo_name: str = "ControlPlane") -> ProposalProvenance:
+    return ProposalProvenance(
+        source="autonomy",
+        source_family="lint_fix",
+        candidate_id="cand:test",
+        candidate_dedup_key="candidate|test|subject|present",
+        repo_name=repo_name,
+        observer_run_ids=["obs_001"],
+        insight_run_id="ins_001",
+        decision_run_id="dec_001",
+        proposer_run_id="prop_001",
+    )
+
+
+def _make_settings(tmp_path: Path) -> object:
+    from control_plane.config.settings import load_settings
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "\n".join([
+            "plane:",
+            "  base_url: http://plane.local",
+            "  api_token_env: PLANE_API_TOKEN",
+            "  workspace_slug: ws",
+            "  project_id: proj",
+            "git: {}",
+            "kodo: {}",
+            "repos:",
+            "  ControlPlane:",
+            "    clone_url: git@github.com:test/repo.git",
+            "    default_branch: main",
+        ])
+    )
+    return load_settings(cfg)
+
+
+def _map(candidate: ProposalCandidate, tmp_path: Path) -> str:
+    settings = _make_settings(tmp_path)
+    mapper = ProposalCandidateMapper()
+    draft = mapper.map_to_task(
+        candidate=candidate,
+        settings=settings,
+        provenance=_provenance(),
+    )
+    return draft.description
+
+
+def test_task_body_includes_validation_profile(tmp_path: Path) -> None:
+    body = _map(_candidate(family="lint_fix", validation_profile=RUFF_CLEAN), tmp_path)
+    assert "validation_profile: ruff_clean" in body
+
+
+def test_task_body_includes_ty_clean_for_type_fix(tmp_path: Path) -> None:
+    body = _map(_candidate(family="type_fix", risk_class="style", validation_profile=TY_CLEAN), tmp_path)
+    assert "validation_profile: ty_clean" in body
+
+
+def test_task_body_requires_human_approval_false_for_tier2_style(tmp_path: Path) -> None:
+    """lint_fix at tier 2 (style) → Ready for AI → requires_human_approval: false."""
+    body = _map(_candidate(family="lint_fix", risk_class="style"), tmp_path)
+    assert "requires_human_approval: false" in body
+
+
+def test_task_body_requires_human_approval_true_for_logic(tmp_path: Path) -> None:
+    """execution_health_followup at tier 1 with logic risk → Backlog → requires_human_approval: true."""
+    body = _map(
+        _candidate(
+            family="execution_health_followup",
+            risk_class="logic",
+            validation_profile=TESTS_PASS,
+        ),
+        tmp_path,
+    )
+    assert "requires_human_approval: true" in body
+
+
+def test_task_body_provenance_fields_ordered(tmp_path: Path) -> None:
+    """validation_profile and requires_human_approval appear after risk_class."""
+    body = _map(_candidate(), tmp_path)
+    lines = body.splitlines()
+    rc_idx = next(i for i, l in enumerate(lines) if l.startswith("risk_class:"))
+    vp_idx = next(i for i, l in enumerate(lines) if l.startswith("validation_profile:"))
+    rha_idx = next(i for i, l in enumerate(lines) if l.startswith("requires_human_approval:"))
+    assert rc_idx < vp_idx < rha_idx

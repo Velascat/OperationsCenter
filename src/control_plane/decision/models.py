@@ -38,6 +38,7 @@ class ProposalCandidate(BaseModel):
     evidence_lines: list[str] = Field(default_factory=list)
     risk_class: str = "logic"
     expires_after_runs: int = 5
+    validation_profile: str = ""
     rationale: CandidateRationale
     proposal_outline: ProposalOutline
 
