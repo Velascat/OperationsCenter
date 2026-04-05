@@ -1100,19 +1100,20 @@ class ExecutionService:
                 return _SelfReviewVerdict(verdict="error", concerns=[".review/verdict.txt was empty"])
 
             first = lines[0].strip().upper()
-            if first == "LGTM":
+            _LGTM_SYNONYMS = {"LGTM", "APPROVE", "APPROVED", "LOOKS GOOD", "LOOKS GOOD TO ME"}
+            if first in _LGTM_SYNONYMS:
                 return _SelfReviewVerdict(verdict="lgtm", concerns=[])
             elif first == "CONCERNS":
                 concerns = [line.lstrip("- ").strip() for line in lines[1:] if line.strip()]
                 return _SelfReviewVerdict(verdict="concerns", concerns=concerns or ["(no details)"])
             else:
-                # Fuzzy fallback: if LGTM appears anywhere without CONCERN, treat as lgtm
+                # Fuzzy fallback: if any LGTM synonym appears anywhere without CONCERN, treat as lgtm
                 self.logger.warning(
                     "Self-review verdict fuzzy fallback triggered; first line: %s",
                     first,
                 )
                 upper = content.upper()
-                if "LGTM" in upper and "CONCERN" not in upper:
+                if any(s in upper for s in _LGTM_SYNONYMS) and "CONCERN" not in upper:
                     return _SelfReviewVerdict(verdict="lgtm", concerns=[])
                 return _SelfReviewVerdict(verdict="concerns", concerns=[content[:500]])
         finally:
