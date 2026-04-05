@@ -108,17 +108,27 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 
 ## Next
 
+Items here are promoted to the board automatically by the `backlog_promotion` family (when enabled).
+`type: arch` and `type: redesign` items are **never** auto-promoted — they require deliberate operator action.
+
+---
+
 ### autonomy — Promote hotspot_concentration and todo_accumulation families
+**Type**: maintenance
 After observing healthy emit/create rates for the four default families, promote hotspot and todo families to `_DEFAULT_ALLOWED_FAMILIES`. Requires documented promotion criteria and at least one clean dry-run showing useful candidates.
 
 ### autonomy — Family-specific tuning refinement based on real regulator behavior
+**Type**: maintenance
 After the first few `tune-autonomy` runs accumulate retained artifacts, review recommendations against actual board outcomes and adjust the recommendation rule thresholds (OVER_SUPPRESSED_RATE, NOISY_CREATE_RATE_CEILING, HEALTHY_CREATE_RATE_FLOOR) if the defaults are too aggressive or too conservative for the observed repos.
 
 ### autonomy — Revisit dry-run-first posture for trusted repos
+**Type**: feature
 Define "trusted" in terms of measurable execution health and tuning stability (low no-op rate, clean validation history, healthy create/emit ratio stable across N regulator runs). Add a `trusted_repos` or `auto_execute_families` config key so specific repos skip the dry-run gate automatically.
 
 ### config — Per-repo execution budget overrides
+**Type**: feature
 Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when code_youtube_shorts and ControlPlane have different execution intensity.
 
 ### ci — Enforce `analyze-artifacts` output as a CI artifact
+**Type**: maintenance
 Run `analyze-artifacts` in CI on the retained artifacts directory and upload the output as a build artifact. Makes the tuning loop auditable per-commit.

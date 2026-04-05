@@ -93,6 +93,8 @@ Families in `_DEFAULT_ALLOWED_FAMILIES` fire automatically on every cycle:
 | `execution_health_followup` | yes |
 | `hotspot_concentration` | no — requires `--all-families` |
 | `todo_accumulation` | no — requires `--all-families` |
+| `backlog_promotion` | no — requires `--all-families` |
+| `arch_promotion` | no — requires `--all-families` + health gates |
 
 ## Per-Family Threshold Reference
 

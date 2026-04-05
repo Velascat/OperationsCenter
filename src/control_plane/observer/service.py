@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from control_plane.config import Settings
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.models import (
+    BacklogSignal,
     DependencyDriftSignal,
     ExecutionHealthSignal,
     RepoContextSnapshot,
@@ -50,6 +51,7 @@ class RepoObserverService:
         dependency_drift_collector: RepoSignalCollector,
         todo_signal_collector: RepoSignalCollector,
         execution_health_collector: RepoSignalCollector | None = None,
+        backlog_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -60,6 +62,7 @@ class RepoObserverService:
         self.dependency_drift_collector = dependency_drift_collector
         self.todo_signal_collector = todo_signal_collector
         self.execution_health_collector = execution_health_collector
+        self.backlog_collector = backlog_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -100,6 +103,17 @@ class RepoObserverService:
             if self.execution_health_collector is not None
             else ExecutionHealthSignal()
         )
+        backlog = (
+            self._collect_optional(
+                self.backlog_collector,
+                context,
+                "backlog",
+                collector_errors,
+                default=BacklogSignal(),
+            )
+            if self.backlog_collector is not None
+            else BacklogSignal()
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -108,6 +122,7 @@ class RepoObserverService:
             dependency_drift=dependency_drift,
             todo_signal=todo_signal,
             execution_health=execution_health,
+            backlog=backlog,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

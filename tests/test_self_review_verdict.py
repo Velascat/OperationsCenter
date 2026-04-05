@@ -48,7 +48,8 @@ def test_self_review_fuzzy_fallback_lgtm(tmp_path):
 
     # Make kodo.run write the verdict file with LGTM not on first line
     def fake_kodo_run(goal_file, rp):
-        verdict_file = rp / "review_verdict.txt"
+        verdict_file = rp / ".review" / "verdict.txt"
+        verdict_file.parent.mkdir(exist_ok=True)
         verdict_file.write_text("Everything looks great\nThe code is LGTM worthy\n")
 
     svc.kodo.run.side_effect = fake_kodo_run
@@ -83,7 +84,8 @@ def test_self_review_fuzzy_fallback_concerns(tmp_path):
     concern_text = "Overall review: some CONCERN about error handling and LGTM otherwise"
 
     def fake_kodo_run(goal_file, rp):
-        verdict_file = rp / "review_verdict.txt"
+        verdict_file = rp / ".review" / "verdict.txt"
+        verdict_file.parent.mkdir(exist_ok=True)
         verdict_file.write_text(concern_text)
 
     svc.kodo.run.side_effect = fake_kodo_run

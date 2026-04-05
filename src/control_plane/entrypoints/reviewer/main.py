@@ -94,6 +94,17 @@ def _merge_and_finalize(
                 logger.warning(json.dumps({"event": "plane_update_failed", "task_id": task_id, "error": str(exc)}))
             state_file.unlink(missing_ok=True)
             return
+        # If CI checks are still running or failing, skip merge this cycle and retry later.
+        mergeable_state = pr_data.get("mergeable_state", "")
+        if mergeable_state == "unstable":
+            logger.info(json.dumps({
+                "event": "pr_merge_skipped_ci",
+                "task_id": task_id,
+                "pr_number": pr_number,
+                "mergeable_state": mergeable_state,
+                "reason": "CI checks failing or pending — will retry next cycle",
+            }))
+            return
     except Exception as exc:
         logger.warning(json.dumps({"event": "pr_state_check_failed", "task_id": task_id, "error": str(exc)}))
         # Continue and attempt merge anyway; merge_pr will fail if PR is gone

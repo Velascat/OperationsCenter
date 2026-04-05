@@ -16,3 +16,4 @@ deployment/plane/logs/
 tools/report/kodo_plane/
 tools/report/control_plane/
 state/
+.review/
