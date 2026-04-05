@@ -606,48 +606,178 @@ def test_try_merge_base_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ===========================================================================
-# COVERAGE GAP AUDIT — untested behaviours per method in client.py
+# COVERAGE GAP AUDIT — full review of client.py (179 lines)
 # ===========================================================================
 #
-# changed_files (line 103)
-#   GAP: Deduplication when the same file appears in BOTH the tracked diff
-#        output and untracked ls-files output.  The method uses sorted(set(...))
-#        but no test exercises this overlap path.
+# Legend:
+#   ✅ COVERED  — gap identified and test written (in this file below)
+#   🔴 HIGH     — must add test (next stage)
+#   🟡 MEDIUM   — should add test (next stage)
+#   ⬜ SKIP     — implicitly covered or tests stdlib; not worth adding
 #
-# _parse_name_status_output (line 137)
-#   GAP: Copy status ("C") tested only alongside Rename in a combined test.
-#        No isolated test for a Copy entry verifying only the destination file
-#        is returned (not the source).
+# ---------------------------------------------------------------------------
+# _run (line 9) / _run_bytes (line 15)
+# ---------------------------------------------------------------------------
+#   ✅ Error on nonzero exit (lines 228, 256)
+#   ✅ Stderr included in error message (line 242)
+#   ✅ _run_bytes decodes non-UTF-8 stderr gracefully (line 270)
+#   ✅ _run returns stripped stdout (line 285)
+#   ✅ _run_bytes returns raw stdout (line 298)
+#   ✅ cwd forwarded to subprocess.run for both _run and _run_bytes (lines 870, 891)
 #
-# add_local_exclude (line 27)
-#   GAP: Leading/trailing whitespace in pattern argument.  The method calls
-#        pattern.strip() for both the dedup check and the written value, but no
-#        test passes e.g. "  pattern  " to verify whitespace is stripped on
-#        write and dedup still works against a clean existing line.
-#
-# try_merge_base (line 57)
-#   GAP: Merge fails (returncode != 0) but git diff returns NO unmerged paths
-#        (empty stdout).  Current conflict test always supplies file names.
-#        This edge case should return (False, []).
-#
-# commit_all (line 126)
-#   GAP: The exact commit message string is forwarded to _run.  Existing test
-#        only checks the return value (True); no assertion that the message
-#        argument reaches the git commit command.
-#
+# ---------------------------------------------------------------------------
 # clone (line 22)
-#   GAP: clone_url is correctly forwarded as an argument to _run.  Existing
-#        test only checks the returned Path; no assertion that _run received
-#        ["git", "clone", <url>, ...].
+# ---------------------------------------------------------------------------
+#   ✅ Returns correct path (line 498)
+#   ✅ Forwards URL to _run (line 856)
 #
-# _run / _run_bytes (lines 9, 15)
-#   GAP: cwd parameter is forwarded to subprocess.run.  Current monkeypatch
-#        tests ignore kwargs; no assertion verifies cwd reaches subprocess.
+# ---------------------------------------------------------------------------
+# add_local_exclude (line 27)
+# ---------------------------------------------------------------------------
+#   ✅ Creates file when missing (line 181)
+#   ✅ Appends to existing (line 191)
+#   ✅ Dedup skips existing pattern (line 202)
+#   ✅ Normalizes missing trailing newline (line 213)
+#   ✅ Strips whitespace from pattern (line 807)
 #
+# ---------------------------------------------------------------------------
+# verify_remote_branch_exists (line 40)
+# ---------------------------------------------------------------------------
+#   ✅ Success path (line 474)
+#   ✅ Raises ValueError when branch missing (line 484)
+#
+# ---------------------------------------------------------------------------
 # checkout_base (line 45)
-#   GAP: cwd parameter is forwarded to _run.  The TrackingFake records args
-#        but ignores the cwd keyword; no assertion that cwd=repo_path is
-#        passed through.
+# ---------------------------------------------------------------------------
+#   ✅ Delegates to git checkout (line 557)
+#   🟡 GAP: cwd forwarding — test at line 557 uses TrackingFake that
+#        discards cwd. Should verify cwd=repo_path reaches _run.
+#
+# ---------------------------------------------------------------------------
+# create_task_branch (line 48)
+# ---------------------------------------------------------------------------
+#   ✅ Remote exists — tracks it (line 417)
+#   ✅ New branch — creates locally (line 433)
+#   ✅ Returns True when remote exists (line 448)
+#   ✅ Returns False when new (line 460)
+#
+# ---------------------------------------------------------------------------
+# try_merge_base (line 57) — calls subprocess.run directly, NOT _run
+# ---------------------------------------------------------------------------
+#   ✅ Merge succeeds (line 574)
+#   ✅ Merge conflict with files (line 590)
+#   ✅ Merge conflict with no unmerged paths (line 821)
+#   🔴 GAP: git diff command itself fails (returncode != 0 at line 72).
+#        Code never checks status.returncode — silently reads stdout.
+#        This is also a LATENT BUG in client.py: should it raise or log?
+#        Test should document current behavior (returns (False, [])).
+#   🔴 GAP: cwd forwarding — both subprocess.run calls (merge at line 65,
+#        diff at line 72) should pass cwd=repo_path. No test verifies this.
+#        Unlike other methods, try_merge_base bypasses _run entirely.
+#   🟡 GAP: Whitespace-only lines in conflict output — the `if f.strip()`
+#        filter at line 76 is a defensive guard. Test with stdout containing
+#        blank/whitespace lines to confirm they're dropped.
+#
+# ---------------------------------------------------------------------------
+# recent_commits (line 79)
+# ---------------------------------------------------------------------------
+#   ✅ Normal output (line 315)
+#   ✅ Empty output (line 325)
+#   ✅ Custom max_count (line 334)
+#
+# ---------------------------------------------------------------------------
+# recent_changed_files (line 86)
+# ---------------------------------------------------------------------------
+#   ✅ Deduplication (line 348)
+#   ✅ Path normalization (line 358)
+#   ✅ Empty output (line 368)
+#   ✅ Custom max_count (line 377)
+#
+# ---------------------------------------------------------------------------
+# set_identity (line 99)
+# ---------------------------------------------------------------------------
+#   ✅ Calls both config commands (line 522)
+#
+# ---------------------------------------------------------------------------
+# changed_files (line 103)
+# ---------------------------------------------------------------------------
+#   ✅ Rename, delete, and untracked (line 19)
+#   ✅ Empty when no changes (line 39)
+#   ✅ Dedup overlap between diff and untracked (line 788)
+#
+# ---------------------------------------------------------------------------
+# diff_stat (line 114)
+# ---------------------------------------------------------------------------
+#   ✅ Empty when no changes (line 50)
+#   ✅ Includes untracked files (line 61)
+#   🟡 GAP: Untracked-only (no tracked changes) — tests cover "both" and
+#        "neither" but not the case where only untracked files exist.
+#
+# ---------------------------------------------------------------------------
+# diff_patch (line 123)
+# ---------------------------------------------------------------------------
+#   ✅ Returns diff output (line 508)
+#
+# ---------------------------------------------------------------------------
+# commit_all (line 126)
+# ---------------------------------------------------------------------------
+#   ✅ Returns False when no changes (line 392)
+#   ✅ Returns True when changes exist (line 402)
+#   ✅ Forwards message to git commit (line 840)
+#
+# ---------------------------------------------------------------------------
+# push_branch (line 134)
+# ---------------------------------------------------------------------------
+#   ✅ Calls push with correct args (line 540)
+#
+# ---------------------------------------------------------------------------
+# _parse_name_status_output (line 137)
+# ---------------------------------------------------------------------------
+#   ✅ Empty input (line 79)
+#   ✅ Simple statuses M/D/A (line 84)
+#   ✅ Rename and Copy combined (line 90)
+#   ✅ Truncated input — status with no path (line 96)
+#   ✅ Isolated Copy returns destination (line 800)
+#   🟡 GAP: Truncated rename — e.g. b"R100\x00old.py\x00" where destination
+#        is missing. Exercises the guard at line 149 (idx+1 >= len(parts)),
+#        which is a DIFFERENT branch from the existing truncation test at
+#        line 96 (which exercises line 156).
+#
+# ---------------------------------------------------------------------------
+# _parse_null_delimited_paths (line 162)
+# ---------------------------------------------------------------------------
+#   ✅ Empty input (line 106)
+#   ✅ Single path (line 110)
+#   ✅ Multiple paths (line 116)
+#   ✅ Trailing null produces no empty strings (line 121)
+#
+# ---------------------------------------------------------------------------
+# _normalize_repo_relative_path (line 171)
+# ---------------------------------------------------------------------------
+#   ✅ Leading dot-slash (line 132)
+#   ✅ Backslashes (line 137)
+#   ✅ Clean passthrough (line 142)
+#
+# ---------------------------------------------------------------------------
+# branch_allowed (standalone, line 175)
+# ---------------------------------------------------------------------------
+#   ✅ Empty patterns (line 151)
+#   ✅ Exact match (line 155)
+#   ✅ Glob wildcard (line 159)
+#   ✅ No match (line 163)
+#   ✅ Matches later pattern (line 167)
+#   ✅ Star pattern matches everything (line 172)
+#
+# ===========================================================================
+# SUMMARY OF REMAINING GAPS (for next stage)
+# ===========================================================================
+#   🔴 HIGH:   try_merge_base — git diff fails (returncode != 0) [+ latent bug]
+#   🔴 HIGH:   try_merge_base — cwd forwarding for both subprocess.run calls
+#   🟡 MEDIUM: checkout_base — cwd forwarding to _run
+#   🟡 MEDIUM: _parse_name_status_output — truncated rename (missing dest)
+#   🟡 MEDIUM: try_merge_base — whitespace lines in conflict output
+#   🟡 MEDIUM: diff_stat — untracked-only (no tracked changes)
+# ===========================================================================
 
 
 # ===========================================================================
@@ -777,3 +907,237 @@ def test_run_bytes_forwards_cwd_to_subprocess(monkeypatch: pytest.MonkeyPatch) -
     client = GitClient()
     client._run_bytes(["git", "diff"], cwd=Path("/myrepo"))
     assert captured["cwd"] == Path("/myrepo")
+
+
+# ===========================================================================
+# Stage 2: Edge-case and error-path tests
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# checkout_base — cwd forwarding
+# ---------------------------------------------------------------------------
+
+def test_checkout_base_forwards_cwd_to_run() -> None:
+    """checkout_base passes repo_path as cwd to _run."""
+    captured_cwd: list[Path | None] = []
+
+    class CwdTrackingFake(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            captured_cwd.append(cwd)
+            return ""
+
+    client = CwdTrackingFake()
+    client.checkout_base(Path("/my/repo"), "main")
+    assert captured_cwd == [Path("/my/repo")]
+
+
+# ---------------------------------------------------------------------------
+# try_merge_base — git diff itself fails (returncode != 0)
+# ---------------------------------------------------------------------------
+
+def test_try_merge_base_diff_command_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the git diff command itself fails (returncode != 0), the current
+    code does NOT check status.returncode — it silently reads stdout.
+    Document this behavior: returns (False, []) because stdout is empty."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="merge conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=128, stdout="", stderr="fatal: bad object")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == []
+
+
+# ---------------------------------------------------------------------------
+# try_merge_base — cwd forwarding for both subprocess.run calls
+# ---------------------------------------------------------------------------
+
+def test_try_merge_base_forwards_cwd_to_both_subprocess_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """try_merge_base bypasses _run and calls subprocess.run directly.
+    Verify cwd=repo_path is passed to both the merge and the diff calls."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    captured_cwds: list[Path | None] = []
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        captured_cwds.append(kwargs.get("cwd"))
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="conflict")
+        return SimpleNamespace(returncode=0, stdout="src/a.py\n", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    client.try_merge_base(Path("/the/repo"), "main")
+    assert captured_cwds == [Path("/the/repo"), Path("/the/repo")]
+
+
+# ---------------------------------------------------------------------------
+# try_merge_base — whitespace/blank lines in conflict output
+# ---------------------------------------------------------------------------
+
+def test_try_merge_base_filters_blank_lines_from_conflict_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Blank and whitespace-only lines in git diff output are filtered out."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout="\n  \nsrc/a.py\n\n  \nsrc/b.py\n  \n",
+                stderr="",
+            )
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == ["src/a.py", "src/b.py"]
+
+
+# ---------------------------------------------------------------------------
+# _parse_name_status_output — truncated rename (missing destination)
+# ---------------------------------------------------------------------------
+
+def test_parse_name_status_output_truncated_rename_missing_destination() -> None:
+    """Rename entry with source but no destination exercises the guard at
+    line 149 (idx+1 >= len(parts)), different from the existing truncation
+    test which exercises line 156."""
+    client = GitClient()
+    raw = b"R100\x00old.py\x00"
+    assert client._parse_name_status_output(raw) == []
+
+
+# ---------------------------------------------------------------------------
+# branch_allowed — edge patterns
+# ---------------------------------------------------------------------------
+
+def test_branch_allowed_empty_string_branch() -> None:
+    """Empty string branch does not match non-wildcard patterns."""
+    assert branch_allowed("", ["main", "develop"]) is False
+
+
+def test_branch_allowed_empty_string_matches_star() -> None:
+    """Empty string branch matches the '*' wildcard."""
+    assert branch_allowed("", ["*"]) is True
+
+
+def test_branch_allowed_question_mark_glob() -> None:
+    """'?' glob matches exactly one character."""
+    assert branch_allowed("v1", ["v?"]) is True
+    assert branch_allowed("v12", ["v?"]) is False
+
+
+# ---------------------------------------------------------------------------
+# add_local_exclude — edge cases
+# ---------------------------------------------------------------------------
+
+def test_add_local_exclude_empty_string_pattern(tmp_path: Path) -> None:
+    """Empty string pattern (after stripping) is still written."""
+    client = GitClient()
+    client.add_local_exclude(tmp_path, "")
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    assert exclude_path.exists()
+    assert exclude_path.read_text() == "\n"
+
+
+def test_add_local_exclude_pattern_with_newline_chars(tmp_path: Path) -> None:
+    """Pattern containing embedded newline chars: strip() collapses them,
+    so only the inner content is written as a single line."""
+    client = GitClient()
+    client.add_local_exclude(tmp_path, "\nmy_pattern\n")
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    # strip() removes leading/trailing newlines, so "my_pattern" is written
+    assert exclude_path.read_text() == "my_pattern\n"
+
+
+# ---------------------------------------------------------------------------
+# diff_stat — untracked-only (no tracked changes)
+# ---------------------------------------------------------------------------
+
+def test_diff_stat_untracked_only_no_tracked_changes() -> None:
+    """When there are no tracked changes but untracked files exist,
+    diff_stat returns only the untracked lines."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--stat", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): (
+                b"new_file.py\x00another.txt\x00"
+            ),
+        }
+    )
+    result = client.diff_stat(Path("."))
+    assert "untracked | new_file.py" in result
+    assert "untracked | another.txt" in result
+    lines = result.strip().splitlines()
+    assert len(lines) == 2
+
+
+# ---------------------------------------------------------------------------
+# recent_commits — blank lines in output
+# ---------------------------------------------------------------------------
+
+def test_recent_commits_filters_blank_lines() -> None:
+    """Blank lines interspersed in git log output are filtered out."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n5", "--pretty=format:%h %s"): (
+                b"abc1234 First\n\n\ndef5678 Second\n  \n"
+            ),
+        }
+    )
+    result = client.recent_commits(Path("."))
+    assert result == ["abc1234 First", "def5678 Second"]
+
+
+# ---------------------------------------------------------------------------
+# recent_changed_files — blank lines in output
+# ---------------------------------------------------------------------------
+
+def test_recent_changed_files_filters_blank_lines() -> None:
+    """Blank lines in git log --name-only output are filtered out."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n3", "--name-only", "--pretty=format:"): (
+                b"\n\nsrc/a.py\n\n\nsrc/b.py\n\n"
+            ),
+        }
+    )
+    result = client.recent_changed_files(Path("."))
+    assert result == ["src/a.py", "src/b.py"]
+
+
+# ---------------------------------------------------------------------------
+# changed_files — paths needing normalization
+# ---------------------------------------------------------------------------
+
+def test_changed_files_normalizes_backslashes_and_dot_prefixes() -> None:
+    """Paths with backslashes or leading ./ are normalized in changed_files."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): (
+                b"M\x00./src/main.py\x00M\x00src\\utils\\helper.py\x00"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert "src/main.py" in result
+    assert "src/utils/helper.py" in result
