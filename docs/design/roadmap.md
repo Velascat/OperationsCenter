@@ -1,6 +1,6 @@
 # ControlPlane Roadmap
 
-Phases 1–4 are complete. This document tracks what is deferred, why, and what must be true before each item is unlocked.
+This document tracks what is deferred, what is partially done, and what must be true before each item is unlocked.
 
 ---
 
@@ -11,10 +11,45 @@ Phases 1–4 are complete. This document tracks what is deferred, why, and what 
 | 1 | Passive observation and reporting | ✓ complete |
 | 2 | Proposal generation (dry-run) | ✓ complete |
 | 3 | Bounded automatic proposal creation | ✓ complete |
-| 4 | Validation profiles + structured evidence bundles | ✓ complete |
+| 4 | Validation profiles + execution feedback depth | partial — see below |
 | 5 | Richer signal depth (architecture, benchmark, security) | deferred |
 | 6 | Cross-run confidence calibration | deferred |
 | 7 | Bounded experiment mode | deferred — guarded |
+
+---
+
+## Phase 4 — Validation profiles + execution feedback depth
+
+Phase 4 has two halves. The first is complete; the second is TODO'd.
+
+### ✓ Done
+
+- `validation_profile` field in task body provenance — five profile constants (`ruff_clean`, `ty_clean`, `tests_pass`, `ci_green`, `manual_review`) mapped to all 12 families; auto-assigned by `CandidateBuilder`; appears in every task body
+- `requires_human_approval` flag in task body — derived from `state == "Backlog"`
+- `evidence_schema_version` in task body provenance — tracks the evidence bundle format
+- `EvidenceBundle` in decision artifact — structured machine-readable evidence for `lint_fix` and `type_fix`
+
+### TODO — execution feedback depth
+
+These items are TODO'd in the source at their insertion points.
+
+**`ExecutionOutcomeDeriver`** (`src/control_plane/insights/derivers/execution_outcome.py`)
+
+Reads execution transcripts (not just `control_outcome.json` records) to classify failure modes: timeout, test regression, validation loop, scope violation. Currently `ExecutionHealthDeriver` only sees aggregate counts — it cannot tell whether failures are timeouts vs. test regressions vs. scope violations.
+
+Plug in: `build_insight_service()` in `autonomy_cycle/main.py` (TODO comment present). Emits `execution_outcome/timeout_pattern`, `execution_outcome/test_regression`, `execution_outcome/validation_loop`.
+
+**Per-task validation profile tracking** (`src/control_plane/observer/collectors/validation_history.py`)
+
+`ValidationHistoryCollector` currently counts validation failures per task but does not record which `validation_profile` was expected when the failure occurred. Adding profile tracking enables the question "did lint_fix tasks consistently fail `ruff_clean` validation?" — which feeds into `ValidationPatternDeriver` and eventually into tier demotion recommendations.
+
+Requires: execution artifacts to carry a `validation_profile` field (set when the task is created from a candidate with a validation_profile).
+
+**Validation profiles in cycle report** (`src/control_plane/entrypoints/autonomy_cycle/main.py` → `_write_cycle_report`)
+
+The `decide` section of the cycle report shows `emitted_families` but not the `validation_profile` of each emitted candidate. Adding `emitted_candidates` as a list of `{family, validation_profile, confidence}` dicts makes the report more useful for debugging execution outcomes.
+
+**Unlock condition for "execution feedback depth":** At least 10 lint_fix tasks executed; cycle report shows `validation_profile` per emitted candidate; `ValidationHistoryCollector` can distinguish profile-typed failures.
 
 ---
 

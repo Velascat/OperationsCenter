@@ -326,3 +326,18 @@ def test_task_body_provenance_fields_ordered(tmp_path: Path) -> None:
     vp_idx = next(i for i, l in enumerate(lines) if l.startswith("validation_profile:"))
     rha_idx = next(i for i, l in enumerate(lines) if l.startswith("requires_human_approval:"))
     assert rc_idx < vp_idx < rha_idx
+
+
+def test_task_body_includes_evidence_schema_version(tmp_path: Path) -> None:
+    """evidence_schema_version appears in the provenance block."""
+    body = _map(_candidate(family="lint_fix"), tmp_path)
+    assert "evidence_schema_version: 1" in body
+
+
+def test_task_body_evidence_schema_version_default_when_no_bundle(tmp_path: Path) -> None:
+    """Families with no EvidenceBundle still emit evidence_schema_version: 1."""
+    body = _map(
+        _candidate(family="observation_coverage", risk_class="logic", validation_profile=TESTS_PASS),
+        tmp_path,
+    )
+    assert "evidence_schema_version: 1" in body

@@ -113,6 +113,13 @@ def build_insight_service() -> InsightEngineService:
             # CrossSignalDeriver runs last so all single-signal derivers have already fired.
             # Its insights are consumed by lint_fix and type_fix rules for confidence boosting.
             CrossSignalDeriver(normalizer),
+            # TODO (Phase 4 — execution feedback depth): add ExecutionOutcomeDeriver(normalizer)
+            # here once implemented. It reads execution transcripts (not just outcome records)
+            # to classify failure modes: timeout, test_regression, validation_loop,
+            # scope_violation. Emits execution_outcome/timeout_pattern,
+            # execution_outcome/test_regression, execution_outcome/validation_loop insights.
+            # These feed into a new execution_outcome rule family and make the ValidationPattern
+            # deriver failure reasons classifiable. See docs/design/roadmap.md §Phase 4.
             # TODO (Phase 5 — architecture deriver): add ArchitectureDriftDeriver(normalizer) here
             # once ArchitectureSignalCollector exists. Emits arch_drift/coupling_high and
             # arch_drift/module_bloat insights consumed by the arch_promotion rule.
@@ -402,6 +409,18 @@ def _write_cycle_report(
                 "candidates_suppressed": len(candidates_artifact.suppressed),
                 "suppression_reasons": dict(suppression_reasons),
                 "emitted_families": [c.family for c in emitted],
+                "emitted_candidates": [
+                    {
+                        "family": c.family,
+                        "validation_profile": c.validation_profile,
+                        "confidence": c.confidence,
+                    }
+                    for c in emitted
+                ],
+                # TODO (Phase 4 — execution feedback depth): once ExecutionOutcomeDeriver
+                # exists, add "failure_classes_observed" here from the latest execution
+                # outcome insights so the cycle report shows failure patterns alongside
+                # emitted candidates. See docs/design/roadmap.md §Phase 4.
             },
             "propose": {
                 "run_id": prop_artifact.run_id if prop_artifact else None,

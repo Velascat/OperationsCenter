@@ -59,6 +59,11 @@ class ProposalCandidateMapper:
         expires_at = (datetime.now(UTC) + timedelta(days=candidate.expires_after_runs * 2)).strftime("%Y-%m-%d")
         lines.extend(["", "## Provenance"])
         requires_human_approval = state == "Backlog"
+        evidence_schema_version = (
+            candidate.evidence_bundle.schema_version
+            if candidate.evidence_bundle is not None
+            else 1
+        )
         lines.extend(
             [
                 f"source: {provenance.source}",
@@ -70,6 +75,11 @@ class ProposalCandidateMapper:
                 f"autonomy_tier: {tier}",
                 f"validation_profile: {candidate.validation_profile}",
                 f"requires_human_approval: {'true' if requires_human_approval else 'false'}",
+                f"evidence_schema_version: {evidence_schema_version}",
+                # TODO (Phase 4): add proposal_generation_run once autonomy_cycle assigns a
+                # stable cycle-level run_id distinct from the decision run_id. This field
+                # will link the task back to the specific cycle_<ts>.json report that
+                # originated it. For now, decision_run_id serves as the closest proxy.
                 f"expires_at: {expires_at}",
                 "observer_run_ids:",
             ]
