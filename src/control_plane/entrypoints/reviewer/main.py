@@ -47,12 +47,13 @@ def _is_bot_comment(comment: dict, bot_comment_ids: set[int], bot_logins: set[st
 def _load_pr_states() -> list[tuple[Path, dict]]:
     if not PR_REVIEW_STATE_DIR.exists():
         return []
+    logger = logging.getLogger(__name__)
     states = []
     for f in sorted(PR_REVIEW_STATE_DIR.glob("*.json")):
         try:
             states.append((f, json.loads(f.read_text())))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to load state file %s: %s", f, exc)
     return states
 
 
@@ -184,8 +185,8 @@ def _process_self_review(
         try:
             _post_bot_comment(gh, owner, repo, pr_number,
                               "Self-review passed — merging.", marker)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to post self-review merge comment for PR %s: %s", pr_number, exc)
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="self_review_lgtm")
         return 1
 
@@ -359,8 +360,8 @@ def _process_human_review(
             notice = _post_bot_comment(gh, owner, repo, pr_number,
                                        "Maximum revision loops (3) reached — merging as-is.", marker)
             bot_comment_ids.add(notice["id"])
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to post max-loops notice for PR %s: %s", pr_number, exc)
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="max_loops")
         return 1
 

@@ -1793,3 +1793,33 @@ def test_verify_remote_branch_exists_error_contains_branch_name() -> None:
     )
     with pytest.raises(ValueError, match="nonexistent-branch"):
         client.verify_remote_branch_exists(Path("."), "nonexistent-branch")
+
+
+# ---------------------------------------------------------------------------
+# try_merge_base: git-diff also fails (non-zero returncode)
+# ---------------------------------------------------------------------------
+
+
+def test_try_merge_base_diff_filter_fails(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    """When merge fails AND git diff --diff-filter=U also fails, return (False, []) and log a warning."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="merge conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=128, stdout="", stderr="fatal: bad revision")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        success, conflicts = client.try_merge_base(Path("/repo"), "main")
+
+    assert success is False
+    assert conflicts == []
+    assert any("git diff --diff-filter=U failed" in rec.message for rec in caplog.records)

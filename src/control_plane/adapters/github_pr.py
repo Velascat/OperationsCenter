@@ -47,6 +47,11 @@ class GitHubPRClient:
         return resp.json()
 
     def get_pr(self, owner: str, repo: str, pr_number: int) -> dict:
+        """Fetch a single pull request by number from the GitHub REST API.
+
+        Returns the full PR resource as a dict (see GitHub docs for schema).
+        Raises ``httpx.HTTPStatusError`` on non-2xx responses.
+        """
         resp = httpx.get(
             f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
             headers=self._headers,

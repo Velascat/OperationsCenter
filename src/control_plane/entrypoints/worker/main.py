@@ -33,6 +33,7 @@ PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
 LOW_BACKLOG_THRESHOLD = 6
 EXECUTION_ACTIONS = {"execute", "improve_task"}
 MAX_CLASSIFICATION_ISSUES = 20
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -791,8 +792,8 @@ def issue_execution_target(issue: dict[str, Any], service: ExecutionService) -> 
             if repo_key in service.settings.repos and base_branch:
                 allowed_paths = [str(path).strip() for path in metadata.get("allowed_paths", []) if str(path).strip()]
                 return repo_key, base_branch, allowed_paths or allowed_paths_for_repo(repo_key)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            _logger.debug("Failed to parse task metadata: %s", exc)
 
     repo_key = default_repo_key(service)
     repo_cfg = service.settings.repos[repo_key]
@@ -980,7 +981,8 @@ def _run_tool(cmd: list[str], cwd: Path, timeout: int = 30) -> str:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False)
         return result.stdout
-    except Exception:
+    except Exception as exc:
+        _logger.debug("Tool command failed %s: %s", cmd, exc)
         return ""
 
 
@@ -996,7 +998,8 @@ def _safety_findings(repo_path: Path) -> list[dict[str, str]]:
         rel = str(path.relative_to(repo_path))
         try:
             tree = ast.parse(path.read_text(errors="replace"))
-        except (SyntaxError, OSError):
+        except (SyntaxError, OSError) as exc:
+            _logger.debug("Skipping %s during safety scan: %s", path, exc)
             continue
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
@@ -1079,7 +1082,8 @@ def _dead_code_findings(repo_path: Path) -> list[dict[str, str]]:
         try:
             src = path.read_text(errors="replace")
             tree = ast.parse(src)
-        except (SyntaxError, OSError):
+        except (SyntaxError, OSError) as exc:
+            _logger.debug("Skipping %s during dead-code scan: %s", path, exc)
             continue
         defined_private = {
             node.name for node in ast.walk(tree)
@@ -1155,7 +1159,8 @@ def _type_coverage_findings(repo_path: Path) -> list[dict[str, str]]:
         try:
             src = path.read_text(errors="replace")
             tree = ast.parse(src)
-        except (SyntaxError, OSError):
+        except (SyntaxError, OSError) as exc:
+            _logger.debug("Skipping %s during type scan: %s", path, exc)
             continue
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -1202,7 +1207,8 @@ def _recursion_findings(repo_path: Path) -> list[dict[str, str]]:
         rel = str(path.relative_to(repo_path))
         try:
             tree = ast.parse(path.read_text(errors="replace"))
-        except (SyntaxError, OSError):
+        except (SyntaxError, OSError) as exc:
+            _logger.debug("Skipping %s during recursion scan: %s", path, exc)
             continue
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -1257,7 +1263,8 @@ def _ast_complexity_findings(repo_path: Path) -> list[dict[str, str]]:
             try:
                 source = path.read_text(errors="replace")
                 tree = ast.parse(source)
-            except (SyntaxError, OSError):
+            except (SyntaxError, OSError) as exc:
+                _logger.debug("Skipping %s during complexity scan: %s", path, exc)
                 continue
             line_count = len(source.splitlines())
             large_fns: list[tuple[str, int]] = []

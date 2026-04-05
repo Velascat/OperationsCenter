@@ -1107,6 +1107,10 @@ class ExecutionService:
                 return _SelfReviewVerdict(verdict="concerns", concerns=concerns or ["(no details)"])
             else:
                 # Fuzzy fallback: if LGTM appears anywhere without CONCERN, treat as lgtm
+                self.logger.warning(
+                    "Self-review verdict fuzzy fallback triggered; first line: %s",
+                    first,
+                )
                 upper = content.upper()
                 if "LGTM" in upper and "CONCERN" not in upper:
                     return _SelfReviewVerdict(verdict="lgtm", concerns=[])

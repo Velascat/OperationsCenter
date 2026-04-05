@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import fnmatch
+import logging
 import subprocess
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class GitClient:
@@ -73,6 +76,12 @@ class GitClient:
             ["git", "diff", "--name-only", "--diff-filter=U"],
             cwd=repo_path, capture_output=True, text=True,
         )
+        if status.returncode != 0:
+            logger.warning(
+                "git diff --diff-filter=U failed (rc=%d): %s",
+                status.returncode,
+                status.stderr.strip(),
+            )
         conflict_files = [f.strip() for f in status.stdout.splitlines() if f.strip()]
         return False, conflict_files
 
