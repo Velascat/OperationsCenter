@@ -1141,3 +1141,337 @@ def test_changed_files_normalizes_backslashes_and_dot_prefixes() -> None:
     result = client.changed_files(Path("."))
     assert "src/main.py" in result
     assert "src/utils/helper.py" in result
+
+
+# ===========================================================================
+# Stage 3: Gap-filling tests
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# 1. Error propagation tests — RaisingGitClient
+# ---------------------------------------------------------------------------
+
+
+class RaisingGitClient(GitClient):
+    """GitClient subclass where _run raises RuntimeError for specific command prefixes."""
+
+    def __init__(self, failing_prefixes: list[tuple[str, ...]]) -> None:
+        self.failing_prefixes = failing_prefixes
+
+    def _run(self, args: list[str], cwd: Path | None = None) -> str:
+        for prefix in self.failing_prefixes:
+            if tuple(args[: len(prefix)]) == prefix:
+                raise RuntimeError(f"simulated failure: {' '.join(args)}")
+        return ""
+
+    def _run_bytes(self, args: list[str], cwd: Path | None = None) -> bytes:
+        for prefix in self.failing_prefixes:
+            if tuple(args[: len(prefix)]) == prefix:
+                raise RuntimeError(f"simulated failure: {' '.join(args)}")
+        return b""
+
+
+def test_clone_propagates_runtime_error() -> None:
+    client = RaisingGitClient([("git", "clone")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.clone("https://example.com/repo.git", Path("/ws"))
+
+
+def test_push_branch_propagates_runtime_error() -> None:
+    client = RaisingGitClient([("git", "push")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.push_branch(Path("."), "feature-1")
+
+
+def test_diff_patch_propagates_runtime_error() -> None:
+    client = RaisingGitClient([("git", "diff")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.diff_patch(Path("."))
+
+
+def test_checkout_base_propagates_runtime_error() -> None:
+    client = RaisingGitClient([("git", "checkout")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.checkout_base(Path("."), "main")
+
+
+def test_commit_all_raises_when_git_add_fails() -> None:
+    """commit_all raises RuntimeError when git add -A (the first _run call) fails."""
+    client = RaisingGitClient([("git", "add")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.commit_all(Path("."), "msg")
+
+
+def test_set_identity_raises_when_name_config_fails() -> None:
+    """set_identity raises RuntimeError when the user.name config command fails."""
+    client = RaisingGitClient([("git", "config", "user.name")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.set_identity(Path("."), "Bot", "bot@example.com")
+
+
+def test_set_identity_raises_when_email_config_fails() -> None:
+    """set_identity raises RuntimeError when the user.email config command fails."""
+    client = RaisingGitClient([("git", "config", "user.email")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.set_identity(Path("."), "Bot", "bot@example.com")
+
+
+# ---------------------------------------------------------------------------
+# 2. verify_remote_branch_exists — error message propagation
+# ---------------------------------------------------------------------------
+
+
+def test_verify_remote_branch_exists_propagates_runtime_error_message() -> None:
+    """When _run raises RuntimeError with a specific stderr message, it propagates intact."""
+    client = RaisingGitClient([("git", "ls-remote")])
+    with pytest.raises(RuntimeError, match="simulated failure.*git ls-remote"):
+        client.verify_remote_branch_exists(Path("."), "main")
+
+
+# ---------------------------------------------------------------------------
+# 3. branch_allowed with fnmatch special chars
+# ---------------------------------------------------------------------------
+
+
+def test_branch_allowed_bracket_pattern_matching() -> None:
+    """Bracket patterns like [abc]* match branches starting with a, b, or c."""
+    assert branch_allowed("alpha", ["[abc]*"]) is True
+    assert branch_allowed("bravo", ["[abc]*"]) is True
+    assert branch_allowed("charlie", ["[abc]*"]) is True
+    assert branch_allowed("delta", ["[abc]*"]) is False
+
+
+def test_branch_allowed_bracket_pattern_no_match() -> None:
+    """Bracket patterns don't match characters outside the set."""
+    assert branch_allowed("xyz", ["[abc]*"]) is False
+
+
+def test_branch_allowed_question_mark_single_char() -> None:
+    """'?' matches exactly one character, no more, no less."""
+    assert branch_allowed("a", ["?"]) is True
+    assert branch_allowed("ab", ["?"]) is False
+    assert branch_allowed("", ["?"]) is False
+
+
+def test_branch_allowed_escaped_bracket_literal() -> None:
+    """Escaped bracket patterns match literal brackets (fnmatch behavior)."""
+    assert branch_allowed("[abc]test", ["[[]abc]test"]) is True
+    assert branch_allowed("atest", ["[[]abc]test"]) is False
+
+
+# ---------------------------------------------------------------------------
+# 4. changed_files sort stability with mixed-case paths
+# ---------------------------------------------------------------------------
+
+
+def test_changed_files_sort_stability_mixed_case() -> None:
+    """Mixed-case paths that normalize should produce deterministic sorted output."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): (
+                b"M\x00src/Zebra.py\x00"
+                b"M\x00src/alpha.py\x00"
+                b"M\x00src/Beta.py\x00"
+                b"M\x00src/gamma.py\x00"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert result == sorted(result)
+    # Capital letters sort before lowercase in default sort
+    assert result == ["src/Beta.py", "src/Zebra.py", "src/alpha.py", "src/gamma.py"]
+
+
+# ---------------------------------------------------------------------------
+# 5. add_local_exclude idempotency
+# ---------------------------------------------------------------------------
+
+
+def test_add_local_exclude_idempotency(tmp_path: Path) -> None:
+    """Calling add_local_exclude twice with the same pattern writes it only once."""
+    client = GitClient()
+    client.add_local_exclude(tmp_path, "mypattern")
+    client.add_local_exclude(tmp_path, "mypattern")
+
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    content = exclude_path.read_text()
+    assert content.count("mypattern") == 1
+
+
+def test_add_local_exclude_whitespace_pattern_idempotency(tmp_path: Path) -> None:
+    """Pattern with leading/trailing whitespace is stripped; dedup works across calls."""
+    client = GitClient()
+    client.add_local_exclude(tmp_path, "  spaced  ")
+    client.add_local_exclude(tmp_path, "spaced")
+
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    content = exclude_path.read_text()
+    assert content.count("spaced") == 1
+
+
+def test_add_local_exclude_appends_to_file_without_trailing_newline(tmp_path: Path) -> None:
+    """Adding to a file that doesn't end with newline inserts one before the pattern."""
+    client = GitClient()
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text("existing")
+
+    client.add_local_exclude(tmp_path, "new")
+
+    content = exclude_path.read_text()
+    assert content == "existing\nnew\n"
+
+
+# ---------------------------------------------------------------------------
+# 6. recent_commits with whitespace-only lines (tab-only)
+# ---------------------------------------------------------------------------
+
+
+def test_recent_commits_filters_tab_only_lines() -> None:
+    """Tab-only lines in git log output are filtered out."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n5", "--pretty=format:%h %s"): (
+                b"abc1234 First\n\t\t\ndef5678 Second\n\t\n"
+            ),
+        }
+    )
+    result = client.recent_commits(Path("."))
+    assert result == ["abc1234 First", "def5678 Second"]
+
+
+# ---------------------------------------------------------------------------
+# 7. recent_changed_files order preservation
+# ---------------------------------------------------------------------------
+
+
+def test_recent_changed_files_preserves_first_occurrence_order() -> None:
+    """Deduplication preserves first-occurrence order, not last."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n3", "--name-only", "--pretty=format:"): (
+                b"\nsrc/c.py\nsrc/a.py\nsrc/b.py\n\nsrc/a.py\nsrc/c.py\n"
+            ),
+        }
+    )
+    result = client.recent_changed_files(Path("."))
+    # First occurrence order: c, a, b
+    assert result == ["src/c.py", "src/a.py", "src/b.py"]
+
+
+# ---------------------------------------------------------------------------
+# 8. _parse_name_status_output with mixed R/C/M/D/A
+# ---------------------------------------------------------------------------
+
+
+def test_parse_name_status_output_mixed_all_status_codes() -> None:
+    """Sequence containing all status codes: A, M, D, R, C."""
+    client = GitClient()
+    raw = (
+        b"A\x00added.py\x00"
+        b"M\x00modified.py\x00"
+        b"D\x00deleted.py\x00"
+        b"R100\x00old_name.py\x00new_name.py\x00"
+        b"C050\x00source.py\x00copied.py\x00"
+    )
+    result = client._parse_name_status_output(raw)
+    assert result == ["added.py", "modified.py", "deleted.py", "new_name.py", "copied.py"]
+
+
+# ---------------------------------------------------------------------------
+# 9. _parse_name_status_output with malformed/truncated input
+# ---------------------------------------------------------------------------
+
+
+def test_parse_name_status_output_rename_with_only_one_path() -> None:
+    """R status with only source path but no destination — should break out safely."""
+    client = GitClient()
+    raw = b"R100\x00only_source.py\x00"
+    result = client._parse_name_status_output(raw)
+    assert result == []
+
+
+def test_parse_name_status_output_copy_with_only_one_path() -> None:
+    """C status with only source path but no destination — should break out safely."""
+    client = GitClient()
+    raw = b"C100\x00only_source.py\x00"
+    result = client._parse_name_status_output(raw)
+    assert result == []
+
+
+def test_parse_name_status_output_status_code_only_no_paths() -> None:
+    """Status code with no following paths — should break out safely."""
+    client = GitClient()
+    raw = b"M\x00"
+    result = client._parse_name_status_output(raw)
+    assert result == []
+
+
+def test_parse_name_status_output_valid_then_truncated() -> None:
+    """Valid entries followed by a truncated rename — valid entries are returned."""
+    client = GitClient()
+    raw = b"A\x00good.py\x00R100\x00orphan.py\x00"
+    result = client._parse_name_status_output(raw)
+    assert result == ["good.py"]
+
+
+# ---------------------------------------------------------------------------
+# 10. try_merge_base when diff --name-only also fails
+# ---------------------------------------------------------------------------
+
+
+def test_try_merge_base_both_merge_and_diff_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When merge fails (returncode=1) and diff --name-only also fails
+    (returncode != 0), verify it returns (False, [])."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="merge conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=128, stdout="", stderr="fatal: error")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == []
+
+
+# ---------------------------------------------------------------------------
+# 11. _parse_null_delimited_paths and _parse_name_status_output with
+#     non-UTF-8 bytes (surrogateescape handling)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_null_delimited_paths_non_utf8_bytes() -> None:
+    """Non-UTF-8 bytes like 0xff are decoded via surrogateescape."""
+    client = GitClient()
+    raw = b"\xff_file.py\x00normal.py\x00"
+    result = client._parse_null_delimited_paths(raw)
+    assert len(result) == 2
+    # The 0xff byte is decoded using surrogateescape
+    assert result[0] == "\udcff_file.py"
+    assert result[1] == "normal.py"
+
+
+def test_parse_name_status_output_non_utf8_bytes() -> None:
+    """Non-UTF-8 bytes in filenames are decoded via surrogateescape."""
+    client = GitClient()
+    raw = b"M\x00\xff_weird.py\x00"
+    result = client._parse_name_status_output(raw)
+    assert len(result) == 1
+    assert result[0] == "\udcff_weird.py"
+
+
+def test_parse_name_status_output_non_utf8_in_rename() -> None:
+    """Non-UTF-8 bytes in rename source/destination are handled via surrogateescape."""
+    client = GitClient()
+    raw = b"R100\x00old_\xff.py\x00new_\xfe.py\x00"
+    result = client._parse_name_status_output(raw)
+    assert len(result) == 1
+    assert result[0] == "new_\udcfe.py"
