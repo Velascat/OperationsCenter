@@ -24,6 +24,7 @@ _DEFAULT_FAMILY_TIERS: dict[str, int] = {
     "backlog_promotion": 1,
     "type_fix": 1,  # logic risk; keep at 1 until track record shows safe to auto-run
     "ci_pattern": 1,  # logic risk; requires human review before auto-executing
+    "validation_pattern_followup": 1,  # logic risk; investigation required before executing
     # structural and arch require explicit human approval
     "hotspot_concentration": 1,
     "arch_promotion": 0,

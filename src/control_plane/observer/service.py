@@ -19,6 +19,7 @@ from control_plane.observer.models import (
     TestSignal,
     TodoSignal,
     TypeSignal,
+    ValidationHistorySignal,
 )
 from control_plane.observer.snapshot_builder import SnapshotBuilder
 
@@ -58,6 +59,7 @@ class RepoObserverService:
         lint_signal_collector: RepoSignalCollector | None = None,
         type_signal_collector: RepoSignalCollector | None = None,
         ci_history_collector: RepoSignalCollector | None = None,
+        validation_history_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -72,6 +74,7 @@ class RepoObserverService:
         self.lint_signal_collector = lint_signal_collector
         self.type_signal_collector = type_signal_collector
         self.ci_history_collector = ci_history_collector
+        self.validation_history_collector = validation_history_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -156,6 +159,17 @@ class RepoObserverService:
             if self.ci_history_collector is not None
             else CIHistorySignal(status="unavailable")
         )
+        validation_history = (
+            self._collect_optional(
+                self.validation_history_collector,
+                context,
+                "validation_history",
+                collector_errors,
+                default=ValidationHistorySignal(status="unavailable"),
+            )
+            if self.validation_history_collector is not None
+            else ValidationHistorySignal(status="unavailable")
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -168,6 +182,7 @@ class RepoObserverService:
             lint_signal=lint_signal,
             type_signal=type_signal,
             ci_history=ci_history,
+            validation_history=validation_history,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

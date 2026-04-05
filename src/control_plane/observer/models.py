@@ -111,6 +111,21 @@ class TypeSignal(BaseModel):
     source: str | None = None
 
 
+class ValidationFailureRecord(BaseModel):
+    task_id: str
+    worker_role: str
+    total_runs: int
+    validation_failure_count: int
+
+
+class ValidationHistorySignal(BaseModel):
+    status: str  # "nominal", "patterns_detected", "unavailable"
+    tasks_analyzed: int = 0
+    tasks_with_repeated_failures: list[ValidationFailureRecord] = Field(default_factory=list)
+    overall_failure_rate: float = 0.0
+    source: str | None = None
+
+
 class CICheckRunRecord(BaseModel):
     name: str
     sha: str
@@ -138,6 +153,7 @@ class RepoSignalsSnapshot(BaseModel):
     lint_signal: LintSignal = Field(default_factory=lambda: LintSignal(status="unavailable"))
     type_signal: TypeSignal = Field(default_factory=lambda: TypeSignal(status="unavailable"))
     ci_history: CIHistorySignal = Field(default_factory=lambda: CIHistorySignal(status="unavailable"))
+    validation_history: ValidationHistorySignal = Field(default_factory=lambda: ValidationHistorySignal(status="unavailable"))
 
 
 class RepoStateSnapshot(BaseModel):

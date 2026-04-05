@@ -164,6 +164,11 @@ class ProposalCandidateMapper:
                 "- Keep the change scoped to the identified failing or flaky checks.",
                 "- Document findings even if no code change is needed.",
             ],
+            "validation_pattern_followup": [
+                "- Investigate the validation artifacts for the identified tasks before proposing changes.",
+                "- Fix the root cause (broken test, misconfigured validator, or task scope issue).",
+                "- Do not simply suppress or skip the failing validation step.",
+            ],
         }
         return family_scopes.get(
             candidate.family,

@@ -17,6 +17,7 @@ from control_plane.decision.rules.execution_health import ExecutionHealthRule
 from control_plane.decision.rules.hotspot_concentration import HotspotConcentrationRule
 from control_plane.decision.rules.ci_pattern import CIPatternRule
 from control_plane.decision.rules.lint_fix import LintFixRule
+from control_plane.decision.rules.validation_pattern import ValidationPatternRule
 from control_plane.decision.rules.observation_coverage import ObservationCoverageRule
 from control_plane.decision.rules.type_improvement import TypeImprovementRule
 from control_plane.decision.rules.test_visibility import TestVisibilityRule
@@ -31,8 +32,8 @@ class DecisionLoaderProtocol(Protocol):
         ...
 
 
-_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "type_fix"})
-ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "type_fix", "ci_pattern", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
+_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "type_fix", "validation_pattern_followup"})
+ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "type_fix", "validation_pattern_followup", "ci_pattern", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[ty
         LintFixRule(min_violations=lint_min),
         TypeImprovementRule(min_errors=type_min),
         CIPatternRule(),
+        ValidationPatternRule(),
         BacklogPromotionRule(),
         ArchPromotionRule(),
     ]
