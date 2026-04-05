@@ -72,9 +72,12 @@ def build_insight_service() -> InsightEngineService:
 
 
 def build_decision_service() -> DecisionEngineService:
+    from control_plane.tuning.applier import load_tuning_config
+    tuning_config = load_tuning_config()
     return DecisionEngineService(
         loader=DecisionLoader(),
         artifact_writer=DecisionArtifactWriter(),
+        tuning_config=tuning_config,
     )
 
 

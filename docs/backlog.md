@@ -88,6 +88,15 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 
 ---
 
+## Completed (Regulation Loop Phase)
+
+### autonomy — Bounded self-tuning regulation loop (`tune-autonomy`)
+**Status**: done
+
+`TuningRegulatorService` aggregates per-family metrics from retained decision and proposer artifacts and applies explicit recommendation rules (over-suppressed → loosen; noisy → tighten; healthy → keep). Recommendation-only by default; auto-apply mode (opt-in via `--apply` + `CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1`) writes conservative bounded changes to `config/autonomy_tuning.json` with full cooldown, quota, oscillation, and allowlist guardrails. `DecisionEngineService` reads tuning overrides at startup. Full audit trail retained in `tools/report/control_plane/tuning/`. 47 tests.
+
+---
+
 ## Completed (Post-Hardening)
 
 ### autonomy — Execution health self-tuning loop
@@ -102,8 +111,11 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 ### autonomy — Promote hotspot_concentration and todo_accumulation families
 After observing healthy emit/create rates for the four default families, promote hotspot and todo families to `_DEFAULT_ALLOWED_FAMILIES`. Requires documented promotion criteria and at least one clean dry-run showing useful candidates.
 
+### autonomy — Family-specific tuning refinement based on real regulator behavior
+After the first few `tune-autonomy` runs accumulate retained artifacts, review recommendations against actual board outcomes and adjust the recommendation rule thresholds (OVER_SUPPRESSED_RATE, NOISY_CREATE_RATE_CEILING, HEALTHY_CREATE_RATE_FLOOR) if the defaults are too aggressive or too conservative for the observed repos.
+
 ### autonomy — Revisit dry-run-first posture for trusted repos
-Define "trusted" in terms of measurable execution health (low no-op rate, clean validation history, healthy emit/create ratio over N cycles). Add a `trusted_repos` or `auto_execute_families` config key so specific repos skip the dry-run gate automatically. The execution health loop provides the signal; this makes it actionable at the config level.
+Define "trusted" in terms of measurable execution health and tuning stability (low no-op rate, clean validation history, healthy create/emit ratio stable across N regulator runs). Add a `trusted_repos` or `auto_execute_families` config key so specific repos skip the dry-run gate automatically.
 
 ### config — Per-repo execution budget overrides
 Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when code_youtube_shorts and ControlPlane have different execution intensity.

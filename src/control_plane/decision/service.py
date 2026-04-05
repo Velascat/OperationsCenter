@@ -16,6 +16,7 @@ from control_plane.decision.rules.test_visibility import TestVisibilityRule
 from control_plane.decision.rules.todo_accumulation import TodoAccumulationRule
 from control_plane.decision.suppression import suppressed_candidate
 from control_plane.execution import UsageStore
+from control_plane.tuning.models import TuningConfig
 
 
 class DecisionLoaderProtocol(Protocol):
@@ -41,6 +42,25 @@ class DecisionContext:
     allowed_families: frozenset[str] = _DEFAULT_ALLOWED_FAMILIES
 
 
+def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[type-arg]
+    """Construct decision rules, applying any active tuning overrides."""
+    obs_min = 2
+    test_min = 3
+    drift_min = 2
+    if tuning_config is not None:
+        obs_min = tuning_config.get_int("observation_coverage", "min_consecutive_runs", 2)
+        test_min = tuning_config.get_int("test_visibility", "min_consecutive_runs", 3)
+        drift_min = tuning_config.get_int("dependency_drift", "min_consecutive_runs", 2)
+    return [
+        ObservationCoverageRule(min_consecutive_runs=obs_min),
+        TestVisibilityRule(min_consecutive_runs=test_min),
+        DependencyDriftRule(min_consecutive_runs=drift_min),
+        HotspotConcentrationRule(min_repeated_runs=2),
+        TodoAccumulationRule(),
+        ExecutionHealthRule(),
+    ]
+
+
 class DecisionEngineService:
     def __init__(
         self,
@@ -49,19 +69,13 @@ class DecisionEngineService:
         policy: DecisionPolicy | None = None,
         artifact_writer: DecisionArtifactWriter | None = None,
         usage_store: UsageStore | None = None,
+        tuning_config: TuningConfig | None = None,
     ) -> None:
         self.loader = loader
         self.policy = policy or DecisionPolicy(config=DecisionPolicyConfig())
         self.artifact_writer = artifact_writer or DecisionArtifactWriter()
         self._usage_store = usage_store
-        self.rules = [
-            ObservationCoverageRule(min_consecutive_runs=2),
-            TestVisibilityRule(min_consecutive_runs=3),
-            DependencyDriftRule(min_consecutive_runs=2),
-            HotspotConcentrationRule(min_repeated_runs=2),
-            TodoAccumulationRule(),
-            ExecutionHealthRule(),
-        ]
+        self.rules = _build_rules(tuning_config)
         self.builder = CandidateBuilder()
 
     def decide(self, context: DecisionContext) -> tuple[ProposalCandidatesArtifact, list[str]]:

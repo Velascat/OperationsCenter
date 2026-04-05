@@ -2,25 +2,11 @@
 
 This guide explains how to interpret `analyze-artifacts` output and tune the repo-aware autonomy loop over time.
 
-## The Tuning Loop
+## Two Tuning Tools
 
-Run the tuning loop after the system has accumulated at least a few days of retained artifacts:
+Control Plane provides two complementary tools for understanding and adjusting autonomy behavior.
 
-```
-observe-repo (daily) -> generate-insights -> decide-proposals -> propose-from-candidates
-                                      ↓
-                             analyze-artifacts  <- run this weekly to assess quality
-```
-
-The loop is:
-
-1. **Run `analyze-artifacts`** to get per-family emit/suppress/create rates.
-2. **Identify problematic patterns** (high suppression, emitted-but-never-created families).
-3. **Adjust thresholds** in the relevant rule or config.
-4. **Re-run the cycle** dry-run first, then execute once the output looks reasonable.
-5. **Document the change** and why.
-
-## Running `analyze-artifacts`
+### `analyze-artifacts` — per-family inspection
 
 ```bash
 ./scripts/control-plane.sh analyze-artifacts
@@ -28,7 +14,7 @@ The loop is:
 ./scripts/control-plane.sh analyze-artifacts --repo ControlPlane --limit 20
 ```
 
-The command reads retained decision and proposer artifacts and prints a per-family table:
+Reads retained decision and proposer artifacts and prints a per-family table with recommendations. Best for quick human inspection.
 
 ```
 family                  emitted  suppressed  created  guardrail_skipped  suppress_rate
@@ -37,11 +23,63 @@ test_visibility              1           3        1                  0         7
 dependency_drift             2           1        2                  0         33%
 ```
 
-Followed by recommendations when patterns exceed thresholds:
+Flags:
+- `suppress_rate >= 90%` → consider loosening threshold
+- `emitted > 0 but created == 0` → check guardrails or proposer dedup
+- `guardrail_skipped > 0` → proposals blocked by budget or cooldown
 
-- `suppress_rate >= 90%` — the family is almost always suppressed; consider loosening thresholds or checking why signals aren't clearing.
-- `emitted > 0 but created == 0` — candidates are reaching the decision engine but never making it to the board; check guardrails or proposer dedup.
-- `guardrail_skipped > 0` — proposals were blocked by budget or cooldown guardrails on the proposer side.
+### `tune-autonomy` — bounded self-tuning regulation loop
+
+```bash
+# Recommendation-only (default, safe, writes artifacts but no config changes)
+./scripts/control-plane.sh tune-autonomy
+
+# With wider window
+./scripts/control-plane.sh tune-autonomy --window 30
+
+# Auto-apply mode (opt-in, requires env var as second gate)
+CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/control-plane.sh tune-autonomy --apply
+```
+
+The regulation loop:
+
+1. Aggregates per-family metrics from retained decision + proposer artifacts.
+2. Applies explicit recommendation rules (over-suppressed → loosen; noisy/low-value → tighten; healthy → keep).
+3. In auto-apply mode, applies conservative bounded changes to `config/autonomy_tuning.json`.
+4. Retains a full audit trail under `tools/report/control_plane/tuning/<run_id>/`.
+
+The `DecisionEngineService` reads `config/autonomy_tuning.json` at startup if it exists, applying overrides to rule thresholds. To revert a change, delete or edit the file.
+
+**Retained artifacts per run:**
+- `family_tuning_summary.json` — per-family metrics
+- `tuning_recommendations.json` — one recommendation per family with evidence
+- `tuning_changes.json` — applied and skipped changes with before/after values
+- `tuning_run.json` — combined artifact used by cooldown/quota checks
+
+## Cadence
+
+Run `tune-autonomy` as a periodic maintenance step, not on every autonomy cycle:
+
+- **Weekly** during the first month of deployment
+- **Monthly** once behavior stabilizes
+- **After any significant threshold change** to validate the change had the intended effect
+- **After promoting a new candidate family** to confirm it's behaving well
+
+## The Manual Tuning Loop
+
+For hands-on adjustments (or for families not in the auto-apply allowlist):
+
+```
+observe-repo (daily) -> generate-insights -> decide-proposals -> propose-from-candidates
+                                      ↓
+                    tune-autonomy (weekly)  <- review recommendations
+                                      ↓
+                     manually edit thresholds or update tuning config
+                                      ↓
+                    autonomy-cycle --dry-run  <- verify output looks right
+                                      ↓
+                    autonomy-cycle --execute  <- go live
+```
 
 ## Default vs Gated Families
 

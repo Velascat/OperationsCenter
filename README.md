@@ -73,6 +73,9 @@ The repo-aware autonomy loop can be run stage-by-stage or as a single chained co
 **Threshold tuning:**
 - `analyze-artifacts` reads retained decision + proposer artifacts, computes per-family emit/suppress/create rates, and prints recommendations when suppression is too high or emitted candidates never reach the board.
 
+**Self-tuning regulation (bounded):**
+- `tune-autonomy` runs a bounded self-tuning regulation loop: reads retained decision and proposer artifacts, computes per-family behavior metrics, and emits conservative threshold recommendations. Recommendation-only by default. Optional `--apply` mode (requires `CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1`) applies small bounded changes to `config/autonomy_tuning.json` with full cooldowns, quotas, and audit trail. The `DecisionEngineService` reads the tuning config at startup if it exists.
+
 **Execution health (automatic):**
 - Every `autonomy-cycle` run also reads retained execution artifacts and checks whether the system is generating useful work. If no-op rate is high or validation keeps failing, a bounded improve task is proposed automatically. No separate command needed.
 
@@ -372,7 +375,7 @@ The repo-aware autonomy loop is behaving well when:
 - [Golden-Path Demo](docs/demo.md) — start here; also use as a post-change validation ritual
 - [Setup Guide](docs/operator/setup.md)
 - [Runtime Guide](docs/operator/runtime.md) — commands, watcher roles, dry-run-first posture
-- [Autonomy Threshold Tuning](docs/operator/tuning.md) — per-family thresholds, analyze-artifacts loop
+- [Autonomy Threshold Tuning](docs/operator/tuning.md) — per-family thresholds, analyze-artifacts loop, tune-autonomy regulation loop
 - [PR Review Loop Guide](docs/operator/pr_review.md) — two-phase review, guardrails, troubleshooting
 - [Diagnostics and Maintenance](docs/operator/diagnostics.md)
 
