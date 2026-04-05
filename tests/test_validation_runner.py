@@ -71,3 +71,77 @@ class TestValidationRunnerNoTimeout:
             runner.run(["true"], cwd=Path("/tmp"), timeout_seconds=None)
 
         assert mock_run.call_args.kwargs.get("timeout") is None
+
+
+class TestValidationRunnerTimeoutStdoutBytes:
+    def test_timeout_decodes_partial_stdout_bytes(self):
+        runner = ValidationRunner()
+        exc = subprocess.TimeoutExpired(cmd="sleep 999", timeout=60)
+        exc.stdout = b"partial output\nline two"
+
+        with patch("control_plane.application.validation.subprocess.run", side_effect=exc):
+            results = runner.run(["sleep 999"], cwd=Path("/tmp"), timeout_seconds=60)
+
+        assert len(results) == 1
+        result = results[0]
+        assert result.exit_code == 124
+        assert result.stdout == "partial output\nline two"
+        assert "timed out after 60s" in result.stderr
+
+
+class TestValidationRunnerMixedCommandOutcomes:
+    def test_mixed_pass_timeout_pass_returns_all_results(self):
+        runner = ValidationRunner()
+        mock_proc_ok = MagicMock()
+        mock_proc_ok.returncode = 0
+        mock_proc_ok.stdout = "first ok\n"
+        mock_proc_ok.stderr = ""
+
+        timeout_exc = subprocess.TimeoutExpired(cmd="sleep 999", timeout=30)
+        timeout_exc.stdout = None
+
+        mock_proc_ok2 = MagicMock()
+        mock_proc_ok2.returncode = 0
+        mock_proc_ok2.stdout = "third ok\n"
+        mock_proc_ok2.stderr = ""
+
+        with patch(
+            "control_plane.application.validation.subprocess.run",
+            side_effect=[mock_proc_ok, timeout_exc, mock_proc_ok2],
+        ):
+            results = runner.run(
+                ["echo first", "sleep 999", "echo third"],
+                cwd=Path("/tmp"),
+                timeout_seconds=30,
+            )
+
+        assert len(results) == 3
+        assert [result.command for result in results] == ["echo first", "sleep 999", "echo third"]
+        assert [result.exit_code for result in results] == [0, 124, 0]
+        assert results[0].stdout == "first ok\n"
+        assert results[1].stdout == ""
+        assert "timed out after 30s" in results[1].stderr
+        assert results[2].stdout == "third ok\n"
+
+
+class TestServiceValidationTimeoutPropagation:
+    def test_all_validation_run_calls_pass_repo_target_timeout(self):
+        service_path = Path("src/control_plane/application/service.py")
+        content = service_path.read_text()
+        marker = "self.validation.run("
+
+        occurrences: list[str] = []
+        start = 0
+        while True:
+            index = content.find(marker, start)
+            if index == -1:
+                break
+            line_end = content.find("\n", index)
+            if line_end == -1:
+                line_end = len(content)
+            occurrences.append(content[index:line_end])
+            start = index + len(marker)
+
+        assert len(occurrences) == 4
+        for call_text in occurrences:
+            assert "timeout_seconds=repo_target.validation_timeout_seconds" in call_text
