@@ -18,9 +18,11 @@ from control_plane.config import load_settings
 _BRANCH_TASK_ID_RE = re.compile(
     r"^plane/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
 )
+_MERGE_CONFLICT_RE = re.compile(r"merge conflict|unresolved .* conflict", re.IGNORECASE)
 
 PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 REVIEW_TIMEOUT_SECONDS = 86400  # 1 day
+MAX_CI_FIX_ATTEMPTS = 2
 
 
 def _bot_marker(settings) -> str:
@@ -42,6 +44,29 @@ def _is_bot_comment(comment: dict, bot_comment_ids: set[int], bot_logins: set[st
     if marker in (comment.get("body") or ""):
         return True
     return False
+
+
+def _concerns_indicate_merge_conflict(concerns: list[str]) -> bool:
+    return any(_MERGE_CONFLICT_RE.search(c) for c in concerns)
+
+
+def _try_auto_rebase(state: dict, service: ExecutionService, logger: logging.Logger) -> bool:
+    """Clone the branch, rebase onto origin/base, force-push. Returns True on success."""
+    repo_key = state["repo_key"]
+    branch = state["branch"]
+    base = state["base"]
+    task_id = state["task_id"]
+    try:
+        repo_cfg = service.settings.repos[repo_key]
+        return service.rebase_branch(
+            clone_url=repo_cfg.clone_url,
+            branch=branch,
+            base_branch=base,
+            task_id=task_id,
+        )
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "auto_rebase_exception", "task_id": task_id, "error": str(exc)}))
+        return False
 
 
 def _load_pr_states() -> list[tuple[Path, dict]]:
@@ -193,6 +218,21 @@ def _process_self_review(
     }))
 
     if verdict.verdict == "lgtm":
+        # Option B: before merging, check whether CI is passing.
+        try:
+            pr_data = gh.get_pr(owner, repo, pr_number)
+            if pr_data.get("mergeable_state") == "unstable":
+                # CI is failing — hand off to the CI-fix phase instead of merging.
+                state["phase"] = "awaiting_ci"
+                state_file.write_text(json.dumps(state, indent=2))
+                logger.info(json.dumps({
+                    "event": "self_review_lgtm_awaiting_ci",
+                    "task_id": task_id,
+                    "pr_number": pr_number,
+                }))
+                return 1
+        except Exception as exc:
+            logger.warning(json.dumps({"event": "pr_ci_check_failed", "task_id": task_id, "error": str(exc)}))
         try:
             _post_bot_comment(gh, owner, repo, pr_number,
                               "Self-review passed — merging.", marker)
@@ -201,7 +241,19 @@ def _process_self_review(
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="self_review_lgtm")
         return 1
 
-    # CONCERNS or error
+    # CONCERNS — check for merge conflicts first (Option A).
+    if _concerns_indicate_merge_conflict(verdict.concerns) and not state.get("auto_rebase_attempted"):
+        logger.info(json.dumps({"event": "auto_rebase_start", "task_id": task_id}))
+        rebased = _try_auto_rebase(state, service, logger)
+        state["auto_rebase_attempted"] = True
+        state_file.write_text(json.dumps(state, indent=2))
+        if rebased:
+            # Rebase succeeded — let the next cycle retry self-review fresh.
+            logger.info(json.dumps({"event": "auto_rebase_succeeded_retrying", "task_id": task_id}))
+            return 1
+        logger.info(json.dumps({"event": "auto_rebase_failed_falling_through", "task_id": task_id}))
+        # Fall through to normal revision/escalation below.
+
     if self_review_loops >= max_loops:
         concerns_text = "\n".join(f"- {c}" for c in verdict.concerns)
         escalation_msg = (
@@ -213,7 +265,7 @@ def _process_self_review(
                            reason=escalation_msg)
         return 1
 
-    # Run a revision pass to address the concerns
+    # Run a revision pass to address the concerns.
     concerns_comment = "Address the following self-review concerns:\n" + "\n".join(
         f"- {c}" for c in verdict.concerns
     )
@@ -452,6 +504,98 @@ def _process_human_review(
     return 1
 
 
+def _process_awaiting_ci(
+    state_file: Path,
+    state: dict,
+    plane_client: PlaneClient,
+    service: ExecutionService,
+    logger: logging.Logger,
+) -> int:
+    """CI-fix phase: self-review passed but CI is failing.
+
+    Each cycle: if CI cleared → merge; if still failing → run a kodo fix pass.
+    After MAX_CI_FIX_ATTEMPTS failures → escalate to human.
+    """
+    repo_key = state["repo_key"]
+    token = service.settings.repo_git_token(repo_key)
+    if not token:
+        logger.warning(json.dumps({"event": "pr_review_no_token", "repo_key": repo_key}))
+        return 0
+
+    gh = GitHubPRClient(token)
+    owner = state["owner"]
+    repo = state["repo"]
+    pr_number = state["pr_number"]
+    task_id = state["task_id"]
+    marker = _bot_marker(service.settings)
+
+    try:
+        pr_data = gh.get_pr(owner, repo, pr_number)
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "pr_state_check_failed", "task_id": task_id, "error": str(exc)}))
+        return 0
+
+    mergeable_state = pr_data.get("mergeable_state", "")
+    if mergeable_state != "unstable":
+        # CI cleared (or state is unknown/clean) — proceed to merge.
+        logger.info(json.dumps({"event": "ci_cleared_merging", "task_id": task_id, "mergeable_state": mergeable_state}))
+        try:
+            _post_bot_comment(gh, owner, repo, pr_number, "CI checks passed — merging.", marker)
+        except Exception as exc:
+            logger.warning("Failed to post CI-cleared comment for PR %s: %s", pr_number, exc)
+        _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="self_review_lgtm")
+        return 1
+
+    # CI still failing.
+    ci_fix_attempts = state.get("ci_fix_attempts", 0)
+    if ci_fix_attempts >= MAX_CI_FIX_ATTEMPTS:
+        failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=pr_data)
+        failures_text = "\n".join(f"- {f}" for f in (failed or ["(unknown)"]))
+        reason = (
+            f"CI is still failing after {ci_fix_attempts} automated fix attempt(s). "
+            f"Failing checks:\n{failures_text}\n\n"
+            f"Please review and fix manually, or react with 👍 to merge as-is."
+        )
+        logger.info(json.dumps({"event": "ci_fix_exhausted_escalating", "task_id": task_id, "attempts": ci_fix_attempts}))
+        _escalate_to_human(gh, state, state_file, plane_client, logger, service.settings, reason=reason)
+        return 1
+
+    failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=pr_data)
+    if not failed:
+        # Can't identify what's failing yet — wait for checks to finish.
+        logger.info(json.dumps({"event": "ci_fix_waiting_for_checks", "task_id": task_id}))
+        return 0
+
+    repo_cfg = service.settings.repos[repo_key]
+    ci_fix_comment = (
+        "CI checks are failing. Fix the following failures without changing the intent of the "
+        "original changes:\n" + "\n".join(f"- {f}" for f in failed)
+    )
+    logger.info(json.dumps({
+        "event": "ci_fix_start",
+        "task_id": task_id,
+        "attempt": ci_fix_attempts + 1,
+        "failures": failed,
+    }))
+    _, changed_files = service.run_review_pass(
+        repo_key=repo_key,
+        clone_url=repo_cfg.clone_url,
+        branch=state["branch"],
+        base_branch=state["base"],
+        original_goal=state.get("original_goal", ""),
+        review_comment=ci_fix_comment,
+        task_id=task_id,
+    )
+    state["ci_fix_attempts"] = ci_fix_attempts + 1
+    logger.info(json.dumps({
+        "event": "ci_fix_end",
+        "task_id": task_id,
+        "changed_files": len(changed_files),
+    }))
+    state_file.write_text(json.dumps(state, indent=2))
+    return 1
+
+
 def _process_pr_state(
     state_file: Path,
     state: dict,
@@ -463,6 +607,8 @@ def _process_pr_state(
     phase = state.get("phase", "self_review")
     if phase == "self_review":
         return _process_self_review(state_file, state, plane_client, service, logger)
+    elif phase == "awaiting_ci":
+        return _process_awaiting_ci(state_file, state, plane_client, service, logger)
     else:
         return _process_human_review(state_file, state, plane_client, service, logger)
 

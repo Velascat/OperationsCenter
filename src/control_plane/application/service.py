@@ -1031,6 +1031,39 @@ class ExecutionService:
         }
         (state_dir / f"{task.task_id}.json").write_text(json.dumps(state, indent=2))
 
+    def rebase_branch(
+        self,
+        *,
+        clone_url: str,
+        branch: str,
+        base_branch: str,
+        task_id: str,
+    ) -> bool:
+        """Clone repo, checkout task branch, rebase onto origin/base_branch, force-push.
+
+        Returns True if the rebase and push succeeded.  On conflict the rebase
+        is aborted so the remote branch is left unchanged.
+        """
+        logger = logging.getLogger(__name__)
+        workspace_path = self.workspace.create()
+        try:
+            repo_path = self.git.clone(clone_url, workspace_path)
+            self.git.set_identity(
+                repo_path,
+                author_name=self.settings.git.author_name,
+                author_email=self.settings.git.author_email,
+            )
+            self.git.checkout_branch(repo_path, branch)
+            success = self.git.rebase_onto_origin(repo_path, base_branch)
+            if success:
+                self.git.push_branch_force(repo_path, branch)
+            return success
+        except Exception as exc:
+            logger.warning(json.dumps({"event": "rebase_branch_error", "task_id": task_id, "error": str(exc)}))
+            return False
+        finally:
+            self.workspace.cleanup(workspace_path)
+
     def run_review_pass(
         self,
         repo_key: str,

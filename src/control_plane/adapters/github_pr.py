@@ -125,6 +125,38 @@ class GitHubPRClient:
         resp.raise_for_status()
         return resp.json()
 
+    def get_check_runs(self, owner: str, repo: str, ref: str) -> list[dict]:
+        """Return all check-runs for a given commit SHA or ref."""
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/commits/{ref}/check-runs",
+            headers=self._headers,
+            params={"per_page": 100},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json().get("check_runs", [])
+
+    def get_failed_checks(
+        self, owner: str, repo: str, pr_number: int, *, pr_data: dict | None = None
+    ) -> list[str]:
+        """Return human-readable descriptions of failing CI checks for the PR's head commit."""
+        if pr_data is None:
+            pr_data = self.get_pr(owner, repo, pr_number)
+        head_sha = (pr_data.get("head") or {}).get("sha", "")
+        if not head_sha:
+            return []
+        try:
+            check_runs = self.get_check_runs(owner, repo, head_sha)
+        except Exception:
+            return []
+        failed = []
+        for cr in check_runs:
+            if cr.get("conclusion") in ("failure", "timed_out", "cancelled"):
+                name = cr.get("name", "unknown")
+                summary = (cr.get("output") or {}).get("title") or cr.get("conclusion", "failed")
+                failed.append(f"{name}: {summary}")
+        return failed
+
     def list_open_prs(self, owner: str, repo: str) -> list[dict]:
         resp = httpx.get(
             f"{self._API}/repos/{owner}/{repo}/pulls",

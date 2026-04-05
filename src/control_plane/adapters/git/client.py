@@ -147,6 +147,31 @@ class GitClient:
     def push_branch(self, repo_path: Path, branch: str) -> None:
         self._run(["git", "push", "-u", "origin", branch], cwd=repo_path)
 
+    def push_branch_force(self, repo_path: Path, branch: str) -> None:
+        """Force-push branch to origin using --force-with-lease."""
+        self._run(["git", "push", "--force-with-lease", "origin", branch], cwd=repo_path)
+
+    def checkout_branch(self, repo_path: Path, branch: str) -> None:
+        """Check out an existing local or remote-tracking branch."""
+        self._run(["git", "checkout", branch], cwd=repo_path)
+
+    def rebase_onto_origin(self, repo_path: Path, base_branch: str) -> bool:
+        """Rebase HEAD onto origin/<base_branch>.  Aborts cleanly on conflict.
+
+        Returns True if the rebase succeeded, False if there were conflicts
+        (the rebase is aborted so the working tree is left clean).
+        """
+        try:
+            self._run(["git", "fetch", "origin", base_branch], cwd=repo_path)
+            self._run(["git", "rebase", f"origin/{base_branch}"], cwd=repo_path)
+            return True
+        except RuntimeError:
+            try:
+                self._run(["git", "rebase", "--abort"], cwd=repo_path)
+            except RuntimeError:
+                pass
+            return False
+
     def _parse_name_status_output(self, output: bytes) -> list[str]:
         if not output:
             return []
