@@ -2059,3 +2059,144 @@ def test_clone_does_not_pass_cwd() -> None:
 
     assert len(client.recorded_cwd) == 1, "clone() should call _run exactly once"
     assert client.recorded_cwd[0] is None, "clone() must not pass a cwd to _run"
+
+
+# ---------------------------------------------------------------------------
+# checkout_base: pull failure is silently swallowed
+# ---------------------------------------------------------------------------
+
+
+def test_checkout_base_silently_ignores_pull_failure() -> None:
+    """checkout_base swallows RuntimeError from 'git pull --ff-only' (client.py lines 50-53).
+
+    The try/except ensures that a failed pull does not abort the checkout flow —
+    we proceed with whatever local state is available.
+    """
+
+    class _PullFailingClient(GitClient):
+        def __init__(self) -> None:
+            self.attempted: list[list[str]] = []
+
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            self.attempted.append(args)
+            if args[:2] == ["git", "pull"]:
+                raise RuntimeError("network unreachable")
+            return ""
+
+    client = _PullFailingClient()
+    # Must NOT raise — the RuntimeError from pull is swallowed
+    client.checkout_base(Path("/repo"), "main")
+
+    # Both checkout and pull must have been attempted
+    assert len(client.attempted) == 2
+    assert client.attempted[0] == ["git", "checkout", "main"]
+    assert client.attempted[1] == ["git", "pull", "--ff-only"]
+
+
+def test_checkout_base_pull_succeeds() -> None:
+    """Happy path: checkout_base calls both checkout and pull when pull succeeds."""
+    client = TrackingGitClient()
+    client.checkout_base(Path("/repo"), "main")
+
+    assert len(client.calls) == 2
+    assert client.calls[0][0] == ["git", "checkout", "main"]
+    assert client.calls[1][0] == ["git", "pull", "--ff-only"]
+
+
+# ---------------------------------------------------------------------------
+# _normalize_repo_relative_path: single-dot edge case
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_repo_relative_path_single_dot() -> None:
+    """_normalize_repo_relative_path('.') returns '' because Path('.') is '.' and lstrip('./') strips everything."""
+    client = GitClient()
+    assert client._normalize_repo_relative_path(".") == ""
+
+
+# ---------------------------------------------------------------------------
+# changed_files: result ordering
+# ---------------------------------------------------------------------------
+
+
+def test_changed_files_result_is_always_sorted() -> None:
+    """changed_files returns paths in sorted order regardless of input order."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): (
+                b"M\x00z_last.py\x00"
+                b"M\x00m_middle.py\x00"
+                b"M\x00a_first.py\x00"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert result == sorted(result)
+
+
+# ---------------------------------------------------------------------------
+# create_task_branch: return type contract
+# ---------------------------------------------------------------------------
+
+
+def test_create_task_branch_returns_bool_types() -> None:
+    """create_task_branch returns actual bool values, not just truthy/falsy."""
+    # Branch exists on remote → returns True
+    client_exists = FakeGitClient(
+        {
+            ("git", "ls-remote", "--heads", "origin", "feat-123"): b"abc123\trefs/heads/feat-123\n",
+            ("git", "checkout", "-b", "feat-123", "origin/feat-123"): b"",
+        }
+    )
+    result_exists = client_exists.create_task_branch(Path("/repo"), "feat-123")
+    assert isinstance(result_exists, bool)
+    assert result_exists is True
+
+    # Branch does not exist → returns False
+    client_new = FakeGitClient(
+        {
+            ("git", "ls-remote", "--heads", "origin", "feat-456"): b"",
+            ("git", "checkout", "-b", "feat-456"): b"",
+        }
+    )
+    result_new = client_new.create_task_branch(Path("/repo"), "feat-456")
+    assert isinstance(result_new, bool)
+    assert result_new is False
+
+
+# ---------------------------------------------------------------------------
+# diff_patch: empty diff
+# ---------------------------------------------------------------------------
+
+
+def test_diff_patch_returns_empty_string_when_no_diff() -> None:
+    """diff_patch returns an empty string when git diff --binary HEAD produces no output."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--binary", "HEAD"): b"",
+        }
+    )
+    result = client.diff_patch(Path("/repo"))
+    assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# add_local_exclude: multiple patterns in order
+# ---------------------------------------------------------------------------
+
+
+def test_add_local_exclude_multiple_patterns_in_order(tmp_path: Path) -> None:
+    """Adding three patterns sequentially writes each on its own line, in order."""
+    repo = tmp_path / "repo"
+    git_info = repo / ".git" / "info"
+    git_info.mkdir(parents=True)
+
+    client = GitClient()
+    client.add_local_exclude(repo, "*.pyc")
+    client.add_local_exclude(repo, "__pycache__/")
+    client.add_local_exclude(repo, ".env")
+
+    exclude_path = git_info / "exclude"
+    lines = exclude_path.read_text().splitlines()
+    assert lines == ["*.pyc", "__pycache__/", ".env"]
