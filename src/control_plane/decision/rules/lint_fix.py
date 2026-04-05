@@ -19,6 +19,12 @@ class LintFixRule:
         self.min_violations = min_violations
 
     def evaluate(self, insights: Sequence[DerivedInsight]) -> list[CandidateSpec]:
+        # Cross-signal: check once for lint↔hotspot overlap across all insights.
+        has_hotspot_overlap = any(
+            i.kind == "cross_signal" and i.subject == "lint_hotspot_overlap"
+            for i in insights
+        )
+
         candidates: list[CandidateSpec] = []
         for insight in insights:
             if insight.kind != "lint_drift":
@@ -33,22 +39,28 @@ class LintFixRule:
                     continue
                 top_codes = insight.evidence.get("top_codes", [])
                 codes_str = ", ".join(str(c) for c in top_codes[:3]) if top_codes else "various"
+                distinct_files = insight.evidence.get("distinct_file_count")
+                # Confidence is high when count is large OR when violations overlap with
+                # git hotspots (corroborating evidence from a second signal).
+                confidence = "high" if (count >= 20 or has_hotspot_overlap) else "medium"
+                ev_lines = [f"ruff reports {count} lint violation(s). Top codes: {codes_str}."]
+                if has_hotspot_overlap:
+                    ev_lines.append("Lint violations overlap with active git hotspot files (cross-signal corroboration).")
+                matched = ["lint_violations_present_min_threshold", "candidate_not_seen_in_cooldown_window"]
+                if has_hotspot_overlap:
+                    matched.append("cross_signal_lint_hotspot_overlap")
                 candidates.append(
                     CandidateSpec(
                         family="lint_fix",
                         subject="lint_violations",
                         pattern_key="violations_present",
                         evidence=dict(insight.evidence),
-                        matched_rules=[
-                            "lint_violations_present_min_threshold",
-                            "candidate_not_seen_in_cooldown_window",
-                        ],
-                        confidence="high" if count >= 20 else "medium",
-                        evidence_lines=[
-                            f"ruff reports {count} lint violation(s). Top codes: {codes_str}.",
-                        ],
+                        matched_rules=matched,
+                        confidence=confidence,
+                        evidence_lines=ev_lines,
                         risk_class="style",
                         expires_after_runs=3,
+                        estimated_affected_files=int(distinct_files) if distinct_files is not None else None,
                         proposal_outline=ProposalOutline(
                             title_hint=f"Fix {count} ruff lint violation(s) ({codes_str})",
                             summary_hint=(

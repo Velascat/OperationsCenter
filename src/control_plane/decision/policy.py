@@ -17,6 +17,7 @@ class DecisionPolicyConfig:
     max_candidates_per_family: int = 1
     cooldown_minutes: int = 120
     min_confidence: str = "low"  # Candidates below this level are suppressed
+    max_changed_files: int = 30  # Suppress candidates estimated to touch more than this many files
 
 
 class DecisionPolicy:
@@ -50,6 +51,24 @@ class DecisionPolicy:
                         evidence={
                             "candidate_confidence": candidate.confidence,
                             "min_confidence": self.config.min_confidence,
+                        },
+                    )
+                )
+                continue
+            # Scope guard: suppress candidates estimated to affect too many files.
+            if (
+                spec.estimated_affected_files is not None
+                and spec.estimated_affected_files > self.config.max_changed_files
+            ):
+                suppressed.append(
+                    suppressed_candidate(
+                        dedup_key=candidate.dedup_key,
+                        family=candidate.family,
+                        subject=candidate.subject,
+                        reason="scope_too_broad",
+                        evidence={
+                            "estimated_affected_files": spec.estimated_affected_files,
+                            "max_changed_files": self.config.max_changed_files,
                         },
                     )
                 )

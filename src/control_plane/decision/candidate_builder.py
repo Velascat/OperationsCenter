@@ -18,6 +18,7 @@ class CandidateSpec:
     evidence_lines: list[str] = field(default_factory=list)
     risk_class: str = "logic"
     expires_after_runs: int = 5
+    estimated_affected_files: int | None = None
 
 
 class CandidateBuilder:

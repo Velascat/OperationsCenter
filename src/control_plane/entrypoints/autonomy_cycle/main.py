@@ -14,6 +14,7 @@ from control_plane.decision.loader import DecisionLoader
 from control_plane.decision.service import ALL_FAMILIES, DecisionEngineService, _DEFAULT_ALLOWED_FAMILIES, new_decision_context
 from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
+from control_plane.insights.derivers.cross_signal import CrossSignalDeriver
 from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
 from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
 from control_plane.insights.derivers.execution_health import ExecutionHealthDeriver
@@ -94,6 +95,9 @@ def build_insight_service() -> InsightEngineService:
             CIPatternDeriver(normalizer),
             ValidationPatternDeriver(normalizer),
             ProposalOutcomeDeriver(normalizer),
+            # CrossSignalDeriver runs last so all single-signal derivers have already fired.
+            # Its insights are consumed by lint_fix and type_fix rules for confidence boosting.
+            CrossSignalDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )

@@ -22,6 +22,7 @@ from control_plane.decision.rules.observation_coverage import ObservationCoverag
 from control_plane.decision.rules.type_improvement import TypeImprovementRule
 from control_plane.decision.rules.test_visibility import TestVisibilityRule
 from control_plane.decision.rules.todo_accumulation import TodoAccumulationRule
+from control_plane.decision.chain_policy import ChainPolicy
 from control_plane.decision.suppression import suppressed_candidate
 from control_plane.execution import UsageStore
 from control_plane.tuning.models import TuningConfig
@@ -49,6 +50,7 @@ class DecisionContext:
     dry_run: bool = False
     allowed_families: frozenset[str] = _DEFAULT_ALLOWED_FAMILIES
     max_proposals_per_24h: int = 10
+    max_changed_files: int = 30
     proposer_root: Path = field(default_factory=lambda: Path("tools/report/control_plane/proposer"))
     feedback_root: Path = field(default_factory=lambda: Path("state/proposal_feedback"))
 
@@ -190,11 +192,21 @@ class DecisionEngineService:
                     live_specs.append(spec)
             filtered_specs = live_specs
 
+        # Chain policy: suppress downstream families when upstream prerequisites are active.
+        chain_policy = ChainPolicy(cooldown_minutes=context.cooldown_minutes)
+        filtered_specs, chain_suppressed = chain_policy.apply(
+            specs=filtered_specs,
+            prior_artifacts=prior_decisions,
+            generated_at=context.generated_at,
+        )
+        suppressed.extend(chain_suppressed)
+
         policy = DecisionPolicy(
             config=DecisionPolicyConfig(
                 max_candidates=context.max_candidates,
                 max_candidates_per_family=1,
                 cooldown_minutes=context.cooldown_minutes,
+                max_changed_files=context.max_changed_files,
             )
         )
         candidates, policy_suppressed = policy.apply(

@@ -153,11 +153,13 @@ class ProposalCandidateMapper:
                 "- Use `ruff check --fix` to auto-fix where possible, then manually resolve remaining violations.",
                 "- Keep the change scoped to lint fixes only — do not refactor or change logic.",
                 "- Do not suppress violations with `# noqa` unless there is a documented reason.",
+                "- Do not modify more than 20 files; if the scope is broader, address the highest-severity files first.",
             ],
             "type_fix": [
                 "- Resolve type errors with targeted annotations; avoid broad `# type: ignore` suppressions.",
                 "- Keep the change scoped to type fixes only — do not refactor or change logic.",
                 "- If a suppression is unavoidable, add a comment explaining why.",
+                "- Do not modify more than 20 files; if the scope is broader, address the highest-severity files first.",
             ],
             "ci_pattern": [
                 "- Investigate root cause before proposing a fix; do not suppress or skip failing checks.",
