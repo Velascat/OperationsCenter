@@ -203,7 +203,7 @@ def test_deriver_does_not_emit_when_no_op_rate_below_threshold(tmp_path: Path) -
 
 
 def test_deriver_emits_persistent_validation_failures_insight(tmp_path: Path) -> None:
-    sig = ExecutionHealthSignal(total_runs=10, executed_count=5, no_op_count=5, validation_failed_count=3)
+    sig = ExecutionHealthSignal(total_runs=10, executed_count=5, no_op_count=5, validation_failed_count=2)
     snapshot = _make_snapshot("ControlPlane", sig)
 
     insights = ExecutionHealthDeriver(InsightNormalizer()).derive([snapshot])
@@ -212,12 +212,28 @@ def test_deriver_emits_persistent_validation_failures_insight(tmp_path: Path) ->
 
 
 def test_deriver_does_not_emit_validation_insight_below_threshold(tmp_path: Path) -> None:
-    sig = ExecutionHealthSignal(total_runs=10, executed_count=5, no_op_count=5, validation_failed_count=2)
+    sig = ExecutionHealthSignal(total_runs=10, executed_count=5, no_op_count=5, validation_failed_count=1)
     snapshot = _make_snapshot("ControlPlane", sig)
 
     insights = ExecutionHealthDeriver(InsightNormalizer()).derive([snapshot])
 
     assert not any("persistent_validation_failures" in i.dedup_key for i in insights)
+
+
+def test_deriver_respects_custom_threshold(tmp_path: Path) -> None:
+    deriver = ExecutionHealthDeriver(InsightNormalizer(), validation_failure_threshold=4)
+
+    # count=3 should NOT trigger with threshold=4
+    sig_below = ExecutionHealthSignal(total_runs=10, executed_count=5, no_op_count=5, validation_failed_count=3)
+    snapshot_below = _make_snapshot("ControlPlane", sig_below)
+    insights_below = deriver.derive([snapshot_below])
+    assert not any("persistent_validation_failures" in i.dedup_key for i in insights_below)
+
+    # count=4 SHOULD trigger with threshold=4
+    sig_at = ExecutionHealthSignal(total_runs=10, executed_count=5, no_op_count=5, validation_failed_count=4)
+    snapshot_at = _make_snapshot("ControlPlane", sig_at)
+    insights_at = deriver.derive([snapshot_at])
+    assert any("persistent_validation_failures" in i.dedup_key for i in insights_at)
 
 
 def test_deriver_returns_empty_for_empty_snapshots() -> None:

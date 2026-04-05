@@ -11,7 +11,7 @@ _MIN_RUNS_FOR_RATE = 5
 # Fraction of runs that are no_ops before we flag it.
 _HIGH_NO_OP_RATE_THRESHOLD = 0.5
 # Absolute count of validation failures before we flag it.
-_VALIDATION_FAILURE_THRESHOLD = 3
+_DEFAULT_VALIDATION_FAILURE_THRESHOLD = 2
 
 
 class ExecutionHealthDeriver:
@@ -24,8 +24,9 @@ class ExecutionHealthDeriver:
       suggesting a systemic quality issue or overly complex task descriptions.
     """
 
-    def __init__(self, normalizer: InsightNormalizer) -> None:
+    def __init__(self, normalizer: InsightNormalizer, validation_failure_threshold: int = 2) -> None:
         self.normalizer = normalizer
+        self.validation_failure_threshold = validation_failure_threshold
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
         if not snapshots:
@@ -56,7 +57,7 @@ class ExecutionHealthDeriver:
                     )
                 )
 
-        if sig.validation_failed_count >= _VALIDATION_FAILURE_THRESHOLD:
+        if sig.validation_failed_count >= self.validation_failure_threshold:
             insights.append(
                 self.normalizer.normalize(
                     kind="execution_health",
