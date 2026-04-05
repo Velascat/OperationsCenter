@@ -80,7 +80,7 @@ def test_service_uses_bootstrap_environment_for_validation(tmp_path: Path) -> No
 
     captured_env: dict[str, str] = {}
 
-    def fake_run(commands: list[str], cwd: Path, env: dict[str, str] | None = None):  # noqa: ARG001
+    def fake_run(commands: list[str], cwd: Path, env: dict[str, str] | None = None, **kwargs):  # noqa: ARG001
         nonlocal captured_env
         captured_env = dict(env or {})
         return [
