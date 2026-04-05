@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from pathlib import Path
 
 from control_plane.insights.models import DerivedInsight
 from control_plane.insights.normalizer import InsightNormalizer
