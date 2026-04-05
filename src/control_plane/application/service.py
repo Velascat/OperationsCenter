@@ -1073,6 +1073,8 @@ class ExecutionService:
                 )
 
             goal_file = workspace_path / "goal.md"
+            verdict_file = repo_path / ".review" / "verdict.txt"
+            verdict_file.parent.mkdir(exist_ok=True)
             goal_text = (
                 f"## Goal\n"
                 f"Self-review: evaluate whether the changes on branch `{branch}` fully satisfy the original goal.\n\n"
@@ -1081,23 +1083,21 @@ class ExecutionService:
                 f"## Instructions\n"
                 f"1. Run `git diff origin/{base_branch}..HEAD` to see what was changed\n"
                 f"2. Evaluate whether all requirements in the Original Goal section are addressed\n"
-                f"3. Write ONLY to `review_verdict.txt` in the repo root:\n"
+                f"3. Write ONLY to `.review/verdict.txt` (relative to the repo root):\n"
                 f"   - If everything correctly satisfies the goal: write exactly `LGTM` on the first line\n"
                 f"   - If there are specific issues: write `CONCERNS` on the first line, then one issue per line starting with `- `\n"
                 f"4. CRITICAL: Do NOT modify any source files, tests, or configuration. "
-                f"Your only permitted output is `review_verdict.txt`.\n"
+                f"Your only permitted output is `.review/verdict.txt`.\n"
             )
             self.kodo.write_goal_file(goal_file, goal_text)
             self.kodo.run(goal_file, repo_path)
-
-            verdict_file = repo_path / "review_verdict.txt"
             if not verdict_file.exists():
-                return _SelfReviewVerdict(verdict="error", concerns=["Self-review did not produce review_verdict.txt"])
+                return _SelfReviewVerdict(verdict="error", concerns=["Self-review did not produce .review/verdict.txt"])
 
             content = verdict_file.read_text().strip()
             lines = [line for line in content.splitlines() if line.strip()]
             if not lines:
-                return _SelfReviewVerdict(verdict="error", concerns=["review_verdict.txt was empty"])
+                return _SelfReviewVerdict(verdict="error", concerns=[".review/verdict.txt was empty"])
 
             first = lines[0].strip().upper()
             if first == "LGTM":
