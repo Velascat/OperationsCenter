@@ -112,6 +112,44 @@ class TestBuildFixValidationDescription:
         assert "## Constraints" in desc
         assert "- `lint`" in desc
 
+    def test_empty_validation_results_list(self) -> None:
+        repo_target = _make_repo_target(["lint", "test"])
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="org/repo",
+            baseline_error_text="err",
+            occurrence_count=1,
+            validation_results=[],
+            repo_target=repo_target,
+        )
+        assert "## Failing Commands" not in desc
+        assert "## Baseline Failure History" in desc
+        assert "## Constraints" in desc
+
+    def test_all_passing_results_no_failing_section(self) -> None:
+        results = [
+            _make_validation_result("lint", 0, stdout="ok"),
+            _make_validation_result("test", 0, stdout="ok"),
+        ]
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="org/repo",
+            baseline_error_text="err",
+            occurrence_count=1,
+            validation_results=results,
+            repo_target=_make_repo_target(["lint", "test"]),
+        )
+        assert "## Failing Commands" not in desc
+        assert "Fix these specific commands" not in desc
+        assert "## Baseline Failure History" in desc
+
+    def test_occurrence_count_zero(self) -> None:
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="org/repo",
+            baseline_error_text="err",
+            occurrence_count=0,
+            validation_results=[],
+        )
+        assert "occurrence #0" in desc
+
     def test_stderr_preferred_over_stdout(self) -> None:
         results = [
             _make_validation_result("cmd", 1, stderr="err output", stdout="std output"),
@@ -141,6 +179,47 @@ class TestBuildFixValidationDescription:
         long_stderr = "\n".join(f"line {i}" for i in range(100))
         results = [
             _make_validation_result("cmd", 1, stderr=long_stderr),
+        ]
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="r",
+            baseline_error_text="e",
+            occurrence_count=1,
+            validation_results=results,
+        )
+        assert "line 49" in desc
+        assert "line 50" not in desc
+
+    def test_very_long_command_name(self) -> None:
+        command = "a" * 500
+        results = [
+            _make_validation_result(command, 1, stderr="err"),
+        ]
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="r",
+            baseline_error_text="e",
+            occurrence_count=1,
+            validation_results=results,
+        )
+        assert f"### `{command}` (exit code: 1)" in desc
+
+    def test_truncation_boundary_exactly_50_lines(self) -> None:
+        stderr = "\n".join(f"line {i}" for i in range(50))
+        results = [
+            _make_validation_result("cmd", 1, stderr=stderr),
+        ]
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="r",
+            baseline_error_text="e",
+            occurrence_count=1,
+            validation_results=results,
+        )
+        assert "line 49" in desc
+        assert "line 50" not in desc
+
+    def test_truncation_boundary_51_lines(self) -> None:
+        stderr = "\n".join(f"line {i}" for i in range(51))
+        results = [
+            _make_validation_result("cmd", 1, stderr=stderr),
         ]
         desc = ExecutionService._build_fix_validation_description(
             repo_key="r",
@@ -244,6 +323,70 @@ class TestMaybeCreateFixValidationTask:
 
         tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
         assert tid == "new-task-123"
+
+    def test_dedup_blocked_state_is_closed(self) -> None:
+        svc = _make_service()
+        task = _make_task("org/repo")
+        existing = [
+            {
+                "id": "old-1",
+                "name": "Fix pre-existing validation failure in org/repo",
+                "state": {"name": "Blocked"},
+            },
+        ]
+        pc = _make_plane_client(existing_issues=existing)
+
+        tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
+        assert tid == "new-task-123"
+        pc.create_issue.assert_called_once()
+
+    def test_dedup_in_review_state_is_open(self) -> None:
+        svc = _make_service()
+        task = _make_task("org/repo")
+        existing = [
+            {
+                "id": "existing-1",
+                "name": "Fix pre-existing validation failure in org/repo",
+                "state": {"name": "In Review"},
+            },
+        ]
+        pc = _make_plane_client(existing_issues=existing)
+
+        tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
+        assert tid is None
+        pc.create_issue.assert_not_called()
+
+    def test_dedup_backlog_state_is_open(self) -> None:
+        svc = _make_service()
+        task = _make_task("org/repo")
+        existing = [
+            {
+                "id": "existing-1",
+                "name": "Fix pre-existing validation failure in org/repo",
+                "state": {"name": "Backlog"},
+            },
+        ]
+        pc = _make_plane_client(existing_issues=existing)
+
+        tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
+        assert tid is None
+        pc.create_issue.assert_not_called()
+
+    def test_dedup_todo_state_is_open(self) -> None:
+        svc = _make_service()
+        task = _make_task("org/repo")
+        existing = [
+            {
+                "id": "existing-1",
+                "name": "Fix pre-existing validation failure in org/repo",
+                "state": {"name": "Todo"},
+            },
+        ]
+        pc = _make_plane_client(existing_issues=existing)
+
+        tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
+        assert tid is None
+        pc.create_issue.assert_not_called()
 
     def test_occurrence_count_includes_closed_issues(self) -> None:
         """Closed issues count toward the occurrence total."""
