@@ -37,7 +37,7 @@ def cmd_show(args: argparse.Namespace) -> None:
     print("Autonomy Tier Configuration")
     print("=" * 50)
     if config:
-        print(f"  config file:  config/autonomy_tiers.json")
+        print("  config file:  config/autonomy_tiers.json")
         print(f"  updated_at:   {config.updated_at.isoformat()}")
         print(f"  version:      {config.version}")
     else:
@@ -104,7 +104,7 @@ def _apply_tier(family: str, tier: int, *, note: str | None, reason: str) -> Non
     print(f"  {family}: {reason} → {tier_label}")
     if note:
         print(f"  note: {note}")
-    print(f"  Saved to config/autonomy_tiers.json")
+    print("  Saved to config/autonomy_tiers.json")
 
 
 def main() -> None:

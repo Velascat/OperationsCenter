@@ -103,7 +103,7 @@ class TypeSignalCollector:
     @staticmethod
     def _parse_mypy_output(raw: str) -> TypeSignal:
         # mypy --output=json emits one JSON object per line
-        lines = [l.strip() for l in raw.splitlines() if l.strip()]
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
         if not lines:
             return TypeSignal(status="clean", error_count=0, source="mypy")
 

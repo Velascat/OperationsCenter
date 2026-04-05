@@ -163,6 +163,10 @@ class GitClient:
         """
         try:
             self._run(["git", "fetch", "origin", base_branch], cwd=repo_path)
+        except RuntimeError:
+            return False
+
+        try:
             self._run(["git", "rebase", f"origin/{base_branch}"], cwd=repo_path)
             return True
         except RuntimeError:

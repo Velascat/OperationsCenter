@@ -9,11 +9,10 @@ Covers:
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
-import pytest
 
-from control_plane.decision.candidate_builder import CandidateBuilder, CandidateSpec
+from control_plane.decision.candidate_builder import CandidateSpec
 from control_plane.decision.models import ProposalOutline
 from control_plane.decision.policy import DecisionPolicy, DecisionPolicyConfig
 from control_plane.insights.derivers.lint_drift import LintDriftDeriver
@@ -211,7 +210,6 @@ def _make_snapshot_with_count(
     type_errors: list[TypeError] | None = None,
 ) -> RepoStateSnapshot:
     """Build a snapshot with explicit signal counts (for worsened-path testing)."""
-    from datetime import timezone
     lint = LintSignal(
         status="violations" if lint_count > 0 else "clean",
         violation_count=lint_count,
@@ -274,7 +272,6 @@ def test_type_worsened_insight_includes_distinct_file_count() -> None:
 def test_lint_worsened_scope_guard_fires_via_rule_and_policy() -> None:
     """End-to-end: worsened lint insight with broad file scope → scope_too_broad suppression."""
     from control_plane.decision.rules.lint_fix import LintFixRule
-    from control_plane.insights.models import DerivedInsight
 
     # Build a worsened insight with 35 distinct files (over the default 30 limit)
     current = _make_snapshot_with_count(lint_count=50, lint_distinct=35)
