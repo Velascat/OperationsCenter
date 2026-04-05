@@ -43,7 +43,38 @@ Followed by recommendations when patterns exceed thresholds:
 - `emitted > 0 but created == 0` — candidates are reaching the decision engine but never making it to the board; check guardrails or proposer dedup.
 - `guardrail_skipped > 0` — proposals were blocked by budget or cooldown guardrails on the proposer side.
 
+## Default vs Gated Families
+
+Families in `_DEFAULT_ALLOWED_FAMILIES` fire automatically on every cycle:
+
+| Family | Active by default |
+|--------|-------------------|
+| `observation_coverage` | yes |
+| `test_visibility` | yes |
+| `dependency_drift` | yes |
+| `execution_health_followup` | yes |
+| `hotspot_concentration` | no — requires `--all-families` |
+| `todo_accumulation` | no — requires `--all-families` |
+
 ## Per-Family Threshold Reference
+
+### `execution_health_followup`
+
+Fires when retained execution artifacts show systemic execution quality problems.
+
+Two patterns:
+
+**`high_no_op_rate`**
+- **Condition**: `no_op_count / total_runs >= 0.5` and `total_runs >= 5`
+- **When to loosen**: too many spurious proposals for repos that legitimately have many no-op test runs; raise the rate threshold to 0.65 or raise `_MIN_RUNS_FOR_RATE`.
+- **When to tighten**: lower the threshold if you want earlier warning; e.g. 0.4 on repos where no-ops are reliably a signal of bad task quality.
+- **Where to change**: `src/control_plane/insights/derivers/execution_health.py` constants `_HIGH_NO_OP_RATE_THRESHOLD`, `_MIN_RUNS_FOR_RATE`.
+
+**`persistent_validation_failures`**
+- **Condition**: `validation_failed_count >= 3`
+- **When to loosen**: repos under active development naturally have transient failures; raise threshold to 5.
+- **When to tighten**: lower to 2 for repos with strict quality gates where even 2 failures warrant a task.
+- **Where to change**: `_VALIDATION_FAILURE_THRESHOLD` in the same file.
 
 ### `observation_coverage`
 

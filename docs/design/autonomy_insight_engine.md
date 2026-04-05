@@ -36,6 +36,18 @@ The insight engine may also read a bounded recent snapshot history for the same 
 - dependency drift continuity
 - TODO/FIXME concentration
 - observation coverage
+- execution health
+
+## Execution Health Insights
+
+`ExecutionHealthDeriver` reads `signals.execution_health` from the most recent snapshot and derives up to two insights per repo:
+
+| Pattern | Condition | Dedup key suffix |
+|---------|-----------|-----------------|
+| `high_no_op_rate` | ≥50% of runs were no-ops and total_runs ≥ 5 | `high_no_op_rate` |
+| `persistent_validation_failures` | validation_failed_count ≥ 3 | `persistent_validation_failures` |
+
+These are factual observations about execution behaviour, not recommendations. The decision engine converts them into candidates.
 
 ## Output
 

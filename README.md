@@ -73,6 +73,9 @@ The repo-aware autonomy loop can be run stage-by-stage or as a single chained co
 **Threshold tuning:**
 - `analyze-artifacts` reads retained decision + proposer artifacts, computes per-family emit/suppress/create rates, and prints recommendations when suppression is too high or emitted candidates never reach the board.
 
+**Execution health (automatic):**
+- Every `autonomy-cycle` run also reads retained execution artifacts and checks whether the system is generating useful work. If no-op rate is high or validation keeps failing, a bounded improve task is proposed automatically. No separate command needed.
+
 ## `Propose` Means Two Related Things
 
 - In the repo-aware autonomy loop, `propose` is the stage that routes approved candidates toward task creation.
@@ -94,7 +97,7 @@ The naming is intentionally close because the second is the board adapter for th
 
 ### Repo-Aware Autonomy
 
-- Read-only repo observer snapshots.
+- Read-only repo observer snapshots with seven signal collectors (git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health).
 - Read-only normalized insight generation from retained observer snapshots.
 - Guarded proposal-candidate generation from retained insights.
 - Candidate-driven Plane task creation through the proposer lane with provenance and dedup protection.
@@ -102,6 +105,7 @@ The naming is intentionally close because the second is the board adapter for th
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
 - Proposer idle-board task generation with cooldowns, quotas, and deduplication.
 - Dependency drift reporting with optional Plane improve-task creation.
+- **Execution health self-tuning loop**: on every `autonomy-cycle` the observer reads retained kodo_plane execution artifacts, derives `high_no_op_rate` and `persistent_validation_failures` insights, and automatically proposes bounded improve tasks when execution quality degrades. No manual trigger or consecutive-run threshold required.
 
 ### PR Automation with Review Loop
 
@@ -335,6 +339,7 @@ The repo-aware autonomy loop is behaving well when:
 - it produces zero proposals when no strong signal exists
 - every autonomy-generated task can be traced back to retained repo signals and decision artifacts
 - it improves visibility and workflow quality rather than inventing open-ended work
+- when execution quality degrades (high no-op rate, recurring validation failures), it surfaces an improve task automatically rather than silently continuing to generate unhelpful work
 
 ## Current Limitations
 

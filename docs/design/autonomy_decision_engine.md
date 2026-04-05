@@ -29,13 +29,32 @@ Optional bounded history:
 
 - recent prior decision artifacts for cooldown, dedup, and quota enforcement
 
-## Candidate Families In Scope
+## Candidate Families
 
-- test visibility
-- dependency drift follow-up
-- hotspot concentration
-- TODO/FIXME accumulation
-- observation coverage
+### Default (active without flags)
+
+| Family | Rule | Signal source |
+|--------|------|---------------|
+| `observation_coverage` | `ObservationCoverageRule` | observer coverage gaps |
+| `test_visibility` | `TestVisibilityRule` | test status continuity |
+| `dependency_drift` | `DependencyDriftRule` | dependency drift continuity |
+| `execution_health_followup` | `ExecutionHealthRule` | execution artifact outcomes |
+
+### Gated (require `--all-families` or explicit `allowed_families`)
+
+| Family | Rule | Promotion criteria |
+|--------|------|--------------------|
+| `hotspot_concentration` | `HotspotConcentrationRule` | confirm hotspot signals identify genuinely decomposable files |
+| `todo_accumulation` | `TodoAccumulationRule` | confirm TODO markers represent real debt, not intentional markers |
+
+### `execution_health_followup`
+
+Fires on two patterns derived from retained execution artifacts:
+
+- **`high_no_op_rate`** — most recent runs for a repo produced no code changes. Suggests reviewing task quality or proposer heuristics.
+- **`persistent_validation_failures`** — multiple executed runs failed the post-execution validation step. Suggests a systemic quality issue or tasks scoped beyond one execution pass.
+
+This family is in `_DEFAULT_ALLOWED_FAMILIES` because its signals are derived directly from observed execution behaviour rather than from consecutive-run thresholds, making false-positive suppression less likely.
 
 ## Guardrails
 

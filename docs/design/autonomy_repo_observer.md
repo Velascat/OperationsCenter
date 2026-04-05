@@ -31,7 +31,19 @@ This pass only implements `observe`.
 - last known local test signal from existing Control Plane logs/artifacts if available
 - dependency drift signal from existing dependency-check artifacts if available
 - TODO/FIXME summary
+- execution health — outcome rates and validation failure counts read from retained kodo_plane artifacts
 - observation metadata
+
+## Execution Health Signal
+
+The `ExecutionArtifactCollector` reads retained run artifacts from `tools/report/kodo_plane/` on every observer run. For the target repo it computes:
+
+- `total_runs` — number of retained artifact directories matched to this repo
+- `executed_count` / `no_op_count` — breakdown of outcome status
+- `validation_failed_count` — how many executed runs failed the post-execution validation step
+- `recent_runs` — the ten most recent `ExecutionRunRecord` objects for audit trail
+
+This signal is optional: if no artifacts exist yet the observer emits an empty `ExecutionHealthSignal` and collection proceeds normally. Partial failure is recorded in `collector_errors` without aborting the snapshot.
 
 ## Output
 

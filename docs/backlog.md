@@ -88,10 +88,22 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 
 ---
 
+## Completed (Post-Hardening)
+
+### autonomy — Execution health self-tuning loop
+**Status**: done
+
+`ExecutionArtifactCollector` reads retained kodo_plane artifacts on every observer run and computes per-repo execution quality metrics (`total_runs`, `no_op_count`, `executed_count`, `validation_failed_count`). `ExecutionHealthDeriver` derives `high_no_op_rate` and `persistent_validation_failures` insights. `ExecutionHealthRule` converts them into `execution_health_followup` candidates. The family is in `_DEFAULT_ALLOWED_FAMILIES` so it fires automatically. No manual trigger needed.
+
+---
+
 ## Next
 
 ### autonomy — Promote hotspot_concentration and todo_accumulation families
-After observing healthy emit/create rates for the three default families, promote hotspot and todo families to `_DEFAULT_ALLOWED_FAMILIES`. Requires documented promotion criteria and at least one clean dry-run showing useful candidates.
+After observing healthy emit/create rates for the four default families, promote hotspot and todo families to `_DEFAULT_ALLOWED_FAMILIES`. Requires documented promotion criteria and at least one clean dry-run showing useful candidates.
+
+### autonomy — Revisit dry-run-first posture for trusted repos
+Define "trusted" in terms of measurable execution health (low no-op rate, clean validation history, healthy emit/create ratio over N cycles). Add a `trusted_repos` or `auto_execute_families` config key so specific repos skip the dry-run gate automatically. The execution health loop provides the signal; this makes it actionable at the config level.
 
 ### config — Per-repo execution budget overrides
 Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when code_youtube_shorts and ControlPlane have different execution intensity.
