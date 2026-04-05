@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-ExecutionMode = Literal["goal"]
+ExecutionMode = Literal["goal", "fix_pr"]
 
 
 class ParsedTaskBody(BaseModel):

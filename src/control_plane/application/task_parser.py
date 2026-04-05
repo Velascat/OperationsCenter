@@ -12,7 +12,7 @@ SECTION_PATTERN = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 class TaskParser:
     REQUIRED_EXEC_FIELDS = ("repo",)
-    SUPPORTED_MODES = {"goal"}
+    SUPPORTED_MODES = {"goal", "fix_pr"}
 
     def parse(self, description: str, *, labels: list[str] | None = None) -> ParsedTaskBody:
         label_repo = self._repo_from_labels(labels or [])

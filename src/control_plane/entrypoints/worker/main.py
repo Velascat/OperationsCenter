@@ -457,6 +457,13 @@ def select_watch_candidate(
 ) -> tuple[str, str]:
     issues = client.list_issues()
     if role == "improve":
+        # First priority: fix_pr tasks (CI-fix tasks created by the CI monitor).
+        for issue in issues:
+            task_id = str(issue["id"])
+            candidate = client.fetch_issue(task_id) if issue_needs_detail(issue) else issue
+            if issue_status_name(candidate) == ready_state and issue_task_kind(candidate) == "fix_pr":
+                return task_id, "fix_pr_task"
+        # Second priority: improve tasks.
         for issue in issues:
             task_id = str(issue["id"])
             candidate = client.fetch_issue(task_id) if issue_needs_detail(issue) else issue
@@ -622,7 +629,7 @@ def reconcile_stale_running_issues(client: PlaneClient, *, role: str, ready_stat
             continue
         task_kind = issue_task_kind(issue)
         if role == "improve":
-            if task_kind != "improve":
+            if task_kind not in {"improve", "fix_pr"}:
                 continue
         elif task_kind != role:
             continue
@@ -2389,6 +2396,18 @@ def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id:
     return created_ids
 
 
+def handle_fix_pr_task(client: PlaneClient, service: ExecutionService, task_id: str) -> None:
+    """Dispatch a fix_pr task to ExecutionService and log the outcome."""
+    result = service.run_fix_pr_task(client, task_id)
+    _logger.info(json.dumps({
+        "event": "fix_pr_complete",
+        "task_id": task_id,
+        "outcome_status": result.outcome_status,
+        "changed_files": len(result.changed_files),
+        "success": result.success,
+    }))
+
+
 def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_id: str) -> tuple[str, list[str]]:
     issue = client.fetch_issue(task_id)
     comments = client.list_comments(task_id)
@@ -2613,6 +2632,10 @@ def run_watch_loop(
                             counters["blocked_tasks_triaged"] += 1
                             logger.info(json.dumps({"event": "watch_triage_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "classification": classification, "created_task_ids": created_ids, "run_id": cycle_run_id}))
                             write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_triage_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, blocked_classification=classification, counters=counters)
+                        elif action == "fix_pr_task":
+                            handle_fix_pr_task(client, service, task_id)
+                            logger.info(json.dumps({"event": "watch_fix_pr_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "run_id": cycle_run_id}))
+                            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="fix_pr_complete", task_id=task_id, task_kind=task_kind, counters=counters)
                         else:
                             created_ids = handle_improve_task(client, service, task_id)
                             counters["follow_up_tasks_created"] += len(created_ids)

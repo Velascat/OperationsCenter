@@ -1003,6 +1003,79 @@ class ExecutionService:
 
     _PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 
+    def run_fix_pr_task(self, plane_client: "PlaneClient", task_id: str) -> "ExecutionResult":
+        """Execute a fix_pr task: checkout the existing PR branch, run kodo to fix CI failures, push.
+
+        Uses run_review_pass internally so the PR branch is patched in-place without
+        creating a new branch or PR.
+        """
+        logger = logging.getLogger(__name__)
+        run_id = uuid.uuid4().hex[:12]
+
+        try:
+            issue = plane_client.fetch_issue(task_id)
+            task = plane_client.to_board_task(issue)
+            if not task.base_branch:
+                raise ValueError(f"fix_pr task {task_id} has no base_branch (must be the PR branch)")
+            repo_cfg = self.settings.repos.get(task.repo_key)
+            if not repo_cfg:
+                raise ValueError(f"Unknown repo key: {task.repo_key}")
+
+            plane_client.transition_issue(task.task_id, "Running")
+
+            _, changed_files = self.run_review_pass(
+                repo_key=task.repo_key,
+                clone_url=repo_cfg.clone_url,
+                branch=task.base_branch,
+                base_branch=repo_cfg.default_branch,
+                original_goal="",
+                review_comment=task.goal_text,
+                task_id=task.task_id,
+            )
+
+            if changed_files:
+                plane_client.transition_issue(task.task_id, "Done")
+                plane_client.comment_issue(
+                    task.task_id,
+                    f"[CI Fix] Pushed fixes to {len(changed_files)} file(s) on `{task.base_branch}`. CI will rerun.",
+                )
+                outcome_status = "executed"
+            else:
+                plane_client.transition_issue(task.task_id, "Blocked")
+                plane_client.comment_issue(
+                    task.task_id,
+                    "[CI Fix] Ran but made no changes. The CI failures may require manual intervention.",
+                )
+                outcome_status = "no_changes"
+
+            return ExecutionResult(
+                run_id=run_id,
+                worker_role="improve",
+                task_kind="fix_pr",
+                success=bool(changed_files),
+                outcome_status=outcome_status,
+                changed_files=changed_files,
+                branch_pushed=bool(changed_files),
+                summary=f"run_id={run_id} task_id={task.task_id} changed_files={len(changed_files)} outcome={outcome_status}",
+                final_status="Done" if changed_files else "Blocked",
+            )
+
+        except Exception as exc:
+            logger.warning(json.dumps({"event": "fix_pr_task_error", "task_id": task_id, "error": str(exc)}))
+            try:
+                plane_client.transition_issue(task_id, "Blocked")
+            except Exception:
+                pass
+            return ExecutionResult(
+                run_id=run_id,
+                worker_role="improve",
+                task_kind="fix_pr",
+                success=False,
+                outcome_status="error",
+                outcome_reason=str(exc),
+                summary=f"run_id={run_id} error={exc}",
+            )
+
     def _write_pr_review_state(
         self,
         task: "BoardTask",
