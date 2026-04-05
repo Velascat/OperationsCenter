@@ -68,7 +68,7 @@ The repo-aware autonomy loop can be run stage-by-stage or as a single chained co
 - `propose-from-candidates` routes emitted candidates through existing proposer protections and may create bounded Plane tasks.
 
 **Chained command (dry-run first):**
-- `autonomy-cycle` runs all four stages in sequence. Dry-run by default — shows what would be proposed without creating tasks. Pass `--execute` to create real Plane tasks. Pass `--all-families` to include all five decision families.
+- `autonomy-cycle` runs all four stages in sequence. Dry-run by default — shows what would be proposed without creating tasks. Pass `--execute` to create real Plane tasks. Pass `--all-families` to enable all twelve candidate families (seven default + five gated).
 
 **Threshold tuning:**
 - `analyze-artifacts` reads retained decision + proposer artifacts, computes per-family emit/suppress/create rates, and prints recommendations when suppression is too high or emitted candidates never reach the board.
@@ -100,15 +100,22 @@ The naming is intentionally close because the second is the board adapter for th
 
 ### Repo-Aware Autonomy
 
-- Read-only repo observer snapshots with seven signal collectors (git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health).
-- Read-only normalized insight generation from retained observer snapshots.
-- Guarded proposal-candidate generation from retained insights.
+- Read-only repo observer snapshots with eleven signal collectors: git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health, lint violations (`ruff`), type errors (`ty`/`mypy`), CI check history (GitHub API), and per-task validation failure patterns.
+- Read-only normalized insight generation from retained observer snapshots across thirteen derivers.
+- Cross-signal correlation: lint and type violations are checked for overlap with git hotspot files; overlap boosts candidate confidence with a second corroborating signal.
+- Guarded proposal-candidate generation from retained insights across twelve candidate families (seven active by default, five gated).
+- Chain-aware candidate sequencing: `type_fix` is suppressed when `lint_fix` is active in the same cycle or was recently emitted; `execution_health_followup` is suppressed when `test_visibility` is active. Both suppression reasons are artifact-visible.
+- Blast-radius guardrail: candidates whose `distinct_file_count` exceeds `max_changed_files` (default 30) are suppressed with reason `scope_too_broad` and logged in the decision artifact.
+- Validation profiles in every created task: `validation_profile` (`ruff_clean`, `ty_clean`, `tests_pass`, `ci_green`, `manual_review`), `requires_human_approval`, and `evidence_schema_version` appear in every task's `## Provenance` block.
+- Structured `EvidenceBundle` in decision artifact for `lint_fix` and `type_fix`: machine-readable count, `distinct_file_count`, delta, trend, top codes, and source.
 - Candidate-driven Plane task creation through the proposer lane with provenance and dedup protection.
 - End-to-end coverage of the repo-aware autonomy handoff chain from observer -> insights -> decision -> proposer.
 - Improve-worker blocked-task triage, repeated-failure pattern detection, and bounded follow-up task creation.
-- Proposer idle-board task generation with cooldowns, quotas, and deduplication.
+- Proposer idle-board task generation with cooldowns, quotas, deduplication, velocity cap, and staleness guard.
 - Dependency drift reporting with optional Plane improve-task creation.
 - **Execution health self-tuning loop**: on every `autonomy-cycle` the observer reads retained kodo_plane execution artifacts, derives `high_no_op_rate` and `persistent_validation_failures` insights, and automatically proposes bounded improve tasks when execution quality degrades. No manual trigger or consecutive-run threshold required.
+- **Bounded self-tuning regulator** (`tune-autonomy`): aggregates per-family metrics from retained artifacts and emits conservative threshold recommendations. Optional auto-apply mode (double-gated) writes bounded changes to `config/autonomy_tuning.json` with full audit trail.
+- **Autonomy tier management** (`autonomy-tiers`): operator CLI to promote or demote families between tier 0 (decision artifact only), tier 1 (Backlog), and tier 2 (Ready for AI).
 
 ### PR Automation with Review Loop
 
@@ -234,6 +241,10 @@ Then:
 ./scripts/control-plane.sh autonomy-cycle --execute --all-families
 ./scripts/control-plane.sh analyze-artifacts
 ./scripts/control-plane.sh analyze-artifacts --repo ControlPlane --limit 20
+./scripts/control-plane.sh tune-autonomy
+./scripts/control-plane.sh tune-autonomy --window 30
+./scripts/control-plane.sh autonomy-tiers show
+./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
 ./scripts/control-plane.sh backfill-pr-reviews
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
@@ -316,6 +327,9 @@ Useful companions:
 - Insight artifacts: `tools/report/control_plane/insights/`
 - Decision artifacts: `tools/report/control_plane/decision/`
 - Proposer result artifacts: `tools/report/control_plane/proposer/`
+- Tuning run artifacts: `tools/report/control_plane/tuning/`
+- Proposal feedback records: `state/proposal_feedback/`
+- Autonomy cycle reports: `logs/autonomy_cycle/`
 
 The wrapper runs `janitor` automatically before commands and keeps local logs/artifacts for 1 day by default. Override with `CONTROL_PLANE_RETENTION_DAYS`.
 
@@ -367,8 +381,10 @@ The repo-aware autonomy loop is behaving well when:
 - [Decision Engine](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_decision_engine.md)
 - [Proposer Integration](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_proposer_integration.md)
 - [Repo-Aware Autonomy Layer](/home/dev/Documents/GitHub/ControlPlane/docs/design/repo_aware_autonomy.md)
+- [Self-Tuning Regulator](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_self_tuning_regulator.md)
 - [Execution Budget And Safety Controls](/home/dev/Documents/GitHub/ControlPlane/docs/design/execution_budget_and_safety_controls.md)
 - [Plane + Kodo Wrapper Design](/home/dev/Documents/GitHub/ControlPlane/docs/design/plane_kodo_wrapper.md)
+- [Roadmap](docs/design/roadmap.md)
 
 ### Operator Guides
 
