@@ -1883,3 +1883,135 @@ def test_normalize_repo_relative_path_parent_traversal() -> None:
     """Document current lstrip('./') bug where ../foo.py becomes foo.py."""
     client = GitClient()
     assert client._normalize_repo_relative_path("../foo.py") == "foo.py"
+
+
+# ---------------------------------------------------------------------------
+# Gap 1: Dotfile lstrip bug propagation through higher-level methods
+# ---------------------------------------------------------------------------
+
+
+def test_changed_files_dotfile_lstrip_bug_propagation() -> None:
+    """The lstrip('./') bug propagates through changed_files: dotfiles lose leading dot."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): (
+                b"M\x00.gitignore\x00"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): (
+                b".env\x00"
+            ),
+        }
+    )
+    result = client.changed_files(Path("."))
+    assert "gitignore" in result
+    assert "env" in result
+    assert ".gitignore" not in result
+    assert ".env" not in result
+
+
+def test_recent_changed_files_dotfile_lstrip_bug_propagation() -> None:
+    """The lstrip('./') bug propagates through recent_changed_files: dotfiles lose leading dot."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n3", "--name-only", "--pretty=format:"): (
+                b".gitignore\n.env\n"
+            ),
+        }
+    )
+    result = client.recent_changed_files(Path("."))
+    assert result == ["gitignore", "env"]
+
+
+def test_diff_stat_dotfile_lstrip_bug_propagation() -> None:
+    """The lstrip('./') bug propagates through diff_stat: untracked dotfiles lose leading dot."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--stat", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): (
+                b".env\x00"
+            ),
+        }
+    )
+    result = client.diff_stat(Path("."))
+    assert "untracked | env" in result
+    assert ".env" not in result
+
+
+# ---------------------------------------------------------------------------
+# Gap 2: changed_files untracked-only (no diff changes)
+# ---------------------------------------------------------------------------
+
+
+def test_changed_files_untracked_only_no_diff_changes() -> None:
+    """changed_files returns untracked files even when diff output is empty."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): (
+                b"new_file.py\x00"
+            ),
+        }
+    )
+    assert client.changed_files(Path(".")) == ["new_file.py"]
+
+
+# ---------------------------------------------------------------------------
+# Gap 3: try_merge_base merge command args verification
+# ---------------------------------------------------------------------------
+
+
+def test_try_merge_base_passes_correct_merge_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    """try_merge_base passes the correct args and cwd to subprocess.run for the merge call."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append((args, kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    repo_path = Path("/repo")
+
+    client.try_merge_base(repo_path, "main")
+
+    assert len(calls) == 1
+    assert calls[0][0] == ["git", "merge", "--no-edit", "origin/main"]
+    assert calls[0][1].get("cwd") == repo_path
+
+
+# ---------------------------------------------------------------------------
+# Gap 4: diff_stat whitespace-only tracked output
+# ---------------------------------------------------------------------------
+
+
+def test_diff_stat_filters_whitespace_only_tracked_lines() -> None:
+    """diff_stat filters out whitespace-only lines from git diff --stat output."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--stat", "HEAD"): (
+                b"  \n\n src/main.py | 2 +-\n  \n"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+    result = client.diff_stat(Path("."))
+    assert result == "src/main.py | 2 +-"
+
+
+# ---------------------------------------------------------------------------
+# Gap 5: clone cwd=None
+# ---------------------------------------------------------------------------
+
+
+def test_clone_does_not_pass_cwd() -> None:
+    """clone calls _run without cwd (cwd=None)."""
+    client = TrackingGitClient()
+    client.clone("https://example.com/repo.git", Path("/workspace"))
+
+    assert len(client.calls) == 1
+    args, cwd = client.calls[0]
+    assert args == ["git", "clone", "https://example.com/repo.git", "/workspace/repo"]
+    assert cwd is None
