@@ -11,7 +11,7 @@ Control Plane is operated through **Plane + CLI**:
 3. Watchers poll the board and execute tasks automatically.
 4. Results are written back to Plane as comments and state transitions.
 
-For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**.
+For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it as a validation ritual after any significant config or threshold change.
 
 ---
 
@@ -364,9 +364,11 @@ The repo-aware autonomy loop is behaving well when:
 
 ### Operator Guides
 
-- [Golden-Path Demo](docs/demo.md)
+- [Golden-Path Demo](docs/demo.md) — start here; also use as a post-change validation ritual
 - [Setup Guide](docs/operator/setup.md)
-- [Runtime Guide](docs/operator/runtime.md)
+- [Runtime Guide](docs/operator/runtime.md) — commands, watcher roles, dry-run-first posture
+- [Autonomy Threshold Tuning](docs/operator/tuning.md) — per-family thresholds, analyze-artifacts loop
+- [PR Review Loop Guide](docs/operator/pr_review.md) — two-phase review, guardrails, troubleshooting
 - [Diagnostics and Maintenance](docs/operator/diagnostics.md)
 
 ### Roadmap

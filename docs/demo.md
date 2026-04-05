@@ -155,6 +155,36 @@ cat tools/report/kodo_plane/TASK-*/*/summary.json | python3 -m json.tool
 - [ ] Plane task comment shows execution result details
 - [ ] GitHub branch or PR exists if push succeeded
 
+## Using This Demo As A Validation Ritual
+
+Run this demo — or a lightweight variant of it — as a validation ritual after significant changes to the system:
+
+- After threshold tuning (changed `min_consecutive_runs`, cooldown values, or family gates)
+- After watcher restarts following a budget-exhaustion or rate-limit event
+- After promoting a new candidate family from gated to active
+- After any change to PR automation config (`await_review`, `bot_logins`, `max_self_review_loops`)
+- Before and after a new repo is added to config
+
+The goal is not to re-test everything on every change. It is to confirm that the golden path still works end-to-end so you have a known-good baseline before trusting the autonomous loop to run unsupervised.
+
+### Autonomy-Cycle Ritual (5 minutes)
+
+A focused validation that covers the full autonomy chain without needing a Plane task:
+
+```bash
+# Dry-run first — inspect what would be proposed
+./scripts/control-plane.sh autonomy-cycle
+
+# If the dry-run output looks reasonable, execute
+./scripts/control-plane.sh autonomy-cycle --execute
+```
+
+Confirm:
+- [ ] Dry-run output shows at least one candidate or a clear suppression reason
+- [ ] Artifact paths are printed and the files exist under `tools/report/control_plane/`
+- [ ] `--execute` creates a Plane task with `source: autonomy` and `source: propose` labels
+- [ ] The task description includes `## Proposal Provenance` with traceable run IDs
+
 ## Running the smoke test directly
 
 To test Plane connectivity and task parsing without running a full kodo execution:

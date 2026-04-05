@@ -105,6 +105,39 @@ observe-repo -> generate-insights -> decide-proposals -> propose-from-candidates
 
 Each stage writes its own retained artifact before the next stage consumes it.
 
+### Dry-Run-First Posture
+
+**Always run `autonomy-cycle` dry-run before executing.** This is the default behavior.
+
+```bash
+# Dry-run (default) — shows what would be proposed, no Plane writes
+./scripts/control-plane.sh autonomy-cycle
+
+# Execute — creates real Plane tasks
+./scripts/control-plane.sh autonomy-cycle --execute
+
+# Execute with all candidate families enabled
+./scripts/control-plane.sh autonomy-cycle --execute --all-families
+```
+
+The dry-run output shows:
+- which candidate families fired
+- which candidates would be emitted vs. suppressed
+- suppression reasons (cooldown, quota, budget, family-gating)
+
+Review this output before adding `--execute`, especially after:
+- changing threshold config or tuning heuristics
+- restarting watchers after a budget-exhaustion event
+- promoting a new candidate family from gated to active
+
+The stage-by-stage commands also support dry-run:
+```bash
+./scripts/control-plane.sh decide-proposals --dry-run
+./scripts/control-plane.sh propose-from-candidates --dry-run
+```
+
+Use these when you want to inspect a single stage without running the full chain.
+
 ## Retention
 
 ```bash

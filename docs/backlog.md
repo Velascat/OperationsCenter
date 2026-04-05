@@ -1,89 +1,100 @@
-# Backlog — Hardening and Trust Phase
+# Backlog — Post-Hardening: Tuning, Trust, and Public Packaging
 
-Issues tracking the next phase of work before expanding autonomy features.
+The hardening phase is complete. The system is running with two active repos (ControlPlane and code_youtube_shorts), a functional five-lane watcher, repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
 
-## Open
+## Active
+
+### tuning — Run analyze-artifacts loop and document threshold adjustments
+Run `analyze-artifacts` weekly, identify suppression patterns, tune per-family thresholds, document changes.
+Tracked: [#17](https://github.com/Velascat/ControlPlane/issues/17)
+**Status**: in progress (`docs/operator/tuning.md` created; first tuning run pending)
+
+---
+
+### tuning — Candidate-family heuristics review
+Review emit/suppress rates for observation_coverage, test_visibility, dependency_drift. Define promotion criteria for hotspot_concentration and todo_accumulation.
+Tracked: [#18](https://github.com/Velascat/ControlPlane/issues/18)
+**Status**: open
+
+---
+
+### trust — Validate PR review loop end-to-end
+Run the two-phase review loop against a real or controlled test PR. Verify audit trail, guardrail checklist, and escalation path.
+Tracked: [#19](https://github.com/Velascat/ControlPlane/issues/19)
+**Status**: open (`docs/operator/pr_review.md` created; live validation pending)
+
+---
+
+### docs — Promote golden-path demo as ongoing validation ritual
+README and demo.md updated to position the demo as a post-change ritual. Ensure demo stays runnable as config and thresholds change.
+Tracked: [#20](https://github.com/Velascat/ControlPlane/issues/20)
+**Status**: done (demo.md updated with Autonomy-Cycle Ritual section; README updated)
+
+---
+
+### docs — Polish public docs packaging
+Operator docs suite: tuning.md, pr_review.md, runtime.md (dry-run-first), README cross-links, backlog update.
+Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
+**Status**: done (all operator docs created/updated)
+
+---
+
+## Completed (Hardening Phase)
 
 ### ci — Add GitHub Actions CI workflow
-Run ruff and pytest on every push and pull request.
-Blocks the green path on lint or test failure.
 **Status**: done (`.github/workflows/ci.yml`)
 
----
-
 ### validation — Harden repo/branch/task contract validation
-Reject unknown repo keys, missing goal text, and disallowed branches early
-with clear operator-facing error messages and Plane comments.
-No silent fallback to wrong repo or branch.
 **Status**: done (`TaskContractError` in `service.py`)
 
----
-
 ### docs — Add golden-path end-to-end demo
-A reproducible walkthrough from local startup to a completed task with
-retained artifacts, success/failure signal recognition, and a verification checklist.
 **Status**: done (`docs/demo.md`)
 
----
-
 ### config — Polish config templates as first-class product surface
-Comments for every major section, multi-repo example, `await_review` example,
-execution budget example, PR dry-run example. Templates and README tell the same story.
 **Status**: done (`config/control_plane.example.yaml`, `.env.control-plane.example`)
 
----
-
 ### pr-automation — Harden PR automation with dry-run and audit trail
-`CONTROL_PLANE_PR_DRY_RUN=1` skips actual PR creation/merge and logs the intended action.
-Cleaner structured audit log events around every PR action (`pr_review_pending`, `pr_dry_run`,
-`pr_create_failed`, `pr_merged`).
 **Status**: done
-
----
 
 ### docs — Clarify primary operator surface in README
-Plane + CLI is the primary control model. All board management happens through the Plane UI directly.
 **Status**: done
 
----
-
-## Phase C (complete)
-
 ### autonomy — `analyze-artifacts` threshold tuning tool
-Reads all retained decision + proposer artifacts and computes per-family stats
-(emitted, suppressed, created, guardrail-skipped, suppression reasons).
-Prints recommendations when suppression rate ≥ 90% or emitted tasks never created.
-**Status**: done (`src/control_plane/entrypoints/analyze/main.py`, `scripts/control-plane.sh analyze-artifacts`)
-
----
+**Status**: done (`src/control_plane/entrypoints/analyze/main.py`)
 
 ### autonomy — `autonomy-cycle` dry-run-first wrapper
-Chains `observe → insights → decide → propose` in one command.
-Dry-run by default (shows what would be proposed); `--execute` creates real Plane tasks.
-`--all-families` enables hotspot_concentration and todo_accumulation families.
-**Status**: done (`src/control_plane/entrypoints/autonomy_cycle/main.py`, `scripts/control-plane.sh autonomy-cycle`)
-
----
+**Status**: done (`src/control_plane/entrypoints/autonomy_cycle/main.py`)
 
 ### validation — Contract validation for proposer candidates
-Proposer `candidate_mapper` raises `ValueError` with clear message instead of silently
-falling back to the first known repo when a candidate has no matching repo key.
 **Status**: done (`proposer/candidate_mapper.py`)
 
----
-
 ### config — Non-Python repo bootstrap support
-`bootstrap_commands` list in `RepoSettings` replaces Python venv setup when set,
-allowing non-Python repos to declare their own install steps.
 **Status**: done (`config/settings.py`, `adapters/workspace/bootstrap.py`)
+
+### ci — Type checking with `ty`
+**Status**: done (`.github/workflows/ci.yml`, `pyproject.toml`)
+
+### autonomy — Per-repo board idle check
+**Status**: done (proposer filters by `repo:` label before evaluating idle state)
+
+### autonomy — Proposal interleaving across repos
+**Status**: done (round-robin by repo_key ensures fair multi-repo distribution)
+
+### reliability — Rate-limited task self-healing
+**Status**: done (rate-limited tasks reset to Ready for AI automatically; budget not charged)
+
+### tests — Injectable UsageStore for isolated test runs
+**Status**: done (ProposerGuardrailAdapter and DecisionEngineService accept `usage_store` param)
 
 ---
 
 ## Next
 
-### config — Per-repo execution budget overrides
-Allow repos to declare their own hourly/daily caps rather than sharing the global budget.
+### autonomy — Promote hotspot_concentration and todo_accumulation families
+After observing healthy emit/create rates for the three default families, promote hotspot and todo families to `_DEFAULT_ALLOWED_FAMILIES`. Requires documented promotion criteria and at least one clean dry-run showing useful candidates.
 
-### ci — Type checking with `ty`
-`ty` is the active type-checking contract. `ty check src/` passes clean and runs in CI.
-**Status**: done (`.github/workflows/ci.yml`, `pyproject.toml`)
+### config — Per-repo execution budget overrides
+Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when code_youtube_shorts and ControlPlane have different execution intensity.
+
+### ci — Enforce `analyze-artifacts` output as a CI artifact
+Run `analyze-artifacts` in CI on the retained artifacts directory and upload the output as a build artifact. Makes the tuning loop auditable per-commit.
