@@ -196,3 +196,152 @@ def test_type_deriver_includes_distinct_file_count() -> None:
     present = [i for i in insights if i.dedup_key.endswith("present")]
     assert len(present) == 1
     assert present[0].evidence["distinct_file_count"] == 2
+
+
+# ── worsened path carries distinct_file_count ────────────────────────────
+
+
+def _make_snapshot_with_count(
+    *,
+    lint_count: int = 0,
+    lint_distinct: int = 0,
+    lint_violations: list[LintViolation] | None = None,
+    type_count: int = 0,
+    type_distinct: int = 0,
+    type_errors: list[TypeError] | None = None,
+) -> RepoStateSnapshot:
+    """Build a snapshot with explicit signal counts (for worsened-path testing)."""
+    from datetime import timezone
+    lint = LintSignal(
+        status="violations" if lint_count > 0 else "clean",
+        violation_count=lint_count,
+        distinct_file_count=lint_distinct,
+        top_violations=lint_violations or [],
+    )
+    type_sig = TypeSignal(
+        status="errors" if type_count > 0 else "clean",
+        error_count=type_count,
+        distinct_file_count=type_distinct,
+        top_errors=type_errors or [],
+    )
+    signals = RepoSignalsSnapshot(
+        test_signal=TestSignal(status="unknown"),
+        dependency_drift=DependencyDriftSignal(status="unknown"),
+        todo_signal=TodoSignal(),
+        lint_signal=lint,
+        type_signal=type_sig,
+    )
+    return RepoStateSnapshot(
+        run_id="obs_test",
+        observed_at=_NOW,
+        source_command="test",
+        repo=RepoContextSnapshot(
+            name="repo",
+            path=__import__("pathlib").Path("/tmp/repo"),
+            current_branch="main",
+            is_dirty=False,
+        ),
+        signals=signals,
+    )
+
+
+def test_lint_worsened_insight_includes_distinct_file_count() -> None:
+    """LintDriftDeriver worsened insight must carry distinct_file_count."""
+    current = _make_snapshot_with_count(lint_count=20, lint_distinct=8)
+    prior = _make_snapshot_with_count(lint_count=10, lint_distinct=5)
+    normalizer = InsightNormalizer()
+    deriver = LintDriftDeriver(normalizer)
+    insights = deriver.derive([current, prior])
+    worsened = [i for i in insights if i.dedup_key.endswith("worsened")]
+    assert len(worsened) == 1
+    assert "distinct_file_count" in worsened[0].evidence
+    assert worsened[0].evidence["distinct_file_count"] == 8  # from current snapshot
+
+
+def test_type_worsened_insight_includes_distinct_file_count() -> None:
+    """TypeHealthDeriver worsened insight must carry distinct_file_count."""
+    current = _make_snapshot_with_count(type_count=15, type_distinct=6)
+    prior = _make_snapshot_with_count(type_count=5, type_distinct=3)
+    normalizer = InsightNormalizer()
+    deriver = TypeHealthDeriver(normalizer)
+    insights = deriver.derive([current, prior])
+    worsened = [i for i in insights if i.dedup_key.endswith("worsened")]
+    assert len(worsened) == 1
+    assert "distinct_file_count" in worsened[0].evidence
+    assert worsened[0].evidence["distinct_file_count"] == 6
+
+
+def test_lint_worsened_scope_guard_fires_via_rule_and_policy() -> None:
+    """End-to-end: worsened lint insight with broad file scope → scope_too_broad suppression."""
+    from control_plane.decision.rules.lint_fix import LintFixRule
+    from control_plane.insights.models import DerivedInsight
+
+    # Build a worsened insight with 35 distinct files (over the default 30 limit)
+    current = _make_snapshot_with_count(lint_count=50, lint_distinct=35)
+    prior = _make_snapshot_with_count(lint_count=20, lint_distinct=10)
+    normalizer = InsightNormalizer()
+    deriver = LintDriftDeriver(normalizer)
+    insights = deriver.derive([current, prior])
+
+    rule = LintFixRule(min_violations=5)
+    specs = rule.evaluate(insights)
+    worsened_specs = [s for s in specs if s.pattern_key == "violations_worsened"]
+    assert len(worsened_specs) == 1
+    assert worsened_specs[0].estimated_affected_files == 35
+
+    policy = _make_policy(max_changed_files=30)
+    emitted, suppressed = policy.apply(
+        candidate_specs=worsened_specs, prior_artifacts=[], generated_at=_NOW
+    )
+    assert len(emitted) == 0
+    assert suppressed[0].reason == "scope_too_broad"
+    assert suppressed[0].evidence["estimated_affected_files"] == 35
+
+
+def test_type_worsened_scope_guard_fires_via_rule_and_policy() -> None:
+    """End-to-end: worsened type insight with broad file scope → scope_too_broad suppression."""
+    from control_plane.decision.rules.type_improvement import TypeImprovementRule
+
+    current = _make_snapshot_with_count(type_count=40, type_distinct=32)
+    prior = _make_snapshot_with_count(type_count=10, type_distinct=8)
+    normalizer = InsightNormalizer()
+    deriver = TypeHealthDeriver(normalizer)
+    insights = deriver.derive([current, prior])
+
+    rule = TypeImprovementRule(min_errors=3)
+    specs = rule.evaluate(insights)
+    worsened_specs = [s for s in specs if s.pattern_key == "errors_worsened"]
+    assert len(worsened_specs) == 1
+    assert worsened_specs[0].estimated_affected_files == 32
+
+    policy = _make_policy(max_changed_files=30)
+    emitted, suppressed = policy.apply(
+        candidate_specs=worsened_specs, prior_artifacts=[], generated_at=_NOW
+    )
+    assert len(emitted) == 0
+    assert suppressed[0].reason == "scope_too_broad"
+    assert suppressed[0].evidence["estimated_affected_files"] == 32
+
+
+def test_worsened_within_limit_passes_scope_guard() -> None:
+    """Worsened candidate under the file limit is not suppressed by scope guard."""
+    from control_plane.decision.rules.lint_fix import LintFixRule
+
+    current = _make_snapshot_with_count(lint_count=25, lint_distinct=10)
+    prior = _make_snapshot_with_count(lint_count=15, lint_distinct=8)
+    normalizer = InsightNormalizer()
+    deriver = LintDriftDeriver(normalizer)
+    insights = deriver.derive([current, prior])
+
+    rule = LintFixRule(min_violations=5)
+    specs = rule.evaluate(insights)
+    worsened_specs = [s for s in specs if s.pattern_key == "violations_worsened"]
+    assert len(worsened_specs) == 1
+    assert worsened_specs[0].estimated_affected_files == 10
+
+    policy = _make_policy(max_changed_files=30)
+    emitted, suppressed = policy.apply(
+        candidate_specs=worsened_specs, prior_artifacts=[], generated_at=_NOW
+    )
+    assert len(emitted) == 1
+    assert not any(s.reason == "scope_too_broad" for s in suppressed)

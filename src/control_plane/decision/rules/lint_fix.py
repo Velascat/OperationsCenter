@@ -79,6 +79,7 @@ class LintFixRule:
             elif insight.dedup_key.endswith("worsened"):
                 delta = int(insight.evidence.get("delta", 0))
                 current = int(insight.evidence.get("current_count", 0))
+                distinct_files = insight.evidence.get("distinct_file_count")
                 candidates.append(
                     CandidateSpec(
                         family="lint_fix",
@@ -95,6 +96,7 @@ class LintFixRule:
                         ],
                         risk_class="style",
                         expires_after_runs=3,
+                        estimated_affected_files=int(distinct_files) if distinct_files is not None else None,
                         proposal_outline=ProposalOutline(
                             title_hint=f"Fix lint regression: +{delta} new ruff violations",
                             summary_hint=(

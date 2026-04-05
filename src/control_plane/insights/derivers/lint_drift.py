@@ -73,6 +73,10 @@ class LintDriftDeriver:
                             "current_count": current_lint.violation_count,
                             "previous_count": previous_lint.violation_count,
                             "delta": delta,
+                            "distinct_file_count": (
+                                current_lint.distinct_file_count
+                                or len({v.path for v in current_lint.top_violations})
+                            ),
                         },
                         first_seen_at=snapshots[1].observed_at,
                         last_seen_at=snapshots[0].observed_at,

@@ -73,6 +73,10 @@ class TypeHealthDeriver:
                             "current_count": current_type.error_count,
                             "previous_count": previous_type.error_count,
                             "delta": delta,
+                            "distinct_file_count": (
+                                current_type.distinct_file_count
+                                or len({e.path for e in current_type.top_errors})
+                            ),
                         },
                         first_seen_at=snapshots[1].observed_at,
                         last_seen_at=snapshots[0].observed_at,

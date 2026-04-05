@@ -75,6 +75,7 @@ class TypeImprovementRule:
             elif insight.dedup_key.endswith("worsened"):
                 delta = int(insight.evidence.get("delta", 0))
                 current = int(insight.evidence.get("current_count", 0))
+                distinct_files = insight.evidence.get("distinct_file_count")
                 candidates.append(
                     CandidateSpec(
                         family="type_fix",
@@ -91,6 +92,7 @@ class TypeImprovementRule:
                         ],
                         risk_class="logic",
                         expires_after_runs=4,
+                        estimated_affected_files=int(distinct_files) if distinct_files is not None else None,
                         proposal_outline=ProposalOutline(
                             title_hint=f"Fix type regression: +{delta} new type error(s)",
                             summary_hint=(
