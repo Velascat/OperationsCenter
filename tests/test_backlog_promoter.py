@@ -16,9 +16,8 @@ Covers:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
-import pytest
 
 from control_plane.proposer.backlog_promoter import (
     BacklogPromoterService,

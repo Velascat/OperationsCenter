@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 from control_plane.decision.models import CandidateRationale, EvidenceBundle, ProposalCandidate, ProposalOutline
 from control_plane.decision.validation_profiles import profile_for_family
@@ -31,27 +32,28 @@ def _synthesize_evidence_bundle(
     Only families with a stable, well-known evidence schema are handled here.
     Other families return None and rely solely on evidence_lines.
     """
+    ev = cast(dict[str, Any], evidence)
     if family == "lint_fix":
-        count_raw = evidence.get("violation_count") or evidence.get("current_count")
+        count_raw = ev.get("violation_count") or ev.get("current_count")
         return EvidenceBundle(
             kind="lint_count",
             count=int(count_raw) if count_raw is not None else None,
-            distinct_file_count=int(evidence["distinct_file_count"]) if "distinct_file_count" in evidence else None,
-            delta=int(evidence["delta"]) if "delta" in evidence else None,
-            trend="worsening" if "delta" in evidence else "present",
-            top_codes=[str(c) for c in evidence.get("top_codes", [])],  # type: ignore[arg-type]
-            source=str(evidence.get("source", "ruff")),
+            distinct_file_count=int(ev["distinct_file_count"]) if "distinct_file_count" in ev else None,
+            delta=int(ev["delta"]) if "delta" in ev else None,
+            trend="worsening" if "delta" in ev else "present",
+            top_codes=[str(c) for c in ev.get("top_codes", [])],
+            source=str(ev.get("source", "ruff")),
         )
     if family == "type_fix":
-        count_raw = evidence.get("error_count") or evidence.get("current_count")
+        count_raw = ev.get("error_count") or ev.get("current_count")
         return EvidenceBundle(
             kind="type_count",
             count=int(count_raw) if count_raw is not None else None,
-            distinct_file_count=int(evidence["distinct_file_count"]) if "distinct_file_count" in evidence else None,
-            delta=int(evidence["delta"]) if "delta" in evidence else None,
-            trend="worsening" if "delta" in evidence else "present",
-            top_codes=[str(c) for c in evidence.get("top_codes", [])],  # type: ignore[arg-type]
-            source=str(evidence.get("source", "type_checker")),
+            distinct_file_count=int(ev["distinct_file_count"]) if "distinct_file_count" in ev else None,
+            delta=int(ev["delta"]) if "delta" in ev else None,
+            trend="worsening" if "delta" in ev else "present",
+            top_codes=[str(c) for c in ev.get("top_codes", [])],
+            source=str(ev.get("source", "type_checker")),
         )
     return None
 

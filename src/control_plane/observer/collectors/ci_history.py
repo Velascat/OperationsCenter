@@ -102,7 +102,7 @@ class CIHistoryCollector:
     def _get_recent_shas(context: ObserverContext) -> list[str]:
         try:
             result = subprocess.run(
-                ["git", "log", f"--format=%H", f"-n{_COMMIT_LOOKBACK}"],
+                ["git", "log", "--format=%H", f"-n{_COMMIT_LOOKBACK}"],
                 cwd=context.repo_path,
                 capture_output=True,
                 text=True,

@@ -17,7 +17,6 @@ import pytest
 from control_plane.decision.candidate_builder import CandidateBuilder, CandidateSpec
 from control_plane.decision.models import (
     CandidateRationale,
-    DecisionRepoRef,
     ProposalCandidate,
     ProposalOutline,
 )
@@ -322,9 +321,9 @@ def test_task_body_provenance_fields_ordered(tmp_path: Path) -> None:
     """validation_profile and requires_human_approval appear after risk_class."""
     body = _map(_candidate(), tmp_path)
     lines = body.splitlines()
-    rc_idx = next(i for i, l in enumerate(lines) if l.startswith("risk_class:"))
-    vp_idx = next(i for i, l in enumerate(lines) if l.startswith("validation_profile:"))
-    rha_idx = next(i for i, l in enumerate(lines) if l.startswith("requires_human_approval:"))
+    rc_idx = next(i for i, line in enumerate(lines) if line.startswith("risk_class:"))
+    vp_idx = next(i for i, line in enumerate(lines) if line.startswith("validation_profile:"))
+    rha_idx = next(i for i, line in enumerate(lines) if line.startswith("requires_human_approval:"))
     assert rc_idx < vp_idx < rha_idx
 
 

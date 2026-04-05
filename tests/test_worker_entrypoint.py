@@ -21,7 +21,6 @@ from control_plane.entrypoints.worker.main import (
     handle_test_task,
     issue_status_name,
     issue_task_kind,
-    load_proposal_memory,
     recently_proposed,
     record_proposed,
     reconcile_stale_running_issues,

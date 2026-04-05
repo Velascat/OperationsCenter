@@ -2209,3 +2209,213 @@ def test_add_local_exclude_multiple_patterns_in_order(tmp_path: Path) -> None:
     lines = exclude_path.read_text().splitlines()
     assert lines == ["*.pyc", "__pycache__/", ".env"]
 
+
+# ---------------------------------------------------------------------------
+# Stage 2: Additional edge-case tests
+# ---------------------------------------------------------------------------
+
+
+def test_commit_all_preserves_special_characters_in_message() -> None:
+    class TrackingFake(GitClient):
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[str], Path | None]] = []
+
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            self.calls.append((args, cwd))
+            if args == ["git", "status", "--porcelain"]:
+                return "M  src/main.py"
+            return ""
+
+    client = TrackingFake()
+    message = 'fix: "quoted" line\nsecond line\n✓ done'
+
+    assert client.commit_all(Path("/repo"), message) is True
+    assert client.calls[2] == (["git", "commit", "-m", message], Path("/repo"))
+
+
+def test_rebase_onto_origin_fetch_failure_skips_rebase() -> None:
+    client = SelectiveRaisingGitClient(
+        failing_commands={("git", "fetch", "origin", "main")},
+    )
+
+    result = client.rebase_onto_origin(Path("/ws/repo"), "main")
+
+    assert result is False
+    assert len(client.calls) == 1
+
+
+def test_checkout_base_returns_none_even_when_pull_fails() -> None:
+    class PullFailingClient(GitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            if args == ["git", "pull", "--ff-only"]:
+                raise RuntimeError("simulated pull failure")
+            return ""
+
+    client = PullFailingClient()
+
+    result = client.checkout_base(Path("/repo"), "main")
+
+    assert result is None
+
+
+def test_changed_files_copy_status_returns_destination() -> None:
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): (
+                b"C100\x00original.py\x00copy.py\x00"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
+        }
+    )
+
+    result = client.changed_files(Path("."))
+
+    assert "copy.py" in result
+    assert "original.py" not in result
+
+
+def test_try_merge_base_conflict_paths_are_stripped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout="  src/a.py  \n  src/b.py  \n",
+                stderr="",
+            )
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+
+    assert success is False
+    assert conflicts == ["src/a.py", "src/b.py"]
+
+
+def test_run_error_message_includes_command_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess as sp
+
+    class FakeProc:
+        returncode = 1
+        stdout = ""
+        stderr = "fatal: not a git repository"
+
+    monkeypatch.setattr(sp, "run", lambda *a, **kw: FakeProc())  # type: ignore[attr-defined]
+    client = GitClient()
+    with pytest.raises(RuntimeError, match=r"git status --porcelain"):
+        client._run(["git", "status", "--porcelain"])
+
+
+# ---------------------------------------------------------------------------
+# push_branch_force tests
+# ---------------------------------------------------------------------------
+
+
+def test_push_branch_force_delegates_correct_args() -> None:
+    client = TrackingGitClient()
+    client.push_branch_force(Path("/repos/myproject"), "my-branch")
+
+    assert len(client.calls) == 1
+    args, cwd = client.calls[0]
+    assert args == ["git", "push", "--force-with-lease", "origin", "my-branch"]
+    assert cwd == Path("/repos/myproject")
+
+
+def test_push_branch_force_propagates_error() -> None:
+    client = RaisingGitClient([("git", "push")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.push_branch_force(Path("."), "my-branch")
+
+
+# ---------------------------------------------------------------------------
+# checkout_branch tests
+# ---------------------------------------------------------------------------
+
+
+def test_checkout_branch_delegates_correct_args() -> None:
+    client = TrackingGitClient()
+    client.checkout_branch(Path("/ws/repo"), "feature-x")
+
+    assert len(client.calls) == 1
+    args, cwd = client.calls[0]
+    assert args == ["git", "checkout", "feature-x"]
+    assert cwd == Path("/ws/repo")
+
+
+def test_checkout_branch_propagates_error() -> None:
+    client = RaisingGitClient([("git", "checkout")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.checkout_branch(Path("."), "feature-x")
+
+
+# ---------------------------------------------------------------------------
+# rebase_onto_origin tests
+# ---------------------------------------------------------------------------
+
+
+class SelectiveRaisingGitClient(GitClient):
+    """GitClient that raises RuntimeError for commands matching exact arg lists."""
+
+    def __init__(self, failing_commands: set[tuple[str, ...]]) -> None:
+        self.failing_commands = failing_commands
+        self.calls: list[tuple[list[str], Path | None]] = []
+
+    def _run(self, args: list[str], cwd: Path | None = None) -> str:
+        self.calls.append((args, cwd))
+        if tuple(args) in self.failing_commands:
+            raise RuntimeError(f"simulated failure: {' '.join(args)}")
+        return ""
+
+
+def test_rebase_onto_origin_success_returns_true() -> None:
+    client = TrackingGitClient()
+    result = client.rebase_onto_origin(Path("/ws/repo"), "main")
+
+    assert result is True
+    assert len(client.calls) == 2
+    assert client.calls[0] == (["git", "fetch", "origin", "main"], Path("/ws/repo"))
+    assert client.calls[1] == (["git", "rebase", "origin/main"], Path("/ws/repo"))
+
+
+def test_rebase_onto_origin_conflict_aborts_and_returns_false() -> None:
+    """Rebase conflict triggers abort and returns False."""
+    client = SelectiveRaisingGitClient(
+        failing_commands={("git", "rebase", "origin/main")},
+    )
+    result = client.rebase_onto_origin(Path("/ws/repo"), "main")
+
+    assert result is False
+    # Should have called: fetch, rebase (failed), rebase --abort
+    assert len(client.calls) == 3
+    assert client.calls[0] == (["git", "fetch", "origin", "main"], Path("/ws/repo"))
+    assert client.calls[1] == (["git", "rebase", "origin/main"], Path("/ws/repo"))
+    assert client.calls[2] == (["git", "rebase", "--abort"], Path("/ws/repo"))
+
+
+def test_rebase_onto_origin_fetch_failure_returns_false() -> None:
+    client = RaisingGitClient([("git", "fetch")])
+    result = client.rebase_onto_origin(Path("/ws/repo"), "main")
+
+    assert result is False
+
+
+def test_rebase_onto_origin_abort_failure_silently_caught() -> None:
+    """When both rebase and rebase --abort fail, returns False without raising."""
+    client = SelectiveRaisingGitClient(
+        failing_commands={
+            ("git", "rebase", "origin/main"),
+            ("git", "rebase", "--abort"),
+        },
+    )
+    result = client.rebase_onto_origin(Path("/ws/repo"), "main")
+
+    assert result is False
+    assert len(client.calls) == 3
