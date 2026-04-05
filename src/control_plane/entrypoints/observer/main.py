@@ -6,6 +6,7 @@ from pathlib import Path
 from control_plane.config import Settings, load_settings
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.collectors.dependency_drift import DependencyDriftCollector
+from control_plane.observer.collectors.backlog import BacklogCollector
 from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector, run_git
@@ -77,6 +78,7 @@ def main() -> None:
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
         execution_health_collector=ExecutionArtifactCollector(),
+        backlog_collector=BacklogCollector(),
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )

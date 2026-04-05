@@ -6,6 +6,7 @@ from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
 from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
 from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
+from control_plane.insights.derivers.backlog_promotion import BacklogPromotionDeriver
 from control_plane.insights.derivers.execution_health import ExecutionHealthDeriver
 from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
 from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
@@ -35,6 +36,7 @@ def main() -> None:
             TodoConcentrationDeriver(normalizer),
             ObservationCoverageDeriver(normalizer),
             ExecutionHealthDeriver(normalizer),
+            BacklogPromotionDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )
