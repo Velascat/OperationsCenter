@@ -21,6 +21,9 @@ from control_plane.entrypoints.worker.main import (
     handle_test_task,
     issue_status_name,
     issue_task_kind,
+    load_proposal_memory,
+    recently_proposed,
+    record_proposed,
     reconcile_stale_running_issues,
     run_watch_loop,
     select_ready_task_id,
@@ -1311,3 +1314,128 @@ def test_has_active_pr_review_false_when_file_missing(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr("control_plane.entrypoints.worker.main._PR_REVIEW_STATE_DIR", tmp_path)
     assert _has_active_pr_review("task-456") is False
+
+
+# ── proposed_index (recently_proposed / record_proposed) ─────────────────────
+
+
+def test_recently_proposed_false_when_index_empty() -> None:
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    memory: dict = {"proposed_index": {}}
+    assert recently_proposed(memory, title="Add tests for client.py", dedup_key="k|test|client", now=now) is False
+
+
+def test_recently_proposed_true_by_title_within_window() -> None:
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    yesterday = (now.timestamp() - 86400)
+    memory: dict = {"proposed_index": {"add tests for client.py": yesterday}}
+    assert recently_proposed(memory, title="Add tests for client.py", dedup_key="k|test|client", now=now) is True
+
+
+def test_recently_proposed_true_by_dedup_key_within_window() -> None:
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    yesterday = now.timestamp() - 86400
+    memory: dict = {"proposed_index": {"k|test|client": yesterday}}
+    assert recently_proposed(memory, title="Add tests for client.py", dedup_key="k|test|client", now=now) is True
+
+
+def test_recently_proposed_false_when_entry_outside_window() -> None:
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    eight_days_ago = now.timestamp() - (8 * 86400)
+    memory: dict = {"proposed_index": {"add tests for client.py": eight_days_ago}}
+    assert recently_proposed(memory, title="Add tests for client.py", dedup_key="k|test|client", now=now) is False
+
+
+def test_recently_proposed_prunes_stale_entries() -> None:
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    fresh = now.timestamp() - 3600
+    stale = now.timestamp() - (8 * 86400)
+    memory: dict = {"proposed_index": {"fresh_title": fresh, "old_title": stale}}
+    recently_proposed(memory, title="irrelevant", dedup_key="irrelevant_key", now=now)
+    assert "fresh_title" in memory["proposed_index"]
+    assert "old_title" not in memory["proposed_index"]
+
+
+def test_record_proposed_writes_both_keys() -> None:
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    memory: dict = {"proposed_index": {}}
+    record_proposed(memory, title="Fix lint issues", dedup_key="k|lint_fix|src", now=now)
+    assert "fix lint issues" in memory["proposed_index"]
+    assert "k|lint_fix|src" in memory["proposed_index"]
+
+
+def test_handle_propose_cycle_skips_recently_proposed_task(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tasks in the proposed_index within the window are not re-created."""
+    client = FakePlaneClient([])
+    service = FakeService()
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda _client, _service, **_kwargs: (
+            [
+                ProposalSpec(
+                    task_kind="goal",
+                    title="Add tests for client.py",
+                    goal_text="Write tests.",
+                    reason_summary="Missing coverage.",
+                    source_signal="repo_scan_test",
+                    confidence="high",
+                    recommended_state="Ready for AI",
+                    handoff_reason="propose_idle_board_scan",
+                    dedup_key="k|test_coverage|client_py",
+                )
+            ],
+            [],
+            True,
+        ),
+    )
+
+    # Pre-populate the index with this title from 1 day ago (within 7-day window)
+    memory_path = tmp_path / "propose.memory.json"
+    import json as _json
+    memory_path.write_text(_json.dumps({
+        "last_proposal_at": None,
+        "proposal_timestamps": [],
+        "proposed_index": {"add tests for client.py": now.timestamp() - 86400},
+    }))
+
+    result = handle_propose_cycle(client, service, status_dir=tmp_path, now=now)
+
+    assert result.created_task_ids == []
+    assert client.created == []
+
+
+def test_handle_propose_cycle_records_in_index_after_creation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """After a task is created, its title and dedup_key appear in proposed_index."""
+    client = FakePlaneClient([])
+    service = FakeService()
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda _client, _service, **_kwargs: (
+            [
+                ProposalSpec(
+                    task_kind="goal",
+                    title="Fix lint in src/",
+                    goal_text="Fix lint.",
+                    reason_summary="Lint violations detected.",
+                    source_signal="repo_scan_lint",
+                    confidence="high",
+                    recommended_state="Backlog",
+                    handoff_reason="propose_idle_board_scan",
+                    dedup_key="k|lint_fix|src",
+                )
+            ],
+            [],
+            True,
+        ),
+    )
+
+    handle_propose_cycle(client, service, status_dir=tmp_path, now=now)
+
+    import json as _json
+    saved = _json.loads((tmp_path / "propose.memory.json").read_text())
+    assert "fix lint in src/" in saved["proposed_index"]
+    assert "k|lint_fix|src" in saved["proposed_index"]

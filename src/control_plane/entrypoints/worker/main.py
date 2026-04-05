@@ -30,6 +30,7 @@ MAX_PROPOSALS_PER_CYCLE = 4
 MAX_PROPOSALS_PER_DAY = 30
 PROPOSAL_COOLDOWN_SECONDS = 20 * 60
 PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
+RECENTLY_PROPOSED_WINDOW_SECONDS = 7 * 24 * 60 * 60
 LOW_BACKLOG_THRESHOLD = 6
 EXECUTION_ACTIONS = {"execute", "improve_task"}
 MAX_CLASSIFICATION_ISSUES = 20
@@ -177,14 +178,15 @@ def proposal_memory_path(status_dir: Path | None) -> Path | None:
 def load_proposal_memory(status_dir: Path | None) -> dict[str, Any]:
     path = proposal_memory_path(status_dir)
     if path is None or not path.exists():
-        return {"last_proposal_at": None, "proposal_timestamps": []}
+        return {"last_proposal_at": None, "proposal_timestamps": [], "proposed_index": {}}
     try:
         payload = json.loads(path.read_text())
     except json.JSONDecodeError:
-        return {"last_proposal_at": None, "proposal_timestamps": []}
+        return {"last_proposal_at": None, "proposal_timestamps": [], "proposed_index": {}}
     return {
         "last_proposal_at": payload.get("last_proposal_at"),
         "proposal_timestamps": list(payload.get("proposal_timestamps", [])),
+        "proposed_index": dict(payload.get("proposed_index", {})),
     }
 
 
@@ -1898,11 +1900,16 @@ def create_proposed_task_if_missing(
     proposal: ProposalSpec,
     existing_names: set[str],
     proposal_keys: set[str],
+    memory: dict[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any] | None:
     normalized_title = proposal.title.strip().lower()
     normalized_key = proposal.dedup_key.strip().lower()
     if normalized_title in existing_names or normalized_key in proposal_keys:
         return None
+    if memory is not None and now is not None:
+        if recently_proposed(memory, title=proposal.title, dedup_key=proposal.dedup_key, now=now):
+            return None
 
     description = build_proposal_description(service=service, proposal=proposal)
     reason_label = re.sub(r"[^a-z0-9_]+", "_", proposal.source_signal.lower()).strip("_")
@@ -1930,6 +1937,8 @@ def create_proposed_task_if_missing(
     )
     existing_names.add(normalized_title)
     proposal_keys.add(normalized_key)
+    if memory is not None and now is not None:
+        record_proposed(memory, title=proposal.title, dedup_key=proposal.dedup_key, now=now)
     return created
 
 
@@ -1956,6 +1965,35 @@ def proposal_quota_exhausted(memory: dict[str, Any], now: datetime) -> bool:
             timestamps.append(value)
     memory["proposal_timestamps"] = timestamps
     return len(timestamps) >= MAX_PROPOSALS_PER_DAY
+
+
+def recently_proposed(memory: dict[str, Any], *, title: str, dedup_key: str, now: datetime) -> bool:
+    """Return True if this title or dedup_key was proposed within RECENTLY_PROPOSED_WINDOW_SECONDS.
+
+    Also prunes the index of entries older than the window.
+    """
+    cutoff = now.timestamp() - RECENTLY_PROPOSED_WINDOW_SECONDS
+    index: dict[str, float] = {}
+    for key, raw_ts in memory.get("proposed_index", {}).items():
+        try:
+            ts = float(raw_ts)
+        except (TypeError, ValueError):
+            continue
+        if ts >= cutoff:
+            index[key] = ts
+    memory["proposed_index"] = index
+    title_key = title.strip().lower()
+    dedup_key_norm = dedup_key.strip().lower()
+    return title_key in index or dedup_key_norm in index
+
+
+def record_proposed(memory: dict[str, Any], *, title: str, dedup_key: str, now: datetime) -> None:
+    """Record a newly created proposal in the index."""
+    index = dict(memory.get("proposed_index", {}))
+    ts = now.timestamp()
+    index[title.strip().lower()] = ts
+    index[dedup_key.strip().lower()] = ts
+    memory["proposed_index"] = index
 
 
 def handle_propose_cycle(
@@ -2067,6 +2105,8 @@ def handle_propose_cycle(
             proposal=proposal,
             existing_names=existing_names,
             proposal_keys=proposal_keys,
+            memory=memory,
+            now=now,
         )
         if created is None:
             continue
