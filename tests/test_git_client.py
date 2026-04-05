@@ -81,6 +81,34 @@ def test_diff_stat_includes_untracked_files() -> None:
     assert "untracked | tmp/new_file.py" in stat
 
 
+def test_changed_files_propagates_diff_error() -> None:
+    client = RaisingGitClient([("git", "diff", "--name-status")])
+
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.changed_files(Path("."))
+
+
+def test_changed_files_propagates_untracked_error() -> None:
+    client = RaisingGitClient([("git", "ls-files", "--others")])
+
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.changed_files(Path("."))
+
+
+def test_diff_stat_propagates_tracked_diff_error() -> None:
+    client = RaisingGitClient([("git", "diff", "--stat")])
+
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.diff_stat(Path("."))
+
+
+def test_diff_stat_propagates_untracked_error() -> None:
+    client = RaisingGitClient([("git", "ls-files", "--others")])
+
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.diff_stat(Path("."))
+
+
 # ---------------------------------------------------------------------------
 # _parse_name_status_output
 # ---------------------------------------------------------------------------
@@ -100,6 +128,12 @@ def test_parse_name_status_output_rename_and_copy() -> None:
     client = GitClient()
     raw = b"R100\x00old.py\x00new.py\x00C050\x00a.py\x00b.py\x00"
     assert client._parse_name_status_output(raw) == ["new.py", "b.py"]
+
+
+def test_parse_name_status_output_typechange_and_unmerged_statuses() -> None:
+    client = GitClient()
+    raw = b"T\x00src/typechange.py\x00U\x00src/conflicted.py\x00"
+    assert client._parse_name_status_output(raw) == ["src/typechange.py", "src/conflicted.py"]
 
 
 def test_parse_name_status_output_truncated_input() -> None:
@@ -259,6 +293,17 @@ def test_add_local_exclude_normalizes_missing_trailing_newline(tmp_path: Path) -
     client.add_local_exclude(tmp_path, "second")
 
     assert exclude_path.read_text() == "first\nsecond\n"
+
+
+def test_add_local_exclude_appends_to_existing_empty_file(tmp_path: Path) -> None:
+    client = GitClient()
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text("")
+
+    client.add_local_exclude(tmp_path, "pattern")
+
+    assert exclude_path.read_text() == "pattern\n"
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +495,37 @@ def test_commit_all_returns_true_when_changes_exist() -> None:
     assert client.commit_all(Path("."), "fix stuff") is True
 
 
+def test_commit_all_runs_add_status_commit_in_order() -> None:
+    class OrderedTrackingGitClient(GitClient):
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[str], Path | None]] = []
+
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            self.calls.append((args, cwd))
+            if args == ["git", "status", "--porcelain"]:
+                return "M  src/main.py"
+            return ""
+
+    client = OrderedTrackingGitClient()
+
+    assert client.commit_all(Path("/repo"), "fix stuff") is True
+    assert client.calls == [
+        (["git", "add", "-A"], Path("/repo")),
+        (["git", "status", "--porcelain"], Path("/repo")),
+        (["git", "commit", "-m", "fix stuff"], Path("/repo")),
+    ]
+
+
+def test_commit_all_runs_git_add_before_noop_status_check() -> None:
+    client = TrackingGitClient()
+
+    assert client.commit_all(Path("/repo"), "msg") is False
+    assert client.calls == [
+        (["git", "add", "-A"], Path("/repo")),
+        (["git", "status", "--porcelain"], Path("/repo")),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # create_task_branch
 # ---------------------------------------------------------------------------
@@ -591,6 +667,24 @@ def test_try_merge_base_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
     success, conflicts = client.try_merge_base(Path("/repo"), "main")
     assert success is False
     assert conflicts == ["src/a.py", "src/b.py"]
+
+
+def test_try_merge_base_treats_fatal_merge_error_as_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=128, stdout="", stderr="fatal: bad revision")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=0, stdout="src/conflict.py\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == ["src/conflict.py"]
 
 
 # ===========================================================================
@@ -945,6 +1039,25 @@ def test_try_merge_base_diff_command_fails(monkeypatch: pytest.MonkeyPatch) -> N
     assert conflicts == []
 
 
+def test_try_merge_base_diff_failure_with_partial_stdout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even when git diff fails, any stdout paths are still returned as conflicts."""
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
+        if args[:2] == ["git", "merge"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="merge conflict")
+        if args[:2] == ["git", "diff"]:
+            return SimpleNamespace(returncode=128, stdout="src/partial.py\n", stderr="fatal: bad object")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    client = GitClient()
+    success, conflicts = client.try_merge_base(Path("/repo"), "main")
+    assert success is False
+    assert conflicts == ["src/partial.py"]
+
+
 # ---------------------------------------------------------------------------
 # try_merge_base — cwd forwarding for both subprocess.run calls
 # ---------------------------------------------------------------------------
@@ -1076,6 +1189,22 @@ def test_diff_stat_untracked_only_no_tracked_changes() -> None:
     assert "untracked | another.txt" in result
     lines = result.strip().splitlines()
     assert len(lines) == 2
+
+
+def test_diff_stat_normalizes_untracked_paths() -> None:
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--stat", "HEAD"): b"",
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): (
+                b"./tmp/new_file.py\x00src\\windows\\path.py\x00"
+            ),
+        }
+    )
+
+    result = client.diff_stat(Path("."))
+
+    assert "untracked | tmp/new_file.py" in result
+    assert "untracked | src/windows/path.py" in result
 
 
 # ---------------------------------------------------------------------------
