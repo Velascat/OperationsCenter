@@ -16,6 +16,15 @@ class FakeGitClient(GitClient):
         return self.outputs.get(tuple(args), b"")
 
 
+class TrackingGitClient(GitClient):
+    def __init__(self) -> None:
+        self.calls: list[tuple[list[str], Path | None]] = []
+
+    def _run(self, args: list[str], cwd: Path | None = None) -> str:
+        self.calls.append((args, cwd))
+        return ""
+
+
 def test_changed_files_handles_rename_delete_and_untracked_output() -> None:
     client = FakeGitClient(
         {
@@ -142,6 +151,37 @@ def test_normalize_repo_relative_path_backslashes() -> None:
 def test_normalize_repo_relative_path_clean_passthrough() -> None:
     client = GitClient()
     assert client._normalize_repo_relative_path("src/main.py") == "src/main.py"
+
+
+# ---------------------------------------------------------------------------
+# simple delegations
+# ---------------------------------------------------------------------------
+
+def test_checkout_base_delegates_correct_command() -> None:
+    client = TrackingGitClient()
+
+    client.checkout_base(Path("/repo"), "main")
+
+    assert client.calls == [(["git", "checkout", "main"], Path("/repo"))]
+
+
+def test_set_identity_calls_name_and_email_in_order() -> None:
+    client = TrackingGitClient()
+
+    client.set_identity(Path("/repo"), "Alice", "alice@example.com")
+
+    assert client.calls == [
+        (["git", "config", "user.name", "Alice"], Path("/repo")),
+        (["git", "config", "user.email", "alice@example.com"], Path("/repo")),
+    ]
+
+
+def test_push_branch_delegates_correct_command() -> None:
+    client = TrackingGitClient()
+
+    client.push_branch(Path("/repo"), "feature-x")
+
+    assert client.calls == [(["git", "push", "-u", "origin", "feature-x"], Path("/repo"))]
 
 
 # ---------------------------------------------------------------------------
@@ -513,58 +553,6 @@ def test_diff_patch_returns_diff_output() -> None:
     )
     result = client.diff_patch(Path("."))
     assert "diff --git" in result
-
-
-# ---------------------------------------------------------------------------
-# set_identity
-# ---------------------------------------------------------------------------
-
-def test_set_identity_calls_both_config_commands() -> None:
-    calls: list[tuple[str, ...]] = []
-
-    class TrackingFake(GitClient):
-        def _run(self, args: list[str], cwd: Path | None = None) -> str:
-            calls.append(tuple(args))
-            return ""
-
-    client = TrackingFake()
-    client.set_identity(Path("."), "Bot", "bot@example.com")
-    assert ("git", "config", "user.name", "Bot") in calls
-    assert ("git", "config", "user.email", "bot@example.com") in calls
-
-
-# ---------------------------------------------------------------------------
-# push_branch
-# ---------------------------------------------------------------------------
-
-def test_push_branch_calls_push() -> None:
-    calls: list[tuple[str, ...]] = []
-
-    class TrackingFake(GitClient):
-        def _run(self, args: list[str], cwd: Path | None = None) -> str:
-            calls.append(tuple(args))
-            return ""
-
-    client = TrackingFake()
-    client.push_branch(Path("."), "feature-1")
-    assert ("git", "push", "-u", "origin", "feature-1") in calls
-
-
-# ---------------------------------------------------------------------------
-# checkout_base
-# ---------------------------------------------------------------------------
-
-def test_checkout_base_delegates_to_git_checkout() -> None:
-    calls: list[tuple[str, ...]] = []
-
-    class TrackingFake(GitClient):
-        def _run(self, args: list[str], cwd: Path | None = None) -> str:
-            calls.append(tuple(args))
-            return ""
-
-    client = TrackingFake()
-    client.checkout_base(Path("/repo"), "main")
-    assert ("git", "checkout", "main") in calls
 
 
 # ---------------------------------------------------------------------------
@@ -1141,3 +1129,74 @@ def test_changed_files_normalizes_backslashes_and_dot_prefixes() -> None:
     result = client.changed_files(Path("."))
     assert "src/main.py" in result
     assert "src/utils/helper.py" in result
+
+
+# ---------------------------------------------------------------------------
+# Edge-case tests — Stage 3
+# ---------------------------------------------------------------------------
+
+def test_add_local_exclude_dedup_with_whitespace_in_existing_file(tmp_path: Path) -> None:
+    """When the exclude file already contains a whitespace-padded line,
+    adding the stripped version should be treated as a duplicate."""
+    client = GitClient()
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text("  my_pattern  \n")
+
+    # Adding the stripped version should be detected as duplicate
+    client.add_local_exclude(tmp_path, "my_pattern")
+
+    # strip() removes leading/trailing whitespace from existing lines,
+    # so "my_pattern" matches and nothing is appended
+    assert exclude_path.read_text() == "  my_pattern  \n"
+
+
+def test_changed_files_deduplicates_tracked_and_untracked_overlap() -> None:
+    """A file appearing in both git diff (tracked) and ls-files (untracked)
+    should appear only once in the result."""
+    client = FakeGitClient(
+        {
+            ("git", "diff", "--name-status", "-z", "HEAD"): (
+                b"M\x00src/shared.py\x00M\x00src/only_tracked.py\x00"
+            ),
+            ("git", "ls-files", "--others", "--exclude-standard", "-z"): (
+                b"src/shared.py\x00src/only_untracked.py\x00"
+            ),
+        }
+    )
+    result = client.changed_files(Path("."))
+    # sorted(set(...)) ensures no duplicates
+    assert result == ["src/only_tracked.py", "src/only_untracked.py", "src/shared.py"]
+    assert result.count("src/shared.py") == 1
+
+
+def test_parse_name_status_output_truncated_rename_entry() -> None:
+    """A rename (R) status followed by only one path (instead of two)
+    should be handled gracefully — the parser breaks out of the loop."""
+    client = GitClient()
+    # R100 followed by old.py but missing new.py — truncated input
+    raw = b"M\x00src/ok.py\x00R100\x00old.py\x00"
+    result = client._parse_name_status_output(raw)
+    # The M entry is parsed fine; the R entry has only one path so parsing stops
+    assert result == ["src/ok.py"]
+
+
+def test_recent_changed_files_preserves_insertion_order_across_commits() -> None:
+    """Files from earlier commits should appear after files from later commits,
+    preserving the insertion order (first-seen wins for dedup)."""
+    client = FakeGitClient(
+        {
+            ("git", "log", "-n3", "--name-only", "--pretty=format:"): (
+                # Commit 1 (most recent): c.py, a.py
+                b"\nc.py\na.py\n"
+                # Commit 2: a.py (duplicate), b.py
+                b"\na.py\nb.py\n"
+                # Commit 3 (oldest): d.py
+                b"\nd.py\n"
+            ),
+        }
+    )
+    result = client.recent_changed_files(Path("."))
+    # c.py first seen in commit 1, a.py first seen in commit 1,
+    # b.py first seen in commit 2, d.py first seen in commit 3
+    assert result == ["c.py", "a.py", "b.py", "d.py"]
