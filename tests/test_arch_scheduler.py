@@ -8,8 +8,6 @@ from unittest.mock import MagicMock
 from control_plane.insights.derivers.arch_scheduler import (
     ArchSchedulerDeriver,
     _MIN_RUNS,
-    _MAX_NO_OP_RATE,
-    _MAX_VALIDATION_FAILURES,
 )
 from control_plane.insights.normalizer import InsightNormalizer
 from control_plane.decision.rules.arch_promotion import ArchPromotionRule
