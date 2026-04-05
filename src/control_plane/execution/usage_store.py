@@ -4,7 +4,7 @@ import json
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from control_plane.execution.models import BudgetDecision, ExecutionControlSettings, NoOpDecision, RetryDecision
 
@@ -103,8 +103,9 @@ class UsageStore:
         for event in reversed(events):
             if not isinstance(event, dict):
                 continue
-            if event.get("task_id") == task_id and event.get("kind") in ("execution", "retry_cap_block"):
-                ts = event.get("timestamp")
+            ev = cast("dict[str, object]", event)
+            if ev.get("task_id") == task_id and ev.get("kind") in ("execution", "retry_cap_block"):
+                ts = ev.get("timestamp")
                 if ts:
                     try:
                         from datetime import timezone

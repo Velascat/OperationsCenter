@@ -35,11 +35,15 @@ class ValidationRunner:
                 )
             except subprocess.TimeoutExpired as exc:
                 duration_ms = int((time.monotonic() - start) * 1000)
+                raw_stdout = exc.stdout
+                timeout_stdout = (
+                    raw_stdout.decode(errors="replace") if isinstance(raw_stdout, bytes) else (raw_stdout or "")
+                )
                 results.append(
                     ValidationResult(
                         command=command,
                         exit_code=124,
-                        stdout=exc.stdout or "",
+                        stdout=timeout_stdout,
                         stderr=f"Command timed out after {timeout_seconds}s: {command}",
                         duration_ms=duration_ms,
                     )
