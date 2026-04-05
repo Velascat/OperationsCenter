@@ -1936,6 +1936,7 @@ def test_recent_changed_files_dotfile_lstrip_bug_propagation() -> None:
     assert "env" in result
     # Originals must NOT be present — confirms the bug is active
     assert ".gitignore" not in result
+
     assert ".env" not in result
 
 
@@ -1965,11 +1966,13 @@ def test_diff_stat_dotfile_lstrip_bug_propagation() -> None:
 
 # ---------------------------------------------------------------------------
 # changed_files: untracked only, no diff changes
+
 # ---------------------------------------------------------------------------
 
 
 def test_changed_files_untracked_only_no_diff_changes() -> None:
     """changed_files returns only untracked files when git diff produces no output."""
+
     client = FakeGitClient(
         {
             ("git", "diff", "--name-status", "-z", "HEAD"): b"",
@@ -1985,6 +1988,7 @@ def test_changed_files_untracked_only_no_diff_changes() -> None:
 
 # ---------------------------------------------------------------------------
 # try_merge_base: verify exact subprocess args and cwd forwarding
+
 # ---------------------------------------------------------------------------
 
 
@@ -1997,6 +2001,7 @@ def test_try_merge_base_passes_correct_merge_args(monkeypatch: pytest.MonkeyPatc
 
     def fake_run(args: list[str], **kwargs: object) -> SimpleNamespace:
         captured.append((list(args), kwargs.get("cwd")))
+
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(sp, "run", fake_run)
@@ -2016,6 +2021,7 @@ def test_try_merge_base_passes_correct_merge_args(monkeypatch: pytest.MonkeyPatc
 
 # ---------------------------------------------------------------------------
 # diff_stat: whitespace-only tracked lines are filtered
+
 # ---------------------------------------------------------------------------
 
 
@@ -2026,6 +2032,7 @@ def test_diff_stat_filters_whitespace_only_tracked_lines() -> None:
             # Inject blank and tab-only lines between real content lines
             ("git", "diff", "--stat", "HEAD"): (
                 b" src/main.py | 2 +-\n   \n\t\n 1 file changed\n"
+
             ),
             ("git", "ls-files", "--others", "--exclude-standard", "-z"): b"",
         }
@@ -2040,6 +2047,7 @@ def test_diff_stat_filters_whitespace_only_tracked_lines() -> None:
 
 # ---------------------------------------------------------------------------
 # clone: does not forward cwd to _run
+
 # ---------------------------------------------------------------------------
 
 
@@ -2200,3 +2208,4 @@ def test_add_local_exclude_multiple_patterns_in_order(tmp_path: Path) -> None:
     exclude_path = git_info / "exclude"
     lines = exclude_path.read_text().splitlines()
     assert lines == ["*.pyc", "__pycache__/", ".env"]
+
