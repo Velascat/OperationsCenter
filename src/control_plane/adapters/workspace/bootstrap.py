@@ -39,6 +39,16 @@ class RepoEnvironmentBootstrapper:
         base = dict(base_env or {})
 
         if not enabled:
+            # Auto-discover a repo-provided bootstrap script when no explicit commands
+            # are configured.  Convention: repos place their primary environment
+            # bootstrap at tools/bootstrap.sh.  ControlPlane runs it when present.
+            if bootstrap_commands is None:
+                candidate = repo_path / "tools" / "bootstrap.sh"
+                if candidate.exists():
+                    bootstrap_commands = ["bash tools/bootstrap.sh"]
+            if bootstrap_commands:
+                for cmd in bootstrap_commands:
+                    commands.append(self._run_shell(cmd, cwd=repo_path, env=base))
             return BootstrapResult(venv_path=venv_path, env=base, commands=commands)
 
         # Custom bootstrap commands override Python venv setup (for non-Python repos)

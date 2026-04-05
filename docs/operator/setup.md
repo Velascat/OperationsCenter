@@ -62,6 +62,24 @@ source .env.control-plane.local
 - validation commands
 - repo-local `.venv` bootstrap behavior
 
+## Repo Bootstrap Convention
+
+Before kodo runs on a task, ControlPlane bootstraps the repo's Python environment.
+
+**Default (Python repos):** set `bootstrap_enabled: true` in the repo config.
+ControlPlane creates a venv at `venv_dir` and runs `install_dev_command`.
+
+**Custom bootstrap:** set `bootstrap_enabled: false` and place a `tools/bootstrap.sh`
+in the repo root.  ControlPlane auto-discovers and runs it — no `bootstrap_commands`
+config needed.  The script can set up any environment the repo requires; it runs
+with the repo root as the working directory.
+
+`bootstrap_commands` in the repo config can still override this for one-off cases,
+but the preferred pattern for repos with their own setup process is `tools/bootstrap.sh`.
+
+Validation commands run after kodo using full paths (e.g. `.codebase-venv/bin/python -m pytest -q`)
+so they work regardless of which venv was activated during bootstrap.
+
 ## Kodo Install Behavior
 
 Setup:
