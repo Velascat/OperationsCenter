@@ -196,7 +196,10 @@ def test_checkout_base_delegates_correct_command() -> None:
 
     client.checkout_base(Path("/repo"), "main")
 
-    assert client.calls == [(["git", "checkout", "main"], Path("/repo"))]
+    assert client.calls == [
+        (["git", "checkout", "main"], Path("/repo")),
+        (["git", "pull", "--ff-only"], Path("/repo")),
+    ]
 
 
 def test_set_identity_calls_name_and_email_in_order() -> None:
@@ -1035,7 +1038,7 @@ def test_checkout_base_forwards_cwd_to_run() -> None:
 
     client = CwdTrackingFake()
     client.checkout_base(Path("/my/repo"), "main")
-    assert captured_cwd == [Path("/my/repo")]
+    assert captured_cwd == [Path("/my/repo"), Path("/my/repo")]
 
 
 # ---------------------------------------------------------------------------
