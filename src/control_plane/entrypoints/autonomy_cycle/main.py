@@ -18,9 +18,11 @@ from control_plane.insights.derivers.dependency_drift import DependencyDriftDeri
 from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
 from control_plane.insights.derivers.execution_health import ExecutionHealthDeriver
 from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
+from control_plane.insights.derivers.ci_pattern import CIPatternDeriver
 from control_plane.insights.derivers.lint_drift import LintDriftDeriver
 from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
 from control_plane.insights.derivers.proposal_outcome import ProposalOutcomeDeriver
+from control_plane.insights.derivers.type_health import TypeHealthDeriver
 from control_plane.insights.derivers.test_continuity import TestContinuityDeriver
 from control_plane.insights.derivers.todo_concentration import TodoConcentrationDeriver
 from control_plane.insights.loader import SnapshotLoader
@@ -31,8 +33,10 @@ from control_plane.observer.collectors.dependency_drift import DependencyDriftCo
 from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector
+from control_plane.observer.collectors.ci_history import CIHistoryCollector
 from control_plane.observer.collectors.lint_signal import LintSignalCollector
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
+from control_plane.observer.collectors.type_check import TypeSignalCollector
 from control_plane.observer.collectors.test_signal import TestSignalCollector
 from control_plane.observer.collectors.todo_signal import TodoSignalCollector
 from control_plane.observer.service import RepoObserverService, new_observer_context
@@ -54,6 +58,8 @@ def build_observer_service() -> RepoObserverService:
         todo_signal_collector=TodoSignalCollector(),
         execution_health_collector=ExecutionArtifactCollector(),
         lint_signal_collector=LintSignalCollector(),
+        type_signal_collector=TypeSignalCollector(),
+        ci_history_collector=CIHistoryCollector(),
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )
@@ -81,6 +87,8 @@ def build_insight_service() -> InsightEngineService:
             ObservationCoverageDeriver(normalizer),
             ExecutionHealthDeriver(normalizer, validation_failure_threshold=validation_threshold),
             LintDriftDeriver(normalizer),
+            TypeHealthDeriver(normalizer),
+            CIPatternDeriver(normalizer),
             ProposalOutcomeDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
@@ -291,6 +299,10 @@ def _write_cycle_report(
         signals_collected.append("backlog")
     if signals.lint_signal.status != "unavailable":
         signals_collected.append("lint_signal")
+    if signals.type_signal.status != "unavailable":
+        signals_collected.append("type_signal")
+    if signals.ci_history.status != "unavailable":
+        signals_collected.append("ci_history")
 
     # Insights by kind
     insights_by_kind: Counter = Counter(i.kind for i in insight_artifact.insights)
@@ -354,6 +366,16 @@ def _write_cycle_report(
             "lint": {
                 "status": signals.lint_signal.status,
                 "violation_count": signals.lint_signal.violation_count,
+            },
+            "type": {
+                "status": signals.type_signal.status,
+                "error_count": signals.type_signal.error_count,
+            },
+            "ci": {
+                "status": signals.ci_history.status,
+                "failure_rate": signals.ci_history.failure_rate,
+                "failing_checks": signals.ci_history.failing_checks,
+                "flaky_checks": signals.ci_history.flaky_checks,
             },
             "execution_health": {
                 "total_runs": signals.execution_health.total_runs,

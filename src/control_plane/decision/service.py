@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
+import json
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Protocol
 
 from control_plane.decision.candidate_builder import CandidateBuilder
@@ -13,8 +15,10 @@ from control_plane.decision.rules.backlog_promotion import BacklogPromotionRule
 from control_plane.decision.rules.dependency_drift import DependencyDriftRule
 from control_plane.decision.rules.execution_health import ExecutionHealthRule
 from control_plane.decision.rules.hotspot_concentration import HotspotConcentrationRule
+from control_plane.decision.rules.ci_pattern import CIPatternRule
 from control_plane.decision.rules.lint_fix import LintFixRule
 from control_plane.decision.rules.observation_coverage import ObservationCoverageRule
+from control_plane.decision.rules.type_improvement import TypeImprovementRule
 from control_plane.decision.rules.test_visibility import TestVisibilityRule
 from control_plane.decision.rules.todo_accumulation import TodoAccumulationRule
 from control_plane.decision.suppression import suppressed_candidate
@@ -27,8 +31,8 @@ class DecisionLoaderProtocol(Protocol):
         ...
 
 
-_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix"})
-ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
+_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "type_fix"})
+ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "type_fix", "ci_pattern", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,9 @@ class DecisionContext:
     source_command: str
     dry_run: bool = False
     allowed_families: frozenset[str] = _DEFAULT_ALLOWED_FAMILIES
+    max_proposals_per_24h: int = 10
+    proposer_root: Path = field(default_factory=lambda: Path("tools/report/control_plane/proposer"))
+    feedback_root: Path = field(default_factory=lambda: Path("state/proposal_feedback"))
 
 
 def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[type-arg]
@@ -57,6 +64,9 @@ def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[ty
     lint_min = 5
     if tuning_config is not None:
         lint_min = tuning_config.get_int("lint_fix", "min_violations", 5)
+    type_min = 3
+    if tuning_config is not None:
+        type_min = tuning_config.get_int("type_fix", "min_errors", 3)
     return [
         ObservationCoverageRule(min_consecutive_runs=obs_min),
         TestVisibilityRule(min_consecutive_runs=test_min),
@@ -65,6 +75,8 @@ def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[ty
         TodoAccumulationRule(),
         ExecutionHealthRule(),
         LintFixRule(min_violations=lint_min),
+        TypeImprovementRule(min_errors=type_min),
+        CIPatternRule(),
         BacklogPromotionRule(),
         ArchPromotionRule(),
     ]
@@ -137,6 +149,45 @@ class DecisionEngineService:
                 )
             filtered_specs = []
 
+        # Velocity cap: suppress all if too many proposals were created in the last 24h
+        recent_count = self._count_proposals_last_24h(context)
+        if recent_count >= context.max_proposals_per_24h:
+            for spec in filtered_specs:
+                candidate = self.builder.build(spec)
+                suppressed.append(
+                    suppressed_candidate(
+                        dedup_key=candidate.dedup_key,
+                        family=candidate.family,
+                        subject=candidate.subject,
+                        reason="velocity_cap_reached",
+                        evidence={
+                            "proposals_last_24h": recent_count,
+                            "max_proposals_per_24h": context.max_proposals_per_24h,
+                        },
+                    )
+                )
+            filtered_specs = []
+
+        # Staleness check: suppress dedup_keys with unresolved proposals past expiry
+        stale_keys = self._stale_open_dedup_keys(context, prior_decisions)
+        if stale_keys:
+            live_specs = []
+            for spec in filtered_specs:
+                candidate = self.builder.build(spec)
+                if candidate.dedup_key in stale_keys:
+                    suppressed.append(
+                        suppressed_candidate(
+                            dedup_key=candidate.dedup_key,
+                            family=candidate.family,
+                            subject=candidate.subject,
+                            reason="proposal_stale_open",
+                            evidence={"stale_dedup_key": candidate.dedup_key},
+                        )
+                    )
+                else:
+                    live_specs.append(spec)
+            filtered_specs = live_specs
+
         policy = DecisionPolicy(
             config=DecisionPolicyConfig(
                 max_candidates=context.max_candidates,
@@ -161,6 +212,99 @@ class DecisionEngineService:
             suppressed=suppressed,
         )
         return artifact, self.artifact_writer.write(artifact)
+
+
+    def _count_proposals_last_24h(self, context: DecisionContext) -> int:
+        """Count proposals created in the proposer stage within the last 24 hours."""
+        cutoff = context.generated_at - timedelta(hours=24)
+        count = 0
+        proposer_root = context.proposer_root
+        if not proposer_root.exists():
+            return 0
+        for results_file in proposer_root.glob("*/proposal_results.json"):
+            try:
+                data = json.loads(results_file.read_text())
+            except Exception:
+                continue
+            if data.get("dry_run"):
+                continue
+            ts_raw = data.get("generated_at", "")
+            try:
+                generated_at = datetime.fromisoformat(str(ts_raw))
+            except Exception:
+                continue
+            if generated_at < cutoff:
+                continue
+            created = data.get("created", [])
+            if isinstance(created, list):
+                count += len(created)
+        return count
+
+    def _stale_open_dedup_keys(
+        self,
+        context: DecisionContext,
+        prior_decisions: list,
+    ) -> set[str]:
+        """Return dedup_keys for proposals that were created but are still open past expiry."""
+        # Build dedup_key → (plane_issue_id, proposed_at, expires_after_runs) from prior decisions
+        dedup_to_proposed: dict[str, tuple[str, datetime, int]] = {}
+        for artifact in prior_decisions:
+            for candidate in artifact.candidates:
+                if candidate.dedup_key not in dedup_to_proposed:
+                    dedup_to_proposed[candidate.dedup_key] = (
+                        "",  # plane_issue_id unknown from decision artifact alone
+                        artifact.generated_at,
+                        candidate.expires_after_runs,
+                    )
+
+        if not dedup_to_proposed:
+            return set()
+
+        # Enrich with plane_issue_id from proposer artifacts
+        dedup_to_issue: dict[str, str] = {}
+        proposer_root = context.proposer_root
+        if proposer_root.exists():
+            for results_file in proposer_root.glob("*/proposal_results.json"):
+                try:
+                    data = json.loads(results_file.read_text())
+                except Exception:
+                    continue
+                created = data.get("created", [])
+                if not isinstance(created, list):
+                    continue
+                for item in created:
+                    if isinstance(item, dict):
+                        dk = str(item.get("dedup_key", ""))
+                        issue_id = str(item.get("plane_issue_id", ""))
+                        if dk and issue_id:
+                            dedup_to_issue[dk] = issue_id
+
+        # Load resolved issue_ids from feedback records
+        resolved_issue_ids: set[str] = set()
+        feedback_root = context.feedback_root
+        if feedback_root.exists():
+            for fb_file in feedback_root.glob("*.json"):
+                try:
+                    record = json.loads(fb_file.read_text())
+                except Exception:
+                    continue
+                task_id = str(record.get("task_id", ""))
+                outcome = str(record.get("outcome", ""))
+                if task_id and outcome in ("merged", "escalated"):
+                    resolved_issue_ids.add(task_id)
+
+        stale: set[str] = set()
+        for dedup_key, (_, proposed_at, expires_after_runs) in dedup_to_proposed.items():
+            expiry = proposed_at + timedelta(days=expires_after_runs * 2)
+            if expiry >= context.generated_at:
+                continue  # not yet expired
+            issue_id = dedup_to_issue.get(dedup_key, "")
+            if not issue_id:
+                continue  # was never actually created in Plane
+            if issue_id in resolved_issue_ids:
+                continue  # already resolved (merged or escalated)
+            stale.add(dedup_key)
+        return stale
 
 
 def new_decision_context(

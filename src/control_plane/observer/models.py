@@ -96,6 +96,37 @@ class LintSignal(BaseModel):
     source: str | None = None
 
 
+class TypeError(BaseModel):
+    path: str
+    line: int
+    col: int
+    code: str
+    message: str
+
+
+class TypeSignal(BaseModel):
+    status: str  # "clean", "errors", "unavailable"
+    error_count: int = 0
+    top_errors: list[TypeError] = Field(default_factory=list)
+    source: str | None = None
+
+
+class CICheckRunRecord(BaseModel):
+    name: str
+    sha: str
+    conclusion: str  # success, failure, timed_out, cancelled, skipped, neutral, etc.
+
+
+class CIHistorySignal(BaseModel):
+    status: str  # "nominal", "flaky", "failing", "unavailable"
+    runs_checked: int = 0
+    failure_rate: float = 0.0
+    flaky_checks: list[str] = Field(default_factory=list)
+    failing_checks: list[str] = Field(default_factory=list)
+    recent_runs: list[CICheckRunRecord] = Field(default_factory=list)
+    source: str | None = None
+
+
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
@@ -105,6 +136,8 @@ class RepoSignalsSnapshot(BaseModel):
     execution_health: ExecutionHealthSignal = Field(default_factory=ExecutionHealthSignal)
     backlog: BacklogSignal = Field(default_factory=BacklogSignal)
     lint_signal: LintSignal = Field(default_factory=lambda: LintSignal(status="unavailable"))
+    type_signal: TypeSignal = Field(default_factory=lambda: TypeSignal(status="unavailable"))
+    ci_history: CIHistorySignal = Field(default_factory=lambda: CIHistorySignal(status="unavailable"))
 
 
 class RepoStateSnapshot(BaseModel):

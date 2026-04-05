@@ -17,6 +17,9 @@ class FamilyMetrics(BaseModel):
     create_rate: float = 0.0
     no_creation_rate: float = 0.0
     top_suppression_reasons: dict[str, int] = Field(default_factory=dict)
+    proposals_merged: int = 0
+    proposals_escalated: int = 0
+    acceptance_rate: float = 0.0  # merged / (merged + escalated), or 0 if no feedback
 
 
 class TuningRecommendation(BaseModel):

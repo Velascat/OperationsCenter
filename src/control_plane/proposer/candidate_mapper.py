@@ -154,6 +154,16 @@ class ProposalCandidateMapper:
                 "- Keep the change scoped to lint fixes only — do not refactor or change logic.",
                 "- Do not suppress violations with `# noqa` unless there is a documented reason.",
             ],
+            "type_fix": [
+                "- Resolve type errors with targeted annotations; avoid broad `# type: ignore` suppressions.",
+                "- Keep the change scoped to type fixes only — do not refactor or change logic.",
+                "- If a suppression is unavoidable, add a comment explaining why.",
+            ],
+            "ci_pattern": [
+                "- Investigate root cause before proposing a fix; do not suppress or skip failing checks.",
+                "- Keep the change scoped to the identified failing or flaky checks.",
+                "- Document findings even if no code change is needed.",
+            ],
         }
         return family_scopes.get(
             candidate.family,

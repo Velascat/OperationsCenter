@@ -5,6 +5,11 @@ from control_plane.tuning.models import FamilyMetrics, TuningRecommendation
 # Minimum sample runs before any recommendation is issued.
 MIN_SAMPLE_FOR_RECOMMENDATION = 5
 
+# Acceptance-rate thresholds (proposals_merged / (merged + escalated))
+LOW_ACCEPTANCE_RATE = 0.3   # below this with enough feedback → consider tightening or tier demotion
+HIGH_ACCEPTANCE_RATE = 0.8  # above this with enough feedback → consider tier promotion
+MIN_FEEDBACK_FOR_ACCEPTANCE = 5  # minimum merged+escalated records before acceptance-rate rules fire
+
 # A family suppressed at this rate or above is flagged as over-suppressed.
 OVER_SUPPRESSED_RATE = 0.90
 
@@ -41,6 +46,9 @@ class RecommendationEngine:
             "candidates_skipped": m.candidates_skipped,
             "suppression_rate": m.suppression_rate,
             "create_rate": m.create_rate,
+            "proposals_merged": m.proposals_merged,
+            "proposals_escalated": m.proposals_escalated,
+            "acceptance_rate": m.acceptance_rate,
         }
 
         # Insufficient data — make no claim
@@ -121,6 +129,39 @@ class RecommendationEngine:
                 ),
                 confidence="high" if m.candidates_emitted >= 5 else "medium",
                 evidence=evidence,
+            )
+
+        # Low acceptance rate — proposals are being escalated rather than merged
+        feedback_total = m.proposals_merged + m.proposals_escalated
+        if feedback_total >= MIN_FEEDBACK_FOR_ACCEPTANCE and m.acceptance_rate < LOW_ACCEPTANCE_RATE:
+            return TuningRecommendation(
+                family=family,
+                action="tighten_threshold",
+                rationale=(
+                    f"'{family}' has a low acceptance rate of {m.acceptance_rate:.0%} "
+                    f"({m.proposals_merged} merged, {m.proposals_escalated} escalated of {feedback_total} reviewed). "
+                    "Many proposals are being escalated rather than accepted; consider tightening the threshold "
+                    "or demoting the autonomy tier to require human promotion."
+                ),
+                confidence="high" if feedback_total >= 10 else "medium",
+                evidence=evidence,
+                suggested_change={"autonomy_tier": {"direction": "decrease", "step": 1}},
+            )
+
+        # High acceptance rate — proposals consistently merged; consider auto-promoting tier
+        if feedback_total >= MIN_FEEDBACK_FOR_ACCEPTANCE and m.acceptance_rate >= HIGH_ACCEPTANCE_RATE:
+            return TuningRecommendation(
+                family=family,
+                action="keep",
+                rationale=(
+                    f"'{family}' has a high acceptance rate of {m.acceptance_rate:.0%} "
+                    f"({m.proposals_merged} merged, {m.proposals_escalated} escalated of {feedback_total} reviewed). "
+                    "Consider promoting the autonomy tier to allow auto-execution "
+                    "if not already at tier 2."
+                ),
+                confidence="high" if feedback_total >= 10 else "medium",
+                evidence=evidence,
+                suggested_change={"autonomy_tier": {"direction": "increase", "step": 1}},
             )
 
         # Moderate / not enough signal yet to have a strong view

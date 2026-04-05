@@ -9,6 +9,7 @@ from control_plane.config import Settings
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.models import (
     BacklogSignal,
+    CIHistorySignal,
     DependencyDriftSignal,
     ExecutionHealthSignal,
     LintSignal,
@@ -17,6 +18,7 @@ from control_plane.observer.models import (
     RepoStateSnapshot,
     TestSignal,
     TodoSignal,
+    TypeSignal,
 )
 from control_plane.observer.snapshot_builder import SnapshotBuilder
 
@@ -54,6 +56,8 @@ class RepoObserverService:
         execution_health_collector: RepoSignalCollector | None = None,
         backlog_collector: RepoSignalCollector | None = None,
         lint_signal_collector: RepoSignalCollector | None = None,
+        type_signal_collector: RepoSignalCollector | None = None,
+        ci_history_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -66,6 +70,8 @@ class RepoObserverService:
         self.execution_health_collector = execution_health_collector
         self.backlog_collector = backlog_collector
         self.lint_signal_collector = lint_signal_collector
+        self.type_signal_collector = type_signal_collector
+        self.ci_history_collector = ci_history_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -128,6 +134,28 @@ class RepoObserverService:
             if self.lint_signal_collector is not None
             else LintSignal(status="unavailable")
         )
+        type_signal = (
+            self._collect_optional(
+                self.type_signal_collector,
+                context,
+                "type_signal",
+                collector_errors,
+                default=TypeSignal(status="unavailable"),
+            )
+            if self.type_signal_collector is not None
+            else TypeSignal(status="unavailable")
+        )
+        ci_history = (
+            self._collect_optional(
+                self.ci_history_collector,
+                context,
+                "ci_history",
+                collector_errors,
+                default=CIHistorySignal(status="unavailable"),
+            )
+            if self.ci_history_collector is not None
+            else CIHistorySignal(status="unavailable")
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -138,6 +166,8 @@ class RepoObserverService:
             execution_health=execution_health,
             backlog=backlog,
             lint_signal=lint_signal,
+            type_signal=type_signal,
+            ci_history=ci_history,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

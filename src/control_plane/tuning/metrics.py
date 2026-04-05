@@ -14,6 +14,7 @@ def aggregate_family_metrics(
     *,
     decision_root: Path,
     proposer_root: Path,
+    feedback_root: Path | None = None,
     window: int = 20,
 ) -> tuple[list[FamilyMetrics], int, datetime | None, datetime | None]:
     """Aggregate per-family behavior metrics from retained decision and proposer artifacts.
@@ -58,6 +59,46 @@ def aggregate_family_metrics(
             src = str(data.get("source_decision_run_id", ""))
             if src:
                 proposer_by_decision[src] = data
+
+    # Build plane_issue_id → family map from proposer artifacts
+    issue_to_family: dict[str, str] = {}
+    if proposer_root.exists():
+        for d in _sorted_artifact_dirs(proposer_root):
+            path = d / "proposal_results.json"
+            if not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except Exception:
+                continue
+            for item in _iter_list(data, "created"):
+                issue_id = str(item.get("plane_issue_id", ""))
+                family = str(item.get("family", ""))
+                if issue_id and family:
+                    issue_to_family[issue_id] = family
+
+    # Load proposal feedback records: state/proposal_feedback/*.json
+    merged_by_family: Counter[str] = Counter()
+    escalated_by_family: Counter[str] = Counter()
+    _feedback_root = feedback_root or Path("state/proposal_feedback")
+    if _feedback_root.exists():
+        for feedback_file in _feedback_root.glob("*.json"):
+            try:
+                record = json.loads(feedback_file.read_text())
+            except Exception:
+                continue
+            task_id = str(record.get("task_id", ""))
+            outcome = str(record.get("outcome", ""))
+            family = issue_to_family.get(task_id, "")
+            if not family:
+                # try plane_issue_id field directly
+                family = issue_to_family.get(str(record.get("plane_issue_id", "")), "")
+            if not family:
+                continue
+            if outcome == "merged":
+                merged_by_family[family] += 1
+            elif outcome == "escalated":
+                escalated_by_family[family] += 1
 
     # Aggregate counts per family
     emitted: Counter[str] = Counter()
@@ -120,6 +161,10 @@ def aggregate_family_metrics(
         suppression_rate = s / total_seen if total_seen > 0 else 0.0
         create_rate = c / e if e > 0 else 0.0
         no_creation_rate = (e - c) / e if e > 0 else 0.0
+        merged = merged_by_family[family]
+        escalated = escalated_by_family[family]
+        feedback_total = merged + escalated
+        acceptance_rate = merged / feedback_total if feedback_total > 0 else 0.0
 
         metrics.append(
             FamilyMetrics(
@@ -136,6 +181,9 @@ def aggregate_family_metrics(
                 top_suppression_reasons=dict(
                     suppression_reasons.get(family, Counter()).most_common(5)
                 ),
+                proposals_merged=merged,
+                proposals_escalated=escalated,
+                acceptance_rate=round(acceptance_rate, 3),
             )
         )
 
