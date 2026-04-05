@@ -77,7 +77,9 @@ class ExecutionHealthRule:
                                 "failures unrelated to the tasks being run, or recent tasks are consistently "
                                 "scoped beyond what one execution pass can resolve cleanly. "
                                 "Investigate recent validation.json artifacts to identify the failing command "
-                                "and address the root cause."
+                                "and address the root cause. "
+                                "While this fix-task remains unresolved, the circuit-breaker will skip "
+                                "further task execution against this repo to avoid wasting budget."
                             ),
                             labels_hint=["task-kind: improve", "source: proposer"],
                             source_family="execution_health_followup",

@@ -54,7 +54,15 @@ def build_observer_service() -> RepoObserverService:
 
 
 def build_insight_service() -> InsightEngineService:
+    from control_plane.tuning.applier import load_tuning_config
+
+    tuning_config = load_tuning_config()
     normalizer = InsightNormalizer()
+    validation_threshold = (
+        tuning_config.get_int("execution_health", "validation_failure_threshold", 2)
+        if tuning_config is not None
+        else 2
+    )
     return InsightEngineService(
         loader=SnapshotLoader(),
         derivers=[
@@ -65,7 +73,7 @@ def build_insight_service() -> InsightEngineService:
             DependencyDriftDeriver(normalizer),
             TodoConcentrationDeriver(normalizer),
             ObservationCoverageDeriver(normalizer),
-            ExecutionHealthDeriver(normalizer),
+            ExecutionHealthDeriver(normalizer, validation_failure_threshold=validation_threshold),
         ],
         artifact_writer=InsightArtifactWriter(),
     )
