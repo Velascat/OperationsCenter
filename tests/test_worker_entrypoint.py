@@ -1289,3 +1289,25 @@ def test_handle_propose_cycle_suppresses_when_budget_too_low(tmp_path: Path, mon
 
     assert result.created_task_ids == []
     assert result.decision == "proposal_budget_too_low"
+
+
+# ---------------------------------------------------------------------------
+# _has_active_pr_review
+# ---------------------------------------------------------------------------
+
+
+def test_has_active_pr_review_true_when_file_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """_has_active_pr_review returns True when the state file exists."""
+    from control_plane.entrypoints.worker.main import _has_active_pr_review
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main._PR_REVIEW_STATE_DIR", tmp_path)
+    (tmp_path / "task-123.json").write_text("{}")
+    assert _has_active_pr_review("task-123") is True
+
+
+def test_has_active_pr_review_false_when_file_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """_has_active_pr_review returns False when no state file exists."""
+    from control_plane.entrypoints.worker.main import _has_active_pr_review
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main._PR_REVIEW_STATE_DIR", tmp_path)
+    assert _has_active_pr_review("task-456") is False
