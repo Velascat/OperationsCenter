@@ -742,6 +742,9 @@ def test_try_merge_base_treats_fatal_merge_error_as_conflict(monkeypatch: pytest
 #   ✅ New branch — creates locally (line 433)
 #   ✅ Returns True when remote exists (line 448)
 #   ✅ Returns False when new (line 460)
+#   🔴 GAP: Checkout error on remote-exists path (line 55) — existing error
+#        propagation test (line 1683) only exercises the new-branch path
+#        (line 57) because RaisingGitClient returns "" for ls-remote.
 #
 # ---------------------------------------------------------------------------
 # try_merge_base (line 57) — calls subprocess.run directly, NOT _run
@@ -839,6 +842,10 @@ def test_try_merge_base_treats_fatal_merge_error_as_conflict(monkeypatch: pytest
 #   ✅ Leading dot-slash (line 132)
 #   ✅ Backslashes (line 137)
 #   ✅ Clean passthrough (line 142)
+#   🟡 GAP: lstrip("./") is a char-level strip, not substring removal.
+#        Dotfiles like ".gitignore" → "gitignore", ".env" → "env".
+#        This is a LATENT BUG. Need tests documenting current behavior
+#        for dotfile paths and parent-traversal paths like "../foo.py".
 #
 # ---------------------------------------------------------------------------
 # branch_allowed (standalone, line 175)
@@ -853,12 +860,29 @@ def test_try_merge_base_treats_fatal_merge_error_as_conflict(monkeypatch: pytest
 # ===========================================================================
 # SUMMARY OF REMAINING GAPS (for next stage)
 # ===========================================================================
-#   🔴 HIGH:   try_merge_base — git diff fails (returncode != 0) [+ latent bug]
-#   🔴 HIGH:   try_merge_base — cwd forwarding for both subprocess.run calls
-#   🟡 MEDIUM: checkout_base — cwd forwarding to _run
-#   🟡 MEDIUM: _parse_name_status_output — truncated rename (missing dest)
-#   🟡 MEDIUM: try_merge_base — whitespace lines in conflict output
-#   🟡 MEDIUM: diff_stat — untracked-only (no tracked changes)
+#   ✅ DONE:   try_merge_base — git diff fails (returncode != 0) [+ latent bug]
+#   ✅ DONE:   try_merge_base — cwd forwarding for both subprocess.run calls
+#   ✅ DONE:   checkout_base — cwd forwarding to _run
+#   ✅ DONE:   _parse_name_status_output — truncated rename (missing dest)
+#   ✅ DONE:   try_merge_base — whitespace lines in conflict output
+#   ✅ DONE:   diff_stat — untracked-only (no tracked changes)
+#   ✅ DONE:   try_merge_base — diff_filter fails, warning logged
+#
+# --- GAPS FOUND IN SECOND AUDIT PASS ---
+#
+#   ✅ DONE:   create_task_branch line 55 — checkout failure on remote-exists
+#              branch. test_create_task_branch_propagates_checkout_error (line
+#              1683) uses RaisingGitClient but ls-remote returns "" so it
+#              always takes the new-branch path (line 57), never the
+#              remote-exists checkout at line 55. Need a test where ls-remote
+#              returns non-empty AND the subsequent checkout -b ... origin/X
+#              raises RuntimeError.
+#
+#   ✅ DONE:   _normalize_repo_relative_path line 181 — lstrip("./") strips
+#              individual chars not the substring "./", so dotfiles like
+#              ".gitignore" become "gitignore" and ".env" becomes "env".
+#              This is a LATENT BUG. Need tests documenting current (buggy)
+#              behavior for paths like ".gitignore", ".env", "../foo.py".
 # ===========================================================================
 
 
@@ -1823,3 +1847,36 @@ def test_try_merge_base_diff_filter_fails(monkeypatch: pytest.MonkeyPatch, caplo
     assert success is False
     assert conflicts == []
     assert any("git diff --diff-filter=U failed" in rec.message for rec in caplog.records)
+
+
+def test_create_task_branch_propagates_checkout_error_remote_exists() -> None:
+    """RuntimeError from checkout -b propagates when remote branch exists."""
+
+    class _RemoteExistsCheckoutRaisingClient(RaisingGitClient):
+        def _run(self, args: list[str], cwd: Path | None = None) -> str:
+            if tuple(args[:2]) == ("git", "ls-remote"):
+                return "deadbeef\trefs/heads/feature-x"
+            return super()._run(args, cwd)
+
+    client = _RemoteExistsCheckoutRaisingClient([("git", "checkout")])
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        client.create_task_branch(Path("/repo"), "feature-x")
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        (".gitignore", "gitignore"),
+        (".env", "env"),
+    ],
+)
+def test_normalize_repo_relative_path_dotfile_lstrip_bug(path: str, expected: str) -> None:
+    """Document current lstrip('./') bug where dotfiles lose their leading dot."""
+    client = GitClient()
+    assert client._normalize_repo_relative_path(path) == expected
+
+
+def test_normalize_repo_relative_path_parent_traversal() -> None:
+    """Document current lstrip('./') bug where ../foo.py becomes foo.py."""
+    client = GitClient()
+    assert client._normalize_repo_relative_path("../foo.py") == "foo.py"
