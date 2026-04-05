@@ -157,6 +157,29 @@ Manages per-family autonomy tiers that control the initial Plane task state:
 
 Tier changes are written to `config/autonomy_tiers.json` and take effect on the next `autonomy-cycle` run.
 
+## Promote-Backlog
+
+When a family's tier is raised from 1 to 2, tasks already sitting in Backlog from before the tier change will not move automatically — they were created before the config update. `promote-backlog` finds those tasks and moves them to `Ready for AI`.
+
+```bash
+# Dry-run (default): show what would be promoted, no Plane writes
+./scripts/control-plane.sh promote-backlog
+
+# Promote all tier-2 families
+./scripts/control-plane.sh promote-backlog --execute
+
+# Promote one family only
+./scripts/control-plane.sh promote-backlog --family lint_fix --execute
+```
+
+Promotion criteria (all must be true):
+- Task is in `Backlog` state.
+- Task has label `source: autonomy`.
+- Task body contains `source_family: <family>` in the `## Provenance` block.
+- Current effective tier for that family (from `config/autonomy_tiers.json`) is >= 2.
+
+Tasks created at tier 0 are never promoted. Tasks without a `source: autonomy` label are not touched.
+
 ## Feedback
 
 Records proposal outcomes manually for tasks that were merged, escalated, or abandoned outside the reviewer loop:

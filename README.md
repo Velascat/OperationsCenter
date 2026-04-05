@@ -245,6 +245,8 @@ Then:
 ./scripts/control-plane.sh tune-autonomy --window 30
 ./scripts/control-plane.sh autonomy-tiers show
 ./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
+./scripts/control-plane.sh promote-backlog
+./scripts/control-plane.sh promote-backlog --family lint_fix --execute
 ./scripts/control-plane.sh backfill-pr-reviews
 ./scripts/control-plane.sh plane-doctor --task-id TASK-123
 ./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only

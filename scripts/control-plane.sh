@@ -113,6 +113,7 @@ Usage:
   scripts/control-plane.sh autonomy-cycle --config FILE [--repo PATH] [--execute] [--all-families]
   scripts/control-plane.sh analyze-artifacts [--repo NAME] [--limit N] [--json]
   scripts/control-plane.sh tune-autonomy [--window N] [--apply]
+  scripts/control-plane.sh promote-backlog [--family FAMILY] [--execute]
 
 Environment:
   CONTROL_PLANE_CONFIG   Override config path (default: ${CONFIG_PATH})
@@ -426,6 +427,11 @@ case "${cmd}" in
     ensure_venv
     load_env_file
     run_with_log tune-autonomy "${VENV_DIR}/bin/python" -m control_plane.entrypoints.tuning.main --config "${CONFIG_PATH}" "$@"
+    ;;
+  promote-backlog)
+    ensure_venv
+    load_env_file
+    run_with_log promote-backlog "${VENV_DIR}/bin/python" -m control_plane.entrypoints.promote_backlog.main --config "${CONFIG_PATH}" "$@"
     ;;
   plane-doctor)
     ensure_venv
