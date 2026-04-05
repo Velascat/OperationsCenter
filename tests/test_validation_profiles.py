@@ -210,6 +210,114 @@ def test_task_body_requires_human_approval_true_for_logic(tmp_path: Path) -> Non
     assert "requires_human_approval: true" in body
 
 
+# ── EvidenceBundle synthesis ─────────────────────────────────────────────────
+
+
+def _lint_spec(pattern_key: str = "violations_present", **evidence_overrides: object) -> CandidateSpec:
+    ev = {"violation_count": 47, "distinct_file_count": 5, "top_codes": ["E501"], "source": "ruff"}
+    ev.update(evidence_overrides)
+    return CandidateSpec(
+        family="lint_fix",
+        subject="lint_violations",
+        pattern_key=pattern_key,
+        evidence=ev,
+        matched_rules=["test"],
+        confidence="high",
+        risk_class="style",
+        expires_after_runs=3,
+        proposal_outline=ProposalOutline(title_hint="Fix lint", summary_hint="Fix lint."),
+        priority=(1, 1, "lint_fix"),
+    )
+
+
+def _type_spec(pattern_key: str = "errors_present", **evidence_overrides: object) -> CandidateSpec:
+    ev = {"error_count": 12, "distinct_file_count": 3, "top_codes": ["attr-defined"], "source": "mypy"}
+    ev.update(evidence_overrides)
+    return CandidateSpec(
+        family="type_fix",
+        subject="type_errors",
+        pattern_key=pattern_key,
+        evidence=ev,
+        matched_rules=["test"],
+        confidence="medium",
+        risk_class="logic",
+        expires_after_runs=4,
+        proposal_outline=ProposalOutline(title_hint="Fix types", summary_hint="Fix types."),
+        priority=(1, 1, "type_fix"),
+    )
+
+
+def test_lint_fix_present_bundle_populated() -> None:
+    builder = CandidateBuilder()
+    candidate = builder.build(_lint_spec())
+    b = candidate.evidence_bundle
+    assert b is not None
+    assert b.kind == "lint_count"
+    assert b.count == 47
+    assert b.distinct_file_count == 5
+    assert b.delta is None
+    assert b.trend == "present"
+    assert "E501" in b.top_codes
+    assert b.source == "ruff"
+
+
+def test_lint_fix_worsened_bundle_has_delta() -> None:
+    builder = CandidateBuilder()
+    ev = {"current_count": 47, "previous_count": 32, "delta": 15}
+    candidate = builder.build(_lint_spec(pattern_key="violations_worsened", **ev))
+    b = candidate.evidence_bundle
+    assert b is not None
+    assert b.count == 47
+    assert b.delta == 15
+    assert b.trend == "worsening"
+
+
+def test_type_fix_present_bundle_populated() -> None:
+    builder = CandidateBuilder()
+    candidate = builder.build(_type_spec())
+    b = candidate.evidence_bundle
+    assert b is not None
+    assert b.kind == "type_count"
+    assert b.count == 12
+    assert b.distinct_file_count == 3
+    assert b.source == "mypy"
+
+
+def test_type_fix_worsened_bundle_has_delta() -> None:
+    builder = CandidateBuilder()
+    ev = {"current_count": 12, "previous_count": 7, "delta": 5}
+    candidate = builder.build(_type_spec(pattern_key="errors_worsened", **ev))
+    b = candidate.evidence_bundle
+    assert b is not None
+    assert b.delta == 5
+    assert b.trend == "worsening"
+
+
+def test_unrelated_family_has_no_bundle() -> None:
+    spec = CandidateSpec(
+        family="observation_coverage",
+        subject="test",
+        pattern_key="gap",
+        evidence={"reason": "no_tests"},
+        matched_rules=["test"],
+        confidence="medium",
+        risk_class="logic",
+        expires_after_runs=5,
+        proposal_outline=ProposalOutline(title_hint="Cover", summary_hint="Cover."),
+        priority=(1, 1, "coverage"),
+    )
+    builder = CandidateBuilder()
+    candidate = builder.build(spec)
+    assert candidate.evidence_bundle is None
+
+
+def test_bundle_schema_version_is_1() -> None:
+    builder = CandidateBuilder()
+    candidate = builder.build(_lint_spec())
+    assert candidate.evidence_bundle is not None
+    assert candidate.evidence_bundle.schema_version == 1
+
+
 def test_task_body_provenance_fields_ordered(tmp_path: Path) -> None:
     """validation_profile and requires_human_approval appear after risk_class."""
     body = _map(_candidate(), tmp_path)

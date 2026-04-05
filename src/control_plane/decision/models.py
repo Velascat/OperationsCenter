@@ -27,6 +27,26 @@ class ProposalOutline(BaseModel):
     source_family: str | None = None
 
 
+class EvidenceBundle(BaseModel):
+    """Structured machine-readable evidence for a proposal candidate.
+
+    Sits alongside the human-readable evidence_lines list. Populated automatically
+    by CandidateBuilder for families whose evidence schema is stable (lint_fix,
+    type_fix). Other families carry evidence only in the raw evidence dict.
+
+    schema_version tracks the bundle format for forward-compatibility.
+    """
+
+    schema_version: int = 1
+    kind: str  # e.g. "lint_count", "type_count"
+    count: int | None = None          # total violations / errors
+    distinct_file_count: int | None = None
+    delta: int | None = None          # change from prior snapshot (positive = worsened)
+    trend: str | None = None          # "present" | "worsening"
+    top_codes: list[str] = Field(default_factory=list)
+    source: str | None = None         # tool that produced the signal (ruff, ty, mypy)
+
+
 class ProposalCandidate(BaseModel):
     candidate_id: str
     dedup_key: str
@@ -39,6 +59,7 @@ class ProposalCandidate(BaseModel):
     risk_class: str = "logic"
     expires_after_runs: int = 5
     validation_profile: str = ""
+    evidence_bundle: EvidenceBundle | None = None
     rationale: CandidateRationale
     proposal_outline: ProposalOutline
 
