@@ -93,6 +93,7 @@ class KodoAdapter:
         command = self.build_command(goal_file, repo_path)
         proc = subprocess.run(
             command,
+            cwd=repo_path,
             capture_output=True,
             text=True,
             timeout=self.settings.timeout_seconds,
@@ -113,6 +114,7 @@ class KodoAdapter:
             command = self.build_command(goal_file, repo_path)
             proc = subprocess.run(
                 command,
+                cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=self.settings.timeout_seconds,

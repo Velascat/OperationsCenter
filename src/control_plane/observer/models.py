@@ -71,6 +71,16 @@ class ExecutionHealthSignal(BaseModel):
     recent_runs: list[ExecutionRunRecord] = Field(default_factory=list)
 
 
+class BacklogItem(BaseModel):
+    title: str
+    item_type: str  # maintenance, feature, enhancement, arch, redesign, etc.
+    description: str = ""
+
+
+class BacklogSignal(BaseModel):
+    items: list[BacklogItem] = Field(default_factory=list)
+
+
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
@@ -78,6 +88,7 @@ class RepoSignalsSnapshot(BaseModel):
     dependency_drift: DependencyDriftSignal
     todo_signal: TodoSignal
     execution_health: ExecutionHealthSignal = Field(default_factory=ExecutionHealthSignal)
+    backlog: BacklogSignal = Field(default_factory=BacklogSignal)
 
 
 class RepoStateSnapshot(BaseModel):
