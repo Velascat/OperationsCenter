@@ -22,6 +22,9 @@ This repo runs as a local polling workflow.
 ./scripts/control-plane.sh generate-insights
 ./scripts/control-plane.sh decide-proposals
 ./scripts/control-plane.sh propose-from-candidates
+./scripts/control-plane.sh autonomy-cycle
+./scripts/control-plane.sh tune-autonomy
+./scripts/control-plane.sh autonomy-tiers
 ```
 
 ## Watchers
@@ -94,6 +97,91 @@ This is the quickest way to tell whether the local system is alive or stalled.
 - insight artifacts: `tools/report/control_plane/insights/`
 - decision artifacts: `tools/report/control_plane/decision/`
 - proposer result artifacts: `tools/report/control_plane/proposer/`
+
+## Autonomy-Cycle
+
+The preferred way to run the full autonomy pipeline in one command:
+
+```bash
+# Dry-run (default) — shows what would be proposed, no Plane writes
+./scripts/control-plane.sh autonomy-cycle --config <config.yaml>
+
+# Execute — creates real Plane tasks
+./scripts/control-plane.sh autonomy-cycle --config <config.yaml> --execute
+
+# Execute with all candidate families enabled
+./scripts/control-plane.sh autonomy-cycle --config <config.yaml> --execute --all-families
+```
+
+**Always review the dry-run output before adding `--execute`**, especially after:
+- changing threshold config or tuning heuristics
+- restarting watchers after a budget-exhaustion event
+- promoting a new candidate family from gated to active
+
+The dry-run output shows which families fired, which candidates would be emitted vs. suppressed, and suppression reasons. Every run writes a structured report to `logs/autonomy_cycle/cycle_<ts>.json`.
+
+## Tune-Autonomy
+
+The bounded self-tuning regulation loop. Run this as a periodic maintenance step, not on every cycle:
+
+```bash
+# Recommendation-only (default, safe — no config changes)
+./scripts/control-plane.sh tune-autonomy
+
+# With wider artifact window
+./scripts/control-plane.sh tune-autonomy --window 30
+
+# Auto-apply mode (opt-in, requires env var as second gate)
+CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/control-plane.sh tune-autonomy --apply
+```
+
+Reads retained decision, proposer, and feedback artifacts. Produces per-family metrics including acceptance rates and emits conservative recommendations. See `docs/operator/tuning.md` and `docs/design/autonomy_self_tuning_regulator.md` for full details.
+
+## Autonomy-Tiers
+
+Manages per-family autonomy tiers that control the initial Plane task state:
+
+```bash
+# Show current tier configuration
+./scripts/control-plane.sh autonomy-tiers show
+
+# Promote a family to auto-execute (tier 2)
+./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
+
+# Demote a family to backlog-only (tier 1)
+./scripts/control-plane.sh autonomy-tiers set --family type_fix --tier 1
+
+# Disable auto-creation for a family (tier 0)
+./scripts/control-plane.sh autonomy-tiers set --family arch_promotion --tier 0
+```
+
+Tier changes are written to `config/autonomy_tiers.json` and take effect on the next `autonomy-cycle` run.
+
+## Feedback
+
+Records proposal outcomes manually for tasks that were merged, escalated, or abandoned outside the reviewer loop:
+
+```bash
+# Record a merge
+python -m control_plane.entrypoints.feedback.main record \
+    --task-id <uuid> --outcome merged --pr-number 42
+
+# Record an escalation
+python -m control_plane.entrypoints.feedback.main record \
+    --task-id <uuid> --outcome escalated
+
+# Record abandonment
+python -m control_plane.entrypoints.feedback.main record \
+    --task-id <uuid> --outcome abandoned
+
+# List all feedback records
+python -m control_plane.entrypoints.feedback.main list
+
+# Show feedback for a specific task
+python -m control_plane.entrypoints.feedback.main show --task-id <uuid>
+```
+
+The reviewer watcher writes feedback records automatically when it merges or escalates a PR. Use this command for manual retroactive recording.
 
 ## Repo-Aware Autonomy Stages
 

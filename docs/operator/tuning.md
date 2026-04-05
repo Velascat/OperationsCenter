@@ -85,16 +85,60 @@ observe-repo (daily) -> generate-insights -> decide-proposals -> propose-from-ca
 
 Families in `_DEFAULT_ALLOWED_FAMILIES` fire automatically on every cycle:
 
-| Family | Active by default |
-|--------|-------------------|
-| `observation_coverage` | yes |
-| `test_visibility` | yes |
-| `dependency_drift` | yes |
-| `execution_health_followup` | yes |
-| `hotspot_concentration` | no — requires `--all-families` |
-| `todo_accumulation` | no — requires `--all-families` |
-| `backlog_promotion` | no — requires `--all-families` |
-| `arch_promotion` | no — requires `--all-families` + health gates |
+| Family | Active by default | Default tier | Risk class |
+|--------|-------------------|-------------|------------|
+| `observation_coverage` | yes | 1 | logic |
+| `test_visibility` | yes | 1 | logic |
+| `dependency_drift` | yes | 1 | logic |
+| `execution_health_followup` | yes | 1 | logic |
+| `lint_fix` | yes | 2 | style |
+| `type_fix` | yes | 1 | logic |
+| `validation_pattern_followup` | yes | 1 | logic |
+| `ci_pattern` | no — requires `--all-families` | 1 | logic |
+| `hotspot_concentration` | no — requires `--all-families` | 1 | structural |
+| `todo_accumulation` | no — requires `--all-families` | 1 | style |
+| `backlog_promotion` | no — requires `--all-families` | 1 | logic |
+| `arch_promotion` | no — requires `--all-families` + health gates | 0 | arch |
+
+## Autonomy Tier Management
+
+Autonomy tiers control the initial Plane task state for created tasks. Tier 2 tasks auto-execute; tier 1 tasks land in Backlog and require human promotion; tier 0 tasks are never created.
+
+```bash
+# View current tiers
+./scripts/control-plane.sh autonomy-tiers show
+
+# Promote a family to auto-execute after confirming track record
+./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
+
+# Demote a family after a bad run
+./scripts/control-plane.sh autonomy-tiers set --family type_fix --tier 0
+```
+
+**When to promote a family to tier 2:**
+- `tune-autonomy` shows `acceptance_rate >= 80%` with ≥ 5 feedback records
+- No runaway board spam from this family in the last 30 days
+- Human review of 3-5 created tasks confirms the scope is consistently bounded
+
+**When to demote a family:**
+- `acceptance_rate < 30%` across 5+ feedback records — proposals are not landing
+- Tasks are consistently escalated rather than merged
+- `tune-autonomy` recommends `tighten_threshold` with `autonomy_tier: decrease`
+
+## Acceptance Rate Tuning
+
+The self-tuning regulator now tracks `proposals_merged` and `proposals_escalated` per family by joining feedback records to proposer artifacts. The resulting `acceptance_rate = merged / (merged + escalated)`.
+
+Two new recommendation rules fire based on acceptance rate:
+
+| Pattern | Condition | Action |
+|---------|-----------|--------|
+| Low acceptance | acceptance_rate < 30% AND ≥ 5 feedback records | `tighten_threshold` — suggests decreasing autonomy tier |
+| High acceptance | acceptance_rate ≥ 80% AND ≥ 5 feedback records | `keep` — suggests increasing autonomy tier |
+
+These suggestions appear in `tuning_recommendations.json` as `suggested_change: {"autonomy_tier": {"direction": "increase|decrease", "step": 1}}`. They are advisory — the operator applies them manually via `autonomy-tiers set`.
+
+The acceptance rate metrics appear in the `tune-autonomy` output per family. To collect meaningful data, ensure the reviewer watcher is writing feedback records (it does so automatically on merge/escalate), and use the `feedback` entrypoint for tasks handled manually.
 
 ## Per-Family Threshold Reference
 
@@ -142,6 +186,45 @@ Fires when dependency drift is persistently detected.
 - **When to loosen**: Drift is always present (expected in active repos); raise threshold or add a pattern exclusion.
 - **When to tighten**: Not usually needed; drift is a slow-moving signal.
 - **Conservative default**: 2 consecutive runs.
+
+### `lint_fix`
+
+Fires when ruff detects lint violations.
+
+- **Rule**: `LintDriftRule` — fires on `lint_drift/present` or `lint_drift/worsened` insights
+- **Default tier**: 2 (auto-executes) — style risk class, bounded scope
+- **When to demote to tier 1**: repos where lint fixes have historically caused unintended refactors; demote to tier 1 so a human reviews before execution
+- **Where to change**: `src/control_plane/insights/derivers/lint_drift.py`
+
+### `type_fix`
+
+Fires when `ty` or `mypy` reports type errors.
+
+- **Rule**: `TypeImprovementRule(min_errors=3)` — requires ≥3 errors before firing
+- **Default tier**: 1 — logic risk class; requires human review before execution
+- **When to loosen**: raise tier to 2 after confirming that auto-generated type fixes are consistently bounded and safe in your codebase
+- **When to tighten**: lower `min_errors` threshold to 1 if you want earlier warning; raise to 10 if noise is high
+- **Where to change**: `src/control_plane/decision/rules/type_improvement.py` constant `min_errors`
+
+### `validation_pattern_followup`
+
+Fires when the same Plane task has ≥2 runs and ≥2 validation failures across retained execution artifacts.
+
+- **Rule**: `ValidationPatternRule` — high confidence if ≥3 affected tasks; medium confidence otherwise
+- **Default tier**: 1 — logic risk class; investigation required before executing
+- **When to loosen**: lower `_MIN_FAILURES_FOR_PATTERN` to 1 if you want earlier warning
+- **When to tighten**: raise `_MIN_RUNS_FOR_PATTERN` to 3 if transient failures are common
+- **Where to change**: `src/control_plane/observer/collectors/validation_history.py`
+
+### `ci_pattern` (gated, not default)
+
+Fires when GitHub check-run history shows failing or flaky checks.
+
+- **Rule**: `CIPatternRule` — `checks_failing` (confidence=high) or `checks_flaky` (confidence=medium)
+- **Default tier**: 1 — logic risk class; root cause investigation required
+- **Promotion criteria**: enable once you have ≥2 weeks of CI history baseline and have confirmed that the failing/flaky classification is reliable for your repo
+- **Thresholds**: `FAILING_THRESHOLD=0.7` (≥70% fail rate), `FLAKY_THRESHOLD=0.2` (≥20%)
+- **Where to change**: `src/control_plane/observer/collectors/ci_history.py`
 
 ### `hotspot_concentration` (gated, not default)
 
@@ -196,6 +279,8 @@ MAX_PROPOSALS_PER_DAY = 30
 | `family_deferred_initial_gating` | Family not in `allowed_families` | Promote the family when ready |
 | `proposal_budget_too_low` | Execution budget too low for proposals | Check `usage.json`; budget resets hourly/daily |
 | `existing_open_equivalent_task` | Board already has an open task with this dedup key | Expected; no action needed |
+| `velocity_cap_exceeded` | ≥10 proposals created in the last 24 hours | Wait for the window to pass; or raise `max_proposals_per_24h` |
+| `proposal_stale_open` | Prior unresolved proposal exceeded `expires_after_runs` without feedback | Close or record feedback for the old task; or increase `expires_after_runs` |
 
 ## Documenting Threshold Changes
 

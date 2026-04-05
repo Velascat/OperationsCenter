@@ -9,7 +9,7 @@ This is **not** an open-ended self-modification system. It is a bounded regulato
 The regulator follows a meta-control model:
 
 ```text
-retained autonomy artifacts
+retained autonomy artifacts + proposal feedback records
   -> aggregate family metrics
   -> evaluate bounded tuning rules
   -> emit recommendations
@@ -28,9 +28,10 @@ observe -> analyze -> decide -> propose
 ```
 tools/report/control_plane/decision/*/proposal_candidates.json
 tools/report/control_plane/proposer/*/proposal_results.json
+state/proposal_feedback/*.json
                   ↓
           MetricsAggregator
-    (per-family emit/suppress/create rates)
+    (per-family emit/suppress/create/acceptance rates)
                   ↓
         RecommendationEngine
     (explicit deterministic rules)
@@ -55,7 +56,7 @@ tools/report/control_plane/proposer/*/proposal_results.json
 ./scripts/control-plane.sh tune-autonomy
 ```
 
-- Reads retained decision and proposer artifacts.
+- Reads retained decision, proposer, and feedback artifacts.
 - Computes per-family behavior metrics.
 - Emits conservative tuning recommendations.
 - Writes retained artifacts to `tools/report/control_plane/tuning/<run_id>/`.
@@ -90,8 +91,11 @@ For each candidate family, over the analysis window (default last 20 decision ru
 | `create_rate` | created / emitted |
 | `no_creation_rate` | (emitted - created) / emitted |
 | `top_suppression_reasons` | Top 5 suppression reason counts |
+| `proposals_merged` | Feedback records with outcome == "merged" for this family |
+| `proposals_escalated` | Feedback records with outcome == "escalated" for this family |
+| `acceptance_rate` | merged / (merged + escalated); 0.0 if no feedback |
 
-Dry-run artifacts are excluded. Proposer artifacts are correlated by `source_decision_run_id`.
+Dry-run artifacts are excluded. Proposer artifacts are correlated by `source_decision_run_id`. Feedback records are joined to proposer artifacts via `plane_issue_id → family`.
 
 ## Recommendation Rules
 
@@ -101,12 +105,14 @@ All rules require at least 5 sample runs. Below this floor: `no_data`.
 |---------|-----------|--------|
 | Over-suppressed | suppression_rate ≥ 90% | `loosen_threshold` |
 | Noisy/low-value | emitted ≥ 5 AND create_rate ≤ 10% | `tighten_threshold` |
+| Low acceptance | acceptance_rate < 30% AND feedback ≥ 5 | `tighten_threshold` with `autonomy_tier: decrease` |
 | Healthy | emitted ≥ 3 AND create_rate ≥ 25% | `keep` |
+| High acceptance | acceptance_rate ≥ 80% AND feedback ≥ 5 | `keep` with `autonomy_tier: increase` |
 | Silent | emitted == 0 AND suppressed == 0 | `review` |
 | Insufficient data | sample_runs < 5 | `no_data` |
 | Moderate | everything else | `review` |
 
-Every recommendation carries the evidence that drove it. Recommendations are deterministic given the same artifact window.
+Every recommendation carries the evidence that drove it, including `proposals_merged`, `proposals_escalated`, and `acceptance_rate` when feedback is available.
 
 ## Auto-Apply Guardrails
 
@@ -117,7 +123,7 @@ Only three families are auto-appliable in the first version:
 - `test_visibility`
 - `dependency_drift`
 
-Gated families (`hotspot_concentration`, `todo_accumulation`, `execution_health_followup`) require manual promotion.
+Gated families require manual promotion.
 
 ### Key allowlist
 
@@ -170,7 +176,7 @@ Auto-apply writes to `config/autonomy_tuning.json`:
 ```json
 {
   "version": 1,
-  "updated_at": "2026-04-04T12:00:00Z",
+  "updated_at": "2026-04-05T12:00:00Z",
   "overrides": {
     "observation_coverage": {"min_consecutive_runs": 1},
     "test_visibility": {"min_consecutive_runs": 4}
@@ -189,8 +195,6 @@ The regulator is not wired into the hot-path autonomy cycle. Run it as a periodi
 ./scripts/control-plane.sh tune-autonomy
 ```
 
-Or add it to a cron/maintenance schedule. It should **not** run on every `autonomy-cycle` call.
-
 ## What This Is Not
 
 - Not open-ended self-modification
@@ -199,4 +203,4 @@ Or add it to a cron/maintenance schedule. It should **not** run on every `autono
 - Not unrestricted config editing
 - Not a replacement for operator review of major policy shifts
 
-Major changes (promoting a gated family, changing the auto-apply allowlist, adjusting the daily quota) remain operator decisions.
+Major changes (promoting a gated family, changing the auto-apply allowlist, adjusting the daily quota, changing autonomy tiers) remain operator decisions.
