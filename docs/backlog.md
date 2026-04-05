@@ -106,6 +106,20 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 
 ---
 
+## Completed (Phase 4 — Validation Profiles + Evidence Bundles)
+
+### autonomy — Validation profiles per candidate family
+**Status**: done
+
+Five profile constants (`ruff_clean`, `ty_clean`, `tests_pass`, `ci_green`, `manual_review`) defined in `validation_profiles.py`. All 12 families mapped via `profile_for_family()`. `CandidateBuilder` auto-assigns from family; rules may override explicitly. `validation_profile`, `requires_human_approval`, and `evidence_schema_version` appear in every created task's `## Provenance` block. `emitted_candidates` list with `{family, validation_profile, confidence}` per emitted candidate in `cycle_<ts>.json` report.
+
+### autonomy — EvidenceBundle structured machine-readable evidence
+**Status**: done
+
+`EvidenceBundle` Pydantic model (`kind`, `count`, `distinct_file_count`, `delta`, `trend`, `top_codes`, `source`, `schema_version`) synthesized by `CandidateBuilder._synthesize_evidence_bundle()` for `lint_fix` and `type_fix`; `None` for other families. `distinct_file_count` is a true count from the full violation/error output (not bounded by the top-N sample window).
+
+---
+
 ## Next
 
 Items here are promoted to the board automatically by the `backlog_promotion` family (when enabled).

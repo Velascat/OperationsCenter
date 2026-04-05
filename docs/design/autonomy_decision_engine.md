@@ -35,7 +35,7 @@ Optional bounded history:
 |--------|------|---------------|------------|
 | `observation_coverage` | `ObservationCoverageRule` | observer coverage gaps | logic |
 | `test_visibility` | `TestVisibilityRule` | test status continuity | logic |
-| `dependency_drift` | `DependencyDriftRule` | dependency drift continuity | logic |
+| `dependency_drift_followup` | `DependencyDriftRule` | dependency drift continuity | logic |
 | `execution_health_followup` | `ExecutionHealthRule` | execution artifact outcomes | logic |
 | `lint_fix` | `LintDriftRule` | lint violation signal | style |
 | `type_fix` | `TypeImprovementRule` | type error signal | logic |
@@ -62,6 +62,8 @@ Every emitted candidate carries:
 | `risk_class` | `style`, `logic`, `structural`, or `arch` — determines default task state |
 | `dedup_key` | stable key used for cooldown and open-task dedup |
 | `expires_after_runs` | how many autonomy cycles before an unresolved candidate is considered stale |
+| `validation_profile` | which validation profile applies — auto-assigned from `profile_for_family()` unless overridden by the rule; one of `ruff_clean`, `ty_clean`, `tests_pass`, `ci_green`, `manual_review` |
+| `evidence_bundle` | structured machine-readable evidence (`EvidenceBundle`) for `lint_fix` and `type_fix`; `None` for other families |
 | `evidence_lines` | bullet list of specific evidence from the signal |
 | `proposal_outline.title_hint` | suggested Plane task title |
 | `proposal_outline.summary_hint` | suggested task description |
@@ -128,7 +130,7 @@ Tier is read from `config/autonomy_tiers.json` (managed by the `autonomy-tiers` 
 | `lint_fix` | 2 |
 | `observation_coverage` | 1 |
 | `test_visibility` | 1 |
-| `dependency_drift` | 1 |
+| `dependency_drift_followup` | 1 |
 | `execution_health_followup` | 1 |
 | `type_fix` | 1 |
 | `ci_pattern` | 1 |

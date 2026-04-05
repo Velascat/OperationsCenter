@@ -1,6 +1,6 @@
 # Autonomy Proposer Integration
 
-The proposer integration is the fourth and final stage of the autonomy pipeline. It connects retained decision output to the existing proposer lane by creating Plane tasks from emitted candidates.
+The proposer integration is the fourth stage of the autonomy pipeline. It connects retained decision output to the existing proposer lane by creating Plane tasks from emitted candidates. Execution, review, and feedback form the remaining stages that close the loop back into the observer.
 
 ## Flow
 
@@ -72,6 +72,9 @@ candidate_dedup_key: <dedup_key>
 confidence: high|medium
 risk_class: style|logic|structural|arch
 autonomy_tier: <0|1|2>
+validation_profile: ruff_clean|ty_clean|tests_pass|ci_green|manual_review
+requires_human_approval: true|false
+evidence_schema_version: 1
 expires_at: <YYYY-MM-DD>
 observer_run_ids:
   - <run_id>
@@ -79,6 +82,8 @@ insight_run_id: <run_id>
 decision_run_id: <run_id>
 proposer_run_id: <run_id>
 ```
+
+`validation_profile` is derived from the candidate family (set by `profile_for_family()` in `validation_profiles.py` unless overridden by the rule). `requires_human_approval` mirrors whether the task started in `Backlog` (`true`) or `Ready for AI` (`false`). `evidence_schema_version` tracks the `EvidenceBundle` format version (currently always `1`).
 
 ### `## Evidence`
 

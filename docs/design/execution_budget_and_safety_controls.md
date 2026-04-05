@@ -33,7 +33,7 @@ Allowed initially:
 
 - `observation_coverage`
 - `test_visibility`
-- `dependency_drift`
+- `dependency_drift_followup`
 
 Deferred initially:
 

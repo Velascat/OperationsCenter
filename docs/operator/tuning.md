@@ -89,7 +89,7 @@ Families in `_DEFAULT_ALLOWED_FAMILIES` fire automatically on every cycle:
 |--------|-------------------|-------------|------------|
 | `observation_coverage` | yes | 1 | logic |
 | `test_visibility` | yes | 1 | logic |
-| `dependency_drift` | yes | 1 | logic |
+| `dependency_drift_followup` | yes | 1 | logic |
 | `execution_health_followup` | yes | 1 | logic |
 | `lint_fix` | yes | 2 | style |
 | `type_fix` | yes | 1 | logic |
@@ -178,7 +178,7 @@ Fires when test status has been persistently unknown.
 - **When to tighten**: Tasks are created too frequently for transient test signal loss; raise to 4.
 - **Conservative default**: 3 consecutive runs. Higher bar than observation_coverage intentionally.
 
-### `dependency_drift`
+### `dependency_drift_followup`
 
 Fires when dependency drift is persistently detected.
 

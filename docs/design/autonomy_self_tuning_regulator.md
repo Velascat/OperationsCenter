@@ -121,7 +121,7 @@ Every recommendation carries the evidence that drove it, including `proposals_me
 Only three families are auto-appliable in the first version:
 - `observation_coverage`
 - `test_visibility`
-- `dependency_drift`
+- `dependency_drift_followup`
 
 Gated families require manual promotion.
 

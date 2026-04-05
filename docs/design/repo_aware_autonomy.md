@@ -51,7 +51,7 @@ The observer collects eleven categories of factual signal:
 The decision engine currently supports twelve candidate families:
 
 **Default (active on every cycle):**
-`observation_coverage`, `test_visibility`, `dependency_drift`, `execution_health_followup`, `lint_fix`, `type_fix`, `validation_pattern_followup`
+`observation_coverage`, `test_visibility`, `dependency_drift_followup`, `execution_health_followup`, `lint_fix`, `type_fix`, `validation_pattern_followup`
 
 **Gated (require `--all-families` or explicit promotion):**
 `ci_pattern`, `hotspot_concentration`, `todo_accumulation`, `backlog_promotion`, `arch_promotion`
@@ -104,6 +104,7 @@ Every `autonomy-cycle` run (whether dry-run or execute) writes a structured JSON
 - Stage summaries (run IDs, signal collection status, insight counts, suppression breakdown)
 - Full signal snapshot (test, lint, type, CI, validation, execution health)
 - Guard rail summary (budget remaining, gated families, cycle health)
+- `emitted_candidates` — list of `{family, validation_profile, confidence}` for every emitted candidate, enabling per-profile debugging of execution outcomes
 
 ## Boundaries
 

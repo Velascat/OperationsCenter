@@ -48,7 +48,9 @@ Runs `ruff check --output-format=json` in the observed repo and produces:
 
 - `status` — `clean`, `violations`, or `unavailable`
 - `violation_count` — total lint violations found
-- `top_files` — files with the most violations
+- `distinct_file_count` — true count of distinct files with violations (computed from full output, not sampled top-N)
+- `top_violations` — up to 20 highest-priority violations
+- `source` — `"ruff"`
 
 Falls back to `status=unavailable` if ruff is not installed or the run times out.
 
@@ -58,7 +60,9 @@ Tries `ty check --output-format json` first, falls back to `mypy --output=json`.
 
 - `status` — `clean`, `errors`, or `unavailable`
 - `error_count` — number of type errors found
-- `top_files` — files with the most type errors
+- `distinct_file_count` — true count of distinct files with errors (computed from full output, not sampled top-N)
+- `top_errors` — up to 20 highest-priority errors
+- `source` — `"ty"` or `"mypy"`
 
 Falls back to `status=unavailable` if neither tool is installed or the run times out.
 
