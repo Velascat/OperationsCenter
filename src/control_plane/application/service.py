@@ -75,6 +75,7 @@ class ExecutionService:
             validation_commands=repo_cfg.validation_commands,
             env=repo_cfg.env,
             allowed_base_branches=repo_cfg.allowed_base_branches,
+            validation_timeout_seconds=repo_cfg.validation_timeout_seconds,
         )
 
     def run_task(
@@ -384,7 +385,7 @@ class ExecutionService:
 
             phase = "validation"
             self._log_event("phase", run_id, phase=phase)
-            validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+            validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
             validation_retried = False
@@ -421,7 +422,7 @@ class ExecutionService:
                         prefix="kodo_retry",
                     )
                 )
-                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
                 validation_ok = self.validation.passed(validation_results)
                 validation_retried = True
                 self._log_event("validation_retry", run_id, retry_passed=validation_ok)
@@ -771,7 +772,7 @@ class ExecutionService:
         """
         if not repo_target.validation_commands:
             return _BaselineResult(failed=False, error_text=None)
-        results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+        results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
         if self.validation.passed(results):
             return _BaselineResult(failed=False, error_text=None)
         error_text = self._validation_excerpt(results)
@@ -940,7 +941,7 @@ class ExecutionService:
 
             run_env = dict(bootstrap_result.env)
             run_env.update(repo_cfg.env)
-            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env)
+            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env, timeout_seconds=repo_cfg.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
             all_changed = self.git.changed_files(repo_path)

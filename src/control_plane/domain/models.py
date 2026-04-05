@@ -40,6 +40,7 @@ class RepoTarget(BaseModel):
     validation_commands: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     allowed_base_branches: list[str] = Field(default_factory=list)
+    validation_timeout_seconds: int = 300
 
 
 class ExecutionRequest(BaseModel):

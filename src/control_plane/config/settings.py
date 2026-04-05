@@ -63,6 +63,7 @@ class RepoSettings(BaseModel):
     propose_enabled: bool = True
     local_path: str | None = None
     bootstrap_commands: list[str] | None = None  # custom bootstrap (replaces Python venv setup for non-Python repos)
+    validation_timeout_seconds: int = 300
 
 
 class Settings(BaseModel):
