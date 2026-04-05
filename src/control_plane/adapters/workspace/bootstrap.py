@@ -49,6 +49,10 @@ class RepoEnvironmentBootstrapper:
             if bootstrap_commands:
                 for cmd in bootstrap_commands:
                     commands.append(self._run_shell(cmd, cwd=repo_path, env=base))
+                # Return the venv env so callers (kodo, validation) have VIRTUAL_ENV
+                # and PATH pointing at the bootstrapped venv.
+                env = self.environment_for(repo_path, venv_dir, base_env=base)
+                return BootstrapResult(venv_path=venv_path, env=env, commands=commands)
             return BootstrapResult(venv_path=venv_path, env=base, commands=commands)
 
         # Custom bootstrap commands override Python venv setup (for non-Python repos)

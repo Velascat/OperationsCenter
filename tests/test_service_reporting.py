@@ -207,7 +207,7 @@ def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path, monk
     service.git.diff_patch = lambda repo_path: ""  # type: ignore[assignment]
     service.git.commit_all = lambda repo_path, message: (_ for _ in ()).throw(AssertionError("should not commit internal-only changes"))  # type: ignore[assignment]
     service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
-    service.kodo.run = lambda goal_file, repo_path: type(  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path, env=None: type(  # type: ignore[assignment]
         "KodoResult",
         (),
         {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},
@@ -299,7 +299,7 @@ def test_validation_retry_succeeds_moves_to_review(tmp_path: Path, monkeypatch: 
 
     kodo_call_count = 0
 
-    def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
+    def kodo_run(goal_file, repo_path, env=None):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
         stdout = f"kodo_stdout_run{kodo_call_count}"
@@ -424,7 +424,7 @@ def test_validation_retry_fails_moves_to_blocked(tmp_path: Path, monkeypatch: py
 
     kodo_call_count = 0
 
-    def kodo_run(goal_file, repo_path):  # type: ignore[no-untyped-def]
+    def kodo_run(goal_file, repo_path, env=None):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
         stdout = f"kodo_stdout_run{kodo_call_count}"
@@ -549,7 +549,7 @@ def test_no_retry_skips_initial_validation_artifact(tmp_path: Path, monkeypatch:
     service.git.commit_all = lambda repo_path, message: True  # type: ignore[assignment]
     service.git.push_branch = lambda repo_path, branch: None  # type: ignore[assignment]
     service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
-    service.kodo.run = lambda goal_file, repo_path: type("KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]})()  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path, env=None: type("KodoResult", (), {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]})()  # type: ignore[assignment]
     service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
     service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
     service.validation.run = lambda commands, cwd, env=None, **kwargs: [ValidationResult(command="pytest", exit_code=0, stdout="all passed", stderr="", duration_ms=100)]  # type: ignore[assignment]

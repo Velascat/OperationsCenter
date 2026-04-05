@@ -89,7 +89,7 @@ class KodoAdapter:
         combined = (result.stdout + result.stderr).lower()
         return any(signal in combined for signal in _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
 
-    def run(self, goal_file: Path, repo_path: Path) -> KodoRunResult:
+    def run(self, goal_file: Path, repo_path: Path, env: dict[str, str] | None = None) -> KodoRunResult:
         command = self.build_command(goal_file, repo_path)
         proc = subprocess.run(
             command,
@@ -98,15 +98,16 @@ class KodoAdapter:
             text=True,
             timeout=self.settings.timeout_seconds,
             check=False,
+            env=env,
         )
         result = KodoRunResult(proc.returncode, proc.stdout, proc.stderr, command)
 
         if result.exit_code != 0 and self._is_codex_quota_error(result):
-            result = self._run_with_claude_fallback(goal_file, repo_path)
+            result = self._run_with_claude_fallback(goal_file, repo_path, env=env)
 
         return result
 
-    def _run_with_claude_fallback(self, goal_file: Path, repo_path: Path) -> KodoRunResult:
+    def _run_with_claude_fallback(self, goal_file: Path, repo_path: Path, env: dict[str, str] | None = None) -> KodoRunResult:
         team_override = repo_path / ".kodo" / "team.json"
         team_override.parent.mkdir(exist_ok=True)
         team_override.write_text(json.dumps(_CLAUDE_FALLBACK_TEAM, indent=2))
@@ -119,6 +120,7 @@ class KodoAdapter:
                 text=True,
                 timeout=self.settings.timeout_seconds,
                 check=False,
+                env=env,
             )
             return KodoRunResult(proc.returncode, proc.stdout, proc.stderr, command)
         finally:

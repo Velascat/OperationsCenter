@@ -395,7 +395,7 @@ class ExecutionService:
 
             phase = "kodo"
             self._log_event("phase", run_id, phase=phase)
-            kodo_result = self.kodo.run(goal_file, repo_path)
+            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
             artifacts.extend(
                 self.reporter.write_kodo(
                     run_dir,
@@ -462,7 +462,7 @@ class ExecutionService:
                         # Kodo introduced the failure: keep original goal, append as feedback
                         with open(goal_file, "a") as f:
                             f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
-                kodo_result = self.kodo.run(goal_file, repo_path)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,
@@ -511,7 +511,7 @@ class ExecutionService:
                         f"Revert all changes to out-of-scope files. Keep only changes within the allowed paths.\n"
                     )
                 self._log_event("policy_retry_start", run_id, violations=policy_violations)
-                kodo_result = self.kodo.run(goal_file, repo_path)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,
@@ -1186,13 +1186,13 @@ class ExecutionService:
                 bootstrap_commands=repo_cfg.bootstrap_commands,
             )
 
-            kodo_result = self.kodo.run(goal_file, repo_path)
+            run_env = dict(bootstrap_result.env)
+            run_env.update(repo_cfg.env)
+
+            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
 
             if self.kodo.is_orchestrator_rate_limited(kodo_result):
                 return False, []
-
-            run_env = dict(bootstrap_result.env)
-            run_env.update(repo_cfg.env)
             validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
