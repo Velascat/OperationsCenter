@@ -81,6 +81,21 @@ class BacklogSignal(BaseModel):
     items: list[BacklogItem] = Field(default_factory=list)
 
 
+class LintViolation(BaseModel):
+    path: str
+    line: int
+    col: int
+    code: str
+    message: str
+
+
+class LintSignal(BaseModel):
+    status: str  # "clean", "violations", "unavailable"
+    violation_count: int = 0
+    top_violations: list[LintViolation] = Field(default_factory=list)
+    source: str | None = None
+
+
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
@@ -89,6 +104,7 @@ class RepoSignalsSnapshot(BaseModel):
     todo_signal: TodoSignal
     execution_health: ExecutionHealthSignal = Field(default_factory=ExecutionHealthSignal)
     backlog: BacklogSignal = Field(default_factory=BacklogSignal)
+    lint_signal: LintSignal = Field(default_factory=lambda: LintSignal(status="unavailable"))
 
 
 class RepoStateSnapshot(BaseModel):

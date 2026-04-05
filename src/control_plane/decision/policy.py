@@ -8,11 +8,15 @@ from control_plane.decision.models import ProposalCandidate, ProposalCandidatesA
 from control_plane.decision.suppression import suppressed_candidate
 
 
+_CONFIDENCE_RANK = {"low": 0, "medium": 1, "high": 2}
+
+
 @dataclass(frozen=True)
 class DecisionPolicyConfig:
     max_candidates: int = 3
     max_candidates_per_family: int = 1
     cooldown_minutes: int = 120
+    min_confidence: str = "low"  # Candidates below this level are suppressed
 
 
 class DecisionPolicy:
@@ -33,8 +37,23 @@ class DecisionPolicy:
         emitted_per_family: dict[str, int] = {}
         cooldown_cutoff = generated_at - timedelta(minutes=self.config.cooldown_minutes)
 
+        min_confidence_rank = _CONFIDENCE_RANK.get(self.config.min_confidence, 0)
         for spec in sorted(candidate_specs, key=lambda item: item.priority):
             candidate = self.builder.build(spec)
+            if _CONFIDENCE_RANK.get(candidate.confidence, 0) < min_confidence_rank:
+                suppressed.append(
+                    suppressed_candidate(
+                        dedup_key=candidate.dedup_key,
+                        family=candidate.family,
+                        subject=candidate.subject,
+                        reason="confidence_below_threshold",
+                        evidence={
+                            "candidate_confidence": candidate.confidence,
+                            "min_confidence": self.config.min_confidence,
+                        },
+                    )
+                )
+                continue
             if candidate.dedup_key in emitted_dedup_keys:
                 suppressed.append(
                     suppressed_candidate(

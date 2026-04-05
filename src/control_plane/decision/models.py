@@ -34,6 +34,10 @@ class ProposalCandidate(BaseModel):
     subject: str
     status: str = "emit"
     evidence: dict[str, Any] = Field(default_factory=dict)
+    confidence: str = "medium"
+    evidence_lines: list[str] = Field(default_factory=list)
+    risk_class: str = "logic"
+    expires_after_runs: int = 5
     rationale: CandidateRationale
     proposal_outline: ProposalOutline
 

@@ -152,7 +152,7 @@ def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
         ),
     )
 
-    assert "## Proposal Provenance" in draft.description
+    assert "## Provenance" in draft.description
     assert "candidate_dedup_key: candidate|test_visibility|test_signal|unknown_persistent" in draft.description
     assert "insight_run_id: ins_1" in draft.description
     assert draft.label_names == [

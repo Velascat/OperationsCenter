@@ -11,6 +11,7 @@ from control_plane.observer.models import (
     BacklogSignal,
     DependencyDriftSignal,
     ExecutionHealthSignal,
+    LintSignal,
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
@@ -52,6 +53,7 @@ class RepoObserverService:
         todo_signal_collector: RepoSignalCollector,
         execution_health_collector: RepoSignalCollector | None = None,
         backlog_collector: RepoSignalCollector | None = None,
+        lint_signal_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -63,6 +65,7 @@ class RepoObserverService:
         self.todo_signal_collector = todo_signal_collector
         self.execution_health_collector = execution_health_collector
         self.backlog_collector = backlog_collector
+        self.lint_signal_collector = lint_signal_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -114,6 +117,17 @@ class RepoObserverService:
             if self.backlog_collector is not None
             else BacklogSignal()
         )
+        lint_signal = (
+            self._collect_optional(
+                self.lint_signal_collector,
+                context,
+                "lint_signal",
+                collector_errors,
+                default=LintSignal(status="unavailable"),
+            )
+            if self.lint_signal_collector is not None
+            else LintSignal(status="unavailable")
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -123,6 +137,7 @@ class RepoObserverService:
             todo_signal=todo_signal,
             execution_health=execution_health,
             backlog=backlog,
+            lint_signal=lint_signal,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

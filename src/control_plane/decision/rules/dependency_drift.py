@@ -20,16 +20,23 @@ class DependencyDriftRule:
                 and insight.dedup_key.endswith("present|persistent")
                 and int(insight.evidence.get("consecutive_snapshots", 0)) >= self.min_consecutive_runs
             ):
+                consecutive = int(insight.evidence.get("consecutive_snapshots", 0))
                 candidates.append(
                     CandidateSpec(
                         family="dependency_drift_followup",
                         subject="dependency_drift",
                         pattern_key="present_persistent",
-                        evidence={"consecutive_snapshots": int(insight.evidence.get("consecutive_snapshots", 0))},
+                        evidence={"consecutive_snapshots": consecutive},
                         matched_rules=[
                             "dependency_drift_persistent_min_consecutive_runs",
                             "candidate_not_seen_in_cooldown_window",
                         ],
+                        confidence="high" if consecutive >= 4 else "medium",
+                        evidence_lines=[
+                            f"Dependency drift present for {consecutive} consecutive snapshots.",
+                        ],
+                        risk_class="logic",
+                        expires_after_runs=5,
                         proposal_outline=ProposalOutline(
                             title_hint="Investigate persistent dependency drift signal",
                             summary_hint=(

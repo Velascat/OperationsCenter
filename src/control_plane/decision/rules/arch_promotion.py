@@ -46,6 +46,8 @@ class ArchPromotionRule:
                     pattern_key=_slug(title),
                     evidence=dict(insight.evidence),
                     matched_rules=["arch_promotion"],
+                    risk_class="arch",
+                    expires_after_runs=10,
                     proposal_outline=ProposalOutline(
                         title_hint=title,
                         summary_hint=summary,

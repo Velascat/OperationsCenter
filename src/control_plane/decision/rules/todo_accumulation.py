@@ -13,7 +13,10 @@ class TodoAccumulationRule:
         for insight in insights:
             if insight.kind != "todo_concentration":
                 continue
-            if insight.dedup_key.endswith("count_changed") and int(insight.evidence.get("current_total", 0)) > int(insight.evidence.get("previous_total", 0)):
+            current_total = int(insight.evidence.get("current_total", 0))
+            previous_total = int(insight.evidence.get("previous_total", 0))
+            if insight.dedup_key.endswith("count_changed") and current_total > previous_total:
+                delta = current_total - previous_total
                 candidates.append(
                     CandidateSpec(
                         family="todo_accumulation",
@@ -24,6 +27,12 @@ class TodoAccumulationRule:
                             "todo_fixme_total_increased",
                             "candidate_not_seen_in_cooldown_window",
                         ],
+                        confidence="medium",
+                        evidence_lines=[
+                            f"TODO/FIXME total increased by {delta} (from {previous_total} to {current_total}).",
+                        ],
+                        risk_class="style",
+                        expires_after_runs=4,
                         proposal_outline=ProposalOutline(
                             title_hint="Investigate recent TODO/FIXME accumulation",
                             summary_hint=(
@@ -37,6 +46,7 @@ class TodoAccumulationRule:
                     )
                 )
             if insight.dedup_key.endswith("fixme|present"):
+                fixme_count = int(insight.evidence.get("fixme_count", 0))
                 candidates.append(
                     CandidateSpec(
                         family="todo_accumulation",
@@ -47,6 +57,12 @@ class TodoAccumulationRule:
                             "fixme_present",
                             "candidate_not_seen_in_cooldown_window",
                         ],
+                        confidence="medium",
+                        evidence_lines=[
+                            f"{fixme_count} FIXME marker(s) present in the codebase.",
+                        ],
+                        risk_class="style",
+                        expires_after_runs=4,
                         proposal_outline=ProposalOutline(
                             title_hint="Review persistent FIXME presence",
                             summary_hint=(

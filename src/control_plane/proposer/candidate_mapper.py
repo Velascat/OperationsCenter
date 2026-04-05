@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
+from control_plane.autonomy_tiers.config import AutonomyTiersConfig, get_family_tier, load_tiers_config
 from control_plane.config.settings import Settings
 from control_plane.decision.models import ProposalCandidate
 from control_plane.proposer.provenance import ProposalProvenance
@@ -23,11 +25,23 @@ class ProposalCandidateMapper:
         candidate: ProposalCandidate,
         settings: Settings,
         provenance: ProposalProvenance,
+        tiers_config: AutonomyTiersConfig | None = None,
     ) -> PlaneTaskDraft:
+        if tiers_config is None:
+            tiers_config = load_tiers_config()
         repo_key = self._repo_key_for_candidate(settings=settings, provenance=provenance)
         repo_cfg = settings.repos[repo_key]
         task_kind = self._task_kind_for_candidate(candidate)
-        state = "Ready for AI" if task_kind == "goal" else "Backlog"
+        tier = get_family_tier(candidate.family, tiers_config)
+        if tier <= 0:
+            # Tier 0 families should not be auto-created; caller is responsible for skipping them.
+            # Defensive fallback: put in Backlog so it's visible but not auto-executed.
+            state = "Backlog"
+        elif tier >= 2:
+            state = "Ready for AI"
+        else:
+            # Tier 1: respect risk_class as secondary heuristic
+            state = "Ready for AI" if candidate.risk_class == "style" else "Backlog"
         allowed_paths = self._allowed_paths(repo_key)
         lines = [
             "## Execution",
@@ -42,13 +56,18 @@ class ProposalCandidateMapper:
         lines.extend(["", "## Goal", candidate.proposal_outline.summary_hint])
         lines.extend(["", "## Constraints"])
         lines.extend(self._constraints_for_candidate(candidate))
-        lines.extend(["", "## Proposal Provenance"])
+        expires_at = (datetime.now(UTC) + timedelta(days=candidate.expires_after_runs * 2)).strftime("%Y-%m-%d")
+        lines.extend(["", "## Provenance"])
         lines.extend(
             [
                 f"source: {provenance.source}",
                 f"source_family: {provenance.source_family}",
                 f"candidate_id: {provenance.candidate_id}",
                 f"candidate_dedup_key: {provenance.candidate_dedup_key}",
+                f"confidence: {candidate.confidence}",
+                f"risk_class: {candidate.risk_class}",
+                f"autonomy_tier: {tier}",
+                f"expires_at: {expires_at}",
                 "observer_run_ids:",
             ]
         )
@@ -61,6 +80,10 @@ class ProposalCandidateMapper:
                 f"proposer_run_id: {provenance.proposer_run_id}",
             ]
         )
+        if candidate.evidence_lines:
+            lines.extend(["", "## Evidence"])
+            for ev_line in candidate.evidence_lines:
+                lines.append(f"- {ev_line}")
         return PlaneTaskDraft(
             name=candidate.proposal_outline.title_hint,
             description="\n".join(lines).strip(),
@@ -125,6 +148,11 @@ class ProposalCandidateMapper:
             "observation_coverage": [
                 "- Keep the change scoped to restoring missing autonomy visibility.",
                 "- Preserve existing observer and insight contracts unless directly required.",
+            ],
+            "lint_fix": [
+                "- Use `ruff check --fix` to auto-fix where possible, then manually resolve remaining violations.",
+                "- Keep the change scoped to lint fixes only — do not refactor or change logic.",
+                "- Do not suppress violations with `# noqa` unless there is a documented reason.",
             ],
         }
         return family_scopes.get(

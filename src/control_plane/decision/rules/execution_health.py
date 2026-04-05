@@ -29,6 +29,7 @@ class ExecutionHealthRule:
             if pattern == "high_no_op_rate":
                 no_op_rate = insight.evidence.get("no_op_rate", 0)
                 total = insight.evidence.get("total_runs", 0)
+                no_op_pct = int(float(no_op_rate) * 100)
                 candidates.append(
                     CandidateSpec(
                         family="execution_health_followup",
@@ -36,6 +37,12 @@ class ExecutionHealthRule:
                         pattern_key="high_no_op_rate",
                         evidence=dict(insight.evidence),
                         matched_rules=["execution_health_high_no_op_rate"],
+                        confidence="high" if no_op_pct >= 80 else "medium",
+                        evidence_lines=[
+                            f"{no_op_pct}% of last {total} runs for '{repo}' were no-ops (no material changes).",
+                        ],
+                        risk_class="logic",
+                        expires_after_runs=5,
                         proposal_outline=ProposalOutline(
                             title_hint=(
                                 f"Review task quality for {repo}: "
@@ -65,6 +72,12 @@ class ExecutionHealthRule:
                         pattern_key="persistent_validation_failures",
                         evidence=dict(insight.evidence),
                         matched_rules=["execution_health_persistent_validation_failures"],
+                        confidence="high",
+                        evidence_lines=[
+                            f"{fail_count} recent runs for '{repo}' completed but failed post-execution validation.",
+                        ],
+                        risk_class="logic",
+                        expires_after_runs=3,
                         proposal_outline=ProposalOutline(
                             title_hint=(
                                 f"Fix recurring validation failures in {repo} "

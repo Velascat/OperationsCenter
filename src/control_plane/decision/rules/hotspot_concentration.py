@@ -38,6 +38,12 @@ class HotspotConcentrationRule:
                         "hotspot_repeated_presence_min_runs",
                         "candidate_not_seen_in_cooldown_window",
                     ],
+                    confidence="medium",
+                    evidence_lines=[
+                        f"'{subject}' appeared in top hotspots across {appearances} recent snapshots.",
+                    ],
+                    risk_class="structural",
+                    expires_after_runs=5,
                     proposal_outline=ProposalOutline(
                         title_hint=f"Investigate repeated hotspot concentration in {subject}",
                         summary_hint=(

@@ -227,7 +227,7 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     ]
     assert matching_issues
     description = str(matching_issues[0]["description"])
-    assert "## Proposal Provenance" in description
+    assert "## Provenance" in description
     assert f"insight_run_id: {insight_artifact.run_id}" in description
     assert f"decision_run_id: {decision_artifact.run_id}" in description
     assert "source: autonomy-proposer" in description

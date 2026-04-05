@@ -41,6 +41,8 @@ class BacklogPromotionRule:
                     pattern_key=_slug(title),
                     evidence=dict(insight.evidence),
                     matched_rules=["backlog_promotion"],
+                    risk_class="logic",
+                    expires_after_runs=7,
                     proposal_outline=ProposalOutline(
                         title_hint=title,
                         summary_hint=summary,

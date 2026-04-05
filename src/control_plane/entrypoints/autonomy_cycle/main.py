@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 from control_plane.adapters.plane import PlaneClient
@@ -16,7 +18,9 @@ from control_plane.insights.derivers.dependency_drift import DependencyDriftDeri
 from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
 from control_plane.insights.derivers.execution_health import ExecutionHealthDeriver
 from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
+from control_plane.insights.derivers.lint_drift import LintDriftDeriver
 from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
+from control_plane.insights.derivers.proposal_outcome import ProposalOutcomeDeriver
 from control_plane.insights.derivers.test_continuity import TestContinuityDeriver
 from control_plane.insights.derivers.todo_concentration import TodoConcentrationDeriver
 from control_plane.insights.loader import SnapshotLoader
@@ -27,6 +31,7 @@ from control_plane.observer.collectors.dependency_drift import DependencyDriftCo
 from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector
+from control_plane.observer.collectors.lint_signal import LintSignalCollector
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
 from control_plane.observer.collectors.test_signal import TestSignalCollector
 from control_plane.observer.collectors.todo_signal import TodoSignalCollector
@@ -48,6 +53,7 @@ def build_observer_service() -> RepoObserverService:
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
         execution_health_collector=ExecutionArtifactCollector(),
+        lint_signal_collector=LintSignalCollector(),
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )
@@ -74,6 +80,8 @@ def build_insight_service() -> InsightEngineService:
             TodoConcentrationDeriver(normalizer),
             ObservationCoverageDeriver(normalizer),
             ExecutionHealthDeriver(normalizer, validation_failure_threshold=validation_threshold),
+            LintDriftDeriver(normalizer),
+            ProposalOutcomeDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )
@@ -192,11 +200,27 @@ def main() -> None:
 
     if dry_run:
         print("\n  Dry-run mode: proposer stage skipped. Use --execute to create Plane tasks.")
+        _write_cycle_report(
+            snapshot=snapshot,
+            insight_artifact=insight_artifact,
+            candidates_artifact=candidates_artifact,
+            emitted=emitted,
+            prop_artifact=None,
+            dry_run=True,
+        )
         return
 
     # --- Stage 4: Propose ---
     if not emitted:
         print("\n[4/4] propose   → skipped (no emitted candidates)")
+        _write_cycle_report(
+            snapshot=snapshot,
+            insight_artifact=insight_artifact,
+            candidates_artifact=candidates_artifact,
+            emitted=emitted,
+            prop_artifact=None,
+            dry_run=False,
+        )
         return
 
     client = PlaneClient(
@@ -223,8 +247,128 @@ def main() -> None:
             print("\n  Created tasks:")
             for r in prop_artifact.created:
                 print(f"    • {r.plane_title} (id={r.plane_issue_id})")
+        _write_cycle_report(
+            snapshot=snapshot,
+            insight_artifact=insight_artifact,
+            candidates_artifact=candidates_artifact,
+            emitted=emitted,
+            prop_artifact=prop_artifact,
+            dry_run=False,
+        )
     finally:
         client.close()
+
+
+def _write_cycle_report(
+    *,
+    snapshot,
+    insight_artifact,
+    candidates_artifact,
+    emitted: list,
+    prop_artifact,
+    dry_run: bool,
+) -> None:
+    from collections import Counter
+    from control_plane.execution import UsageStore
+
+    report_dir = Path("logs/autonomy_cycle")
+    report_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    report_path = report_dir / f"cycle_{ts}.json"
+
+    # Signals collected summary
+    signals = snapshot.signals
+    signals_collected = []
+    if signals.test_signal.status != "unknown":
+        signals_collected.append("test_signal")
+    if signals.dependency_drift.status not in ("unknown", "not_available"):
+        signals_collected.append("dependency_drift")
+    if signals.todo_signal.todo_count + signals.todo_signal.fixme_count > 0:
+        signals_collected.append("todo_signal")
+    if signals.execution_health.total_runs > 0:
+        signals_collected.append("execution_health")
+    if signals.backlog.items:
+        signals_collected.append("backlog")
+    if signals.lint_signal.status != "unavailable":
+        signals_collected.append("lint_signal")
+
+    # Insights by kind
+    insights_by_kind: Counter = Counter(i.kind for i in insight_artifact.insights)
+
+    # Suppression reason breakdown
+    suppression_reasons: Counter = Counter(s.reason for s in candidates_artifact.suppressed)
+
+    # Created task details
+    created_tasks = []
+    if prop_artifact is not None:
+        for r in prop_artifact.created:
+            created_tasks.append({
+                "id": r.plane_issue_id,
+                "title": r.plane_title,
+                "family": r.family,
+                "dedup_key": r.dedup_key,
+            })
+
+    # Guard rail summary
+    usage_store = UsageStore()
+    try:
+        budget_remaining = usage_store.remaining_exec_capacity(now=datetime.now(UTC))
+    except Exception:
+        budget_remaining = None
+    from control_plane.decision.service import _DEFAULT_ALLOWED_FAMILIES, ALL_FAMILIES
+    gated_families = sorted(ALL_FAMILIES - _DEFAULT_ALLOWED_FAMILIES)
+
+    report = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "dry_run": dry_run,
+        "repo": snapshot.repo.name,
+        "stages": {
+            "observe": {
+                "run_id": snapshot.run_id,
+                "collector_errors": len(snapshot.collector_errors),
+                "signals_collected": signals_collected,
+            },
+            "insights": {
+                "run_id": insight_artifact.run_id,
+                "insights_emitted": len(insight_artifact.insights),
+                "insights_by_kind": dict(insights_by_kind),
+            },
+            "decide": {
+                "run_id": candidates_artifact.run_id,
+                "candidates_emitted": len(emitted),
+                "candidates_suppressed": len(candidates_artifact.suppressed),
+                "suppression_reasons": dict(suppression_reasons),
+                "emitted_families": [c.family for c in emitted],
+            },
+            "propose": {
+                "run_id": prop_artifact.run_id if prop_artifact else None,
+                "created": len(prop_artifact.created) if prop_artifact else 0,
+                "skipped": len(prop_artifact.skipped) if prop_artifact else 0,
+                "failed": len(prop_artifact.failed) if prop_artifact else 0,
+                "tasks": created_tasks,
+            },
+        },
+        "signals": {
+            "test": signals.test_signal.status,
+            "dependency_drift": signals.dependency_drift.status,
+            "lint": {
+                "status": signals.lint_signal.status,
+                "violation_count": signals.lint_signal.violation_count,
+            },
+            "execution_health": {
+                "total_runs": signals.execution_health.total_runs,
+                "no_op_count": signals.execution_health.no_op_count,
+                "validation_failed_count": signals.execution_health.validation_failed_count,
+            },
+        },
+        "guard_rail_summary": {
+            "budget_remaining": budget_remaining,
+            "families_gated": gated_families,
+            "cycle_health": "nominal" if len(snapshot.collector_errors) == 0 else "degraded",
+        },
+    }
+    report_path.write_text(json.dumps(report, indent=2))
+    print(f"\n  Cycle report  → {report_path}")
 
 
 if __name__ == "__main__":

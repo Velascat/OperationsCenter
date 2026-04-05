@@ -21,8 +21,29 @@ _BRANCH_TASK_ID_RE = re.compile(
 _MERGE_CONFLICT_RE = re.compile(r"merge conflict|unresolved .* conflict", re.IGNORECASE)
 
 PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
+PROPOSAL_FEEDBACK_DIR = Path("state/proposal_feedback")
 REVIEW_TIMEOUT_SECONDS = 86400  # 1 day
 MAX_CI_FIX_ATTEMPTS = 2
+
+
+def _write_proposal_feedback(state: dict, outcome: str, merge_reason: str | None) -> None:
+    """Write a feedback record so ProposalOutcomeDeriver can track proposal acceptance rates."""
+    try:
+        PROPOSAL_FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
+        task_id = state["task_id"]
+        record = {
+            "recorded_at": datetime.now(UTC).isoformat(),
+            "task_id": task_id,
+            "pr_number": state.get("pr_number"),
+            "outcome": outcome,
+            "merge_reason": merge_reason,
+            "ci_fix_needed": state.get("ci_fix_attempts", 0) > 0,
+            "self_review_loops": state.get("self_review_loops", 0),
+            "human_review_loops": state.get("loop_count", 0),
+        }
+        (PROPOSAL_FEEDBACK_DIR / f"{task_id}.json").write_text(json.dumps(record, indent=2))
+    except Exception:
+        pass  # feedback is best-effort; never block the merge path
 
 
 def _bot_marker(settings) -> str:
@@ -140,6 +161,8 @@ def _merge_and_finalize(
     except Exception as exc:
         logger.warning(json.dumps({"event": "pr_merge_failed", "task_id": task_id, "error": str(exc)}))
         return
+
+    _write_proposal_feedback(state, outcome="merged", merge_reason=reason)
 
     try:
         gh.delete_branch(owner, repo, branch)
@@ -338,6 +361,7 @@ def _escalate_to_human(
     state["phase"] = "human_review"
     state_file.write_text(json.dumps(state, indent=2))
     logger.info(json.dumps({"event": "escalated_to_human_review", "task_id": task_id}))
+    _write_proposal_feedback(state, outcome="escalated", merge_reason=None)
 
 
 def _process_human_review(

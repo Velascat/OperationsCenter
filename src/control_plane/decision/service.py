@@ -13,6 +13,7 @@ from control_plane.decision.rules.backlog_promotion import BacklogPromotionRule
 from control_plane.decision.rules.dependency_drift import DependencyDriftRule
 from control_plane.decision.rules.execution_health import ExecutionHealthRule
 from control_plane.decision.rules.hotspot_concentration import HotspotConcentrationRule
+from control_plane.decision.rules.lint_fix import LintFixRule
 from control_plane.decision.rules.observation_coverage import ObservationCoverageRule
 from control_plane.decision.rules.test_visibility import TestVisibilityRule
 from control_plane.decision.rules.todo_accumulation import TodoAccumulationRule
@@ -26,8 +27,8 @@ class DecisionLoaderProtocol(Protocol):
         ...
 
 
-_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup"})
-ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
+_DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix"})
+ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "lint_fix", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,9 @@ def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[ty
         obs_min = tuning_config.get_int("observation_coverage", "min_consecutive_runs", 2)
         test_min = tuning_config.get_int("test_visibility", "min_consecutive_runs", 3)
         drift_min = tuning_config.get_int("dependency_drift", "min_consecutive_runs", 2)
+    lint_min = 5
+    if tuning_config is not None:
+        lint_min = tuning_config.get_int("lint_fix", "min_violations", 5)
     return [
         ObservationCoverageRule(min_consecutive_runs=obs_min),
         TestVisibilityRule(min_consecutive_runs=test_min),
@@ -60,6 +64,7 @@ def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[ty
         HotspotConcentrationRule(min_repeated_runs=2),
         TodoAccumulationRule(),
         ExecutionHealthRule(),
+        LintFixRule(min_violations=lint_min),
         BacklogPromotionRule(),
         ArchPromotionRule(),
     ]

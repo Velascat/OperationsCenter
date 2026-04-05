@@ -21,6 +21,7 @@ class ObservationCoverageRule:
                 and int(insight.evidence.get("consecutive_snapshots", 0)) >= self.min_consecutive_runs
             ):
                 signal = str(insight.evidence.get("signal", insight.subject))
+                consecutive = int(insight.evidence.get("consecutive_snapshots", 0))
                 candidates.append(
                     CandidateSpec(
                         family="observation_coverage",
@@ -31,6 +32,12 @@ class ObservationCoverageRule:
                             "observation_signal_repeated_unavailable",
                             "candidate_not_seen_in_cooldown_window",
                         ],
+                        confidence="high" if consecutive >= 3 else "medium",
+                        evidence_lines=[
+                            f"Signal '{signal}' unavailable for {consecutive} consecutive snapshots.",
+                        ],
+                        risk_class="logic",
+                        expires_after_runs=5,
                         proposal_outline=ProposalOutline(
                             title_hint=f"Restore repeated missing {signal} coverage",
                             summary_hint=(

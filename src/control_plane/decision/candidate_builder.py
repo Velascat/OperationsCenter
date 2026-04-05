@@ -14,6 +14,10 @@ class CandidateSpec:
     matched_rules: list[str]
     proposal_outline: ProposalOutline
     priority: tuple[int, int, str] = field(default_factory=lambda: (99, 99, ""))
+    confidence: str = "medium"
+    evidence_lines: list[str] = field(default_factory=list)
+    risk_class: str = "logic"
+    expires_after_runs: int = 5
 
 
 class CandidateBuilder:
@@ -27,6 +31,10 @@ class CandidateBuilder:
             subject=spec.subject,
             status="emit",
             evidence=spec.evidence,
+            confidence=spec.confidence,
+            evidence_lines=list(spec.evidence_lines),
+            risk_class=spec.risk_class,
+            expires_after_runs=spec.expires_after_runs,
             rationale=CandidateRationale(matched_rules=spec.matched_rules, suppressed_by=[]),
             proposal_outline=spec.proposal_outline,
         )

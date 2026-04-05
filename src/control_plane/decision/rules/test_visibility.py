@@ -16,10 +16,11 @@ class TestVisibilityRule:
         for insight in insights:
             if insight.kind == "test_status_continuity" and insight.subject == "test_signal":
                 current_status = str(insight.evidence.get("current_status", ""))
+                consecutive = int(insight.evidence.get("consecutive_snapshots", 0))
                 if (
                     current_status == "unknown"
                     and insight.dedup_key.endswith("persistent")
-                    and int(insight.evidence.get("consecutive_snapshots", 0)) >= self.min_consecutive_runs
+                    and consecutive >= self.min_consecutive_runs
                 ):
                     candidates.append(
                         CandidateSpec(
@@ -28,12 +29,18 @@ class TestVisibilityRule:
                             pattern_key="unknown_persistent",
                             evidence={
                                 "current_status": current_status,
-                                "consecutive_snapshots": int(insight.evidence.get("consecutive_snapshots", 0)),
+                                "consecutive_snapshots": consecutive,
                             },
                             matched_rules=[
                                 "test_unknown_persistence_min_consecutive_runs",
                                 "candidate_not_seen_in_cooldown_window",
                             ],
+                            confidence="high" if consecutive >= 5 else "medium",
+                            evidence_lines=[
+                                f"Test signal status 'unknown' for {consecutive} consecutive snapshots.",
+                            ],
+                            risk_class="logic",
+                            expires_after_runs=5,
                             proposal_outline=ProposalOutline(
                                 title_hint="Improve test signal visibility for control-plane",
                                 summary_hint=(
@@ -60,6 +67,12 @@ class TestVisibilityRule:
                                 "test_status_transition_failed",
                                 "candidate_not_seen_in_cooldown_window",
                             ],
+                            confidence="high",
+                            evidence_lines=[
+                                "Test status transitioned from 'passed' to 'failed'.",
+                            ],
+                            risk_class="logic",
+                            expires_after_runs=3,
                             proposal_outline=ProposalOutline(
                                 title_hint="Investigate recent test status regression",
                                 summary_hint=(
@@ -77,6 +90,7 @@ class TestVisibilityRule:
                 and insight.subject == "test_signal"
                 and insight.dedup_key.endswith("persistent_unavailable")
             ):
+                cov_consecutive = int(insight.evidence.get("consecutive_snapshots", 0))
                 candidates.append(
                     CandidateSpec(
                         family="test_visibility",
@@ -84,12 +98,18 @@ class TestVisibilityRule:
                         pattern_key="coverage_unavailable_persistent",
                         evidence={
                             "signal": "test_signal",
-                            "consecutive_snapshots": int(insight.evidence.get("consecutive_snapshots", 0)),
+                            "consecutive_snapshots": cov_consecutive,
                         },
                         matched_rules=[
                             "test_signal_unavailable_repeated",
                             "candidate_not_seen_in_cooldown_window",
                         ],
+                        confidence="high" if cov_consecutive >= 3 else "medium",
+                        evidence_lines=[
+                            f"Test signal unavailable in observer for {cov_consecutive} consecutive snapshots.",
+                        ],
+                        risk_class="logic",
+                        expires_after_runs=5,
                         proposal_outline=ProposalOutline(
                             title_hint="Restore repeated missing test signal coverage",
                             summary_hint=(
