@@ -8,6 +8,7 @@ from control_plane.decision.candidate_builder import CandidateBuilder
 from control_plane.decision.artifact_writer import DecisionArtifactWriter
 from control_plane.decision.models import DecisionRepoRef, ProposalCandidatesArtifact, SuppressedCandidate
 from control_plane.decision.policy import DecisionPolicy, DecisionPolicyConfig
+from control_plane.decision.rules.arch_promotion import ArchPromotionRule
 from control_plane.decision.rules.backlog_promotion import BacklogPromotionRule
 from control_plane.decision.rules.dependency_drift import DependencyDriftRule
 from control_plane.decision.rules.execution_health import ExecutionHealthRule
@@ -26,7 +27,7 @@ class DecisionLoaderProtocol(Protocol):
 
 
 _DEFAULT_ALLOWED_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup"})
-ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "hotspot_concentration", "todo_accumulation", "backlog_promotion"})
+ALL_FAMILIES: frozenset[str] = frozenset({"observation_coverage", "test_visibility", "dependency_drift", "execution_health_followup", "hotspot_concentration", "todo_accumulation", "backlog_promotion", "arch_promotion"})
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ def _build_rules(tuning_config: TuningConfig | None) -> list:  # type: ignore[ty
         TodoAccumulationRule(),
         ExecutionHealthRule(),
         BacklogPromotionRule(),
+        ArchPromotionRule(),
     ]
 
 
