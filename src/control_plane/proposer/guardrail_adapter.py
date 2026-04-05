@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from control_plane.adapters.plane import PlaneClient
 from control_plane.execution import UsageStore
 from control_plane.proposer.result_models import ProposalResultsArtifact
+
+_RECENTLY_DONE_WINDOW_DAYS = 7
 
 
 @dataclass(frozen=True)
@@ -22,10 +24,12 @@ class ProposerGuardrailAdapter:
         *,
         proposer_root: Path | None = None,
         cooldown_minutes: int = 120,
+        recently_done_window_days: int = _RECENTLY_DONE_WINDOW_DAYS,
         usage_store: UsageStore | None = None,
     ) -> None:
         self.proposer_root = proposer_root or Path("tools/report/control_plane/proposer")
         self.cooldown_minutes = cooldown_minutes
+        self.recently_done_window_days = recently_done_window_days
         self._usage_store = usage_store
 
     def evaluate(self, *, client: PlaneClient, dedup_key: str, title: str, now: datetime) -> GuardrailResult:
@@ -49,6 +53,17 @@ class ProposerGuardrailAdapter:
                 allowed=False,
                 reason="existing_open_equivalent_task",
                 evidence={"plane_issue_id": open_match[0], "plane_title": open_match[1]},
+            )
+        done_match = self._find_recently_done_match(client, dedup_key=dedup_key, title=title, now=now)
+        if done_match is not None:
+            return GuardrailResult(
+                allowed=False,
+                reason="recently_completed_equivalent_task",
+                evidence={
+                    "plane_issue_id": done_match[0],
+                    "plane_title": done_match[1],
+                    "recently_done_window_days": self.recently_done_window_days,
+                },
             )
         last_created = self._last_created_at(dedup_key)
         if last_created is not None:
@@ -74,6 +89,44 @@ class ProposerGuardrailAdapter:
                 state_name = str(state.get("name", "")).strip().lower()
             if state_name in {"done", "cancelled"}:
                 continue
+            name = str(issue.get("name", "")).strip().lower()
+            description = str(issue.get("description") or issue.get("description_stripped") or "")
+            if name == title_normalized:
+                return str(issue.get("id")), str(issue.get("name", ""))
+            for line in description.splitlines():
+                if line.strip().lower() == f"candidate_dedup_key: {key_normalized}":
+                    return str(issue.get("id")), str(issue.get("name", ""))
+                if line.strip().lower() == f"- proposal_dedup_key: {key_normalized}":
+                    return str(issue.get("id")), str(issue.get("name", ""))
+        return None
+
+    def _find_recently_done_match(
+        self, client: PlaneClient, *, dedup_key: str, title: str, now: datetime
+    ) -> tuple[str, str] | None:
+        """Return (id, title) of any Done/Cancelled task matching by title or dedup_key
+        that was updated within recently_done_window_days."""
+        if self.recently_done_window_days <= 0:
+            return None
+        cutoff = now - timedelta(days=self.recently_done_window_days)
+        title_normalized = title.strip().lower()
+        key_normalized = dedup_key.strip().lower()
+        for issue in client.list_issues():
+            state_name = ""
+            state = issue.get("state")
+            if isinstance(state, dict):
+                state_name = str(state.get("name", "")).strip().lower()
+            if state_name not in {"done", "cancelled"}:
+                continue
+            updated_raw = issue.get("updated_at") or issue.get("completed_at") or ""
+            if updated_raw:
+                try:
+                    updated_at = datetime.fromisoformat(str(updated_raw).replace("Z", "+00:00"))
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=timezone.utc)
+                    if updated_at < cutoff:
+                        continue
+                except ValueError:
+                    pass
             name = str(issue.get("name", "")).strip().lower()
             description = str(issue.get("description") or issue.get("description_stripped") or "")
             if name == title_normalized:

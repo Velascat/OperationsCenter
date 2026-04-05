@@ -306,3 +306,144 @@ def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> 
     assert len(artifact.created) == 1
     assert len(artifact.failed) == 1
     assert artifact.failed[0].reason == "plane_create_failed"
+
+
+# ── recently_done guard ───────────────────────────────────────────────────────
+
+
+def _guardrail(
+    issues: list[dict[str, object]],
+    *,
+    tmp_path: Path,
+    recently_done_window_days: int = 7,
+) -> ProposerGuardrailAdapter:
+    return ProposerGuardrailAdapter(
+        proposer_root=tmp_path / "proposer",
+        recently_done_window_days=recently_done_window_days,
+        usage_store=UsageStore(tmp_path / "usage.json"),
+        _issues_override=issues,
+    )
+
+
+def test_recently_done_task_blocks_reproposal(tmp_path: Path) -> None:
+    """A Done task updated within the window suppresses a new proposal."""
+    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from unittest.mock import MagicMock
+
+    now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
+    client = MagicMock()
+    client.list_issues.return_value = [
+        {
+            "id": "OLD-1",
+            "name": "Add tests for client.py",
+            "description": "",
+            "state": {"name": "Done"},
+            "updated_at": "2026-04-04T10:00:00+00:00",  # 1 day ago, within 7-day window
+        }
+    ]
+    guardrail = ProposerGuardrailAdapter(
+        proposer_root=tmp_path / "proposer",
+        recently_done_window_days=7,
+        usage_store=UsageStore(tmp_path / "usage.json"),
+    )
+    result = guardrail.evaluate(
+        client=client,
+        dedup_key="candidate|test_coverage|client_py|persistent",
+        title="Add tests for client.py",
+        now=now,
+    )
+    assert not result.allowed
+    assert result.reason == "recently_completed_equivalent_task"
+    assert result.evidence["plane_issue_id"] == "OLD-1"
+    assert result.evidence["recently_done_window_days"] == 7
+
+
+def test_old_done_task_outside_window_does_not_block(tmp_path: Path) -> None:
+    """A Done task updated outside the window does not suppress."""
+    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from unittest.mock import MagicMock
+
+    now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
+    client = MagicMock()
+    client.list_issues.return_value = [
+        {
+            "id": "OLD-2",
+            "name": "Add tests for client.py",
+            "description": "",
+            "state": {"name": "Done"},
+            "updated_at": "2026-03-20T10:00:00+00:00",  # 16 days ago, outside 7-day window
+        }
+    ]
+    guardrail = ProposerGuardrailAdapter(
+        proposer_root=tmp_path / "proposer",
+        recently_done_window_days=7,
+        usage_store=UsageStore(tmp_path / "usage.json"),
+    )
+    result = guardrail.evaluate(
+        client=client,
+        dedup_key="candidate|test_coverage|client_py|persistent",
+        title="Add tests for client.py",
+        now=now,
+    )
+    assert result.allowed
+
+
+def test_recently_done_window_zero_disables_guard(tmp_path: Path) -> None:
+    """recently_done_window_days=0 disables the guard entirely."""
+    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from unittest.mock import MagicMock
+
+    now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
+    client = MagicMock()
+    client.list_issues.return_value = [
+        {
+            "id": "OLD-3",
+            "name": "Add tests for client.py",
+            "description": "",
+            "state": {"name": "Done"},
+            "updated_at": "2026-04-05T01:00:00+00:00",  # today, but window=0
+        }
+    ]
+    guardrail = ProposerGuardrailAdapter(
+        proposer_root=tmp_path / "proposer",
+        recently_done_window_days=0,
+        usage_store=UsageStore(tmp_path / "usage.json"),
+    )
+    result = guardrail.evaluate(
+        client=client,
+        dedup_key="candidate|test_coverage|client_py|persistent",
+        title="Add tests for client.py",
+        now=now,
+    )
+    assert result.allowed
+
+
+def test_recently_done_matches_by_dedup_key_in_description(tmp_path: Path) -> None:
+    """Done task matched by dedup_key in description (not title) also blocks."""
+    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from unittest.mock import MagicMock
+
+    now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
+    client = MagicMock()
+    client.list_issues.return_value = [
+        {
+            "id": "OLD-4",
+            "name": "Some other title",
+            "description": "candidate_dedup_key: candidate|lint_fix|src|persistent",
+            "state": {"name": "Done"},
+            "updated_at": "2026-04-03T10:00:00+00:00",
+        }
+    ]
+    guardrail = ProposerGuardrailAdapter(
+        proposer_root=tmp_path / "proposer",
+        recently_done_window_days=7,
+        usage_store=UsageStore(tmp_path / "usage.json"),
+    )
+    result = guardrail.evaluate(
+        client=client,
+        dedup_key="candidate|lint_fix|src|persistent",
+        title="Fix lint issues in src/",
+        now=now,
+    )
+    assert not result.allowed
+    assert result.reason == "recently_completed_equivalent_task"
