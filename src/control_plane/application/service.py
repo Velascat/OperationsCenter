@@ -1013,6 +1013,7 @@ class ExecutionService:
             self.kodo.write_goal_file(goal_file, combined_goal)
 
             repo_cfg = self.settings.repos[repo_key]
+            repo_target = repo_cfg
             bootstrap_result = self.bootstrapper.prepare(
                 repo_path,
                 python_binary=repo_cfg.python_binary,
@@ -1030,7 +1031,7 @@ class ExecutionService:
 
             run_env = dict(bootstrap_result.env)
             run_env.update(repo_cfg.env)
-            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env, timeout_seconds=repo_cfg.validation_timeout_seconds)
+            validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
             all_changed = self.git.changed_files(repo_path)
