@@ -40,11 +40,18 @@ class _SelfReviewVerdict:
 class _BaselineResult:
     """Outcome of validation run on the clean checkout before kodo executes."""
 
-    __slots__ = ("failed", "error_text")
+    __slots__ = ("failed", "error_text", "validation_results")
 
-    def __init__(self, *, failed: bool, error_text: str | None) -> None:
+    def __init__(
+        self,
+        *,
+        failed: bool,
+        error_text: str | None,
+        validation_results: list["ValidationResult"] | None = None,
+    ) -> None:
         self.failed = failed
         self.error_text = error_text
+        self.validation_results = validation_results
 
 
 class ExecutionService:
@@ -75,6 +82,7 @@ class ExecutionService:
             validation_commands=repo_cfg.validation_commands,
             env=repo_cfg.env,
             allowed_base_branches=repo_cfg.allowed_base_branches,
+            validation_timeout_seconds=repo_cfg.validation_timeout_seconds,
         )
 
     def run_task(
@@ -339,7 +347,9 @@ class ExecutionService:
             fix_validation_task_id: str | None = None
             if baseline.failed and baseline.error_text:
                 fix_validation_task_id = self._maybe_create_fix_validation_task(
-                    plane_client, task, baseline.error_text, run_id
+                    plane_client, task, baseline.error_text, run_id,
+                    validation_results=baseline.validation_results,
+                    repo_target=repo_target,
                 )
 
             phase = "kodo"
@@ -384,7 +394,7 @@ class ExecutionService:
 
             phase = "validation"
             self._log_event("phase", run_id, phase=phase)
-            validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+            validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
             validation_retried = False
@@ -421,7 +431,7 @@ class ExecutionService:
                         prefix="kodo_retry",
                     )
                 )
-                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+                validation_results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
                 validation_ok = self.validation.passed(validation_results)
                 validation_retried = True
                 self._log_event("validation_retry", run_id, retry_passed=validation_ok)
@@ -771,12 +781,12 @@ class ExecutionService:
         """
         if not repo_target.validation_commands:
             return _BaselineResult(failed=False, error_text=None)
-        results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env)
+        results = self.validation.run(repo_target.validation_commands, repo_path, env=run_env, timeout_seconds=repo_target.validation_timeout_seconds)
         if self.validation.passed(results):
-            return _BaselineResult(failed=False, error_text=None)
+            return _BaselineResult(failed=False, error_text=None, validation_results=None)
         error_text = self._validation_excerpt(results)
         self._log_event("baseline_validation_failed", run_id, error_text=error_text or "")
-        return _BaselineResult(failed=True, error_text=error_text)
+        return _BaselineResult(failed=True, error_text=error_text, validation_results=results)
 
     def _maybe_create_fix_validation_task(
         self,
@@ -784,6 +794,9 @@ class ExecutionService:
         task: "BoardTask",
         baseline_error_text: str,
         run_id: str,
+        *,
+        validation_results: list["ValidationResult"] | None = None,
+        repo_target: "RepoTarget" | None = None,
     ) -> str | None:
         """Best-effort: create a dedicated fix-validation task if one isn't already open.
 
@@ -791,11 +804,15 @@ class ExecutionService:
         """
         dedup_prefix = f"Fix pre-existing validation failure in {task.repo_key}"
         try:
+            occurrence_count = 0
             for issue in plane_client.list_issues():
                 name = str(issue.get("name", ""))
+                if not name.startswith(dedup_prefix):
+                    continue
+                occurrence_count += 1
                 s = issue.get("state", {})
                 state_name = s.get("name", "") if isinstance(s, dict) else str(s)
-                if name.startswith(dedup_prefix) and state_name not in ("Done", "Blocked", "Cancelled"):
+                if state_name not in ("Done", "Blocked", "Cancelled"):
                     self._log_event(
                         "fix_validation_task_exists",
                         run_id,
@@ -804,23 +821,17 @@ class ExecutionService:
                     )
                     return None
 
-            description = "\n".join([
-                f"repo: {task.repo_key}",
-                "",
-                "## Goal",
-                f"Fix a pre-existing validation failure in the `{task.repo_key}` repository.",
-                "The validation suite was already failing on the base branch before any changes were applied.",
-                "",
-                "## Validation Error",
-                "```",
-                baseline_error_text,
-                "```",
-                "",
-                "## Constraints",
-                "- Only modify files necessary to make the validation commands pass.",
-                "- Do not introduce new failures.",
-                f"- Target repo: {task.repo_key}",
-            ])
+            # Include the issue we are about to create in the count.
+            occurrence_count += 1
+
+            description = self._build_fix_validation_description(
+                repo_key=task.repo_key,
+                baseline_error_text=baseline_error_text,
+                occurrence_count=occurrence_count,
+                validation_results=validation_results,
+                repo_target=repo_target,
+            )
+
             created = plane_client.create_issue(
                 name=dedup_prefix,
                 description=description,
@@ -832,6 +843,85 @@ class ExecutionService:
         except Exception as exc:
             self._log_event("fix_validation_task_error", run_id, error=str(exc), repo_key=task.repo_key)
             return None
+
+    _MAX_OUTPUT_LINES = 50
+
+    @classmethod
+    def _build_fix_validation_description(
+        cls,
+        *,
+        repo_key: str,
+        baseline_error_text: str,
+        occurrence_count: int,
+        validation_results: list["ValidationResult"] | None = None,
+        repo_target: "RepoTarget" | None = None,
+    ) -> str:
+        """Build the description body for a fix-validation issue."""
+        if validation_results is None:
+            # Fallback: original compact format.
+            return "\n".join([
+                f"repo: {repo_key}",
+                "",
+                "## Goal",
+                f"Fix a pre-existing validation failure in the `{repo_key}` repository.",
+                "The validation suite was already failing on the base branch before any changes were applied.",
+                "",
+                "## Validation Error",
+                "```",
+                baseline_error_text,
+                "```",
+                "",
+                "## Constraints",
+                "- Only modify files necessary to make the validation commands pass.",
+                "- Do not introduce new failures.",
+                f"- Target repo: {repo_key}",
+            ])
+
+        lines: list[str] = [
+            f"repo: {repo_key}",
+            "",
+            "## Goal",
+            f"Fix a pre-existing validation failure in the `{repo_key}` repository.",
+            "The validation suite was already failing on the base branch before any changes were applied.",
+            "",
+            "## Baseline Failure History",
+            f"This is occurrence #{occurrence_count} of baseline validation failure for this repo.",
+        ]
+
+        # Configured Validation Commands
+        if repo_target and repo_target.validation_commands:
+            lines.append("")
+            lines.append("## Configured Validation Commands")
+            for cmd in repo_target.validation_commands:
+                lines.append(f"- `{cmd}`")
+
+        # Failing Commands
+        failing: list["ValidationResult"] = [r for r in validation_results if r.exit_code != 0]
+        if failing:
+            lines.append("")
+            lines.append("## Failing Commands")
+            for result in failing:
+                lines.append("")
+                lines.append(f"### `{result.command}` (exit code: {result.exit_code})")
+                output = result.stderr.strip() if result.stderr.strip() else result.stdout.strip()
+                if output:
+                    truncated = "\n".join(output.splitlines()[: cls._MAX_OUTPUT_LINES])
+                    lines.append("```")
+                    lines.append(truncated)
+                    lines.append("```")
+
+        # Constraints
+        lines.append("")
+        lines.append("## Constraints")
+        lines.append("- Only modify files necessary to make the validation commands pass.")
+        lines.append("- Do not introduce new failures.")
+        lines.append(f"- Target repo: {repo_key}")
+        if failing:
+            lines.append("- Fix these specific commands:")
+            for result in failing:
+                lines.append(f"  - `{result.command}`")
+
+        return "\n".join(lines)
 
     def _validate_task_contract(self, task: "BoardTask") -> None:
         """Fail early and clearly when task metadata violates known contracts."""
@@ -940,7 +1030,7 @@ class ExecutionService:
 
             run_env = dict(bootstrap_result.env)
             run_env.update(repo_cfg.env)
-            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env)
+            validation_results = self.validation.run(repo_cfg.validation_commands, repo_path, env=run_env, timeout_seconds=repo_cfg.validation_timeout_seconds)
             validation_ok = self.validation.passed(validation_results)
 
             all_changed = self.git.changed_files(repo_path)
