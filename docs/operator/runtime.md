@@ -72,6 +72,8 @@ Scans GitHub for open PRs on all `await_review`-enabled repos and creates missin
 - writes separate logs and PID files
 - not a scheduler cluster or distributed supervisor
 
+Each watcher lane runs inside a bash restart loop. If the python process exits with a non-zero code (crash, OOM, unhandled exception), the loop logs a `watcher_restart` event and relaunches after 5 seconds. An exit code of 0 (intentional stop — e.g. credential failure) breaks the loop. `watch-all-stop` sends SIGTERM, which the trap handler catches before killing the python child cleanly.
+
 ## Heartbeat And Status
 
 `watch-all-status` reports:
@@ -162,6 +164,8 @@ The preferred way to run the full autonomy pipeline in one command:
 - promoting a new candidate family from gated to active
 
 The dry-run output shows which families fired, which candidates would be emitted vs. suppressed, and suppression reasons. Every run writes a structured report to `logs/autonomy_cycle/cycle_<ts>.json`.
+
+If the proposer has emitted 0 candidates for 5 consecutive cycles, a `logs/autonomy_cycle/quiet_diagnosis.json` file is written automatically. It aggregates suppression reasons across those cycles (counted and sorted by frequency) with a human-readable `advice` field. The file is deleted when the proposer starts emitting again. This removes the need to manually diff multiple cycle JSON files to diagnose silence.
 
 ## Tune-Autonomy
 

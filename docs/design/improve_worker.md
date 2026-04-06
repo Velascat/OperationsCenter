@@ -79,9 +79,25 @@ All scans run on the primary slot only when `parallel_slots > 1`.
 | Review revision | every 3 cycles | Detects `CHANGES_REQUESTED` reviews on open PRs; creates `[Revise]` tasks |
 | Merge conflict | every 5 cycles | Checks `mergeable==false`; attempts rebase; creates `[Rebase]` task on failure |
 | Post-merge regression | every 10 cycles | Checks merged PR CI status; creates regression tasks for failures |
-| Feedback loop scan | every 15 cycles | Checks Done tasks' PR state on GitHub; auto-records merged/closed outcomes to `state/proposal_feedback/` |
+| Feedback loop scan | every 15 cycles | Checks Done tasks' PR state on GitHub; auto-records merged/closed outcomes to `state/proposal_feedback/`; captures human rejections from Cancelled autonomy tasks (see below) |
 | Stale PR TTL | every 20 cycles | Closes PRs older than `stale_pr_days` (default 7); requeues to Backlog |
 | Workspace health | every 25 cycles | Verifies venv python per repo; attempts bootstrap repair on failure; creates `[Workspace]` task if repair fails |
+| Stale autonomy scan | every 30 cycles | Cancels autonomy-proposed Backlog tasks older than 21 days whose signal is stale |
+
+## Stale Autonomy Task Invalidation
+
+Every 30 improve cycles, `handle_stale_autonomy_task_scan` scans Backlog tasks with `source: autonomy` that are older than 21 days. It cancels them with a `<!-- cp:stale-autonomy-scan -->` marker comment. If the underlying signal reappears (the proposer still finds the same issue in a newer snapshot), the task will be recreated fresh.
+
+The marker prevents the feedback loop scan from treating these system-cancelled tasks as human rejections.
+
+## Human Rejection Signal Capture
+
+The feedback loop scan (Part B, every 15 cycles) also scans Cancelled tasks with `source: autonomy`. If a cancelled task does NOT carry the stale-autonomy-scan marker, it is treated as a human rejection:
+
+1. An `abandoned` feedback record is written to `state/proposal_feedback/<id>.json`.
+2. The task's `candidate_dedup_key` is registered in `ProposalRejectionStore` (`state/proposal_rejections.json`) for permanent suppression.
+
+This "no" signal is indefinite — the proposer will never recreate the same candidate unless the rejection record is manually removed.
 
 ## Context Handoff for `context_limit` Tasks
 

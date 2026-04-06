@@ -136,6 +136,68 @@ Returns JSON:
 
 Requires `cost_per_execution_usd` to be set in config (default 0.0 = disabled).
 
+## Circuit Breaker Diagnosis
+
+When a systemic failure (bad kodo version, auth regression) causes every execution to fail, the circuit breaker opens to prevent burning the full daily budget. Look for:
+
+```
+{"event": "budget_decision", "allowed": false, "reason": "circuit_breaker_open", ...}
+```
+
+in the watcher log. The circuit reopens automatically when the failure rate drops below 80% over the last 5 executions. To reset immediately: fix the underlying issue and wait for a successful execution.
+
+Thresholds are tunable via env vars:
+- `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD` (default `0.8`)
+- `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW` (default `5`)
+
+## Connection Error Backoff
+
+Transient network failures (Plane API down, DNS failure) now trigger exponential backoff in the watcher. Look for `"event": "watch_error"` with `"consecutive_errors": N` and `"backoff_seconds": N` in the log. The backoff caps at 5 minutes. The counter resets on the next successful cycle.
+
+If `consecutive_errors` is climbing and not resetting, the Plane API is unreachable — check network or the `PLANE_API_TOKEN`.
+
+## Observer Snapshot Staleness
+
+`generate-insights` warns if the most recent observer snapshot is older than 2 hours:
+
+```
+[warn] Latest observer snapshot is 4.2h old — insights may not reflect current repo state.
+```
+
+If you see this, re-run `observe-repo` before generating insights:
+
+```bash
+./scripts/control-plane.sh observe-repo
+./scripts/control-plane.sh generate-insights
+```
+
+## Proposer Quiet Diagnosis
+
+When the proposer emits 0 candidates for 5 or more consecutive cycles, a diagnosis file is written automatically:
+
+```
+logs/autonomy_cycle/quiet_diagnosis.json
+```
+
+It contains:
+- `cycles_analyzed` — how many recent cycles were checked
+- `suppression_reasons` — reason counts across all cycles, sorted by frequency
+- `advice` — a plain-language summary of the dominant suppression reason
+
+Check this file before manually inspecting individual cycle JSON files.
+
+The file is deleted automatically when the proposer starts emitting again.
+
+## Proposal Rejection Store
+
+To see which autonomy candidates have been permanently rejected (by human cancellation):
+
+```bash
+cat state/proposal_rejections.json
+```
+
+Each entry has `reason`, `task_id`, `task_title`, and `recorded_at`. These are checked before budget, cooldown, or dedup — a rejected key will never be proposed again. To allow a re-proposal, delete the entry from the JSON file and rerun `autonomy-cycle`.
+
 ## Suggested Debugging Order
 
 1. `watch-all-status`
@@ -146,6 +208,8 @@ Requires `cost_per_execution_usd` to be set in config (default 0.0 = disabled).
 6. heartbeat check: `python -m control_plane.entrypoints.worker.main heartbeat-check`
 7. config drift: look for `config_drift_detected` in watcher log at cycle 1
 8. workspace health: look for `workspace_health_*` events in improve watcher log
+9. circuit breaker: look for `reason: circuit_breaker_open` in watcher log
+10. connection backoff: look for `watch_error` with `consecutive_errors > 1` in watcher log
 
 For autonomy-layer inputs:
 
@@ -163,6 +227,7 @@ When the board is quiet, also check the proposer lane:
 - proposer heartbeat/status in `watch-all-status`
 - proposer log in `logs/local/watch-all/`
 - new tasks labeled `source: proposer`
+- `logs/autonomy_cycle/quiet_diagnosis.json` for aggregated suppression reasons
 
 ## Maintenance Boundary
 

@@ -126,9 +126,18 @@ python -m control_plane.entrypoints.feedback.main record \
     --task-id <uuid> --outcome merged --pr-number 42
 ```
 
+## Long-Lived Deduplication
+
+Beyond the rolling 7-day dedup window on `candidate_dedup_key`, the proposer checks a permanent rejection store before any other guardrail. `ProposalRejectionStore` (`state/proposal_rejections.json`) records keys that were permanently rejected when a human cancelled the task. Records are never pruned.
+
+When `ProposerGuardrailAdapter.evaluate()` finds a match, it returns `reason="permanently_rejected_by_human"` and the candidate is suppressed regardless of budget, cooldown, or board state.
+
+To allow a candidate to be re-proposed after a human rejection, delete its entry from `state/proposal_rejections.json` and run `autonomy-cycle` again.
+
 ## Safety Boundaries
 
 - only `status=emit` decision candidates may become Plane tasks
 - dry-run performs full mapping and guardrails but does not write to Plane
 - one candidate failure does not void the whole proposer run
 - zero-created runs are valid and retained
+- permanently rejected candidates are suppressed indefinitely (`state/proposal_rejections.json`)
