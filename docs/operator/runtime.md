@@ -87,6 +87,14 @@ Scans GitHub for open PRs on all `await_review`-enabled repos and creates missin
 
 This is the quickest way to tell whether the local system is alive or stalled.
 
+Each watcher also writes a `heartbeat_<role>.json` file to `logs/local/watch-all/` at the start of every cycle. Use the heartbeat-check CLI to verify all watchers are alive:
+
+```bash
+python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+```
+
+Exits with code 0 when all watchers are healthy, code 1 when any heartbeat is stale (> 5 minutes old). Suitable for cron-based monitoring.
+
 ## Logs And Artifacts
 
 - command logs: `logs/local/`

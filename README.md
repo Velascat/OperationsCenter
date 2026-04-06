@@ -153,6 +153,34 @@ The naming is intentionally close because the second is the board adapter for th
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
 - Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
+### Autonomy Hardening (18 improvements across two implementation rounds)
+
+The following capabilities were added to close gaps toward full autonomous operation:
+
+**Session 1 — 8 proposal and execution improvements:**
+
+- **Goal coherence** — `focus_areas` config list demotes off-topic proposals to Backlog so the system prioritises what matters before filling the board with lower-priority noise.
+- **Dependency ordering** — `depends_on: <uuid>` in task descriptions is parsed and enforced; dependent tasks are skipped by the watcher until their dependencies reach Done.
+- **Task sizing gate** — decompose findings targeting files >800 lines are split at proposal time into 2–4 bounded part-tasks so Kodo never receives a scope it cannot complete in one context window.
+- **Post-merge CI feedback** — every 10 improve cycles, merged PRs are checked for CI failures; regression tasks are created automatically.
+- **Self-modification controls** — `self_repo_key` in config identifies the ControlPlane repo itself; proposals for it are capped at Backlog; auto-execution requires a `self-modify: approved` label.
+- **Three-tier conflict detection** — proposals are checked against (1) artifact `changed_files` for Review/Running tasks, (2) open PR file lists from the GitHub API, (3) title tokens as a fallback.
+- **Better failure attribution** — `context_limit` and `dependency_missing` classifications added to `classify_execution_result` before `validation_failure`, so follow-up tasks are scoped correctly.
+- **Satiation signal** — proposal cycles are recorded; when the last 5 cycles were ≥90% dedup+skipped with zero new tasks created, proposing stops until external state changes.
+
+**Session 2 — 10 full-autonomy gap improvements:**
+
+- **Human escalation channel** — when the same classification blocks ≥5 tasks in 24 hours, a webhook POST is sent to `escalation.webhook_url`; a per-classification cooldown prevents spam.
+- **Merge conflict detection and rebase** — every 5 improve cycles, open PRs are checked for `mergeable==false`; an in-place rebase is attempted; a `[Rebase]` task is created on failure.
+- **Watcher heartbeat monitoring** — each watcher writes `heartbeat_<role>.json` every cycle; `python -m control_plane.entrypoints.worker.main heartbeat-check` exits non-zero when any watcher is stale.
+- **Context handoff for context_limit tasks** — the execution summary is saved in the task artifact; `context_limit` follow-up tasks include a `prior_progress:` block so Kodo continues from where it stopped.
+- **Flaky test detection** — per-command pass/fail history is tracked; when a command fails ≥30% of its last 10 runs, it is classified as `flaky_test` rather than `validation_failure`.
+- **PR review revision cycle** — every 3 improve cycles, open PRs are checked for `CHANGES_REQUESTED` reviews; `[Revise]` tasks are created with the review comment text as context.
+- **Token/credential expiry detection** — on the first watcher cycle, GitHub and Plane tokens are validated; a 401/403 logs a clear error, writes an escalation event, and aborts the loop.
+- **Success/failure learning** — task outcomes are recorded per proposal category; categories with >70% success are boosted to Ready for AI; categories with <30% are demoted to Backlog.
+- **Scheduled tasks** — `scheduled_tasks:` in config accepts cron expressions; due tasks are created at the start of each propose cycle (requires the optional `croniter` dependency).
+- **Stale PR TTL** — every 20 improve cycles, PRs older than `stale_pr_days` (default 7) are closed after a rebase attempt; the originating task is requeued to Backlog.
+
 ### Repo and Branch Selection
 
 - Repo is selected via a `repo: <key>` label on the Plane work item — no separate UI needed.
@@ -187,6 +215,16 @@ Key per-repo config options:
 - `await_review: true` — open a PR and enter the review loop instead of auto-merging
 - `bootstrap_commands: [...]` — custom install steps for non-Python repos (replaces Python venv setup when set)
 - `propose_enabled: true/false` — controls whether the proposer watcher targets this repo
+
+Top-level config options added in the autonomy hardening phase:
+
+- `focus_areas: [...]` — keywords; proposals not matching any entry are demoted to Backlog
+- `self_repo_key: <key>` — identifies this ControlPlane installation; proposals for it go to Backlog; auto-execution requires `self-modify: approved` label
+- `stale_pr_days: 7` — PRs open longer than this are closed and requeued by the stale-PR scan
+- `escalation.webhook_url: <url>` — POST target for threshold-based escalations
+- `escalation.block_threshold: 5` — same-classification blocks within 24h before escalating
+- `escalation.cooldown_seconds: 3600` — minimum gap between two escalation POSTs for the same classification
+- `scheduled_tasks:` — list of `{cron, title, goal, repo_key, kind}` entries; due tasks are created at the start of each propose cycle (requires `croniter`)
 
 ## Fastest Happy Path
 
@@ -299,6 +337,16 @@ Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/Gi
 
 Skipping is treated as a valid outcome when execution is not justified. Budget skips, no-op skips, retry-cap blocks, and proposal suppression are written to retained artifacts and surfaced in watcher logs.
 
+### Heartbeat Monitoring
+
+Each watcher writes a `heartbeat_<role>.json` timestamp file every cycle. To check liveness:
+
+```bash
+python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+```
+
+Exit code 0 = all healthy. Exit code 1 = stale watchers listed on stderr. Wire this into cron or a simple monitoring script for unattended operation.
+
 ## Local Stack Startup
 
 The easiest way to bring up the whole local system is:
@@ -371,31 +419,33 @@ The repo-aware autonomy loop is behaving well when:
 - No production-grade supervisor beyond local `watch-all`.
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
+- Scheduled tasks require the optional `croniter` Python package (`pip install croniter`).
 
 ## Documentation
 
 ### Design
 
-- [Lifecycle Contract](/home/dev/Documents/GitHub/ControlPlane/docs/design/lifecycle.md)
-- [Improve Worker](/home/dev/Documents/GitHub/ControlPlane/docs/design/improve_worker.md)
-- [Repo Observer](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_repo_observer.md)
-- [Insight Engine](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_insight_engine.md)
-- [Decision Engine](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_decision_engine.md)
-- [Proposer Integration](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_proposer_integration.md)
-- [Repo-Aware Autonomy Layer](/home/dev/Documents/GitHub/ControlPlane/docs/design/repo_aware_autonomy.md)
-- [Self-Tuning Regulator](/home/dev/Documents/GitHub/ControlPlane/docs/design/autonomy_self_tuning_regulator.md)
-- [Execution Budget And Safety Controls](/home/dev/Documents/GitHub/ControlPlane/docs/design/execution_budget_and_safety_controls.md)
-- [Plane + Kodo Wrapper Design](/home/dev/Documents/GitHub/ControlPlane/docs/design/plane_kodo_wrapper.md)
+- [Lifecycle Contract](docs/design/lifecycle.md)
+- [Improve Worker](docs/design/improve_worker.md)
+- [Autonomy Hardening](docs/design/autonomy_gaps.md) — 18 full-autonomy improvements: escalation, conflict detection, heartbeat, context handoff, flaky tests, review cycle, credential validation, success learning, scheduled tasks, stale PR TTL
+- [Repo Observer](docs/design/autonomy_repo_observer.md)
+- [Insight Engine](docs/design/autonomy_insight_engine.md)
+- [Decision Engine](docs/design/autonomy_decision_engine.md)
+- [Proposer Integration](docs/design/autonomy_proposer_integration.md)
+- [Repo-Aware Autonomy Layer](docs/design/repo_aware_autonomy.md)
+- [Self-Tuning Regulator](docs/design/autonomy_self_tuning_regulator.md)
+- [Execution Budget And Safety Controls](docs/design/execution_budget_and_safety_controls.md)
+- [Plane + Kodo Wrapper Design](docs/design/plane_kodo_wrapper.md)
 - [Roadmap](docs/design/roadmap.md)
 
 ### Operator Guides
 
 - [Golden-Path Demo](docs/demo.md) — start here; also use as a post-change validation ritual
 - [Setup Guide](docs/operator/setup.md)
-- [Runtime Guide](docs/operator/runtime.md) — commands, watcher roles, dry-run-first posture
+- [Runtime Guide](docs/operator/runtime.md) — commands, watcher roles, dry-run-first posture, heartbeat monitoring
 - [Autonomy Threshold Tuning](docs/operator/tuning.md) — per-family thresholds, analyze-artifacts loop, tune-autonomy regulation loop
 - [PR Review Loop Guide](docs/operator/pr_review.md) — two-phase review, guardrails, troubleshooting
-- [Diagnostics and Maintenance](docs/operator/diagnostics.md)
+- [Diagnostics and Maintenance](docs/operator/diagnostics.md) — heartbeat check, credential validation, debugging order
 
 ### Roadmap
 

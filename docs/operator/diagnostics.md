@@ -71,6 +71,22 @@ Retained `result_summary.md` files align with board/log language and include:
 - `follow_up_task_ids`
 - `human_attention_required` when relevant
 
+## Watcher Heartbeat Check
+
+```bash
+python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+```
+
+Returns exit code 0 if all watchers wrote a heartbeat within the last 5 minutes. Returns exit code 1 with a message listing stale roles. Run from cron to get paged when a watcher dies silently.
+
+## Credential Validation
+
+On the first cycle of each watcher run, Control Plane calls the GitHub and Plane APIs to validate tokens. If either returns 401/403, the watcher logs a clear error and exits rather than running with invalid credentials. An escalation event is also written to the usage store so the pattern shows up in the dashboard.
+
+If a watcher fails to start with `watch_credential_failure`, check:
+- `GITHUB_TOKEN` is set and valid
+- `PLANE_API_TOKEN` is set and valid for the configured workspace
+
 ## Suggested Debugging Order
 
 1. `watch-all-status`
@@ -78,6 +94,7 @@ Retained `result_summary.md` files align with board/log language and include:
 3. Plane comments on the task
 4. retained artifact directory in `tools/report/kodo_plane/`
 5. `plane-doctor` if the board/API contract looks wrong
+6. heartbeat check: `python -m control_plane.entrypoints.worker.main heartbeat-check`
 
 For autonomy-layer inputs:
 

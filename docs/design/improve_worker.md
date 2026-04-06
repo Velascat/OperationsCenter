@@ -8,6 +8,8 @@ It is responsible for:
 - detecting recurring failure patterns
 - creating the right bounded follow-up tasks
 - routing unclear cases to human attention
+- scanning for merge conflicts, stale PRs, and review requests
+- detecting post-merge CI regressions
 
 Its default rule is:
 
@@ -23,6 +25,7 @@ Priority order:
 2. recent worker comments/results
 3. retained summaries for recent failures
 4. explicit `task-kind: improve` tasks
+5. open PR state (merge conflicts, stale PRs, review feedback)
 
 ## Triage Vocabulary
 
@@ -30,16 +33,15 @@ Blocked tasks are classified into a small fixed set:
 
 - `infra_tooling`
 - `validation_failure`
+- `flaky_test`
 - `scope_policy`
 - `parse_config`
 - `verification_failure`
+- `context_limit`
+- `dependency_missing`
 - `unknown`
 
-This vocabulary is shared across:
-
-- board comments
-- watcher logs
-- retained summaries
+This vocabulary is shared across board comments, watcher logs, and retained summaries.
 
 ## Improve Decision Model
 
@@ -61,6 +63,31 @@ This keeps improve behavior explainable and testable.
 - create one bounded follow-up `test` task
 - create one explicit `improve` task when more analysis is warranted
 - leave a task marked for human attention
+- create `[Rebase]` tasks for PRs with merge conflicts
+- create `[Revise]` tasks for PRs with `CHANGES_REQUESTED` reviews
+- close stale PRs and requeue originating tasks to Backlog
+- create regression tasks for post-merge CI failures
+
+## Periodic Scans (improve watcher, cycle-gated)
+
+| Scan | Frequency | What it does |
+|------|-----------|-------------|
+| Review revision | every 3 cycles | Detects `CHANGES_REQUESTED` reviews on open PRs; creates `[Revise]` tasks |
+| Merge conflict | every 5 cycles | Checks `mergeable==false`; attempts rebase; creates `[Rebase]` task on failure |
+| Post-merge regression | every 10 cycles | Checks merged PR CI status; creates regression tasks for failures |
+| Stale PR TTL | every 20 cycles | Closes PRs older than `stale_pr_days` (default 7); requeues to Backlog |
+
+## Context Handoff for `context_limit` Tasks
+
+When a task fails with `context_limit`, the follow-up task includes a `prior_progress:` block extracted from the previous execution's summary. This lets Kodo continue from where it stopped rather than restarting from scratch.
+
+## Flaky Test Detection
+
+The improve watcher tracks per-command validation outcomes. When a command has failed ≥30% of its last 10 runs, it is classified as `flaky_test` rather than `validation_failure`. The follow-up task targets stabilizing the test rather than retrying the original goal.
+
+## Escalation
+
+When the same classification appears in ≥5 blocked-triage events within 24 hours, an HTTP POST is sent to `escalation.webhook_url` (if configured). A cooldown prevents repeated POSTs for the same classification. This is a signal to the operator that a systemic issue exists.
 
 ## What Improve Should Avoid
 
@@ -75,6 +102,7 @@ This keeps improve behavior explainable and testable.
 - cap on follow-up tasks per improve cycle
 - repeated-pattern heuristic that prefers one system-fix task over many scattered children
 - no recursive unblock task generation for improve-generated failures
+- stale-PR scan only closes PRs whose comment history confirms no prior close attempt
 
 ## Human Attention Routing
 
@@ -85,7 +113,7 @@ Improve should leave tasks visibly human-facing when the next action cannot be a
 - unclear Plane permission problems
 - repeated `unknown` failures without a stable classification
 
-In these cases, improve comments should make clear:
+In these cases, improve comments make clear:
 
 - the classification
 - the reason summary
