@@ -12,6 +12,7 @@ from control_plane.execution import ExecutionControlSettings, UsageStore
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
     ProposalSpec,
+    UNBLOCK_COMMENT_MARKER,
     UNKNOWN_BLOCKED_CLASSIFICATION,
     blocked_resolution_is_complete,
     build_improve_triage_result,
@@ -1644,6 +1645,19 @@ def test_blocked_resolution_is_complete_no_follow_ups_returns_false() -> None:
     assert blocked_resolution_is_complete(client, "TASK-1") is False
 
 
+def test_blocked_resolution_is_complete_already_unblocked_returns_false() -> None:
+    """If the unblock marker is already on the task, do not re-unblock it."""
+    unblock_comment = {"comment_html": f"<p>{UNBLOCK_COMMENT_MARKER} — task unblocked</p>"}
+    client = FakePlaneClient(
+        [
+            {"id": "TASK-1", "state": {"name": "Blocked"}},
+            {"id": "RESOLVE-1", "state": {"name": "Done"}},
+        ],
+        comments={"TASK-1": [_triage_comment("RESOLVE-1"), unblock_comment]},
+    )
+    assert blocked_resolution_is_complete(client, "TASK-1") is False
+
+
 def test_run_watch_loop_improve_auto_unblocks_when_resolution_done(monkeypatch) -> None:
     """improve watcher should move a blocked task to Ready for AI once its resolution task is Done."""
     blocked_task = {
@@ -1688,4 +1702,4 @@ def test_run_watch_loop_improve_auto_unblocks_when_resolution_done(monkeypatch) 
     assert ("BLOCKED-1", "Running") in client.transitions
     assert ("BLOCKED-1", "Ready for AI") in client.transitions
     # A comment about resolution should have been added
-    assert any("Resolution complete" in c for _, c in client.issue_comments)
+    assert any(UNBLOCK_COMMENT_MARKER in c for _, c in client.issue_comments)

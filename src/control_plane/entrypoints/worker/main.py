@@ -22,6 +22,7 @@ from control_plane.config import load_settings
 from control_plane.domain import ExecutionResult
 from control_plane.execution.usage_store import UsageStore
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
+UNBLOCK_COMMENT_MARKER = "[Improve] Resolution complete"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
 PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
 RATE_LIMIT_BACKOFF_MULTIPLIER = 4
@@ -564,7 +565,14 @@ def extract_triage_follow_up_ids(client: PlaneClient, task_id: str) -> list[str]
 
 
 def blocked_resolution_is_complete(client: PlaneClient, task_id: str) -> bool:
-    """Return True if all follow-up resolution tasks from triage are Done/Cancelled."""
+    """Return True if all follow-up resolution tasks are Done/Cancelled and this task
+    hasn't already been unblocked by a previous resolution pass."""
+    already_unblocked = any(
+        UNBLOCK_COMMENT_MARKER.lower() in extract_comment_text(c).lower()
+        for c in client.list_comments(task_id)
+    )
+    if already_unblocked:
+        return False
     follow_up_ids = extract_triage_follow_up_ids(client, task_id)
     if not follow_up_ids:
         return False
@@ -2761,7 +2769,7 @@ def run_watch_loop(
                             client.comment_issue(
                                 task_id,
                                 render_worker_comment(
-                                    "[Improve] Resolution complete — task unblocked",
+                                    f"{UNBLOCK_COMMENT_MARKER} — task unblocked",
                                     [
                                         f"task_id: {task_id}",
                                         f"task_kind: {task_kind}",
