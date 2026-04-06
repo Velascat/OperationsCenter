@@ -485,6 +485,8 @@ def select_watch_candidate(
                 continue
             if not blocked_issue_already_triaged(client, task_id):
                 return task_id, "blocked_triage"
+            if blocked_resolution_is_complete(client, task_id):
+                return task_id, "blocked_resolution_complete"
             if known_triaged_blocked_ids is not None:
                 known_triaged_blocked_ids.add(task_id)
         raise ValueError("No improve work item found for blocked triage or improve task routing")
@@ -540,6 +542,35 @@ def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
         if TRIAGE_COMMENT_MARKER.lower() in extract_comment_text(comment).lower():
             return True
     return False
+
+
+def extract_triage_follow_up_ids(client: PlaneClient, task_id: str) -> list[str]:
+    """Return the follow_up_task_ids recorded in the improve triage comment, if any."""
+    for comment in client.list_comments(task_id):
+        text = extract_comment_text(comment)
+        if TRIAGE_COMMENT_MARKER.lower() not in text.lower():
+            continue
+        raw = parse_context_value(text, "follow_up_task_ids")
+        if not raw or raw.strip().lower() == "none":
+            return []
+        return [part.strip() for part in raw.split(",") if part.strip() and part.strip().lower() != "none"]
+    return []
+
+
+def blocked_resolution_is_complete(client: PlaneClient, task_id: str) -> bool:
+    """Return True if all follow-up resolution tasks from triage are Done/Cancelled."""
+    follow_up_ids = extract_triage_follow_up_ids(client, task_id)
+    if not follow_up_ids:
+        return False
+    terminal = {"done", "cancelled"}
+    for fid in follow_up_ids:
+        try:
+            issue = client.fetch_issue(fid)
+        except Exception:
+            return False
+        if issue_status_name(issue).lower() not in terminal:
+            return False
+    return True
 
 
 def parse_section_lines(text: str, heading: str) -> list[str]:
@@ -2585,7 +2616,7 @@ def run_watch_loop(
                 eligible = status_name == ready_state and task_kind == role
             elif action == "improve_task":
                 eligible = status_name == ready_state and task_kind == "improve"
-            elif action == "blocked_triage":
+            elif action in ("blocked_triage", "blocked_resolution_complete"):
                 eligible = status_name == "Blocked"
 
             if not eligible:
@@ -2707,6 +2738,25 @@ def run_watch_loop(
                             counters["blocked_tasks_triaged"] += 1
                             logger.info(json.dumps({"event": "watch_triage_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "classification": classification, "created_task_ids": created_ids, "run_id": cycle_run_id}))
                             write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_triage_complete", task_id=task_id, task_kind=task_kind, follow_up_task_ids=created_ids, blocked_classification=classification, counters=counters)
+                        elif action == "blocked_resolution_complete":
+                            follow_up_ids = extract_triage_follow_up_ids(client, task_id)
+                            client.transition_issue(task_id, ready_state)
+                            client.comment_issue(
+                                task_id,
+                                render_worker_comment(
+                                    "[Improve] Resolution complete — task unblocked",
+                                    [
+                                        f"task_id: {task_id}",
+                                        f"task_kind: {task_kind}",
+                                        f"result_status: {ready_state.lower().replace(' ', '_')}",
+                                        f"resolved_by: {', '.join(follow_up_ids)}",
+                                        "reason: all resolution follow-up tasks completed",
+                                    ],
+                                ),
+                            )
+                            known_triaged_blocked_ids.discard(task_id)
+                            logger.info(json.dumps({"event": "watch_unblocked", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "resolved_by": follow_up_ids, "run_id": cycle_run_id}))
+                            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_resolution_complete", task_id=task_id, task_kind=task_kind, counters=counters)
                         elif action == "fix_pr_task":
                             handle_fix_pr_task(client, service, task_id)
                             logger.info(json.dumps({"event": "watch_fix_pr_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "run_id": cycle_run_id}))
@@ -2722,7 +2772,9 @@ def run_watch_loop(
                         raise ValueError(f"Unsupported worker role '{role}'")
                 except Exception:
                     if claimed:
-                        client.transition_issue(task_id, ready_state if action != "blocked_triage" else "Blocked")
+                        _blocked_actions = {"blocked_triage", "blocked_resolution_complete"}
+                        _error_state = "Blocked" if action in _blocked_actions else ready_state
+                        client.transition_issue(task_id, _error_state)
                         client.comment_issue(
                             task_id,
                             render_worker_comment(
@@ -2731,7 +2783,7 @@ def run_watch_loop(
                                     f"task_id: {task_id}",
                                     f"task_kind: {task_kind}",
                                     f"action: {action}",
-                                    f"result_status: {(ready_state if action != 'blocked_triage' else 'blocked').lower().replace(' ', '_')}",
+                                    f"result_status: {_error_state.lower().replace(' ', '_')}",
                                     "reason: worker raised after claiming the task",
                                 ],
                             ),

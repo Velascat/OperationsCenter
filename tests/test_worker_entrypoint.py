@@ -13,8 +13,10 @@ from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
     ProposalSpec,
     UNKNOWN_BLOCKED_CLASSIFICATION,
+    blocked_resolution_is_complete,
     build_improve_triage_result,
     classify_blocked_issue,
+    extract_triage_follow_up_ids,
     handle_goal_task,
     handle_improve_task,
     handle_propose_cycle,
@@ -1520,3 +1522,118 @@ def test_handle_propose_cycle_records_in_index_after_creation(tmp_path: Path, mo
     saved = _json.loads((tmp_path / "propose.memory.json").read_text())
     assert "fix lint in src/" in saved["proposed_index"]
     assert "k|lint_fix|src" in saved["proposed_index"]
+
+
+# ---------------------------------------------------------------------------
+# extract_triage_follow_up_ids / blocked_resolution_is_complete
+# ---------------------------------------------------------------------------
+
+def _triage_comment(follow_up_ids: str) -> dict:
+    """Build a minimal fake triage comment with the given follow_up_task_ids string."""
+    body = (
+        f"[Improve] Blocked triage\n"
+        f"- task_id: SOME-ID\n"
+        f"- follow_up_task_ids: {follow_up_ids}\n"
+    )
+    return {"comment_html": f"<p>{body}</p>"}
+
+
+def test_extract_triage_follow_up_ids_returns_uuids() -> None:
+    client = FakePlaneClient(
+        [{"id": "TASK-1", "state": {"name": "Blocked"}}],
+        comments={"TASK-1": [_triage_comment("uuid-a, uuid-b")]},
+    )
+    assert extract_triage_follow_up_ids(client, "TASK-1") == ["uuid-a", "uuid-b"]
+
+
+def test_extract_triage_follow_up_ids_none_returns_empty() -> None:
+    client = FakePlaneClient(
+        [{"id": "TASK-1", "state": {"name": "Blocked"}}],
+        comments={"TASK-1": [_triage_comment("none")]},
+    )
+    assert extract_triage_follow_up_ids(client, "TASK-1") == []
+
+
+def test_extract_triage_follow_up_ids_no_triage_comment_returns_empty() -> None:
+    client = FakePlaneClient(
+        [{"id": "TASK-1", "state": {"name": "Blocked"}}],
+        comments={"TASK-1": [{"comment_html": "<p>some other comment</p>"}]},
+    )
+    assert extract_triage_follow_up_ids(client, "TASK-1") == []
+
+
+def test_blocked_resolution_is_complete_all_done() -> None:
+    client = FakePlaneClient(
+        [
+            {"id": "TASK-1", "state": {"name": "Blocked"}},
+            {"id": "RESOLVE-1", "state": {"name": "Done"}},
+        ],
+        comments={"TASK-1": [_triage_comment("RESOLVE-1")]},
+    )
+    assert blocked_resolution_is_complete(client, "TASK-1") is True
+
+
+def test_blocked_resolution_is_complete_still_running() -> None:
+    client = FakePlaneClient(
+        [
+            {"id": "TASK-1", "state": {"name": "Blocked"}},
+            {"id": "RESOLVE-1", "state": {"name": "Running"}},
+        ],
+        comments={"TASK-1": [_triage_comment("RESOLVE-1")]},
+    )
+    assert blocked_resolution_is_complete(client, "TASK-1") is False
+
+
+def test_blocked_resolution_is_complete_no_follow_ups_returns_false() -> None:
+    client = FakePlaneClient(
+        [{"id": "TASK-1", "state": {"name": "Blocked"}}],
+        comments={"TASK-1": [_triage_comment("none")]},
+    )
+    assert blocked_resolution_is_complete(client, "TASK-1") is False
+
+
+def test_run_watch_loop_improve_auto_unblocks_when_resolution_done(monkeypatch) -> None:
+    """improve watcher should move a blocked task to Ready for AI once its resolution task is Done."""
+    blocked_task = {
+        "id": "BLOCKED-1",
+        "name": "Decompose foo.py",
+        "state": {"name": "Blocked"},
+        "description": "## Execution\nrepo: control-plane\nmode: goal\n",
+        "labels": [{"name": "task-kind: goal"}],
+    }
+    resolve_task = {
+        "id": "RESOLVE-1",
+        "name": "Resolve blocked Decompose foo.py",
+        "state": {"name": "Done"},
+        "description": "## Execution\nrepo: control-plane\nmode: goal\n",
+        "labels": [{"name": "task-kind: goal"}],
+    }
+    triage_comment = _triage_comment("RESOLVE-1")
+    # Also add the triage marker text so blocked_issue_already_triaged returns True
+    triage_comment["comment_html"] = "<p>[Improve] Blocked triage\n- follow_up_task_ids: RESOLVE-1\n</p>"
+    client = FakePlaneClient(
+        [blocked_task, resolve_task],
+        comments={"BLOCKED-1": [triage_comment]},
+    )
+    service = FakeService()
+    sleeps: list[float] = []
+    monkeypatch.setattr("time.sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.reconcile_stale_running_issues",
+        lambda *a, **kw: None,
+    )
+
+    run_watch_loop(
+        client,
+        service,
+        role="improve",
+        ready_state="Ready for AI",
+        poll_interval_seconds=3,
+        max_cycles=1,
+    )
+
+    # Task should have been claimed (Running) then moved to Ready for AI
+    assert ("BLOCKED-1", "Running") in client.transitions
+    assert ("BLOCKED-1", "Ready for AI") in client.transitions
+    # A comment about resolution should have been added
+    assert any("Resolution complete" in c for _, c in client.issue_comments)
