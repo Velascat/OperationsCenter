@@ -356,6 +356,37 @@ def main() -> None:
         project_id=settings.plane.project_id,
     )
     try:
+        # Board saturation check: count queued autonomy tasks before creating more.
+        # This mirrors the check in handle_propose_cycle for the watcher path.
+        _max_queued = int(os.environ.get("CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS", "15"))
+        try:
+            _all_issues = client.list_issues()
+            _autonomy_queued = sum(
+                1 for _iss in _all_issues
+                if str(_iss.get("state", {}).get("name", "") if isinstance(_iss.get("state"), dict) else "").strip()
+                   in ("Ready for AI", "Backlog")
+                and any(
+                    "source: autonomy" == (str(lbl.get("name", "")) if isinstance(lbl, dict) else str(lbl)).strip().lower()
+                    for lbl in _iss.get("labels", [])
+                )
+            )
+            if _autonomy_queued >= _max_queued:
+                print(
+                    f"\n[4/4] propose   → skipped (board saturated: "
+                    f"{_autonomy_queued} autonomy tasks queued, limit {_max_queued})"
+                )
+                _write_cycle_report(
+                    snapshot=snapshot,
+                    insight_artifact=insight_artifact,
+                    candidates_artifact=candidates_artifact,
+                    emitted=emitted,
+                    prop_artifact=None,
+                    dry_run=False,
+                )
+                return
+        except Exception:
+            pass  # Board count failure is non-fatal; proceed with propose
+
         proposer_svc = CandidateProposerIntegrationService(settings=settings, client=client)
         prop_context = new_proposer_integration_context(
             repo_filter=args.repo,
@@ -401,6 +432,14 @@ def _write_cycle_report(
     report_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     report_path = report_dir / f"cycle_{ts}.json"
+
+    # Disk space guardrail: skip writing if critically low to avoid partial files.
+    try:
+        from control_plane.execution.usage_store import _check_disk_space
+        _check_disk_space(report_dir)
+    except OSError as _disk_err:
+        print(f"\n  [error] {_disk_err}")
+        return
 
     # Signals collected summary
     signals = snapshot.signals

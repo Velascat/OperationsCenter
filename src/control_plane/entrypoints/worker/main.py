@@ -43,6 +43,10 @@ LOW_BACKLOG_THRESHOLD = 6
 # Don't create new proposals if this many tasks are already active (Ready for AI or Running).
 # Prevents flooding the board when work is already queued.
 MAX_ACTIVE_TASKS_FOR_PROPOSALS = 3
+# Don't create new autonomy proposals if this many source:autonomy tasks are already
+# queued in Ready for AI or Backlog.  Prevents the propose lane from flooding the board
+# faster than the goal/test lanes can drain it.
+MAX_QUEUED_AUTONOMY_TASKS = int(os.environ.get("CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS", "15"))
 # Maximum tasks to promote from Backlog → Ready for AI when the board is idle.
 MAX_BACKLOG_PROMOTIONS_PER_CYCLE = 2
 # Blocked tasks with human_attention_required that have sat untouched longer than this
@@ -615,6 +619,45 @@ def issue_source(issue: dict[str, Any]) -> str | None:
 
 
 _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def issue_urgency_score(issue: dict[str, Any]) -> int:
+    """Return a composite urgency score (higher = more urgent).
+
+    Combines priority label weight, title-prefix boost, and task age so that
+    regression fixes and high-priority tasks are claimed before routine
+    maintenance work — even when all sit in the same Ready-for-AI queue.
+    """
+    score = 0
+
+    # Priority label weight
+    pri = issue_priority(issue)  # 0=high, 1=medium, 2=low, 3=unset
+    score += {0: 30, 1: 20, 2: 10, 3: 15}.get(pri, 15)
+
+    # Title prefix boost — system-critical task types preempt general work
+    title = str(issue.get("name", "")).strip().lower()
+    if title.startswith("[regression]") or "post-merge regression" in title:
+        score += 25
+    elif title.startswith("[fix]") or title.startswith("[rebase]"):
+        score += 15
+    elif title.startswith("[revise]") or title.startswith("[verify]"):
+        score += 8
+    elif title.startswith("[workspace]") or title.startswith("[step 1"):
+        score += 5
+
+    # Task age: older Ready tasks get a small bump (capped at 3 days = +3)
+    _created_raw = issue.get("created_at") or issue.get("updated_at")
+    if _created_raw:
+        try:
+            from datetime import timezone as _tz
+            _dt = datetime.fromisoformat(str(_created_raw).replace("Z", "+00:00"))
+            if _dt.tzinfo is None:
+                _dt = _dt.replace(tzinfo=_tz.utc)
+            score += min((datetime.now(UTC) - _dt).days, 3)
+        except (ValueError, TypeError):
+            pass
+
+    return score
 
 
 def issue_priority(issue: dict[str, Any]) -> int:
@@ -2202,8 +2245,9 @@ def select_watch_candidate(
                 known_triaged_blocked_ids.add(task_id)
         raise ValueError("No improve work item found for blocked triage or improve task routing")
 
-    # Sort by priority label (high → medium → low → unset) before iterating.
-    sorted_issues = sorted(issues, key=issue_priority)
+    # Sort by composite urgency score (highest first) so regression fixes and
+    # high-priority tasks are claimed before routine maintenance work.
+    sorted_issues = sorted(issues, key=issue_urgency_score, reverse=True)
     for issue in sorted_issues:
         task_id = str(issue["id"])
         if skip_ids and task_id in skip_ids:
@@ -2444,6 +2488,19 @@ def recent_classification_counts(client: PlaneClient, *, issues: list[dict[str, 
     return counts
 
 
+# Per-task-kind TTL (minutes) for reconcile_stale_running_issues.
+# A Running task whose updated_at is within this window is skipped — it may
+# still be legitimately running.  Longer for goal (complex refactors) than for
+# test/improve (bounded verification passes).
+_RUNNING_TTL_MINUTES: dict[str, int] = {
+    "goal": 120,
+    "test": 45,
+    "improve": 30,
+    "fix_pr": 45,
+}
+_RUNNING_TTL_DEFAULT_MINUTES = 90
+
+
 def reconcile_stale_running_issues(
     client: PlaneClient,
     *,
@@ -2460,6 +2517,7 @@ def reconcile_stale_running_issues(
     }
     task_signatures: dict[str, str | None] = usage_data.get("last_task_signatures", {})
     reconciled: list[str] = []
+    _now = datetime.now(UTC)
     for issue in client.list_issues():
         if issue_status_name(issue) != "Running":
             continue
@@ -2470,6 +2528,20 @@ def reconcile_stale_running_issues(
         elif task_kind != role:
             continue
         task_id = str(issue["id"])
+        # TTL guard: skip tasks that were updated recently — they may still be
+        # legitimately running.  Uses updated_at (set when the task moved to
+        # Running) with a per-kind time-to-live.
+        _updated_raw = issue.get("updated_at") or issue.get("created_at")
+        if _updated_raw:
+            try:
+                _updated = datetime.fromisoformat(str(_updated_raw).replace("Z", "+00:00"))
+                if _updated.tzinfo is None:
+                    _updated = _updated.replace(tzinfo=UTC)
+                _ttl = _RUNNING_TTL_MINUTES.get(task_kind, _RUNNING_TTL_DEFAULT_MINUTES) * 60
+                if (_now - _updated).total_seconds() < _ttl:
+                    continue  # Within TTL — do not touch
+            except (ValueError, TypeError):
+                pass  # Unparseable timestamp; fall through to existing logic
         attempts = task_attempts.get(task_id, 0)
         has_signature = bool(task_signatures.get(task_id))
         # Re-queue when the interruption was clearly operational (not a real failure):
@@ -4100,6 +4172,26 @@ def handle_propose_cycle(
             ),
         )
 
+    # Board saturation: don't add more autonomy tasks if the queue is already
+    # large.  This prevents a burst autonomy-cycle run from flooding the board
+    # faster than the watcher lanes can drain it.
+    _autonomy_queued = sum(
+        1 for _iss in issues
+        if issue_status_name(_iss) in ("Ready for AI", "Backlog")
+        and any("source: autonomy" == lbl.strip().lower() for lbl in issue_label_names(_iss))
+    )
+    if _autonomy_queued >= MAX_QUEUED_AUTONOMY_TASKS:
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="board_saturated",
+            board_idle=False,
+            reason_summary=(
+                f"Proposal creation suppressed: {_autonomy_queued} autonomy tasks already "
+                f"queued (limit {MAX_QUEUED_AUTONOMY_TASKS}). "
+                "Drain the queue before creating more."
+            ),
+        )
+
     # Point 8: Satiation — if the last several cycles produced nothing new, the
     # repo is in a stable state.  Stop generating proposals until something changes.
     if service.usage_store.is_proposal_satiated(now=now):
@@ -4424,14 +4516,22 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
         )
     except Exception:
         pass
-    # Circuit-breaker outcome recording
+    # Circuit-breaker outcome recording.
+    # Quota exhaustion is an infrastructure failure — do NOT drain the circuit
+    # breaker window (it would block all tasks until the operator investigates,
+    # without the circuit-breaker being the right signal).
     try:
-        service.usage_store.record_execution_outcome(
-            task_id=task_id,
-            role="goal",
-            succeeded=result.success,
-            now=datetime.now(UTC),
-        )
+        if _is_quota_exhausted_result(result):
+            service.usage_store.record_kodo_quota_event(
+                task_id=task_id, role="goal", now=datetime.now(UTC)
+            )
+        else:
+            service.usage_store.record_execution_outcome(
+                task_id=task_id,
+                role="goal",
+                succeeded=result.success,
+                now=datetime.now(UTC),
+            )
     except Exception:
         pass
     # Cost telemetry
@@ -4465,6 +4565,25 @@ def goal_failure_needs_manual_env_fix(result: ExecutionResult) -> bool:
             "auth",
         ]
     )
+
+
+# Strings that indicate a hard account-level quota exhaustion in kodo stderr.
+# These parallel KodoAdapter._HARD_QUOTA_EXHAUSTED_SIGNALS but are checked on
+# the ExecutionResult.execution_stderr_excerpt (already extracted by service.py).
+_QUOTA_EXHAUSTED_EXCERPT_SIGNALS = (
+    "insufficient_quota",
+    "you've exceeded your usage limit",
+    "you have exceeded your usage limit",
+    "you have run out of credits",
+    "upgrade your plan",
+    "payment required",
+)
+
+
+def _is_quota_exhausted_result(result: ExecutionResult) -> bool:
+    """Return True when the execution result signals a hard quota exhaustion."""
+    excerpt = (result.execution_stderr_excerpt or "").lower()
+    return any(s in excerpt for s in _QUOTA_EXHAUSTED_EXCERPT_SIGNALS)
 
 
 def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
@@ -4566,14 +4685,19 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
             ],
         ),
     )
-    # Circuit-breaker outcome recording
+    # Circuit-breaker outcome recording (skip for quota exhaustion — infra failure).
     try:
-        service.usage_store.record_execution_outcome(
-            task_id=task_id,
-            role="test",
-            succeeded=result.success,
-            now=datetime.now(UTC),
-        )
+        if _is_quota_exhausted_result(result):
+            service.usage_store.record_kodo_quota_event(
+                task_id=task_id, role="test", now=datetime.now(UTC)
+            )
+        else:
+            service.usage_store.record_execution_outcome(
+                task_id=task_id,
+                role="test",
+                succeeded=result.success,
+                now=datetime.now(UTC),
+            )
     except Exception:
         pass
     # Cost telemetry
@@ -4741,6 +4865,49 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
                     task_ids=ids,
                     now=_now,
                 )
+                # Improve → propose feedback channel: when a pattern becomes
+                # systemic (escalation threshold reached), create a single bounded
+                # root-cause investigation task rather than leaving the operator to
+                # manually diagnose and create it after reading the webhook.
+                _systemic_title = (
+                    f"[Systemic] Investigate recurring {triage.classification} failures"
+                )
+                if _systemic_title not in existing_names:
+                    _repo_key_esc, _, _ = issue_execution_target(issue, service)
+                    _repo_cfg_esc = service.settings.repos.get(_repo_key_esc or "")
+                    _base_esc = (_repo_cfg_esc.default_branch if _repo_cfg_esc else "main")
+                    try:
+                        client.create_issue(
+                            name=_systemic_title,
+                            description=(
+                                f"## Execution\n"
+                                f"repo: {_repo_key_esc or 'unknown'}\n"
+                                f"base_branch: {_base_esc}\n"
+                                f"mode: improve\n\n"
+                                f"## Goal\n"
+                                f"Investigate and fix the root cause of recurring "
+                                f"`{triage.classification}` failures. "
+                                f"{len(ids)} tasks have hit this pattern in the last "
+                                f"24 hours (threshold: {esc.block_threshold}).\n\n"
+                                f"Reason from last triage: {triage.reason_summary}\n\n"
+                                f"Affected task IDs: {', '.join(ids[:5])}"
+                                f"{'...' if len(ids) > 5 else ''}\n\n"
+                                f"## Constraints\n"
+                                f"- source: systemic_escalation\n"
+                                f"- classification: {triage.classification}\n"
+                                f"- Do not create further child tasks — produce a direct fix or a "
+                                f"single, bounded follow-up.\n"
+                            ),
+                            state="Ready for AI",
+                            label_names=[
+                                "task-kind: improve",
+                                f"repo: {_repo_key_esc or 'unknown'}",
+                                "source: improve",
+                                "urgency: high",
+                            ],
+                        )
+                    except Exception:
+                        pass  # Systemic task creation is best-effort
     return triage.classification, created_ids
 
 

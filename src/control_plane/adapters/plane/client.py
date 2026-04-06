@@ -237,16 +237,36 @@ class PlaneClient:
         return issue
 
     def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Execute an HTTP request with retry on 429, transient 5xx, and connection errors.
+
+        Retries up to 3 times (4 total attempts).  Connection-level failures
+        (ConnectError, TimeoutException) and 502/503/504 responses are retried
+        with linear backoff.  429 responses honour the Retry-After header.
+        Duplicate side-effects (e.g. duplicate comments from a retried POST) are
+        acceptable — a missed board transition is far more damaging than a
+        duplicate comment.
+        """
         attempts = 4
         for attempt in range(1, attempts + 1):
-            response = self._client.request(method, url, **kwargs)
-            if response.status_code != 429:
-                return response
-            if attempt == attempts:
-                return response
-            retry_after_header = response.headers.get("Retry-After", "").strip()
-            retry_after = int(retry_after_header) if retry_after_header.isdigit() else attempt * 2
-            time.sleep(retry_after)
+            try:
+                response = self._client.request(method, url, **kwargs)
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
+                if attempt == attempts:
+                    raise
+                time.sleep(attempt * 2)
+                continue
+            if response.status_code == 429:
+                if attempt == attempts:
+                    return response
+                retry_after_header = response.headers.get("Retry-After", "").strip()
+                retry_after = int(retry_after_header) if retry_after_header.isdigit() else attempt * 2
+                time.sleep(retry_after)
+                continue
+            # Retry on transient gateway / server errors regardless of HTTP method.
+            if response.status_code in (502, 503, 504) and attempt < attempts:
+                time.sleep(attempt * 2)
+                continue
+            return response
         raise RuntimeError("unreachable")
 
     @staticmethod

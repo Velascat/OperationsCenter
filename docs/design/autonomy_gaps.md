@@ -1,6 +1,6 @@
-# Autonomy Hardening — 26 Full-Autonomy Gap Improvements
+# Autonomy Hardening — 36 Full-Autonomy Gap Improvements
 
-This document describes the 26 improvements implemented across three sessions to close the
+This document describes the 36 improvements implemented across four sessions to close the
 gaps toward fully autonomous operation. They are grouped by session, then by theme.
 
 ---
@@ -508,3 +508,130 @@ the function is a no-op.
 | S3-6 | Cost/spend telemetry | after each goal/test execution | `record_execution_cost`, `get_spend_report` |
 | S3-7 | Parallel execution | watcher startup | `run_parallel_watch_loop` |
 | S3-8 | Multi-step dependency planning | start of goal task execution | `build_multi_step_plan` |
+| S4-1 | Watcher auto-restart | watcher process exit | `start_watch_role` (shell) |
+| S4-2 | Task staleness invalidation | every 30 improve cycles | `handle_stale_autonomy_task_scan` |
+| S4-3 | Success-rate circuit breaker | before each execution | `budget_decision`, `record_execution_outcome` |
+| S4-4 | Parallel slot write safety | every usage store write | `UsageStore._exclusive`, atomic `save()` |
+| S4-5 | Observer snapshot staleness | before generate-insights | `SnapshotLoader.latest_snapshot_age_hours` |
+| S4-6 | Connection error backoff | transient API failures | `run_watch_loop` `_consecutive_errors` |
+| S4-7 | Human rejection capture | feedback loop scan | `handle_feedback_loop_scan` (Part B) |
+| S4-8 | Execution profiles per kind | before each kodo run | `Settings.kodo_profiles`, `KodoAdapter.build_command` |
+| S4-9 | Dry-run quiet diagnosis | after autonomy-cycle report | `_write_quiet_diagnosis` |
+| S4-10 | Long-lived deduplication | before each proposal | `ProposalRejectionStore`, `ProposerGuardrailAdapter` |
+
+---
+
+## Session 4 — 10 Reliability and Learning Improvements
+
+### S4-1. Watcher Auto-Restart
+
+**Problem:** `watch-all` launched five watchers via `setsid` with no supervisor. A crash (OOM, unhandled exception) left the process dead until the operator manually ran `watch-all` again. Heartbeat detection surfaced the failure but nothing healed it.
+
+**Fix:** `start_watch_role` now wraps each python process in a bash restart loop. On non-zero exit (crash) it logs a `watcher_restart` event and relaunches after 5 seconds. A SIGTERM trap ensures that `stop_watch_role` terminates both the wrapper bash and the running python child cleanly. Exit code 0 (intentional stop — e.g. credential failure at startup) breaks the loop.
+
+**Files:** `scripts/control-plane.sh` (`start_watch_role`)
+
+---
+
+### S4-2. Task Staleness Invalidation
+
+**Problem:** Autonomy-proposed tasks could sit in Backlog for weeks after the underlying signal was resolved (lint fixed by a PR, type errors removed by a refactor). On execution, Kodo would find nothing to do and the task would fail as a no-op, wasting budget.
+
+**Fix:** `handle_stale_autonomy_task_scan` runs every 30 improve cycles. It scans Backlog tasks with a `source: autonomy` label older than `_STALE_AUTONOMY_TASK_DAYS = 21` days and cancels them with a `_STALE_AUTONOMY_CANCEL_MARKER` comment. The marker prevents the feedback loop from treating these as human rejections. If the signal reappears, the proposer will recreate the task.
+
+**Files:** `main.py` (`handle_stale_autonomy_task_scan`, `_STALE_AUTONOMY_CANCEL_MARKER`, `_STALE_AUTONOMY_TASK_DAYS`, `_STALE_AUTONOMY_SCAN_CYCLE_INTERVAL`)
+
+---
+
+### S4-3. Success-Rate Circuit Breaker
+
+**Problem:** The execution budget was count-based only. When something systemic broke (bad kodo version, auth regression), the system would burn the full hourly or daily budget executing tasks that all failed — providing no value and consuming all capacity before the operator could investigate.
+
+**Fix:** `record_execution_outcome(*, task_id, role, succeeded, now)` is called after each `handle_goal_task` and `handle_test_task` completes. `budget_decision` checks the last `_CB_WINDOW = 5` execution outcomes. If `≥ _CB_THRESHOLD = 0.8` (80%) of them failed, the budget decision returns `reason="circuit_breaker_open"` and no further tasks run until the rate improves or the operator investigates. Both thresholds are tunable via `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD` and `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW` env vars.
+
+**Files:** `usage_store.py` (`record_execution_outcome`, circuit-breaker check in `budget_decision`)
+
+---
+
+### S4-4. Parallel Slot Write Safety
+
+**Problem:** `run_parallel_watch_loop` launches N threads sharing the same `UsageStore`. Each write method did `load() → modify → save()` with no coordination. Under `parallel_slots > 1`, two threads could read the same JSON, both modify it, and the later `write_text` would silently clobber the first writer's changes — corrupting execution counts, retry caps, and proposal history.
+
+**Fix:** Two protections added to `UsageStore`:
+1. **Per-path reentrant lock**: a module-level `dict[str, threading.RLock]` keyed by the resolved usage file path. All write methods (13 methods) acquire the lock via `_exclusive()` context manager before the load-modify-save triple.
+2. **Atomic write**: `save()` writes to a `.tmp` file first, then calls `os.replace()` (which maps to `rename(2)` on Linux — atomic). Readers never see a partially-written file.
+
+**Files:** `usage_store.py` (`_exclusive`, `_get_lock`, module-level `_path_locks`, atomic write in `save()`)
+
+---
+
+### S4-5. Observer Snapshot Staleness
+
+**Problem:** The standalone `generate-insights` command reads the most recent observer snapshot from disk. If `observe-repo` hadn't run recently (or the janitor pruned it), insights were derived from stale or missing data — silently producing signals based on a week-old repo state.
+
+**Fix:** `SnapshotLoader.latest_snapshot_age_hours()` returns how many hours ago the most recent snapshot was written. The `generate-insights` entrypoint calls this before proceeding and prints a prominent `[warn]` message if the snapshot is older than 2 hours, or if no snapshot exists at all.
+
+**Files:** `insights/loader.py` (`latest_snapshot_age_hours`), `entrypoints/insights/main.py` (staleness check before `service.generate()`)
+
+---
+
+### S4-6. Connection Error Exponential Backoff
+
+**Problem:** Transient network errors (Plane API down, DNS failure, connection refused) hit the bare `except Exception` handler in `run_watch_loop`, which logged `watch_error` and immediately re-slept for `poll_interval_seconds`. During a 10-minute Plane outage, the watcher would log an error every 30–60 seconds — 10–20 noise events before recovery.
+
+**Fix:** `run_watch_loop` tracks `_consecutive_errors`. Each non-429 exception increments it. The backoff is `min(poll_interval * 2^(n-1), 300)` seconds — so errors 1, 2, 3, 4+ sleep for 30s, 60s, 120s, 300s with a 5-minute cap. The counter resets to 0 on any successful cycle (`else:` clause on the `try` block).
+
+**Files:** `main.py` (`_consecutive_errors` in `run_watch_loop`, exponential backoff in `except Exception`)
+
+---
+
+### S4-7. Human Rejection Signal Capture
+
+**Problem:** When a human manually cancelled an autonomy-proposed task, this "no" signal was lost. The feedback loop scan only processed Done tasks with GitHub PRs. The proposer's dedup window (7 days) would eventually expire and the same task would reappear.
+
+**Fix:** `handle_feedback_loop_scan` now has a second pass (Part B) that scans Cancelled tasks with `source: autonomy` label. If the task was NOT cancelled by the stale-autonomy-scan (no `_STALE_AUTONOMY_CANCEL_MARKER` in comments), it is treated as a human rejection: an `abandoned` feedback record is written and the task's `candidate_dedup_key` is registered in `ProposalRejectionStore` for permanent suppression.
+
+**Files:** `main.py` (`handle_feedback_loop_scan` Part B, `ProposalRejectionStore` import)
+
+---
+
+### S4-8. Execution Profiles Per Task Kind
+
+**Problem:** Every Kodo invocation used the same `cycles`, `exchanges`, `effort`, and `timeout_seconds` regardless of task type. A quick lint fix and a complex module refactor received identical resource budgets — the lint fix wasted tokens; the refactor sometimes ran out.
+
+**Fix:** `Settings.kodo_profiles: dict[str, KodoSettings]` accepts per-task-kind overrides keyed by `task.execution_mode` (e.g. `"goal"`, `"improve"`, `"test"`) or a special `"default"` key. `KodoAdapter.build_command` and `KodoAdapter.run` accept an optional `profile: KodoSettings | None` parameter. `ExecutionService.run_task` resolves the profile after fetching the task and passes it to all three `kodo.run` calls (initial, retry, policy retry).
+
+**Config example:**
+```yaml
+kodo_profiles:
+  lint_fix:
+    cycles: 2
+    exchanges: 10
+    effort: low
+  context_limit:
+    cycles: 6
+    exchanges: 40
+    effort: high
+```
+
+**Files:** `settings.py` (`Settings.kodo_profiles`), `adapters/kodo/adapter.py` (`build_command`, `run`, `_run_with_claude_fallback`), `application/service.py` (profile resolution)
+
+---
+
+### S4-9. Dry-Run Quiet Diagnosis
+
+**Problem:** The proposer could go silent (0 candidates for 5+ cycles) with no structured diagnosis. The operator had to manually read the last N cycle report JSON files and manually aggregate suppression reasons to understand why.
+
+**Fix:** After writing each autonomy-cycle report, `_write_quiet_diagnosis()` reads the last 5 `cycle_*.json` reports. If all 5 have `candidates_emitted == 0`, it aggregates suppression reasons (counted across all cycles, sorted by frequency) and writes `logs/autonomy_cycle/quiet_diagnosis.json` with a human-readable `advice` field. The file is deleted when the proposer starts emitting again (candidates > 0). A `[warn]` line is also printed to stdout.
+
+**Files:** `entrypoints/autonomy_cycle/main.py` (`_write_quiet_diagnosis`, called from `_write_cycle_report`)
+
+---
+
+### S4-10. Long-Lived Deduplication
+
+**Problem:** The proposer's dedup window was 7 days (rolling prune). After a week, a once-abandoned or once-rejected proposal could reappear as if it were new. A proposal rejected twice in the same month would be proposed a third time the following month.
+
+**Fix:** `ProposalRejectionStore` (new `proposer/rejection_store.py`) maintains a persistent JSON file at `state/proposal_rejections.json`. Records are keyed by `candidate_dedup_key` and store reason, task_id, task_title, and recorded_at. Records are indefinite (never pruned). `ProposerGuardrailAdapter.evaluate()` checks the rejection store first — before budget, cooldown, or open-task checks — and returns `reason="permanently_rejected_by_human"` for any rejected key. Rejection records are written by the human rejection capture (S4-7) when a Cancelled autonomy task is detected.
+
+**Files:** `proposer/rejection_store.py` (new), `proposer/guardrail_adapter.py` (`_rejection_store` field, check in `evaluate`)

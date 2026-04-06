@@ -41,8 +41,8 @@ def main() -> None:
     age_hours = loader.latest_snapshot_age_hours(repo=args.repo)
     if age_hours is None:
         print(
-            f"[warn] No observer snapshots found. "
-            f"Run 'control-plane.sh observe-repo' before generating insights.",
+            "[warn] No observer snapshots found. "
+            "Run 'control-plane.sh observe-repo' before generating insights.",
             flush=True,
         )
     elif age_hours > _stale_warn_hours:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import threading
 from collections import Counter
 from contextlib import contextmanager
@@ -33,6 +34,38 @@ def _get_lock(path: Path) -> threading.RLock:
 # ---------------------------------------------------------------------------
 _CB_THRESHOLD = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
 _CB_WINDOW = max(3, int(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW", "5")))
+
+# ---------------------------------------------------------------------------
+# Disk-space guardrail constants.
+# ---------------------------------------------------------------------------
+_DISK_WARN_MB = 200   # Log a warning below this threshold
+_DISK_MIN_MB = 50     # Raise OSError below this threshold (avoids partial writes)
+
+
+def _check_disk_space(path: Path) -> None:
+    """Raise OSError when free space near *path* is critically low.
+
+    Logs a structured warning when space is low but above the hard minimum.
+    This prevents the watcher from entering a crash-restart loop caused by
+    failed artifact writes when disk fills between janitor runs.
+    """
+    try:
+        free_mb = shutil.disk_usage(path.parent if not path.is_dir() else path).free / (1024 * 1024)
+    except OSError:
+        return  # Can't check — don't block the write
+    if free_mb < _DISK_MIN_MB:
+        raise OSError(
+            f"disk_space_critical: only {free_mb:.0f} MB free near {path} "
+            f"(minimum {_DISK_MIN_MB} MB required). "
+            "Run 'control-plane.sh janitor' or free disk space before retrying."
+        )
+    # Warn (non-fatal) when space is getting low
+    if free_mb < _DISK_WARN_MB:
+        import logging
+        logging.getLogger(__name__).warning(
+            '{"event": "disk_space_low", "free_mb": %.0f, "warn_threshold_mb": %d, "path": "%s"}',
+            free_mb, _DISK_WARN_MB, path,
+        )
 
 
 class UsageStore:
@@ -66,6 +99,7 @@ class UsageStore:
 
     def save(self, data: dict[str, Any], *, now: datetime) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        _check_disk_space(self.path)
         events = self._prune_events(list(data.get("events", [])), now=now)
         data["events"] = events
         data["updated_at"] = now.isoformat()
@@ -239,6 +273,86 @@ class UsageStore:
                     "task_id": task_id,
                     "role": role,
                     "succeeded": succeeded,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_quality_warning(
+        self,
+        *,
+        task_id: str,
+        repo_key: str,
+        suppression_counts: dict[str, int],
+        now: datetime,
+    ) -> None:
+        """Record a kodo quality-erosion warning for the given task.
+
+        Quality warnings are emitted when a kodo run adds an above-threshold
+        number of inline suppressions (``# noqa``, ``# type: ignore``, bare
+        ``pass`` in test bodies).  These pass validation but erode code quality
+        over time.  Recording them provides a queryable signal for operators and
+        the self-tuning regulator.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "kodo_quality_warning",
+                    "task_id": task_id,
+                    "repo_key": repo_key,
+                    "suppression_counts": suppression_counts,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_scope_violation(
+        self,
+        *,
+        task_id: str,
+        repo_key: str,
+        violated_files: list[str],
+        now: datetime,
+    ) -> None:
+        """Record a scope-policy violation for observability.
+
+        Scope violations occur when kodo modifies files outside the task's
+        ``allowed_paths`` after both the initial run and the policy-retry pass.
+        Recording them enables the improve watcher and operators to detect
+        patterns (e.g. a task family that consistently escapes its scope) via
+        the usage store events.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "scope_violation",
+                    "task_id": task_id,
+                    "repo_key": repo_key,
+                    "violated_files": violated_files[:10],  # cap to avoid bloat
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_kodo_quota_event(self, *, task_id: str, role: str, now: datetime) -> None:
+        """Record a hard quota exhaustion event from a kodo execution.
+
+        Unlike execution_outcome failures, quota events do NOT feed the circuit
+        breaker — they are an infrastructure problem, not a task-quality signal.
+        The operator must top up credits or wait for a monthly reset.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "kodo_quota_event",
+                    "task_id": task_id,
+                    "role": role,
                     "timestamp": now.isoformat(),
                 },
                 now=now,

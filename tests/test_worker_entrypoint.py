@@ -3512,3 +3512,354 @@ def test_snapshot_loader_latest_age_hours_returns_float() -> None:
     age = loader.latest_snapshot_age_hours()
     assert age is not None
     assert age >= 0.0  # Just written, should be very recent
+
+
+# ---------------------------------------------------------------------------
+# Session 5 gap tests
+# ---------------------------------------------------------------------------
+
+# S5-1: Plane write retry on transient errors
+def test_plane_client_retries_on_503(monkeypatch) -> None:
+    """_request should retry on 503 and return the final response."""
+    import httpx
+    from unittest.mock import MagicMock
+    from control_plane.adapters.plane.client import PlaneClient
+
+    call_count = 0
+    responses = [httpx.Response(503), httpx.Response(503), httpx.Response(200)]
+
+    inner = MagicMock()
+    def fake_request(method, url, **kwargs):
+        nonlocal call_count
+        resp = responses[call_count]
+        call_count += 1
+        return resp
+    inner.request.side_effect = fake_request
+
+    client = PlaneClient.__new__(PlaneClient)
+    client._client = inner
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    resp = client._request("GET", "/test")
+    assert resp.status_code == 200
+    assert call_count == 3
+
+
+def test_plane_client_retries_on_connection_error(monkeypatch) -> None:
+    """_request should retry on ConnectError and eventually succeed."""
+    import httpx
+    from unittest.mock import MagicMock
+    from control_plane.adapters.plane.client import PlaneClient
+
+    call_count = 0
+    inner = MagicMock()
+    def fake_request(method, url, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 2:
+            raise httpx.ConnectError("refused")
+        return httpx.Response(200)
+    inner.request.side_effect = fake_request
+
+    client = PlaneClient.__new__(PlaneClient)
+    client._client = inner
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    resp = client._request("GET", "/test")
+    assert resp.status_code == 200
+    assert call_count == 2
+
+
+# S5-2: Kodo process tree cleanup
+def test_kodo_adapter_uses_popen_with_new_session(tmp_path, monkeypatch) -> None:
+    """run() should call Popen with start_new_session=True."""
+    from control_plane.adapters.kodo.adapter import KodoAdapter
+    from control_plane.config.settings import KodoSettings
+
+    popen_kwargs: list[dict] = []
+
+    class FakePopen:
+        returncode = 0
+        def __init__(self, command, **kwargs):
+            popen_kwargs.append(kwargs)
+        def communicate(self, timeout=None):
+            return ("", "")
+
+    monkeypatch.setattr("subprocess.Popen", FakePopen)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    goal = tmp_path / "goal.md"
+    goal.write_text("## Goal\nTest.\n")
+
+    KodoAdapter(KodoSettings()).run(goal, repo)
+
+    assert popen_kwargs, "Popen was not called"
+    assert popen_kwargs[0].get("start_new_session") is True
+
+
+# S5-3: Per-task-kind running TTL in reconcile
+def test_reconcile_skips_recently_updated_running_task() -> None:
+    """Running tasks updated within the kind TTL should NOT be reconciled."""
+    from control_plane.entrypoints.worker.main import reconcile_stale_running_issues
+    from unittest.mock import MagicMock
+    import tempfile
+
+    recent_ts = (datetime.now(UTC) - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    issue = {
+        "id": "task-r1",
+        "state": {"name": "Running"},
+        "labels": [{"name": "task-kind: goal"}],
+        "updated_at": recent_ts,
+        "description": "",
+        "name": "Test",
+    }
+    client = MagicMock()
+    client.list_issues.return_value = [issue]
+
+    store = UsageStore(Path(tempfile.mktemp(suffix=".json")))
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
+    assert reconciled == [], "Recent running task should not be reconciled"
+
+
+def test_reconcile_acts_on_stale_running_task() -> None:
+    """Running tasks updated beyond the kind TTL should be reconciled."""
+    from control_plane.entrypoints.worker.main import reconcile_stale_running_issues
+    from unittest.mock import MagicMock
+    import tempfile
+
+    stale_ts = (datetime.now(UTC) - timedelta(hours=4)).isoformat().replace("+00:00", "Z")
+    issue = {
+        "id": "task-r2",
+        "state": {"name": "Running"},
+        "labels": [{"name": "task-kind: goal"}],
+        "updated_at": stale_ts,
+        "description": "",
+        "name": "Test",
+    }
+    client = MagicMock()
+    client.list_issues.return_value = [issue]
+    client.list_comments.return_value = []
+
+    store = UsageStore(Path(tempfile.mktemp(suffix=".json")))
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
+    assert "task-r2" in reconciled
+
+
+# S5-4: Disk space guardrail
+def test_disk_space_check_raises_on_critically_low_space(monkeypatch, tmp_path) -> None:
+    """_check_disk_space should raise OSError when free space is critically low."""
+    import shutil
+    from control_plane.execution.usage_store import _check_disk_space, _DISK_MIN_MB
+
+    DiskUsage = type("DiskUsage", (), {"free": int((_DISK_MIN_MB - 1) * 1024 * 1024)})
+    monkeypatch.setattr(shutil, "disk_usage", lambda _: DiskUsage())
+
+    with pytest.raises(OSError, match="disk_space_critical"):
+        _check_disk_space(tmp_path / "test.json")
+
+
+def test_disk_space_check_passes_with_adequate_space(monkeypatch, tmp_path) -> None:
+    """_check_disk_space should not raise when plenty of space is available."""
+    import shutil
+    from control_plane.execution.usage_store import _check_disk_space
+
+    DiskUsage = type("DiskUsage", (), {"free": 10 * 1024 * 1024 * 1024})  # 10 GB
+    monkeypatch.setattr(shutil, "disk_usage", lambda _: DiskUsage())
+
+    _check_disk_space(tmp_path / "test.json")  # should not raise
+
+
+# S5-5: Kodo quota exhaustion detection
+def test_kodo_quota_exhausted_detection() -> None:
+    """is_quota_exhausted should return True for hard quota signals."""
+    from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+
+    quota_result = KodoRunResult(1, "", "Error: insufficient_quota for this account", [])
+    assert KodoAdapter.is_quota_exhausted(quota_result) is True
+
+    ok_result = KodoRunResult(0, "completed", "", [])
+    assert KodoAdapter.is_quota_exhausted(ok_result) is False
+
+
+def test_usage_store_records_kodo_quota_event(tmp_path) -> None:
+    """record_kodo_quota_event should append a kodo_quota_event entry."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_kodo_quota_event(task_id="t1", role="goal", now=now)
+
+    data = store.load()
+    quota_events = [e for e in data["events"] if e["kind"] == "kodo_quota_event"]
+    assert len(quota_events) == 1
+    assert quota_events[0]["task_id"] == "t1"
+
+
+# S5-6: Task urgency scoring
+def test_issue_urgency_score_boosts_regression_tasks() -> None:
+    """Regression tasks should score higher than routine goal tasks."""
+    from control_plane.entrypoints.worker.main import issue_urgency_score
+
+    regression = {"name": "[Regression] CI broke after merge", "labels": []}
+    routine = {"name": "Fix lint violations", "labels": []}
+
+    assert issue_urgency_score(regression) > issue_urgency_score(routine)
+
+
+def test_issue_urgency_score_respects_priority_labels() -> None:
+    """High-priority label should yield a higher score than unset priority."""
+    from control_plane.entrypoints.worker.main import issue_urgency_score
+
+    high_pri = {"name": "Fix something", "labels": [{"name": "priority: high"}]}
+    no_pri = {"name": "Fix something", "labels": []}
+
+    assert issue_urgency_score(high_pri) > issue_urgency_score(no_pri)
+
+
+# S5-7: Board saturation backpressure
+def test_handle_propose_cycle_suppressed_when_board_saturated(tmp_path) -> None:
+    """Proposal creation should be suppressed when autonomy queue is full."""
+    from control_plane.entrypoints.worker.main import (
+        handle_propose_cycle,
+        MAX_QUEUED_AUTONOMY_TASKS,
+    )
+    from unittest.mock import MagicMock
+
+    autonomy_issues = [
+        {
+            "id": f"task-{i}",
+            "state": {"name": "Backlog"},
+            "labels": [
+                {"name": "task-kind: goal"},
+                {"name": "source: autonomy"},
+            ],
+            "name": f"Autonomy task {i}",
+            "description": "",
+        }
+        for i in range(MAX_QUEUED_AUTONOMY_TASKS)
+    ]
+    client = MagicMock()
+    client.list_issues.return_value = autonomy_issues
+
+    service = MagicMock()
+    service.settings.execution_controls.return_value = MagicMock(min_remaining_exec_for_proposals=1)
+    service.usage_store.remaining_exec_capacity.return_value = 10
+    service.usage_store.is_proposal_satiated.return_value = False
+    service.settings.scheduled_tasks = None
+
+    result = handle_propose_cycle(client, service, now=datetime.now(UTC))
+    assert result.decision == "board_saturated"
+
+
+# S5-8: Scope violation usage store recording
+def test_record_scope_violation_stored_in_events(tmp_path) -> None:
+    """record_scope_violation should persist a scope_violation event."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_scope_violation(
+        task_id="t1",
+        repo_key="myrepo",
+        violated_files=["src/outside.py"],
+        now=now,
+    )
+
+    data = store.load()
+    events = [e for e in data["events"] if e["kind"] == "scope_violation"]
+    assert len(events) == 1
+    assert events[0]["repo_key"] == "myrepo"
+    assert "src/outside.py" in events[0]["violated_files"]
+
+
+# S5-9: Improve → propose systemic feedback
+def test_systemic_fix_task_created_on_escalation(tmp_path) -> None:
+    """When should_escalate fires, a systemic-fix goal task should be created."""
+    from control_plane.entrypoints.worker.main import handle_blocked_triage
+    from unittest.mock import MagicMock, call
+
+    issue = {
+        "id": "task-blk",
+        "name": "Failing task",
+        "state": {"name": "Blocked"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: myrepo"}],
+        "description": "## Execution\nrepo: myrepo\nmode: goal\n\n## Goal\nDo stuff.",
+    }
+
+    client = MagicMock()
+    client.fetch_issue.return_value = issue
+    client.list_comments.return_value = []
+    client.list_issues.return_value = []
+
+    esc_settings = MagicMock()
+    esc_settings.webhook_url = "http://hook.test"
+    esc_settings.block_threshold = 1
+    esc_settings.cooldown_seconds = 0
+
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    # Pre-load a triage event so should_escalate fires immediately
+    for _ in range(2):
+        store.record_blocked_triage(task_id="task-blk", classification="validation_failure", now=now)
+
+    service = MagicMock()
+    service.usage_store = store
+    service.settings.escalation = esc_settings
+    service.settings.repos = {"myrepo": MagicMock(default_branch="main")}
+
+    handle_blocked_triage(client, service, "task-blk")
+
+    create_calls = client.create_issue.call_args_list
+    systemic_calls = [
+        c for c in create_calls
+        if "Systemic" in (c.kwargs.get("name") or (c.args[0] if c.args else ""))
+    ]
+    assert len(systemic_calls) >= 1, "Systemic fix task was not created"
+
+
+# S5-10: Kodo quality erosion detection
+def test_count_quality_suppressions_counts_noqa_additions() -> None:
+    """_count_quality_suppressions should count +noqa lines in diff."""
+    from control_plane.application.service import ExecutionService
+
+    diff = """\
+diff --git a/src/foo.py b/src/foo.py
+--- a/src/foo.py
++++ b/src/foo.py
+@@ -1,3 +1,5 @@
+ existing = 1
++bad_line = True  # noqa: E501
++another = "x"  # noqa
+-removed_line  # noqa
+ other = 2
+"""
+    counts = ExecutionService._count_quality_suppressions(diff)
+    assert counts["noqa"] == 2   # only '+' lines counted
+    assert counts["type_ignore"] == 0
+
+
+def test_count_quality_suppressions_counts_type_ignore() -> None:
+    """_count_quality_suppressions should count +type: ignore lines."""
+    from control_plane.application.service import ExecutionService
+
+    diff = """\
++result = bad_fn()  # type: ignore
++value: int = other()  # type:ignore[assignment]
+"""
+    counts = ExecutionService._count_quality_suppressions(diff)
+    assert counts["type_ignore"] == 2
+
+
+def test_quality_warning_event_recorded_in_usage_store(tmp_path) -> None:
+    """record_quality_warning should persist a kodo_quality_warning event."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_quality_warning(
+        task_id="t1",
+        repo_key="myrepo",
+        suppression_counts={"noqa": 4, "type_ignore": 0, "bare_pass": 0},
+        now=now,
+    )
+
+    data = store.load()
+    events = [e for e in data["events"] if e["kind"] == "kodo_quality_warning"]
+    assert len(events) == 1
+    assert events[0]["suppression_counts"]["noqa"] == 4
