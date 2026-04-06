@@ -167,6 +167,25 @@ class GitHubPRClient:
         resp.raise_for_status()
         return resp.json()
 
+    def list_pr_files(self, owner: str, repo: str, pr_number: int) -> list[str]:
+        """Return the list of filenames changed in a pull request.
+
+        Uses ``GET /repos/{owner}/{repo}/pulls/{pull_number}/files``.
+        Returns an empty list on any error (best-effort — callers must not rely
+        on completeness for correctness).
+        """
+        try:
+            resp = httpx.get(
+                f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/files",
+                headers=self._headers,
+                params={"per_page": 100},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return [item["filename"] for item in resp.json() if isinstance(item, dict) and "filename" in item]
+        except Exception:
+            return []
+
     @staticmethod
     def has_thumbs_up(reactions: list[dict]) -> bool:
         return any(r["content"] == "+1" for r in reactions)

@@ -149,18 +149,81 @@ def _extract_filename_tokens(title: str) -> set[str]:
     return {m.group(0).lower() for m in re.finditer(r"\b\w[\w.]*\.py\b", title)}
 
 
-def _has_conflict_with_active_task(proposal_title: str, issues: list[dict[str, Any]]) -> bool:
-    """Return True if *proposal_title* shares a .py filename token with a Running/Ready task.
+def _collect_open_pr_files(service: "ExecutionService") -> set[str]:
+    """Return basenames of all files changed in open PRs across all configured repos.
 
-    Used to avoid proposing work that would stomp on in-flight changes to the
-    same source file.
+    Called once per proposal cycle so the cost is amortised across all proposals.
+    Requires GITHUB_TOKEN; returns an empty set on any error or missing token.
+
+    PRs are created during execution (branch pushed while task is still Running),
+    so this gives exact file-level data for first-run Running tasks that have no
+    execution artifact yet.
+    """
+    token = service.settings.git_token()
+    if not token:
+        return set()
+    basenames: set[str] = set()
+    for repo_cfg in service.settings.repos.values():
+        clone_url = getattr(repo_cfg, "clone_url", "")
+        if not clone_url:
+            continue
+        try:
+            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(clone_url)
+            gh = GitHubPRClient(token)
+            for pr in gh.list_open_prs(owner, repo_name):
+                pr_number = pr.get("number")
+                if pr_number is None:
+                    continue
+                for path in gh.list_pr_files(owner, repo_name, int(pr_number)):
+                    basenames.add(Path(path).name.lower())
+        except Exception:
+            pass
+    return basenames
+
+
+def _has_conflict_with_active_task(
+    proposal_title: str,
+    issues: list[dict[str, Any]],
+    usage_store: "UsageStore | None" = None,
+    open_pr_files: set[str] | None = None,
+) -> bool:
+    """Return True if *proposal_title* conflicts with a Running/Review task.
+
+    Conflict resolution priority (highest fidelity first):
+    1. Artifact ``changed_files`` — available for Review tasks and Running retries.
+       Basenames are compared against filename tokens from the proposal title.
+    2. Open PR file basenames — fetched once per cycle by ``_collect_open_pr_files``
+       and passed in.  Covers first-run Running tasks whose branch was pushed but
+       whose execution artifact does not yet exist.
+    3. Title token matching — fallback when neither artifact nor PR data is available
+       (e.g. tasks that are Ready for AI and haven't run yet).
     """
     proposal_tokens = _extract_filename_tokens(proposal_title)
     if not proposal_tokens:
         return False
     for issue in issues:
-        if issue_status_name(issue) not in ("Running", "Ready for AI"):
+        status = issue_status_name(issue)
+        if status not in ("Running", "Ready for AI", "Review"):
             continue
+        task_id = str(issue["id"])
+
+        # --- High-fidelity: artifact changed_files ---
+        if usage_store is not None:
+            artifact = usage_store.get_task_artifact(task_id)
+            if artifact and artifact.get("changed_files"):
+                artifact_basenames = {Path(f).name.lower() for f in artifact["changed_files"] if f}
+                if proposal_tokens & artifact_basenames:
+                    return True
+                # We have authoritative data for this task — skip lower-fidelity checks.
+                continue
+
+        # --- Medium-fidelity: open PR files (Running tasks, first attempt) ---
+        if open_pr_files and status == "Running":
+            if proposal_tokens & open_pr_files:
+                return True
+            continue
+
+        # --- Low-fidelity fallback: title token matching ---
         running_tokens = _extract_filename_tokens(str(issue.get("name", "")))
         if proposal_tokens & running_tokens:
             return True
@@ -2517,12 +2580,16 @@ def handle_propose_cycle(
     created_ids: list[str] = []
     created_states: set[str] = set()
 
+    # Build a set of open-PR file basenames once for the whole cycle so the
+    # per-proposal conflict check doesn't fan out into multiple GitHub API calls.
+    open_pr_files = _collect_open_pr_files(service)
+
     for proposal in proposals:
         if len(created_ids) >= MAX_PROPOSALS_PER_CYCLE:
             break
         # Skip proposals that conflict with an in-flight task touching the same file.
-        if _has_conflict_with_active_task(proposal.title, issues):
-            _logger.info(json.dumps({"event": "propose_conflict_skipped", "title": proposal.title}))
+        if _has_conflict_with_active_task(proposal.title, issues, service.usage_store, open_pr_files):
+            _logger.info(json.dumps({"event": "propose_conflict_skipped", "title": proposal.title, "open_pr_files_count": len(open_pr_files)}))
             continue
         created = create_proposed_task_if_missing(
             client,

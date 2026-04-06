@@ -15,6 +15,7 @@ from control_plane.entrypoints.worker.main import (
     UNBLOCK_COMMENT_MARKER,
     UNKNOWN_BLOCKED_CLASSIFICATION,
     _check_task_pr_merged,
+    _collect_open_pr_files,
     _extract_filename_tokens,
     _has_conflict_with_active_task,
     _record_execution_artifact,
@@ -1914,9 +1915,58 @@ def test_has_conflict_no_py_tokens_never_conflicts() -> None:
     assert _has_conflict_with_active_task("Add return type annotations to 10 functions", issues) is False
 
 
+def test_has_conflict_uses_artifact_changed_files_for_review_task() -> None:
+    """Review task with artifact should use changed_files, not title tokens."""
+    service = FakeService()
+    # Review task whose title doesn't mention the file — title-token fallback would miss this
+    issues = [
+        {"id": "T-REV", "state": {"name": "Review"}, "name": "Add return type annotations"},
+    ]
+    service.usage_store.record_task_artifact(
+        task_id="T-REV",
+        artifact={"changed_files": ["src/control_plane/entrypoints/worker/main.py"], "success": True},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+    assert _has_conflict_with_active_task("Decompose main.py", issues, service.usage_store) is True
+
+
+def test_has_conflict_uses_artifact_skips_title_when_artifact_present() -> None:
+    """If artifact exists but changed_files don't overlap, title match should not fire."""
+    service = FakeService()
+    issues = [
+        # Title mentions main.py but artifact shows different files
+        {"id": "T-RUN", "state": {"name": "Running"}, "name": "Decompose main.py (2800L)"},
+    ]
+    service.usage_store.record_task_artifact(
+        task_id="T-RUN",
+        artifact={"changed_files": ["src/other.py"], "success": True},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+    # Proposal targets main.py; artifact says task only touched other.py — no conflict
+    assert _has_conflict_with_active_task("Fix main.py types", issues, service.usage_store) is False
+
+
+def test_has_conflict_uses_open_pr_files_for_running_without_artifact() -> None:
+    """Running task with no artifact should match via open_pr_files set."""
+    issues = [
+        {"id": "T-RUN", "state": {"name": "Running"}, "name": "Some unrelated task"},
+    ]
+    open_pr_files = {"main.py", "client.py"}  # pre-collected from GitHub API
+    assert _has_conflict_with_active_task("Decompose main.py", issues, None, open_pr_files) is True
+
+
+def test_has_conflict_open_pr_files_ignored_for_non_running() -> None:
+    """open_pr_files should not cause false positives on Review tasks (artifact path handles those)."""
+    issues = [
+        {"id": "T-REV", "state": {"name": "Review"}, "name": "Some unrelated task"},
+    ]
+    open_pr_files = {"main.py"}
+    # No artifact, status is Review, open_pr_files only apply to Running
+    assert _has_conflict_with_active_task("Decompose main.py", issues, None, open_pr_files) is False
+
+
 def test_handle_propose_cycle_skips_conflicting_proposals(monkeypatch) -> None:
     """Proposals whose .py filename overlaps with a Running task should be skipped."""
-    from control_plane.entrypoints.worker.main import build_proposal_candidates
     now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
 
     service = FakeService()
@@ -1934,6 +1984,10 @@ def test_handle_propose_cycle_skips_conflicting_proposals(monkeypatch) -> None:
     monkeypatch.setattr(
         "control_plane.entrypoints.worker.main.build_proposal_candidates",
         lambda *a, **kw: ([conflicting_proposal], [], True),
+    )
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main._collect_open_pr_files",
+        lambda service: set(),
     )
     client = FakePlaneClient(
         issues=[
