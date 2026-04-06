@@ -26,6 +26,45 @@ class TaskContractError(ValueError):
     """Raised when a task fails contract validation before execution begins."""
 
 
+def _build_scope_constraints_section(task: BoardTask) -> str | None:
+    """Build a ``## Scope Constraints`` markdown section from *task* metadata.
+
+    Returns ``None`` when *task.allowed_paths* is empty (no constraints to
+    inject).
+    """
+    if not task.allowed_paths:
+        return None
+
+    lines: list[str] = [
+        "## Scope Constraints",
+        "",
+        "You MUST only modify files within these allowed paths:",
+    ]
+    for p in task.allowed_paths:
+        lines.append(f"- {p}")
+
+    # Extract avoid_paths from constraints_text if present.
+    avoid_paths: list[str] = []
+    if task.constraints_text:
+        for raw_line in task.constraints_text.splitlines():
+            stripped = raw_line.strip().removeprefix("-").strip()
+            if stripped.startswith("avoid_paths:"):
+                values = stripped.removeprefix("avoid_paths:").strip()
+                avoid_paths = [v.strip() for v in values.split(",") if v.strip()]
+                break
+
+    if avoid_paths:
+        lines.append("")
+        lines.append("Do NOT modify these paths (prior scope violations):")
+        for p in avoid_paths:
+            lines.append(f"- {p}")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines)
+
+
 class _SelfReviewVerdict:
     """Result of a kodo self-review pass."""
 
@@ -391,6 +430,9 @@ class ExecutionService:
 
             goal_file = workspace_path / "goal.md"
             goal_text = task.goal_text
+            scope_section = _build_scope_constraints_section(task)
+            if scope_section:
+                goal_text = scope_section + goal_text
             if merge_conflict_files:
                 conflict_list = "\n".join(f"- `{f}`" for f in merge_conflict_files)
                 goal_text = (
