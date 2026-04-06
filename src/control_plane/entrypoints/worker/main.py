@@ -545,12 +545,18 @@ def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
 
 
 def extract_triage_follow_up_ids(client: PlaneClient, task_id: str) -> list[str]:
-    """Return the follow_up_task_ids recorded in the improve triage comment, if any."""
+    """Return the follow_up_task_ids recorded in the improve triage comment, if any.
+
+    Comments are stored as Markdown but returned from the API as rendered HTML.
+    After stripping HTML tags the bullet dashes are gone, so we match either
+    '- follow_up_task_ids: ...' (raw markdown) or 'follow_up_task_ids: ...' (stripped HTML).
+    """
     for comment in client.list_comments(task_id):
         text = extract_comment_text(comment)
         if TRIAGE_COMMENT_MARKER.lower() not in text.lower():
             continue
-        raw = parse_context_value(text, "follow_up_task_ids")
+        # Try both with and without leading dash (markdown vs HTML-stripped)
+        raw = parse_context_value(text, "follow_up_task_ids") or parse_execution_value(text, "follow_up_task_ids")
         if not raw or raw.strip().lower() == "none":
             return []
         return [part.strip() for part in raw.split(",") if part.strip() and part.strip().lower() != "none"]
