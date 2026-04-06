@@ -1703,3 +1703,105 @@ def test_run_watch_loop_improve_auto_unblocks_when_resolution_done(monkeypatch) 
     assert ("BLOCKED-1", "Ready for AI") in client.transitions
     # A comment about resolution should have been added
     assert any(UNBLOCK_COMMENT_MARKER in c for _, c in client.issue_comments)
+
+
+# ---------------------------------------------------------------------------
+# promote_backlog_tasks
+# ---------------------------------------------------------------------------
+
+def test_promote_backlog_tasks_promotes_proposer_tasks() -> None:
+    """Backlog tasks with source: proposer label are promoted to Ready for AI."""
+    from control_plane.entrypoints.worker.main import promote_backlog_tasks
+    client = FakePlaneClient([
+        {"id": "B-1", "name": "Decompose foo.py", "state": {"name": "Backlog"}, "labels": [{"name": "task-kind: goal"}, {"name": "source: proposer"}]},
+        {"id": "B-2", "name": "Add tests", "state": {"name": "Backlog"}, "labels": [{"name": "task-kind: goal"}, {"name": "source: autonomy"}]},
+        {"id": "MANUAL", "name": "Manual task", "state": {"name": "Backlog"}, "labels": [{"name": "task-kind: goal"}]},
+    ])
+    promoted = promote_backlog_tasks(client, client.list_issues(), max_promotions=2)
+    assert set(promoted) == {"B-1", "B-2"}
+    assert ("B-1", "Ready for AI") in client.transitions
+    assert ("B-2", "Ready for AI") in client.transitions
+    assert ("MANUAL", "Ready for AI") not in client.transitions
+
+
+def test_promote_backlog_tasks_respects_max() -> None:
+    from control_plane.entrypoints.worker.main import promote_backlog_tasks
+    issues = [
+        {"id": f"B-{i}", "name": f"Task {i}", "state": {"name": "Backlog"}, "labels": [{"name": "task-kind: goal"}, {"name": "source: proposer"}]}
+        for i in range(5)
+    ]
+    client = FakePlaneClient(issues)
+    promoted = promote_backlog_tasks(client, client.list_issues(), max_promotions=2)
+    assert len(promoted) == 2
+
+
+# ---------------------------------------------------------------------------
+# active_task_count_from_issues
+# ---------------------------------------------------------------------------
+
+def test_active_task_count_counts_ready_and_running() -> None:
+    from control_plane.entrypoints.worker.main import active_task_count_from_issues
+    issues = [
+        {"id": "1", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]},
+        {"id": "2", "state": {"name": "Running"}, "labels": [{"name": "task-kind: goal"}]},
+        {"id": "3", "state": {"name": "Blocked"}, "labels": [{"name": "task-kind: goal"}]},
+        {"id": "4", "state": {"name": "Running"}, "labels": [{"name": "task-kind: improve"}]},  # improve, not counted
+    ]
+    assert active_task_count_from_issues(issues) == 2
+
+
+# ---------------------------------------------------------------------------
+# _normalise_proposal_title
+# ---------------------------------------------------------------------------
+
+def test_normalise_strips_line_count_suffix() -> None:
+    from control_plane.entrypoints.worker.main import _normalise_proposal_title
+    assert _normalise_proposal_title("Decompose main.py (2823L, 15 oversized function(s))") == \
+           _normalise_proposal_title("Decompose main.py (2852L, 16 oversized function(s))")
+
+
+def test_normalise_strips_leading_count() -> None:
+    from control_plane.entrypoints.worker.main import _normalise_proposal_title
+    assert _normalise_proposal_title("Fix 213 type error(s) found by ty") == \
+           _normalise_proposal_title("Fix 212 type error(s) found by ty")
+
+
+def test_recently_proposed_matches_despite_metric_drift(monkeypatch) -> None:
+    """Scan drift in line counts should not allow re-proposing the same task."""
+    from control_plane.entrypoints.worker.main import recently_proposed, record_proposed
+    now = datetime(2026, 4, 5, 12, 0, tzinfo=UTC)
+    memory: dict = {"proposed_index": {}, "proposal_timestamps": [], "last_proposal_at": None}
+    record_proposed(memory, title="Decompose main.py (2823L, 15 oversized function(s))", dedup_key="k|decompose|main_py", now=now)
+    later = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    assert recently_proposed(memory, title="Decompose main.py (2852L, 16 oversized function(s))", dedup_key="k|decompose|main_py_v2", now=later)
+
+
+# ---------------------------------------------------------------------------
+# issue_priority
+# ---------------------------------------------------------------------------
+
+def test_issue_priority_high_sorts_first() -> None:
+    from control_plane.entrypoints.worker.main import issue_priority
+    high = {"labels": [{"name": "priority: high"}]}
+    medium = {"labels": [{"name": "priority: medium"}]}
+    low = {"labels": [{"name": "priority: low"}]}
+    unset = {"labels": []}
+    assert issue_priority(high) < issue_priority(medium) < issue_priority(low) < issue_priority(unset)
+
+
+# ---------------------------------------------------------------------------
+# blocked_issue_is_stale
+# ---------------------------------------------------------------------------
+
+def test_blocked_issue_is_stale_old_task() -> None:
+    from control_plane.entrypoints.worker.main import blocked_issue_is_stale
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    old = {"updated_at": "2026-03-01T00:00:00+00:00"}
+    assert blocked_issue_is_stale(old, now=now) is True
+
+
+def test_blocked_issue_is_stale_recent_task() -> None:
+    from control_plane.entrypoints.worker.main import blocked_issue_is_stale
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    recent = {"updated_at": "2026-04-05T00:00:00+00:00"}
+    assert blocked_issue_is_stale(recent, now=now) is False

@@ -25,6 +25,9 @@ TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 UNBLOCK_COMMENT_MARKER = "[Improve] Resolution complete"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
 PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
+# Set CONTROL_PLANE_NOTIFY_WEBHOOK to a URL to receive POST notifications when a
+# task is blocked and requires human attention.
+_NOTIFY_WEBHOOK_ENV = "CONTROL_PLANE_NOTIFY_WEBHOOK"
 RATE_LIMIT_BACKOFF_MULTIPLIER = 4
 UNKNOWN_BLOCKED_CLASSIFICATION = "unknown"
 MAX_IMPROVE_FOLLOW_UPS_PER_CYCLE = 3
@@ -34,6 +37,14 @@ PROPOSAL_COOLDOWN_SECONDS = 20 * 60
 PROPOSAL_WINDOW_SECONDS = 24 * 60 * 60
 RECENTLY_PROPOSED_WINDOW_SECONDS = 7 * 24 * 60 * 60
 LOW_BACKLOG_THRESHOLD = 6
+# Don't create new proposals if this many tasks are already active (Ready for AI or Running).
+# Prevents flooding the board when work is already queued.
+MAX_ACTIVE_TASKS_FOR_PROPOSALS = 3
+# Maximum tasks to promote from Backlog → Ready for AI when the board is idle.
+MAX_BACKLOG_PROMOTIONS_PER_CYCLE = 2
+# Blocked tasks with human_attention_required that have sat untouched longer than this
+# will be escalated with a fresh re-triage task.
+STALE_BLOCKED_ESCALATION_DAYS = 7
 EXECUTION_ACTIONS = {"execute", "improve_task"}
 MAX_CLASSIFICATION_ISSUES = 20
 _logger = logging.getLogger(__name__)
@@ -86,6 +97,26 @@ class ProposalCycleResult:
 
 def worker_title(role: str) -> str:
     return role.capitalize()
+
+
+def notify_human_attention(task_id: str, task_title: str, classification: str, reason: str) -> None:
+    """POST a JSON notification to CONTROL_PLANE_NOTIFY_WEBHOOK if configured."""
+    webhook_url = os.environ.get(_NOTIFY_WEBHOOK_ENV, "").strip()
+    if not webhook_url:
+        return
+    payload = {
+        "event": "human_attention_required",
+        "task_id": task_id,
+        "task_title": task_title,
+        "classification": classification,
+        "reason": reason,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+    try:
+        with httpx.Client(timeout=10) as http:
+            http.post(webhook_url, json=payload)
+    except Exception:
+        pass  # Notification is best-effort; never block the workflow
 
 
 def render_worker_comment(title: str, bullets: list[str]) -> str:
@@ -352,6 +383,19 @@ def issue_source(issue: dict[str, Any]) -> str | None:
     return None
 
 
+_PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def issue_priority(issue: dict[str, Any]) -> int:
+    """Return a sort key for task priority (0=high, 1=medium, 2=low, 3=unset)."""
+    for label in issue_label_names(issue):
+        normalized = label.strip().lower()
+        if normalized.startswith("priority:"):
+            val = normalized.split(":", 1)[1].strip()
+            return _PRIORITY_ORDER.get(val, 3)
+    return 3
+
+
 def issue_is_improve_generated(issue: dict[str, Any]) -> bool:
     return issue_source(issue) == "improve-worker"
 
@@ -418,6 +462,67 @@ def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]], *, rep
         if issue_status_name(issue) in {"Ready for AI", "Running"}:
             ready_or_running_count += 1
     return ready_or_running_count == 0 and open_count <= LOW_BACKLOG_THRESHOLD
+
+
+def active_task_count_from_issues(issues: list[dict[str, Any]]) -> int:
+    """Count goal/test tasks currently in Ready for AI or Running state."""
+    count = 0
+    for issue in issues:
+        if issue_task_kind(issue) not in {"goal", "test"}:
+            continue
+        if issue_status_name(issue) in {"Ready for AI", "Running"}:
+            count += 1
+    return count
+
+
+def promote_backlog_tasks(
+    client: PlaneClient,
+    issues: list[dict[str, Any]],
+    *,
+    max_promotions: int = MAX_BACKLOG_PROMOTIONS_PER_CYCLE,
+) -> list[str]:
+    """Promote the oldest Backlog tasks to Ready for AI when the board is idle.
+
+    Only promotes tasks that were created by the autonomy system (have a
+    PROPOSE_COMMENT_MARKER comment or a 'source: proposer' / 'source: autonomy'
+    label), to avoid promoting manually-created Backlog items unexpectedly.
+    Returns list of promoted task IDs.
+    """
+    candidates: list[dict[str, Any]] = []
+    for issue in issues:
+        if issue_status_name(issue).strip().lower() != "backlog":
+            continue
+        if issue_task_kind(issue) not in {"goal", "test"}:
+            continue
+        labels = issue_label_names(issue)
+        source = next(
+            (lbl.split(":", 1)[1].strip().lower() for lbl in labels if lbl.lower().startswith("source:")),
+            "",
+        )
+        if source in {"proposer", "autonomy", "improve-worker"}:
+            candidates.append(issue)
+    if not candidates:
+        return []
+    promoted: list[str] = []
+    for issue in candidates[:max_promotions]:
+        task_id = str(issue["id"])
+        try:
+            client.transition_issue(task_id, "Ready for AI")
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Propose] Backlog task promoted to Ready for AI",
+                    [
+                        f"task_id: {task_id}",
+                        "reason: board was idle with no active tasks",
+                        "action: promoted from Backlog to Ready for AI",
+                    ],
+                ),
+            )
+            promoted.append(task_id)
+        except Exception:
+            pass
+    return promoted
 
 
 _PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
@@ -488,11 +593,22 @@ def select_watch_candidate(
                 return task_id, "blocked_triage"
             if blocked_resolution_is_complete(client, task_id):
                 return task_id, "blocked_resolution_complete"
+            # Stale dead-end: human_attention with no follow-ups, sitting for >7 days.
+            # Create a fresh re-triage task rather than leaving it frozen forever.
+            if (
+                blocked_issue_is_stale(candidate)
+                and get_triage_human_attention_flag(client, task_id)
+                and not extract_triage_follow_up_ids(client, task_id)
+                and not blocked_issue_already_escalated(client, task_id)
+            ):
+                return task_id, "blocked_stale_escalation"
             if known_triaged_blocked_ids is not None:
                 known_triaged_blocked_ids.add(task_id)
         raise ValueError("No improve work item found for blocked triage or improve task routing")
 
-    for issue in issues:
+    # Sort by priority label (high → medium → low → unset) before iterating.
+    sorted_issues = sorted(issues, key=issue_priority)
+    for issue in sorted_issues:
         task_id = str(issue["id"])
         if skip_ids and task_id in skip_ids:
             continue
@@ -538,10 +654,45 @@ def issue_description_text(issue: dict[str, Any]) -> str:
     return ""
 
 
+STALE_ESCALATION_MARKER = "[Improve] Stale blocked escalation"
+
+
 def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
     for comment in client.list_comments(task_id):
         if TRIAGE_COMMENT_MARKER.lower() in extract_comment_text(comment).lower():
             return True
+    return False
+
+
+def blocked_issue_already_escalated(client: PlaneClient, task_id: str) -> bool:
+    """Return True if this task was already escalated (stale escalation marker present)."""
+    for comment in client.list_comments(task_id):
+        if STALE_ESCALATION_MARKER.lower() in extract_comment_text(comment).lower():
+            return True
+    return False
+
+
+def blocked_issue_is_stale(issue: dict[str, Any], *, now: datetime | None = None) -> bool:
+    """Return True if this blocked task has been sitting untouched past STALE_BLOCKED_ESCALATION_DAYS."""
+    now = now or datetime.now(UTC)
+    raw = issue.get("updated_at") or issue.get("created_at")
+    if not raw:
+        return False
+    try:
+        updated = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        return (now - updated).days >= STALE_BLOCKED_ESCALATION_DAYS
+    except (ValueError, TypeError):
+        return False
+
+
+def get_triage_human_attention_flag(client: PlaneClient, task_id: str) -> bool:
+    """Return True if the triage comment on this task set human_attention_required: true."""
+    for comment in client.list_comments(task_id):
+        text = extract_comment_text(comment)
+        if TRIAGE_COMMENT_MARKER.lower() not in text.lower():
+            continue
+        val = parse_context_value(text, "human_attention_required") or parse_execution_value(text, "human_attention_required")
+        return (val or "").strip().lower() == "true"
     return False
 
 
@@ -648,6 +799,26 @@ def existing_proposal_keys(client: PlaneClient, *, issues: list[dict[str, Any]] 
     return keys
 
 
+def _summarise_prior_failures(client: PlaneClient, task_id: str) -> str:
+    """Return a compact summary of prior execution failures from task comments."""
+    classifications: list[str] = []
+    outcomes: list[str] = []
+    for comment in client.list_comments(task_id):
+        text = extract_comment_text(comment)
+        m = re.search(r"blocked_classification:\s*([a-z_]+)", text)
+        if m:
+            classifications.append(m.group(1))
+        m = re.search(r"outcome_reason:\s*(\S+)", text)
+        if m and m.group(1) not in {"none", ""}:
+            outcomes.append(m.group(1))
+    parts: list[str] = []
+    if classifications:
+        parts.append("classifications=" + ",".join(dict.fromkeys(classifications)))
+    if outcomes:
+        parts.append("outcomes=" + ",".join(dict.fromkeys(outcomes)))
+    return "; ".join(parts)
+
+
 def recent_classification_counts(client: PlaneClient, *, issues: list[dict[str, Any]] | None = None) -> dict[str, int]:
     counts: dict[str, int] = {}
     scanned = 0
@@ -704,36 +875,36 @@ def reconcile_stale_running_issues(
         #   - attempts >= 2: retried and failed more than once
         #   - attempts >= 1 and has_signature: executed to completion but left Running
         should_requeue = attempts == 0 or (attempts == 1 and not has_signature)
+        # Collect prior failure context from existing comments to aid future runs.
+        prior_context = _summarise_prior_failures(client, task_id)
         if should_requeue:
             client.transition_issue(task_id, ready_state)
-            client.comment_issue(
-                task_id,
-                render_worker_comment(
-                    f"[{worker_title(role)}] Re-queued after interrupted execution",
-                    [
-                        f"task_id: {task_id}",
-                        f"task_kind: {task_kind}",
-                        f"result_status: {ready_state.lower().replace(' ', '_')}",
-                        f"attempts: {attempts}",
-                        "reason: execution was interrupted before completion — safe to retry",
-                    ],
-                ),
-            )
+            bullets = [
+                f"task_id: {task_id}",
+                f"task_kind: {task_kind}",
+                f"result_status: {ready_state.lower().replace(' ', '_')}",
+                f"attempts: {attempts}",
+                "reason: execution was interrupted before completion — safe to retry",
+            ]
+            if prior_context:
+                bullets.append(f"prior_failure_context: {prior_context}")
+            client.comment_issue(task_id, render_worker_comment(
+                f"[{worker_title(role)}] Re-queued after interrupted execution", bullets,
+            ))
         else:
             client.transition_issue(task_id, "Blocked")
-            client.comment_issue(
-                task_id,
-                render_worker_comment(
-                    f"[{worker_title(role)}] Stale running task requires human review",
-                    [
-                        f"task_id: {task_id}",
-                        f"task_kind: {task_kind}",
-                        "result_status: blocked",
-                        f"attempts: {attempts}",
-                        "reason: task ran to completion or retried multiple times without success",
-                    ],
-                ),
-            )
+            bullets = [
+                f"task_id: {task_id}",
+                f"task_kind: {task_kind}",
+                "result_status: blocked",
+                f"attempts: {attempts}",
+                "reason: task ran to completion or retried multiple times without success",
+            ]
+            if prior_context:
+                bullets.append(f"prior_failure_context: {prior_context}")
+            client.comment_issue(task_id, render_worker_comment(
+                f"[{worker_title(role)}] Stale running task requires human review", bullets,
+            ))
         reconciled.append(task_id)
     return reconciled
 
@@ -793,6 +964,8 @@ def build_improve_triage_result(
     client: PlaneClient,
     issue: dict[str, Any],
     comments: list[dict[str, Any]],
+    *,
+    include_failure_context: bool = True,
 ) -> ImproveTriageResult:
     classification, rationale = classify_blocked_issue(issue, comments)
     classification_counts = recent_classification_counts(client)
@@ -846,17 +1019,21 @@ def build_improve_triage_result(
             f"Fix the implementation gap exposed by verification in '{issue_title}' so the verification task can pass on the next run."
         )
 
+    prior_context = _summarise_prior_failures(client, str(issue.get("id", ""))) if include_failure_context else ""
+    constraints_lines = [
+        f"- source_task_id: {issue.get('id')}",
+        f"- source_task_kind: {issue_kind}",
+        f"- classification: {classification}",
+        f"- rationale: {rationale}",
+    ]
+    if prior_context:
+        constraints_lines.append(f"- prior_failure_context: {prior_context}")
     follow_up = ImproveFollowUpSpec(
         task_kind=task_kind,
         title=f"Resolve blocked {issue_title}",
         goal_text=goal_text,
         handoff_reason=f"improve_triage_{classification}",
-        constraints_text=(
-            f"- source_task_id: {issue.get('id')}\n"
-            f"- source_task_kind: {issue_kind}\n"
-            f"- classification: {classification}\n"
-            f"- rationale: {rationale}"
-        ),
+        constraints_text="\n".join(constraints_lines),
     )
     return ImproveTriageResult(
         classification=classification,
@@ -874,6 +1051,16 @@ def default_repo_key(service: ExecutionService) -> str:
 
 def proposal_repo_keys(service: ExecutionService) -> list[str]:
     return [key for key, cfg in service.settings.repos.items() if getattr(cfg, "propose_enabled", True)]
+
+
+def _extract_repo_key(issue: dict[str, Any], service: ExecutionService) -> str:
+    """Return the repo key from an issue's label or fall back to the service default."""
+    labels = issue_label_names(issue)
+    repo_label = next(
+        (lbl.split(":", 1)[1].strip() for lbl in labels if lbl.lower().startswith("repo:")),
+        None,
+    )
+    return repo_label or default_repo_key(service)
 
 
 def allowed_paths_for_repo(repo_key: str) -> list[str]:
@@ -2058,10 +2245,27 @@ def proposal_quota_exhausted(memory: dict[str, Any], now: datetime) -> bool:
     return len(timestamps) >= MAX_PROPOSALS_PER_DAY
 
 
+def _normalise_proposal_title(title: str) -> str:
+    """Strip volatile metric suffixes so scan-drift doesn't create duplicate tasks.
+
+    Examples:
+      "Decompose main.py (2823L, 15 oversized function(s))" → "decompose main.py"
+      "Fix 213 type error(s) found by ty"                   → "fix type error(s) found by ty"
+      "Add timeout to 22 subprocess call(s) missing one"    → "add timeout to subprocess call(s) missing one"
+    """
+    s = title.strip().lower()
+    # Remove parenthesised metric blocks: "(2823L, 15 oversized function(s))"
+    s = re.sub(r"\s*\(\d+l[^)]*\)", "", s)
+    # Remove leading counts before known nouns: "213 type error" → "type error"
+    s = re.sub(r"\b\d+\s+(?=type error|subprocess|function|location|loop|recursive)", "", s)
+    return s.strip()
+
+
 def recently_proposed(memory: dict[str, Any], *, title: str, dedup_key: str, now: datetime) -> bool:
     """Return True if this title or dedup_key was proposed within RECENTLY_PROPOSED_WINDOW_SECONDS.
 
-    Also prunes the index of entries older than the window.
+    Also prunes the index of entries older than the window.  Title comparison uses
+    _normalise_proposal_title to tolerate scan-drift in metric suffixes.
     """
     cutoff = now.timestamp() - RECENTLY_PROPOSED_WINDOW_SECONDS
     index: dict[str, float] = {}
@@ -2073,16 +2277,16 @@ def recently_proposed(memory: dict[str, Any], *, title: str, dedup_key: str, now
         if ts >= cutoff:
             index[key] = ts
     memory["proposed_index"] = index
-    title_key = title.strip().lower()
+    title_key = _normalise_proposal_title(title)
     dedup_key_norm = dedup_key.strip().lower()
     return title_key in index or dedup_key_norm in index
 
 
 def record_proposed(memory: dict[str, Any], *, title: str, dedup_key: str, now: datetime) -> None:
-    """Record a newly created proposal in the index."""
+    """Record a newly created proposal in the index using the normalised title."""
     index = dict(memory.get("proposed_index", {}))
     ts = now.timestamp()
-    index[title.strip().lower()] = ts
+    index[_normalise_proposal_title(title)] = ts
     index[dedup_key.strip().lower()] = ts
     memory["proposed_index"] = index
 
@@ -2097,6 +2301,35 @@ def handle_propose_cycle(
     now = now or datetime.now(UTC)
     issues = client.list_issues()
     board_idle = board_is_idle_for_proposals_from_issues(issues)
+
+    # When board is idle (no active tasks), promote existing Backlog tasks before
+    # creating new ones — work through the queue before adding more.
+    if board_idle:
+        promoted_ids = promote_backlog_tasks(client, issues)
+        if promoted_ids:
+            logger = logging.getLogger(__name__)
+            logger.info(json.dumps({"event": "propose_backlog_promoted", "task_ids": promoted_ids}))
+            return ProposalCycleResult(
+                created_task_ids=promoted_ids,
+                decision="backlog_promoted",
+                board_idle=board_idle,
+                reason_summary=f"Promoted {len(promoted_ids)} backlog task(s) to Ready for AI.",
+                proposed_state="Ready for AI",
+            )
+
+    # Throttle new proposals when the board already has enough active work.
+    active_count = active_task_count_from_issues(issues)
+    if active_count >= MAX_ACTIVE_TASKS_FOR_PROPOSALS:
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="board_congested",
+            board_idle=False,
+            reason_summary=(
+                f"Proposal creation throttled: {active_count} tasks already active "
+                f"(limit {MAX_ACTIVE_TASKS_FOR_PROPOSALS})."
+            ),
+        )
+
     remaining = service.usage_store.remaining_exec_capacity(now=now)
     min_remaining = service.settings.execution_controls().min_remaining_exec_for_proposals
     if remaining < min_remaining:
@@ -2589,6 +2822,13 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
         ),
     )
     client.transition_issue(task_id, "Blocked")
+    if triage.human_attention_required:
+        notify_human_attention(
+            task_id=task_id,
+            task_title=str(issue.get("name", "")),
+            classification=triage.classification,
+            reason=triage.reason_summary,
+        )
     return triage.classification, created_ids
 
 
@@ -2782,6 +3022,47 @@ def run_watch_loop(
                             known_triaged_blocked_ids.discard(task_id)
                             logger.info(json.dumps({"event": "watch_unblocked", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "resolved_by": follow_up_ids, "run_id": cycle_run_id}))
                             write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_resolution_complete", task_id=task_id, task_kind=task_kind, counters=counters)
+                        elif action == "blocked_stale_escalation":
+                            # Task has been blocked with human_attention for >7 days with no follow-up.
+                            # Create a re-triage goal task and mark this one as escalated.
+                            issue_for_escalation = client.fetch_issue(task_id)
+                            issue_title = str(issue_for_escalation.get("name", "blocked task"))
+                            escalation_task = client.create_issue(
+                                name=f"Re-triage: {issue_title}",
+                                description=(
+                                    f"## Execution\nrepo: {_extract_repo_key(issue_for_escalation, service)}\nmode: goal\n\n"
+                                    f"## Goal\n"
+                                    f"This task was blocked with human attention required for over {STALE_BLOCKED_ESCALATION_DAYS} days "
+                                    f"without resolution. Re-examine the original blocked task '{issue_title}' ({task_id}) and either:\n"
+                                    "- Resolve the underlying issue and re-queue the original task, or\n"
+                                    "- Close the original task if it is no longer relevant.\n\n"
+                                    "## Context\n"
+                                    f"- original_task_id: {task_id}\n"
+                                    f"- original_task_kind: {task_kind}\n"
+                                    "- escalation_reason: stale_blocked_human_attention\n"
+                                ),
+                                state="Ready for AI",
+                                label_names=["task-kind: goal", "source: improve-worker"],
+                            )
+                            escalation_id = str(escalation_task.get("id", ""))
+                            client.transition_issue(task_id, "Blocked")
+                            client.comment_issue(
+                                task_id,
+                                render_worker_comment(
+                                    STALE_ESCALATION_MARKER,
+                                    [
+                                        f"task_id: {task_id}",
+                                        f"task_kind: {task_kind}",
+                                        "result_status: blocked",
+                                        f"escalation_task_id: {escalation_id}",
+                                        f"reason: blocked with human_attention_required for >{STALE_BLOCKED_ESCALATION_DAYS} days",
+                                    ],
+                                ),
+                            )
+                            known_triaged_blocked_ids.add(task_id)
+                            counters["follow_up_tasks_created"] += 1
+                            logger.info(json.dumps({"event": "watch_stale_escalation", "role": role, "cycle": cycle, "task_id": task_id, "escalation_task_id": escalation_id, "run_id": cycle_run_id}))
+                            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_stale_escalation", task_id=task_id, task_kind=task_kind, follow_up_task_ids=[escalation_id], counters=counters)
                         elif action == "fix_pr_task":
                             handle_fix_pr_task(client, service, task_id)
                             logger.info(json.dumps({"event": "watch_fix_pr_complete", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "run_id": cycle_run_id}))
@@ -2797,7 +3078,7 @@ def run_watch_loop(
                         raise ValueError(f"Unsupported worker role '{role}'")
                 except Exception:
                     if claimed:
-                        _blocked_actions = {"blocked_triage", "blocked_resolution_complete"}
+                        _blocked_actions = {"blocked_triage", "blocked_resolution_complete", "blocked_stale_escalation"}
                         _error_state = "Blocked" if action in _blocked_actions else ready_state
                         client.transition_issue(task_id, _error_state)
                         client.comment_issue(

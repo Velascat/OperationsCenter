@@ -76,6 +76,29 @@ run_janitor() {
   done < <(find "${REPORT_DIR}" -mindepth 1 -maxdepth 1 -type d -mmin +"${max_age_minutes}" -print)
 
   find "${LOG_DIR}" -depth -type d -empty -delete >/dev/null 2>&1 || true
+
+  # Clean up stale task branches left in local repo clones by kodo.
+  # Branches matching "task/*" or "cp/*" whose worktrees no longer exist are removed.
+  _cleanup_stale_task_branches
+}
+
+_cleanup_stale_task_branches() {
+  local branch deleted=0
+  # Only act on repos that are locally cloned (have a .git directory).
+  for repo_dir in "${ROOT_DIR}"/workspace/*/; do
+    [[ -d "${repo_dir}/.git" ]] || continue
+    while IFS= read -r branch; do
+      branch="${branch#  }"  # strip leading whitespace
+      # Skip the current branch and remote-tracking refs.
+      [[ "${branch}" == "* "* ]] && continue
+      [[ "${branch}" == remotes/* ]] && continue
+      # Only prune branches that look like task branches.
+      if [[ "${branch}" =~ ^(task/|cp/|kodo/) ]]; then
+        git -C "${repo_dir}" branch -D "${branch}" >/dev/null 2>&1 && ((deleted++)) || true
+      fi
+    done < <(git -C "${repo_dir}" branch 2>/dev/null | grep -E '^\s*(task/|cp/|kodo/)' || true)
+  done
+  [[ "${deleted}" -gt 0 ]] && echo "Janitor: removed ${deleted} stale task branch(es)" || true
 }
 
 usage() {
