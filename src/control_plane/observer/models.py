@@ -67,6 +67,8 @@ class ExecutionHealthSignal(BaseModel):
     total_runs: int = 0
     executed_count: int = 0
     no_op_count: int = 0
+    unknown_count: int = 0
+    error_count: int = 0
     validation_failed_count: int = 0
     recent_runs: list[ExecutionRunRecord] = Field(default_factory=list)
 

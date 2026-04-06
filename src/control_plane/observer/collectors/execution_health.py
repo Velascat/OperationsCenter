@@ -31,6 +31,8 @@ class ExecutionArtifactCollector:
         total = 0
         executed = 0
         no_op = 0
+        unknown = 0
+        error = 0
         validation_failed = 0
         recent_runs: list[ExecutionRunRecord] = []
 
@@ -77,6 +79,10 @@ class ExecutionArtifactCollector:
                     validation_failed += 1
             elif outcome_status == "no_op":
                 no_op += 1
+            elif outcome_status == "unknown":
+                unknown += 1
+            elif outcome_status == "error":
+                error += 1
 
             recent_runs.append(
                 ExecutionRunRecord(
@@ -93,6 +99,8 @@ class ExecutionArtifactCollector:
             total_runs=total,
             executed_count=executed,
             no_op_count=no_op,
+            unknown_count=unknown,
+            error_count=error,
             validation_failed_count=validation_failed,
             recent_runs=recent_runs[:_RECENT_RUNS_IN_SIGNAL],
         )

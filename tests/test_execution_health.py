@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -152,6 +153,58 @@ def test_collector_returns_empty_signal_when_no_artifacts(tmp_path: Path) -> Non
     assert sig.recent_runs == []
 
 
+def test_collector_counts_unknown_outcomes(tmp_path: Path) -> None:
+    root = tmp_path / "kodo_plane"
+    root.mkdir()
+    _write_run(root, repo_key="ControlPlane", run_id="r0", task_id="t0", worker_role="goal", outcome_status="unknown")
+    _write_run(root, repo_key="ControlPlane", run_id="r1", task_id="t1", worker_role="goal", outcome_status="unknown")
+    _write_run(root, repo_key="ControlPlane", run_id="r2", task_id="t2", worker_role="goal", outcome_status="executed")
+
+    ctx = _FakeContext("ControlPlane", root)
+    sig = ExecutionArtifactCollector().collect(ctx)  # type: ignore[arg-type]
+
+    assert sig.total_runs == 3
+    assert sig.unknown_count == 2
+    assert sig.executed_count == 1
+    assert sig.error_count == 0
+
+
+def test_collector_counts_error_outcomes(tmp_path: Path) -> None:
+    root = tmp_path / "kodo_plane"
+    root.mkdir()
+    _write_run(root, repo_key="ControlPlane", run_id="r0", task_id="t0", worker_role="goal", outcome_status="error")
+    _write_run(root, repo_key="ControlPlane", run_id="r1", task_id="t1", worker_role="goal", outcome_status="error")
+    _write_run(root, repo_key="ControlPlane", run_id="r2", task_id="t2", worker_role="goal", outcome_status="error")
+    _write_run(root, repo_key="ControlPlane", run_id="r3", task_id="t3", worker_role="goal", outcome_status="executed")
+
+    ctx = _FakeContext("ControlPlane", root)
+    sig = ExecutionArtifactCollector().collect(ctx)  # type: ignore[arg-type]
+
+    assert sig.total_runs == 4
+    assert sig.error_count == 3
+    assert sig.executed_count == 1
+    assert sig.unknown_count == 0
+
+
+def test_collector_counts_mixed_unknown_and_error_outcomes(tmp_path: Path) -> None:
+    root = tmp_path / "kodo_plane"
+    root.mkdir()
+    _write_run(root, repo_key="ControlPlane", run_id="r0", task_id="t0", worker_role="goal", outcome_status="unknown")
+    _write_run(root, repo_key="ControlPlane", run_id="r1", task_id="t1", worker_role="goal", outcome_status="error")
+    _write_run(root, repo_key="ControlPlane", run_id="r2", task_id="t2", worker_role="goal", outcome_status="no_op")
+    _write_run(root, repo_key="ControlPlane", run_id="r3", task_id="t3", worker_role="goal", outcome_status="executed")
+    _write_run(root, repo_key="ControlPlane", run_id="r4", task_id="t4", worker_role="goal", outcome_status="unknown")
+
+    ctx = _FakeContext("ControlPlane", root)
+    sig = ExecutionArtifactCollector().collect(ctx)  # type: ignore[arg-type]
+
+    assert sig.total_runs == 5
+    assert sig.unknown_count == 2
+    assert sig.error_count == 1
+    assert sig.no_op_count == 1
+    assert sig.executed_count == 1
+
+
 def test_collector_ignores_dirs_without_required_files(tmp_path: Path) -> None:
     root = tmp_path / "kodo_plane"
     root.mkdir()
@@ -236,6 +289,47 @@ def test_deriver_respects_custom_threshold(tmp_path: Path) -> None:
     assert any("persistent_validation_failures" in i.dedup_key for i in insights_at)
 
 
+def test_deriver_emits_repeated_unknown_failures_at_threshold() -> None:
+    # unknown_count=1 + error_count=1 = 2 >= default threshold of 2
+    sig = ExecutionHealthSignal(total_runs=5, executed_count=3, no_op_count=0, unknown_count=1, error_count=1)
+    snapshot = _make_snapshot("ControlPlane", sig)
+
+    insights = ExecutionHealthDeriver(InsightNormalizer()).derive([snapshot])
+
+    assert any("repeated_unknown_failures" in i.dedup_key for i in insights)
+    matched = next(i for i in insights if "repeated_unknown_failures" in i.dedup_key)
+    assert matched.evidence["unknown_count"] == 1
+    assert matched.evidence["error_count"] == 1
+    assert matched.evidence["unknown_error_total"] == 2
+    assert matched.evidence["pattern"] == "repeated_unknown_failures"
+
+
+def test_deriver_no_repeated_unknown_failures_below_threshold() -> None:
+    # unknown_count=1 + error_count=0 = 1 < default threshold of 2
+    sig = ExecutionHealthSignal(total_runs=5, executed_count=4, no_op_count=0, unknown_count=1, error_count=0)
+    snapshot = _make_snapshot("ControlPlane", sig)
+
+    insights = ExecutionHealthDeriver(InsightNormalizer()).derive([snapshot])
+
+    assert not any("repeated_unknown_failures" in i.dedup_key for i in insights)
+
+
+def test_deriver_repeated_unknown_failures_respects_custom_threshold() -> None:
+    deriver = ExecutionHealthDeriver(InsightNormalizer(), unknown_failure_threshold=4)
+
+    # 3 < 4 threshold → no insight
+    sig_below = ExecutionHealthSignal(total_runs=5, executed_count=2, no_op_count=0, unknown_count=2, error_count=1)
+    snapshot_below = _make_snapshot("ControlPlane", sig_below)
+    insights_below = deriver.derive([snapshot_below])
+    assert not any("repeated_unknown_failures" in i.dedup_key for i in insights_below)
+
+    # 4 >= 4 threshold → insight
+    sig_at = ExecutionHealthSignal(total_runs=6, executed_count=2, no_op_count=0, unknown_count=2, error_count=2)
+    snapshot_at = _make_snapshot("ControlPlane", sig_at)
+    insights_at = deriver.derive([snapshot_at])
+    assert any("repeated_unknown_failures" in i.dedup_key for i in insights_at)
+
+
 def test_deriver_returns_empty_for_empty_snapshots() -> None:
     assert ExecutionHealthDeriver(InsightNormalizer()).derive([]) == []
 
@@ -308,3 +402,134 @@ def test_rule_produces_candidates_for_both_patterns() -> None:
     assert families == {"execution_health_followup"}
     patterns = {s.pattern_key for s in specs}
     assert patterns == {"high_no_op_rate", "persistent_validation_failures"}
+
+
+# ---------------------------------------------------------------------------
+# ExecutionService circuit-breaker: repeated unknown/error failures
+# ---------------------------------------------------------------------------
+
+
+def _make_service_with_report_root(report_root: Path):
+    """Create an ExecutionService with only settings.report_root wired up."""
+    from unittest.mock import MagicMock, patch
+
+    from control_plane.application.service import ExecutionService
+
+    mock_settings = MagicMock()
+    mock_settings.report_root = report_root
+
+    with patch.object(ExecutionService, "__init__", lambda self, *a, **kw: None):
+        svc = ExecutionService.__new__(ExecutionService)
+    svc.settings = mock_settings
+    svc.logger = logging.getLogger("test")
+    return svc
+
+
+def test_service_skips_on_repeated_unknown_failures(tmp_path: Path) -> None:
+    root = tmp_path / "kodo_plane"
+    root.mkdir()
+    # 2 unknown/error outcomes — meets default threshold of 2
+    _write_run(root, repo_key="ControlPlane", run_id="r0", task_id="t0", worker_role="goal", outcome_status="unknown")
+    _write_run(root, repo_key="ControlPlane", run_id="r1", task_id="t1", worker_role="goal", outcome_status="error")
+    _write_run(root, repo_key="ControlPlane", run_id="r2", task_id="t2", worker_role="goal", outcome_status="executed")
+
+    svc = _make_service_with_report_root(root)
+
+    assert svc._check_repeated_unknown_failures("ControlPlane") is True
+
+
+def test_service_does_not_skip_below_unknown_threshold(tmp_path: Path) -> None:
+    root = tmp_path / "kodo_plane"
+    root.mkdir()
+    # Only 1 unknown outcome — below default threshold of 2
+    _write_run(root, repo_key="ControlPlane", run_id="r0", task_id="t0", worker_role="goal", outcome_status="unknown")
+    _write_run(root, repo_key="ControlPlane", run_id="r1", task_id="t1", worker_role="goal", outcome_status="executed")
+    _write_run(root, repo_key="ControlPlane", run_id="r2", task_id="t2", worker_role="goal", outcome_status="no_op")
+
+    svc = _make_service_with_report_root(root)
+
+    assert svc._check_repeated_unknown_failures("ControlPlane") is False
+
+
+def test_service_skip_produces_correct_result_fields(tmp_path: Path) -> None:
+    """When the unknown-failures circuit-breaker fires during execute(),
+    the returned ExecutionResult must have the expected fields."""
+    from unittest.mock import MagicMock, patch
+
+    from control_plane.application.service import ExecutionService
+    from control_plane.domain import BoardTask, ExecutionResult
+
+    root = tmp_path / "kodo_plane"
+    root.mkdir()
+    # Write 2 unknown runs so the breaker triggers
+    _write_run(root, repo_key="MyRepo", run_id="r0", task_id="t0", worker_role="goal", outcome_status="unknown")
+    _write_run(root, repo_key="MyRepo", run_id="r1", task_id="t1", worker_role="goal", outcome_status="error")
+
+    # Build a minimal service with mocked internals
+    with patch.object(ExecutionService, "__init__", lambda self, *a, **kw: None):
+        svc = ExecutionService.__new__(ExecutionService)
+
+    mock_settings = MagicMock()
+    mock_settings.report_root = root
+    svc.settings = mock_settings
+    svc.logger = logging.getLogger("test")
+
+    # Mock reporter
+    mock_reporter = MagicMock()
+    run_dir = tmp_path / "run_dir"
+    run_dir.mkdir()
+    mock_reporter.create_run_dir.return_value = run_dir
+    mock_reporter.write_request_context.return_value = "artifact0"
+    mock_reporter.write_control_outcome.return_value = "artifact1"
+    mock_reporter.write_summary.return_value = "artifact2"
+    svc.reporter = mock_reporter
+
+    # Mock workspace
+    mock_workspace = MagicMock()
+    mock_workspace.create.return_value = tmp_path / "ws"
+    svc.workspace = mock_workspace
+
+    # Mock usage_store — need noop_decision, budget_decision
+    mock_usage = MagicMock()
+    noop_decision = MagicMock()
+    noop_decision.should_skip = False
+    mock_usage.noop_decision.return_value = noop_decision
+    mock_usage.issue_signature.return_value = "sig"
+    budget_decision = MagicMock()
+    budget_decision.allowed = True
+    mock_usage.budget_decision.return_value = budget_decision
+    retry_decision = MagicMock()
+    retry_decision.allowed = True
+    mock_usage.retry_decision.return_value = retry_decision
+    svc.usage_store = mock_usage
+
+    # Mock plane_client
+    mock_plane = MagicMock()
+    task = BoardTask(
+        task_id="TSK-1",
+        project_id="proj-1",
+        title="Test task",
+        description="desc",
+        status="Todo",
+        repo_key="MyRepo",
+        base_branch="main",
+        execution_mode="goal",
+        goal_text="do something",
+    )
+    mock_plane.fetch_issue.return_value = {"id": "TSK-1"}
+    mock_plane.to_board_task.return_value = task
+
+    # _validate_task_contract and _repo_target_for
+    svc._validate_task_contract = MagicMock()  # type: ignore[method-assign]
+    mock_repo_target = MagicMock()
+    mock_repo_target.repo_key = "MyRepo"
+    mock_repo_target.allowed_base_branches = None
+    svc._repo_target_for = MagicMock(return_value=mock_repo_target)  # type: ignore[method-assign]
+    svc._find_open_fix_validation_task = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+    result = svc.run_task(mock_plane, "TSK-1", worker_role="goal")
+
+    assert isinstance(result, ExecutionResult)
+    assert result.outcome_status == "skipped"
+    assert result.outcome_reason == "repeated_unknown_failures"
+    assert result.success is True

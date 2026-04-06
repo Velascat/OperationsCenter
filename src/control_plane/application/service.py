@@ -284,6 +284,43 @@ class ExecutionService:
                 artifacts.append(self.reporter.write_summary(run_dir, result))
                 return result
 
+            # Circuit-breaker: skip if recent runs show repeated unknown/error outcomes
+            if self._check_repeated_unknown_failures(task.repo_key):
+                self._log_event(
+                    "circuit_breaker_skip_unknown_failures",
+                    run_id,
+                    repo_key=task.repo_key,
+                )
+                result = ExecutionResult(
+                    run_id=run_id,
+                    worker_role=worker_role,
+                    task_kind=task.execution_mode,
+                    success=True,
+                    outcome_status="skipped",
+                    outcome_reason="repeated_unknown_failures",
+                    summary=(
+                        f"run_id={run_id} status=skipped reason=repeated_unknown_failures "
+                        f"repo={task.repo_key}"
+                    ),
+                    final_status=task.status,
+                    artifacts=artifacts,
+                )
+                artifacts.append(
+                    self.reporter.write_control_outcome(
+                        run_dir,
+                        {
+                            "action": "execute_task",
+                            "status": "skipped",
+                            "reason": "repeated_unknown_failures",
+                            "repo_key": task.repo_key,
+                            "task_id": task.task_id,
+                            "worker_role": worker_role,
+                        },
+                    )
+                )
+                artifacts.append(self.reporter.write_summary(run_dir, result))
+                return result
+
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
                 raise TaskContractError(
                     f"Base branch '{task.base_branch}' is not in the allowed list for repo "
@@ -718,6 +755,44 @@ class ExecutionService:
             raise
         finally:
             self.workspace.cleanup(workspace_path)
+
+    def _check_repeated_unknown_failures(self, repo_key: str, threshold: int = 2) -> bool:
+        """Return ``True`` when recent runs for *repo_key* have accumulated
+        at least *threshold* unknown/error outcomes, indicating a pattern of
+        repeated failures that should trip the circuit-breaker."""
+        report_root = Path(self.settings.report_root)
+        if not report_root.exists():
+            return False
+
+        run_dirs = sorted(
+            [d for d in report_root.iterdir() if d.is_dir()],
+            reverse=True,
+        )[:20]
+
+        bad_count = 0
+        for run_dir in run_dirs:
+            outcome_file = run_dir / "control_outcome.json"
+            request_file = run_dir / "request.json"
+            if not outcome_file.exists() or not request_file.exists():
+                continue
+            try:
+                outcome = json.loads(outcome_file.read_text())
+                request = json.loads(request_file.read_text())
+            except Exception:  # noqa: BLE001
+                continue
+
+            task_data = request.get("task", {})
+            run_repo = task_data.get("repo_key", "")
+            if run_repo.lower() != repo_key.lower():
+                continue
+
+            status = str(outcome.get("status", "unknown"))
+            if status in ("unknown", "error"):
+                bad_count += 1
+                if bad_count >= threshold:
+                    return True
+
+        return False
 
     def _find_open_fix_validation_task(self, plane_client: PlaneClient, repo_key: str) -> str | None:
         """Return the id of an unresolved fix-validation task for *repo_key*, or ``None``."""
