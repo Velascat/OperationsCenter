@@ -20,6 +20,7 @@ from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService, TaskParser
 from control_plane.config import load_settings
 from control_plane.domain import ExecutionResult
+from control_plane.execution.usage_store import UsageStore
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
 PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
@@ -622,9 +623,20 @@ def recent_classification_counts(client: PlaneClient, *, issues: list[dict[str, 
     return counts
 
 
-def reconcile_stale_running_issues(client: PlaneClient, *, role: str, ready_state: str) -> list[str]:
+def reconcile_stale_running_issues(
+    client: PlaneClient,
+    *,
+    role: str,
+    ready_state: str,
+    usage_store: "UsageStore | None" = None,
+) -> list[str]:
     if role not in {"goal", "test", "improve"}:
         return []
+    store = usage_store or UsageStore()
+    usage_data = store.load()
+    task_attempts: dict[str, int] = {
+        k: int(v) for k, v in usage_data.get("task_attempts", {}).items()
+    }
     reconciled: list[str] = []
     for issue in client.list_issues():
         if issue_status_name(issue) != "Running":
@@ -636,19 +648,36 @@ def reconcile_stale_running_issues(client: PlaneClient, *, role: str, ready_stat
         elif task_kind != role:
             continue
         task_id = str(issue["id"])
-        client.transition_issue(task_id, "Blocked")
-        client.comment_issue(
-            task_id,
-            render_worker_comment(
-                f"[{worker_title(role)}] Stale running task requires human review",
-                [
-                    f"task_id: {task_id}",
-                    f"task_kind: {task_kind}",
-                    "result_status: blocked",
-                    "reason: task was left in Running without a clean completion — moved to Blocked for human review before retry",
-                ],
-            ),
-        )
+        # If kodo never ran on this task (attempts == 0), the watcher was
+        # restarted right after claiming — re-queue rather than blocking.
+        if task_attempts.get(task_id, 0) == 0:
+            client.transition_issue(task_id, ready_state)
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    f"[{worker_title(role)}] Re-queued after interrupted claim",
+                    [
+                        f"task_id: {task_id}",
+                        f"task_kind: {task_kind}",
+                        f"result_status: {ready_state.lower().replace(' ', '_')}",
+                        "reason: task was claimed but execution never started — re-queued for retry",
+                    ],
+                ),
+            )
+        else:
+            client.transition_issue(task_id, "Blocked")
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    f"[{worker_title(role)}] Stale running task requires human review",
+                    [
+                        f"task_id: {task_id}",
+                        f"task_kind: {task_kind}",
+                        "result_status: blocked",
+                        "reason: task was left in Running without a clean completion — moved to Blocked for human review before retry",
+                    ],
+                ),
+            )
         reconciled.append(task_id)
     return reconciled
 
