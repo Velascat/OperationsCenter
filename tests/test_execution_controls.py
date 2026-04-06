@@ -46,3 +46,66 @@ def test_usage_store_tracks_retry_and_noop_state(monkeypatch, tmp_path: Path) ->
     # After >1h gap (human unblocked it) → auto-reset, allowed again
     retry_after_gap = store.retry_decision(task_id="T1", now=now + timedelta(hours=2))
     assert retry_after_gap.allowed is True
+
+
+def test_retry_cap_reset_only_after_one_hour_gap(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "1")
+    store = UsageStore()
+    now = datetime(2026, 3, 31, 12, tzinfo=UTC)
+
+    store.record_execution(role="goal", task_id="T1", signature="sig-1", now=now)
+
+    # At +30min: cap hit and recent → blocked
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=30))
+    assert retry.allowed is False
+
+    # At +59min: still within 1h window → blocked
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=59))
+    assert retry.allowed is False
+
+    # At +61min: >1h gap triggers reset → allowed
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=61))
+    assert retry.allowed is True
+    assert retry.attempts == 0
+
+
+def test_retry_cap_reset_clears_signatures(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "1")
+    store = UsageStore()
+    now = datetime(2026, 3, 31, 12, tzinfo=UTC)
+
+    store.record_execution(role="goal", task_id="T1", signature="sig-a", now=now)
+
+    # Cap is hit
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=10))
+    assert retry.allowed is False
+
+    # Wait >1h to trigger reset
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(hours=2))
+    assert retry.allowed is True
+
+    # Signature was cleared by reset → noop_decision should not skip
+    noop = store.noop_decision(role="goal", task_id="T1", signature="sig-a")
+    assert noop.should_skip is False
+
+
+def test_retry_cap_recent_block_preserves_attempts(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "2")
+    store = UsageStore()
+    now = datetime(2026, 3, 31, 12, tzinfo=UTC)
+
+    store.record_execution(role="goal", task_id="T1", signature="sig-1", now=now)
+    store.record_execution(role="goal", task_id="T1", signature="sig-2", now=now + timedelta(minutes=1))
+
+    # Blocked at +10min
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=10))
+    assert retry.allowed is False
+    assert retry.attempts == 2
+
+    # Blocked again at +20min — attempts unchanged (no mutation from repeated blocked checks)
+    retry = store.retry_decision(task_id="T1", now=now + timedelta(minutes=20))
+    assert retry.allowed is False
+    assert retry.attempts == 2

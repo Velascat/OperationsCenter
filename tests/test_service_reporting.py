@@ -226,6 +226,76 @@ def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path, monk
     assert any("internal_changed_files: kodo/config.json, kodo/run-status.md" in comment for comment in comments)
 
 
+def test_no_op_with_validation_failure_routes_to_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    settings = Settings.model_validate(
+        {
+            "plane": {
+                "base_url": "http://plane.local",
+                "api_token_env": "PLANE_API_TOKEN",
+                "workspace_slug": "ws",
+                "project_id": "proj",
+            },
+            "git": {"provider": "github"},
+            "kodo": {},
+            "repos": {
+                "repo_a": {
+                    "clone_url": "git@github.com:you/repo_a.git",
+                    "default_branch": "main",
+                }
+            },
+            "report_root": str(tmp_path / "reports"),
+        }
+    )
+    service = ExecutionService(settings)
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    # Create the goal file so the validation-retry path can append to it
+    goal_file = workspace / "goal.md"
+    goal_file.write_text("# Goal\nDo thing.\n")
+
+    transitions: list[str] = []
+    comments: list[str] = []
+
+    class Client(ValidPlaneClient):
+        def transition_issue(self, task_id: str, state: str) -> None:  # noqa: ARG002
+            transitions.append(state)
+
+        def comment_issue(self, task_id: str, comment_markdown: str) -> None:  # noqa: ARG002
+            comments.append(comment_markdown)
+
+    service.workspace.create = lambda: workspace  # type: ignore[assignment]
+    service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
+    service.git.clone = lambda clone_url, workspace_path: repo_path  # type: ignore[assignment]
+    service.git.verify_remote_branch_exists = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.checkout_base = lambda repo_path, branch: None  # type: ignore[assignment]
+    service.git.set_identity = lambda repo_path, author_name, author_email: None  # type: ignore[assignment]
+    service.git.create_task_branch = lambda repo_path, task_branch: None  # type: ignore[assignment]
+    service.git.changed_files = lambda repo_path: ["kodo/config.json", "kodo/run-status.md"]  # type: ignore[assignment]
+    service.git.diff_stat = lambda repo_path: "untracked | kodo/config.json\nuntracked | kodo/run-status.md"  # type: ignore[assignment]
+    service.git.diff_patch = lambda repo_path: ""  # type: ignore[assignment]
+    service.git.commit_all = lambda repo_path, message: (_ for _ in ()).throw(AssertionError("should not commit internal-only changes"))  # type: ignore[assignment]
+    service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path, env=None: type(  # type: ignore[assignment]
+        "KodoResult",
+        (),
+        {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},
+    )()
+    service.kodo.command_to_json = lambda cmd: "{}"  # type: ignore[assignment]
+    service.kodo.is_orchestrator_rate_limited = lambda result: False  # type: ignore[assignment]
+    service.validation.run = lambda commands, cwd, env=None, **kwargs: [ValidationResult(command="pytest", exit_code=1, stdout="", stderr="FAIL", duration_ms=100)]  # type: ignore[assignment]
+    service.validation.passed = lambda results: False  # type: ignore[assignment]
+    service.bootstrapper.prepare = lambda *args, **kwargs: type("BootstrapResult", (), {"env": {}, "commands": []})()  # type: ignore[assignment]
+
+    result = service.run_task(Client(), "TASK-NOOP-FAIL", preauthorized=True)
+
+    assert result.outcome_status == "no_op"
+    assert result.final_status == "Blocked"
+    assert transitions[-1] == "Blocked"
+
+
 def test_comment_markdown_includes_validation_errors_on_failure() -> None:
     task = type("Task", (), {"task_id": "TASK-V1"})
     validation_results = [
