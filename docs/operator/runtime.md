@@ -95,6 +95,41 @@ python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/l
 
 Exits with code 0 when all watchers are healthy, code 1 when any heartbeat is stale (> 5 minutes old). Suitable for cron-based monitoring.
 
+## Parallel Execution
+
+Each watcher lane runs one task at a time by default. For higher throughput, set `parallel_slots` in config or pass `--parallel-slots N` on the CLI:
+
+```bash
+./scripts/control-plane.sh watch --role goal --parallel-slots 3
+```
+
+Or in config:
+```yaml
+parallel_slots: 2
+```
+
+Slot 0 is the primary slot and runs all periodic scans (heartbeat, improve sub-scans, config drift check, credential validation). Additional slots only execute tasks. The Plane API's state machine prevents two slots from claiming the same task.
+
+**Always review board throughput before increasing slots** — parallel execution amplifies any misconfiguration in task scope or execution budget.
+
+## Spend Report
+
+To see how many tasks have been executed and their estimated cost:
+
+```bash
+# Last 24 hours (default)
+python -m control_plane.entrypoints.worker.main spend-report
+
+# Last 7 days
+python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+```
+
+Cost tracking requires `cost_per_execution_usd` to be set in config (default 0.0 = disabled). The value is operator-supplied; ControlPlane does not parse Kodo billing output.
+
+```yaml
+cost_per_execution_usd: 0.15   # rough estimate per task run
+```
+
 ## Logs And Artifacts
 
 - command logs: `logs/local/`

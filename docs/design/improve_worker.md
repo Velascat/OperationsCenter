@@ -41,6 +41,8 @@ Blocked tasks are classified into a small fixed set:
 - `dependency_missing`
 - `unknown`
 
+Additionally, `pre_exec_rejected` is used by the goal watcher when a task fails pre-execution validation before any Kodo run begins.
+
 This vocabulary is shared across board comments, watcher logs, and retained summaries.
 
 ## Improve Decision Model
@@ -70,12 +72,16 @@ This keeps improve behavior explainable and testable.
 
 ## Periodic Scans (improve watcher, cycle-gated)
 
+All scans run on the primary slot only when `parallel_slots > 1`.
+
 | Scan | Frequency | What it does |
 |------|-----------|-------------|
 | Review revision | every 3 cycles | Detects `CHANGES_REQUESTED` reviews on open PRs; creates `[Revise]` tasks |
 | Merge conflict | every 5 cycles | Checks `mergeable==false`; attempts rebase; creates `[Rebase]` task on failure |
 | Post-merge regression | every 10 cycles | Checks merged PR CI status; creates regression tasks for failures |
+| Feedback loop scan | every 15 cycles | Checks Done tasks' PR state on GitHub; auto-records merged/closed outcomes to `state/proposal_feedback/` |
 | Stale PR TTL | every 20 cycles | Closes PRs older than `stale_pr_days` (default 7); requeues to Backlog |
+| Workspace health | every 25 cycles | Verifies venv python per repo; attempts bootstrap repair on failure; creates `[Workspace]` task if repair fails |
 
 ## Context Handoff for `context_limit` Tasks
 
@@ -84,6 +90,22 @@ When a task fails with `context_limit`, the follow-up task includes a `prior_pro
 ## Flaky Test Detection
 
 The improve watcher tracks per-command validation outcomes. When a command has failed ≥30% of its last 10 runs, it is classified as `flaky_test` rather than `validation_failure`. The follow-up task targets stabilizing the test rather than retrying the original goal.
+
+## Feedback Loop Automation
+
+Every 15 improve cycles, `handle_feedback_loop_scan` checks Done tasks that have a
+`pull_request_url` in their artifact but no `state/proposal_feedback/<id>.json` file.
+It fetches the GitHub PR state and writes the feedback record automatically.  This closes
+the learning loop for PRs merged or closed by humans outside the review watcher.
+
+## Workspace Health Monitoring
+
+Every 25 improve cycles, `handle_workspace_health_check` runs a quick sanity check
+(`python -c "import sys; sys.exit(0)"`) inside the venv of each repo with a `local_path`
+configured.  On failure it attempts `RepoEnvironmentBootstrapper.prepare()`.  If bootstrap
+also fails, a high-priority `[Workspace] Repair environment for <repo>` goal task is
+created.  This prevents a broken venv from causing every subsequent task to fail silently
+with `dependency_missing` or `infra_tooling`.
 
 ## Escalation
 

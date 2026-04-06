@@ -1,6 +1,6 @@
-# Autonomy Hardening — 18 Full-Autonomy Gap Improvements
+# Autonomy Hardening — 26 Full-Autonomy Gap Improvements
 
-This document describes the 18 improvements implemented across two sessions to close the
+This document describes the 26 improvements implemented across three sessions to close the
 gaps toward fully autonomous operation. They are grouped by session, then by theme.
 
 ---
@@ -308,6 +308,176 @@ stale_pr_days: 7   # default
 
 ---
 
+---
+
+## Session 3 — 8 Reliability and Throughput Improvements
+
+### 1. GitHub API Rate-Limit Handling
+
+**Problem:** The GitHub adapter made bare `httpx.get/post/...` calls with no rate-limit
+awareness. Under load with multiple repos, 429 responses silently dropped entire scan
+cycles — the improve watcher looked alive while blind to CI failures, merge conflicts,
+and review feedback.
+
+**Fix:** All GitHub API calls now go through `GitHubPRClient._request()`.  On 429, it
+reads the `Retry-After` header (defaulting to 60 s) and retries up to 3 times before
+propagating the error. When `X-RateLimit-Remaining` drops below 10, a `github_rate_limit_low`
+warning is logged so operators have advance notice before hard throttling.
+
+**Files:** `github_pr.py` (`_request`, replaces all direct `httpx.*` call sites)
+
+---
+
+### 2. Pre-Execution Task Validation
+
+**Problem:** Vague or un-actionable tasks were sent to Kodo, failed, became blocked, and
+triggered an improve triage cycle — costing 2–3 full execution passes to discover the
+original task was malformed. The improve worker's triage vocabulary named the failure
+modes (`scope_policy`, `parse_config`) but only saw them after the fact.
+
+**Fix:** `validate_task_pre_execution()` runs on the goal watcher immediately before a
+task is claimed. It checks:
+1. Goal text is non-empty and within a useful length range (30–8000 chars).
+2. Goal text does not contain a vague catch-all phrase (`fix everything`, etc.).
+3. If the goal mentions source files by extension, at least one must exist in a configured `local_path`.
+
+On failure, the task is moved to Backlog with a comment explaining which check failed.
+Empty-goal tasks pass through (conservative — we cannot positively determine they're bad).
+
+**Files:** `main.py` (`validate_task_pre_execution`, called in `run_watch_loop` before claim)
+
+---
+
+### 3. Feedback Loop Automation
+
+**Problem:** The `feedback` CLI entrypoint existed but was manual. When a human closed a
+PR without merging, or a task moved to Done outside the watcher loop (manual merge,
+operator action), `proposal_success_rate` didn't update. The per-category learning signal
+drifted away from reality.
+
+**Fix:** `handle_feedback_loop_scan()` runs every 15 improve cycles. For each Done issue
+with a recorded `pull_request_url` artifact that has no `state/proposal_feedback/<id>.json`
+file, it fetches the PR state from GitHub and writes the feedback record automatically.
+It also updates `proposal_success_rate` via the usage store so the proposer learns from
+these outcomes immediately.
+
+**Files:** `main.py` (`handle_feedback_loop_scan`, `_FEEDBACK_DIR`, `_FEEDBACK_LOOP_CYCLE_INTERVAL`)
+
+---
+
+### 4. Workspace Health Monitoring
+
+**Problem:** Bootstrap runs once at task start. If a package was yanked, a tool version
+changed, or the venv was corrupted between task runs, every subsequent task failed with
+`dependency_missing` or `infra_tooling`. The system created follow-up tasks asking a
+human to "install the dependency in bootstrap," but it never tried to repair the environment
+itself.
+
+**Fix:** `handle_workspace_health_check()` runs every 25 improve cycles. For each repo
+with a configured `local_path`, it runs `python -c "import sys; sys.exit(0)"` inside the
+repo's venv. On failure it calls `RepoEnvironmentBootstrapper.prepare()` to attempt a
+repair. If bootstrap also fails, a high-priority `[Workspace] Repair environment` goal
+task is created so a human is alerted immediately.
+
+**Files:** `main.py` (`handle_workspace_health_check`, `_WORKSPACE_HEALTH_CYCLE_INTERVAL`)
+
+---
+
+### 5. Config Schema Drift Detection
+
+**Problem:** No mechanism existed to detect when a deployed `config/control_plane.local.yaml`
+was missing keys added in newer versions. Features like `escalation`, `stale_pr_days`,
+`scheduled_tasks`, and `self_repo_key` silently defaulted to off if the operator's config
+predated them. Operators could run the system for weeks unaware that a feature was disabled.
+
+**Fix:** New module `config/drift.py` provides `detect_config_drift(config_path, example_path)`
+which compares top-level and one level of nested keys between the deployed config and the
+bundled example. At watcher startup (cycle 1, primary slot only), missing keys are logged
+as `config_drift_detected` warnings — one per missing key plus a summary. Dynamic sections
+(`repos`, `scheduled_tasks`) are intentionally excluded from the nested check to avoid
+false positives.
+
+**Files:** `config/drift.py` (new), `main.py` (called at cycle 1 in `run_watch_loop`)
+
+---
+
+### 6. Cost/Spend Telemetry
+
+**Problem:** The execution budget (hourly/daily task caps) prevented runaway task creation
+but did not track monetary cost. Operators had no way to answer "how much did autonomous
+operation cost this week?" or set a hard spend limit per repo. A runaway loop could burn
+LLM credits with no alarm.
+
+**Fix:** `UsageStore.record_execution_cost()` appends an `execution_cost` event after each
+goal or test task. `get_spend_report(window_days=N)` aggregates those events into a
+`{total_executions, total_estimated_usd, per_repo: {...}}` dict. The per-execution cost is
+operator-supplied via `cost_per_execution_usd: 0.0` in config (zero by default = tracking
+disabled). A `spend-report` CLI subcommand prints the report as JSON.
+
+```bash
+python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+```
+
+**Config:**
+```yaml
+cost_per_execution_usd: 0.15   # operator estimate; 0.0 disables recording
+```
+
+**Files:** `settings.py` (`Settings.cost_per_execution_usd`), `usage_store.py` (`record_execution_cost`, `get_spend_report`), `main.py` (`spend-report` subcommand, cost recording in `handle_goal_task` and `handle_test_task`)
+
+---
+
+### 7. Parallel Execution Within Lanes
+
+**Problem:** Each watcher lane handled one task at a time. With 10 lint_fix tasks ready,
+they executed one per poll cycle with sleeping intervals between them. This was the primary
+throughput bottleneck when heading toward higher-autonomy Phase 7 operation.
+
+**Fix:** `run_parallel_watch_loop()` launches N threads, each running an independent
+`run_watch_loop`. Slot 0 is the primary slot and owns all periodic scans (heartbeat,
+improve sub-scans, config drift check, credential validation). Non-zero slots only execute
+tasks. The Plane API's state machine (task transitions to Running) acts as the distributed
+lock — two slots cannot claim the same task. Configurable via `--parallel-slots N` CLI
+flag or `parallel_slots: N` in config (default 1).
+
+**Config:**
+```yaml
+parallel_slots: 2   # default 1 (serial)
+```
+
+**CLI:**
+```bash
+./scripts/control-plane.sh watch --role goal --parallel-slots 3
+```
+
+**Files:** `settings.py` (`Settings.parallel_slots`), `main.py` (`run_parallel_watch_loop`, `_slot_id` param on `run_watch_loop`, `--parallel-slots` arg in `main()`)
+
+---
+
+### 8. Multi-Step Dependency Planning
+
+**Problem:** Complex tasks (refactors, migrations, redesigns) were sent to Kodo in full.
+They hit `context_limit`, triggered an improve cycle, produced a `prior_progress:` handoff
+follow-up, and repeated — discovering the multi-step structure one failure at a time. The
+cost was 3–5 execution passes for work that could have been scoped upfront.
+
+**Fix:** `build_multi_step_plan()` is called at the top of `handle_goal_task` for tasks
+identified as complex (title contains `refactor`, `migrate`, `redesign`, `modernize`,
+`audit`, `overhaul`, `restructure`, `rewrite`, or the task carries a `plan: multi-step`
+label). It creates three dependent tasks before any execution:
+
+1. `[Step 1/3: Analyze] <title>` — scope investigation, no code changes, starts Ready for AI
+2. `[Step 2/3: Implement] <title>` — depends_on step 1, starts Backlog
+3. `[Step 3/3: Verify] <title>` — depends_on step 2, starts Backlog
+
+The original task is moved to Backlog. Kodo never receives a scope it cannot complete in
+one context window. If the plan has already been created (step titles already on the board),
+the function is a no-op.
+
+**Files:** `main.py` (`build_multi_step_plan`, `_is_multi_step_task`, `_MULTI_STEP_TITLE_KEYWORDS`, `_MULTI_STEP_LABEL`, called from `handle_goal_task`)
+
+---
+
 ## Summary Table
 
 | # | Name | Trigger | Where |
@@ -330,3 +500,11 @@ stale_pr_days: 7   # default
 | S2-8 | Success/failure learning | after execution + proposal | `handle_goal_task`, `build_proposal_candidates` |
 | S2-9 | Scheduled tasks | every propose cycle | `handle_propose_cycle` |
 | S2-10 | Stale PR TTL | every 20 improve cycles | `handle_stale_pr_scan` |
+| S3-1 | GitHub rate-limit handling | every GitHub API call | `GitHubPRClient._request` |
+| S3-2 | Pre-execution task validation | before task claim (goal lane) | `validate_task_pre_execution` |
+| S3-3 | Feedback loop automation | every 15 improve cycles | `handle_feedback_loop_scan` |
+| S3-4 | Workspace health monitoring | every 25 improve cycles | `handle_workspace_health_check` |
+| S3-5 | Config schema drift detection | cycle 1 startup | `detect_config_drift`, `run_watch_loop` |
+| S3-6 | Cost/spend telemetry | after each goal/test execution | `record_execution_cost`, `get_spend_report` |
+| S3-7 | Parallel execution | watcher startup | `run_parallel_watch_loop` |
+| S3-8 | Multi-step dependency planning | start of goal task execution | `build_multi_step_plan` |

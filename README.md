@@ -153,7 +153,7 @@ The naming is intentionally close because the second is the board adapter for th
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
 - Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
-### Autonomy Hardening (18 improvements across two implementation rounds)
+### Autonomy Hardening (26 improvements across three implementation rounds)
 
 The following capabilities were added to close gaps toward full autonomous operation:
 
@@ -180,6 +180,17 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Success/failure learning** — task outcomes are recorded per proposal category; categories with >70% success are boosted to Ready for AI; categories with <30% are demoted to Backlog.
 - **Scheduled tasks** — `scheduled_tasks:` in config accepts cron expressions; due tasks are created at the start of each propose cycle (requires the optional `croniter` dependency).
 - **Stale PR TTL** — every 20 improve cycles, PRs older than `stale_pr_days` (default 7) are closed after a rebase attempt; the originating task is requeued to Backlog.
+
+**Session 3 — 8 reliability and throughput improvements:**
+
+- **GitHub API rate-limit handling** — all GitHub calls go through a `_request()` wrapper; 429 responses retry with `Retry-After` backoff; a warning is logged when `X-RateLimit-Remaining` drops below 10.
+- **Pre-execution task validation** — before claiming a goal task, the watcher validates the goal text is non-empty, appropriately scoped, and not a vague catch-all; failures are moved to Backlog with an explanation.
+- **Feedback loop automation** — every 15 improve cycles, Done tasks with PR URLs are checked on GitHub; merged/closed outcomes are written to `state/proposal_feedback/` automatically, closing the `proposal_success_rate` learning loop without operator CLI calls.
+- **Workspace health monitoring** — every 25 improve cycles, the venv python is verified for each repo with a `local_path`; an automatic bootstrap repair is attempted on failure; a high-priority `[Workspace]` task is created if repair fails.
+- **Config schema drift detection** — at watcher startup, `config/control_plane.local.yaml` is compared against the bundled example; missing keys are logged as warnings so silently-disabled features are surfaced immediately.
+- **Cost/spend telemetry** — `cost_per_execution_usd` in config enables per-task cost recording; `spend-report` CLI subcommand shows total executions and estimated USD per repo per day/week.
+- **Parallel execution within lanes** — `parallel_slots: N` in config (or `--parallel-slots N` CLI flag) launches N task-execution threads; slot 0 owns all periodic scans; throughput scales linearly for independent tasks.
+- **Multi-step dependency planning** — tasks with titles containing `refactor`, `migrate`, `redesign`, etc. (or labeled `plan: multi-step`) are automatically decomposed into Analyze → Implement → Verify subtasks with `depends_on` links before any execution begins.
 
 ### Repo and Branch Selection
 
@@ -225,6 +236,8 @@ Top-level config options added in the autonomy hardening phase:
 - `escalation.block_threshold: 5` — same-classification blocks within 24h before escalating
 - `escalation.cooldown_seconds: 3600` — minimum gap between two escalation POSTs for the same classification
 - `scheduled_tasks:` — list of `{cron, title, goal, repo_key, kind}` entries; due tasks are created at the start of each propose cycle (requires `croniter`)
+- `cost_per_execution_usd: 0.0` — operator estimate of cost per Kodo task run; enables spend telemetry (0.0 = disabled)
+- `parallel_slots: 1` — number of parallel task-execution threads per watcher lane (1 = serial)
 
 ## Fastest Happy Path
 
@@ -347,6 +360,14 @@ python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/l
 
 Exit code 0 = all healthy. Exit code 1 = stale watchers listed on stderr. Wire this into cron or a simple monitoring script for unattended operation.
 
+### Spend Report
+
+```bash
+python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+```
+
+Shows total executions and estimated cost per repo. Requires `cost_per_execution_usd` in config.
+
 ## Local Stack Startup
 
 The easiest way to bring up the whole local system is:
@@ -420,6 +441,8 @@ The repo-aware autonomy loop is behaving well when:
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
 - Scheduled tasks require the optional `croniter` Python package (`pip install croniter`).
+- Cost telemetry is estimate-based; `cost_per_execution_usd` must be set manually — ControlPlane does not parse Kodo billing output.
+- Parallel slots share the Plane API rate limit; monitor `github_rate_limit_low` warnings when `parallel_slots > 1`.
 
 ## Documentation
 
@@ -427,7 +450,7 @@ The repo-aware autonomy loop is behaving well when:
 
 - [Lifecycle Contract](docs/design/lifecycle.md)
 - [Improve Worker](docs/design/improve_worker.md)
-- [Autonomy Hardening](docs/design/autonomy_gaps.md) — 18 full-autonomy improvements: escalation, conflict detection, heartbeat, context handoff, flaky tests, review cycle, credential validation, success learning, scheduled tasks, stale PR TTL
+- [Autonomy Hardening](docs/design/autonomy_gaps.md) — 26 full-autonomy improvements across 3 sessions: rate-limit handling, pre-execution validation, feedback loop automation, workspace health, config drift detection, spend telemetry, parallel execution, multi-step planning, and more
 - [Repo Observer](docs/design/autonomy_repo_observer.md)
 - [Insight Engine](docs/design/autonomy_insight_engine.md)
 - [Decision Engine](docs/design/autonomy_decision_engine.md)
@@ -442,10 +465,10 @@ The repo-aware autonomy loop is behaving well when:
 
 - [Golden-Path Demo](docs/demo.md) — start here; also use as a post-change validation ritual
 - [Setup Guide](docs/operator/setup.md)
-- [Runtime Guide](docs/operator/runtime.md) — commands, watcher roles, dry-run-first posture, heartbeat monitoring
+- [Runtime Guide](docs/operator/runtime.md) — commands, watcher roles, parallel slots, spend report, dry-run-first posture, heartbeat monitoring
 - [Autonomy Threshold Tuning](docs/operator/tuning.md) — per-family thresholds, analyze-artifacts loop, tune-autonomy regulation loop
 - [PR Review Loop Guide](docs/operator/pr_review.md) — two-phase review, guardrails, troubleshooting
-- [Diagnostics and Maintenance](docs/operator/diagnostics.md) — heartbeat check, credential validation, debugging order
+- [Diagnostics and Maintenance](docs/operator/diagnostics.md) — heartbeat check, credential validation, config drift, workspace health, spend report, debugging order
 
 ### Roadmap
 
