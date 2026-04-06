@@ -636,16 +636,16 @@ def reconcile_stale_running_issues(client: PlaneClient, *, role: str, ready_stat
         elif task_kind != role:
             continue
         task_id = str(issue["id"])
-        client.transition_issue(task_id, ready_state)
+        client.transition_issue(task_id, "Blocked")
         client.comment_issue(
             task_id,
             render_worker_comment(
-                f"[{worker_title(role)}] Reconciled stale running state",
+                f"[{worker_title(role)}] Stale running task requires human review",
                 [
                     f"task_id: {task_id}",
                     f"task_kind: {task_kind}",
-                    "result_status: ready_for_ai",
-                    "reason: task was left in Running without an active worker completion path",
+                    "result_status: blocked",
+                    "reason: task was left in Running without a clean completion — moved to Blocked for human review before retry",
                 ],
             ),
         )

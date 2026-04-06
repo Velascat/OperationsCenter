@@ -657,7 +657,7 @@ def test_handle_test_task_does_not_mark_done_for_internal_only_no_op() -> None:
     assert any("target_area_hint: test/conftest.py, src/main.py" in comment for _, comment in client.issue_comments)
 
 
-def test_reconcile_stale_running_issues_moves_owned_running_tasks_back_to_ready() -> None:
+def test_reconcile_stale_running_issues_moves_owned_running_tasks_to_blocked() -> None:
     client = FakePlaneClient(
         [
             {
@@ -678,9 +678,10 @@ def test_reconcile_stale_running_issues_moves_owned_running_tasks_back_to_ready(
     reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI")
 
     assert reconciled == ["GOAL-RUN"]
-    assert ("GOAL-RUN", "Ready for AI") in client.transitions
-    assert ("TEST-RUN", "Ready for AI") not in client.transitions
-    assert any("reconciled stale running state" in comment.lower() for _, comment in client.issue_comments)
+    assert ("GOAL-RUN", "Blocked") in client.transitions
+    assert ("GOAL-RUN", "Ready for AI") not in client.transitions
+    assert ("TEST-RUN", "Blocked") not in client.transitions
+    assert any("human review" in comment.lower() for _, comment in client.issue_comments)
 
 
 def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> None:
