@@ -430,6 +430,81 @@ class UsageStore:
             now=now,
         )
 
+    def record_execution_cost(
+        self,
+        *,
+        task_id: str,
+        repo_key: str,
+        estimated_usd: float,
+        now: datetime,
+    ) -> None:
+        """Append an execution_cost event for spend telemetry.
+
+        *estimated_usd* is a caller-supplied estimate (e.g. from
+        ``Settings.cost_per_execution_usd``).  Zero is valid and means cost
+        tracking is disabled for this repo.
+        """
+        data = self.load()
+        self._append_event(
+            data,
+            {
+                "kind": "execution_cost",
+                "task_id": task_id,
+                "repo_key": repo_key,
+                "estimated_usd": estimated_usd,
+                "timestamp": now.isoformat(),
+            },
+            now=now,
+        )
+
+    def get_spend_report(self, *, window_days: int = 1, now: datetime | None = None) -> dict[str, Any]:
+        """Return a spend summary for the last *window_days* days.
+
+        Returns::
+
+            {
+                "window_days": int,
+                "total_executions": int,
+                "total_estimated_usd": float,
+                "per_repo": {
+                    "<repo_key>": {
+                        "executions": int,
+                        "estimated_usd": float,
+                    },
+                    ...
+                },
+            }
+        """
+        _now = now or datetime.now()
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=_now)
+        cutoff = _now - timedelta(days=window_days)
+        per_repo: dict[str, dict[str, Any]] = {}
+        total_executions = 0
+        total_usd = 0.0
+        for ev in events:
+            if ev.get("kind") != "execution_cost":
+                continue
+            try:
+                ts = datetime.fromisoformat(str(ev["timestamp"]))
+            except (ValueError, KeyError):
+                continue
+            if ts < cutoff:
+                continue
+            repo_key = str(ev.get("repo_key") or "unknown")
+            usd = float(ev.get("estimated_usd") or 0.0)
+            bucket = per_repo.setdefault(repo_key, {"executions": 0, "estimated_usd": 0.0})
+            bucket["executions"] += 1
+            bucket["estimated_usd"] = round(bucket["estimated_usd"] + usd, 6)
+            total_executions += 1
+            total_usd += usd
+        return {
+            "window_days": window_days,
+            "total_executions": total_executions,
+            "total_estimated_usd": round(total_usd, 6),
+            "per_repo": per_repo,
+        }
+
     def record_proposal_budget_suppression(self, *, reason: str, now: datetime, evidence: dict[str, object]) -> None:
         data = self.load()
         self._append_event(

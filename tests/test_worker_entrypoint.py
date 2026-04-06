@@ -18,6 +18,7 @@ from control_plane.entrypoints.worker.main import (
     _extract_filename_tokens,
     _has_conflict_with_active_task,
     _heartbeat_path,
+    _is_multi_step_task,
     _is_self_repo,
     _pr_number_from_url,
     _proposal_matches_focus_areas,
@@ -27,27 +28,32 @@ from control_plane.entrypoints.worker.main import (
     _split_oversized_finding,
     blocked_resolution_is_complete,
     build_improve_triage_result,
+    build_multi_step_plan,
     check_heartbeats,
     classify_blocked_issue,
     classify_execution_result,
     detect_post_merge_regressions,
     extract_triage_follow_up_ids,
+    handle_feedback_loop_scan,
     handle_goal_task,
     handle_improve_task,
     handle_propose_cycle,
     handle_blocked_triage,
     handle_test_task,
+    handle_workspace_health_check,
     issue_status_name,
     issue_task_kind,
     parse_task_dependencies,
     recently_proposed,
     record_proposed,
     reconcile_stale_running_issues,
+    run_parallel_watch_loop,
     run_watch_loop,
     select_ready_task_id,
     task_dependencies_met,
     select_watch_candidate,
     validate_credentials,
+    validate_task_pre_execution,
     write_heartbeat,
 )
 
@@ -2810,3 +2816,453 @@ def test_get_mergeable_returns_none_on_error(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "get", boom)
     result = gh.get_mergeable("owner", "repo", 1)
     assert result is None
+
+
+# ===========================================================================
+# Session 3 — 8 Full-Autonomy Gap Tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Item 1: GitHub rate-limit handling
+# ---------------------------------------------------------------------------
+
+def test_github_request_retries_on_429(monkeypatch) -> None:
+    """_request retries up to _GH_RATE_LIMIT_MAX_RETRIES times on 429."""
+    from control_plane.adapters.github_pr import GitHubPRClient
+    import httpx as _httpx
+
+    gh = GitHubPRClient("token")
+    call_count = 0
+
+    def fake_request(method, url, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            return _httpx.Response(
+                429,
+                headers={"Retry-After": "0"},
+                request=_httpx.Request(method, url),
+            )
+        return _httpx.Response(200, json={"ok": True}, request=_httpx.Request(method, url))
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    # Silence the sleep so test runs fast
+    monkeypatch.setattr("control_plane.adapters.github_pr.time.sleep", lambda _: None)
+    resp = gh._request("GET", "https://api.github.com/user")
+    assert resp.status_code == 200
+    assert call_count == 3
+
+
+def test_github_request_warns_on_low_remaining(monkeypatch, caplog) -> None:
+    """_request logs a warning when X-RateLimit-Remaining < threshold."""
+    import logging
+    from control_plane.adapters.github_pr import GitHubPRClient
+    import httpx as _httpx
+
+    gh = GitHubPRClient("token")
+
+    def fake_request(method, url, **kwargs):
+        return _httpx.Response(
+            200,
+            json={},
+            headers={"X-RateLimit-Remaining": "3"},
+            request=_httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    with caplog.at_level(logging.WARNING, logger="control_plane.adapters.github_pr"):
+        gh._request("GET", "https://api.github.com/user")
+    assert any("github_rate_limit_low" in r.message for r in caplog.records)
+
+
+def test_github_request_no_warn_on_high_remaining(monkeypatch, caplog) -> None:
+    """No warning is emitted when X-RateLimit-Remaining is comfortable."""
+    import logging
+    from control_plane.adapters.github_pr import GitHubPRClient
+    import httpx as _httpx
+
+    gh = GitHubPRClient("token")
+
+    def fake_request(method, url, **kwargs):
+        return _httpx.Response(
+            200,
+            json={},
+            headers={"X-RateLimit-Remaining": "500"},
+            request=_httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    with caplog.at_level(logging.WARNING, logger="control_plane.adapters.github_pr"):
+        gh._request("GET", "https://api.github.com/user")
+    assert not any("github_rate_limit_low" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Item 2: Pre-execution task validation
+# ---------------------------------------------------------------------------
+
+def test_validate_task_pre_execution_passes_with_good_goal() -> None:
+    issue = {"id": "T-1", "state": {"name": "Ready for AI"}, "description": ""}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    # Service.parse_task will raise AttributeError; fallback to description
+    # Give a description long enough to pass
+    issue["description"] = "Refactor the authentication module to use JWT tokens instead of sessions."
+    # parse_task not on FakeService → falls back to description field
+    result = validate_task_pre_execution(client, service, "T-1", issue)
+    assert result is True
+
+
+def test_validate_task_pre_execution_passes_empty_goal() -> None:
+    """Empty goal passes (conservative — we cannot determine it's bad)."""
+    issue = {"id": "T-1", "state": {"name": "Ready for AI"}}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    result = validate_task_pre_execution(client, service, "T-1", issue)
+    assert result is True
+
+
+def test_validate_task_pre_execution_rejects_vague_goal() -> None:
+    issue = {
+        "id": "T-1",
+        "state": {"name": "Ready for AI"},
+        "description": "fix everything in the codebase please",
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    result = validate_task_pre_execution(client, service, "T-1", issue)
+    assert result is False
+    # Task should have been moved to Backlog
+    assert ("T-1", "Backlog") in client.transitions
+
+
+def test_validate_task_pre_execution_rejects_too_short() -> None:
+    issue = {
+        "id": "T-2",
+        "state": {"name": "Ready for AI"},
+        "description": "fix it",
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    result = validate_task_pre_execution(client, service, "T-2", issue)
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Item 3: Feedback loop automation
+# ---------------------------------------------------------------------------
+
+def test_handle_feedback_loop_scan_records_merged_pr(tmp_path, monkeypatch) -> None:
+    """handle_feedback_loop_scan writes a merged feedback record for a Done task."""
+    import httpx as _httpx
+
+    task_id = "aabbccdd-0000-0000-0000-000000000099"
+    issue = {
+        "id": task_id,
+        "state": {"name": "Done"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: control-plane"}],
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    service.settings.git_token = lambda: "gh-token"
+    service.settings.repos["control-plane"] = SimpleNamespace(
+        clone_url="git@github.com:Owner/Repo.git",
+        default_branch="main",
+    )
+    # Store artifact with a PR URL
+    pr_url = "https://github.com/Owner/Repo/pull/7"
+    service.usage_store.record_task_artifact(
+        task_id=task_id,
+        artifact={"pull_request_url": pr_url, "repo_key": "control-plane"},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+
+    def fake_request(method, url, **kwargs):
+        return _httpx.Response(
+            200,
+            json={"state": "closed", "merged_at": "2026-04-06T10:00:00Z", "merged": True},
+            request=_httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    monkeypatch.setattr("control_plane.adapters.github_pr.time.sleep", lambda _: None)
+
+    feedback_dir = tmp_path / "state" / "proposal_feedback"
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main._FEEDBACK_DIR",
+        feedback_dir,
+    )
+
+    recorded = handle_feedback_loop_scan(
+        client, service, now=datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    )
+    assert task_id in recorded
+    feedback_file = feedback_dir / f"{task_id}.json"
+    assert feedback_file.exists()
+    import json as _json
+    data = _json.loads(feedback_file.read_text())
+    assert data["outcome"] == "merged"
+    assert data["source"] == "feedback_loop_scan"
+
+
+def test_handle_feedback_loop_scan_skips_already_recorded(tmp_path, monkeypatch) -> None:
+    """handle_feedback_loop_scan skips tasks that already have a feedback file."""
+    task_id = "aabbccdd-0000-0000-0000-000000000098"
+    issue = {"id": task_id, "state": {"name": "Done"}, "labels": []}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+
+    feedback_dir = tmp_path / "state" / "proposal_feedback"
+    feedback_dir.mkdir(parents=True)
+    (feedback_dir / f"{task_id}.json").write_text('{"outcome":"merged"}')
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main._FEEDBACK_DIR",
+        feedback_dir,
+    )
+    recorded = handle_feedback_loop_scan(client, service)
+    assert task_id not in recorded
+
+
+# ---------------------------------------------------------------------------
+# Item 4: Workspace health monitoring
+# ---------------------------------------------------------------------------
+
+def test_handle_workspace_health_check_healthy_repo(tmp_path) -> None:
+    """No tasks created when the venv python is healthy."""
+    # Create a fake python binary that exits 0
+    fake_venv = tmp_path / ".venv" / "bin"
+    fake_venv.mkdir(parents=True)
+    fake_python = fake_venv / "python"
+    fake_python.write_text("#!/bin/sh\nexit 0\n")
+    fake_python.chmod(0o755)
+
+    issue = {"id": "T-WH", "state": {"name": "Ready for AI"}, "labels": []}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    service.settings.repos["control-plane"] = SimpleNamespace(
+        clone_url="git@github.com:Owner/Repo.git",
+        default_branch="main",
+        local_path=str(tmp_path),
+        venv_dir=".venv",
+        python_binary="python3",
+        install_dev_command=None,
+        bootstrap_enabled=False,
+        bootstrap_commands=None,
+    )
+
+    created = handle_workspace_health_check(client, service)
+    assert created == []
+
+
+def test_handle_workspace_health_check_no_local_path() -> None:
+    """Repos without local_path are skipped silently."""
+    issue = {"id": "T-X", "state": {"name": "Ready for AI"}, "labels": []}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    # Default FakeService repo has no local_path
+    created = handle_workspace_health_check(client, service)
+    assert created == []
+
+
+# ---------------------------------------------------------------------------
+# Item 5: Config schema drift detection
+# ---------------------------------------------------------------------------
+
+def test_detect_config_drift_no_gaps(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    config = tmp_path / "config.yaml"
+    example = tmp_path / "example.yaml"
+    config.write_text("plane:\n  base_url: x\nescalation:\n  webhook_url: ''\n")
+    example.write_text("plane:\n  base_url: x\nescalation:\n  webhook_url: ''\n")
+    assert detect_config_drift(config, example) == []
+
+
+def test_detect_config_drift_missing_top_level(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    config = tmp_path / "config.yaml"
+    example = tmp_path / "example.yaml"
+    config.write_text("plane:\n  base_url: x\n")
+    example.write_text("plane:\n  base_url: x\nescalation:\n  webhook_url: ''\n")
+    gaps = detect_config_drift(config, example)
+    assert "escalation" in gaps
+
+
+def test_detect_config_drift_missing_nested_key(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    config = tmp_path / "config.yaml"
+    example = tmp_path / "example.yaml"
+    config.write_text("escalation:\n  webhook_url: ''\n")
+    example.write_text("escalation:\n  webhook_url: ''\n  block_threshold: 5\n")
+    gaps = detect_config_drift(config, example)
+    assert "escalation.block_threshold" in gaps
+
+
+def test_detect_config_drift_missing_files_returns_empty(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    gaps = detect_config_drift(tmp_path / "nonexistent.yaml", tmp_path / "also_missing.yaml")
+    assert gaps == []
+
+
+# ---------------------------------------------------------------------------
+# Item 6: Cost/spend telemetry
+# ---------------------------------------------------------------------------
+
+def test_record_execution_cost_and_get_report() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service.usage_store.record_execution_cost(
+        task_id="T-1", repo_key="repo-a", estimated_usd=0.05, now=now
+    )
+    service.usage_store.record_execution_cost(
+        task_id="T-2", repo_key="repo-a", estimated_usd=0.10, now=now
+    )
+    service.usage_store.record_execution_cost(
+        task_id="T-3", repo_key="repo-b", estimated_usd=0.02, now=now
+    )
+    report = service.usage_store.get_spend_report(window_days=1, now=now)
+    assert report["total_executions"] == 3
+    assert abs(report["total_estimated_usd"] - 0.17) < 1e-6
+    assert report["per_repo"]["repo-a"]["executions"] == 2
+    assert abs(report["per_repo"]["repo-a"]["estimated_usd"] - 0.15) < 1e-6
+    assert report["per_repo"]["repo-b"]["executions"] == 1
+
+
+def test_get_spend_report_outside_window() -> None:
+    """Events older than window_days are excluded."""
+    service = FakeService()
+    old = datetime(2026, 3, 1, tzinfo=UTC)
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    service.usage_store.record_execution_cost(
+        task_id="T-old", repo_key="r", estimated_usd=9.99, now=old
+    )
+    report = service.usage_store.get_spend_report(window_days=1, now=now)
+    assert report["total_executions"] == 0
+    assert report["total_estimated_usd"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Item 7: Parallel execution
+# ---------------------------------------------------------------------------
+
+def test_run_parallel_watch_loop_single_slot() -> None:
+    """With n_slots=1, parallel loop runs one task exactly like run_watch_loop."""
+    client = FakePlaneClient(
+        [{"id": "TASK-P1", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]}]
+    )
+    service = FakeService()
+    run_parallel_watch_loop(
+        client,
+        service,
+        role="goal",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+        n_slots=1,
+    )
+    assert ("TASK-P1", "Running") in client.transitions
+
+
+def test_run_parallel_watch_loop_two_slots(tmp_path) -> None:
+    """Two parallel slots both attempt to claim tasks and at least one succeeds."""
+
+    # Give enough tasks for both slots
+    tasks = [
+        {"id": f"T-{i}", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]}
+        for i in range(4)
+    ]
+    client = FakePlaneClient(tasks)
+    service = FakeService()
+
+    run_parallel_watch_loop(
+        client,
+        service,
+        role="goal",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=2,
+        n_slots=2,
+    )
+    # At least one transition to Running happened
+    running_transitions = [t for t in client.transitions if t[1] == "Running"]
+    assert len(running_transitions) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Item 8: Multi-step dependency planning
+# ---------------------------------------------------------------------------
+
+def test_is_multi_step_task_keyword_in_title() -> None:
+    for kw in ("refactor", "migrate", "redesign"):
+        issue = {"id": "T", "name": f"Please {kw} the auth module", "labels": []}
+        assert _is_multi_step_task(issue), f"keyword '{kw}' should trigger multi-step"
+
+
+def test_is_multi_step_task_explicit_label() -> None:
+    issue = {"id": "T", "name": "Update logging", "labels": [{"name": "plan: multi-step"}]}
+    assert _is_multi_step_task(issue)
+
+
+def test_is_multi_step_task_normal_task_is_false() -> None:
+    issue = {"id": "T", "name": "Fix typo in README", "labels": [{"name": "task-kind: goal"}]}
+    assert not _is_multi_step_task(issue)
+
+
+def test_build_multi_step_plan_creates_three_steps() -> None:
+    issue = {
+        "id": "SOURCE-1",
+        "name": "Refactor authentication module",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: control-plane"}],
+        "description": "## Execution\nrepo: control-plane\nmode: goal\n\n## Goal\nRefactor auth.\n",
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+
+    created = build_multi_step_plan(client, service, "SOURCE-1", issue)
+    assert len(created) == 3
+    # Step titles should include step numbers
+    names = [c["name"] for c in client.created]
+    assert any("Step 1/3" in n for n in names)
+    assert any("Step 2/3" in n for n in names)
+    assert any("Step 3/3" in n for n in names)
+    # Source task should be moved to Backlog
+    assert ("SOURCE-1", "Backlog") in client.transitions
+
+
+def test_build_multi_step_plan_skips_non_complex_task() -> None:
+    issue = {
+        "id": "SIMPLE-1",
+        "name": "Fix typo in docstring",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}],
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    created = build_multi_step_plan(client, service, "SIMPLE-1", issue)
+    assert created == []
+    assert client.created == []
+
+
+def test_build_multi_step_plan_skips_if_steps_exist() -> None:
+    """Plan is not recreated if step tasks are already on the board."""
+    issue = {
+        "id": "SOURCE-2",
+        "name": "Redesign database layer",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: control-plane"}],
+    }
+    existing_step = {
+        "id": "STEP-EXISTING",
+        "name": "[Step 1/3: Analyze] Redesign database layer",
+        "state": {"name": "Ready for AI"},
+        "labels": [],
+    }
+    client = FakePlaneClient([issue, existing_step])
+    service = FakeService()
+    created = build_multi_step_plan(client, service, "SOURCE-2", issue)
+    assert created == []

@@ -1,8 +1,17 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
+import time
 
 import httpx
+
+_logger = logging.getLogger(__name__)
+
+_GH_RATE_LIMIT_MAX_RETRIES = 3
+_GH_RATE_LIMIT_WARN_THRESHOLD = 10
+_GH_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS = 60
 
 
 class GitHubPRClient:
@@ -16,6 +25,47 @@ class GitHubPRClient:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+
+    def _request(self, method: str, url: str, **kwargs: object) -> httpx.Response:
+        """HTTP request with rate-limit retry and low-quota warning.
+
+        On 429 responses, reads the ``Retry-After`` header (defaulting to
+        ``_GH_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS``) and retries up to
+        ``_GH_RATE_LIMIT_MAX_RETRIES`` times before giving up and returning
+        the last response.  Logs a warning whenever ``X-RateLimit-Remaining``
+        drops below ``_GH_RATE_LIMIT_WARN_THRESHOLD`` so operators have
+        advance notice before hard throttling kicks in.
+        """
+        kwargs.setdefault("timeout", 30)
+        resp: httpx.Response | None = None
+        for attempt in range(_GH_RATE_LIMIT_MAX_RETRIES + 1):
+            resp = httpx.request(method, url, headers=self._headers, **kwargs)  # type: ignore[arg-type]
+            remaining_raw = resp.headers.get("X-RateLimit-Remaining")
+            if remaining_raw is not None:
+                try:
+                    if int(remaining_raw) < _GH_RATE_LIMIT_WARN_THRESHOLD:
+                        _logger.warning(json.dumps({
+                            "event": "github_rate_limit_low",
+                            "remaining": int(remaining_raw),
+                            "reset_epoch": resp.headers.get("X-RateLimit-Reset"),
+                        }))
+                except (ValueError, TypeError):
+                    pass
+            if resp.status_code != 429 or attempt >= _GH_RATE_LIMIT_MAX_RETRIES:
+                return resp
+            retry_after_raw = resp.headers.get("Retry-After", "")
+            try:
+                retry_after = int(retry_after_raw)
+            except (ValueError, TypeError):
+                retry_after = _GH_RATE_LIMIT_DEFAULT_BACKOFF_SECONDS
+            _logger.warning(json.dumps({
+                "event": "github_rate_limited",
+                "attempt": attempt + 1,
+                "retry_after_seconds": retry_after,
+                "url": url,
+            }))
+            time.sleep(retry_after)
+        return resp  # type: ignore[return-value]
 
     @staticmethod
     def owner_repo_from_clone_url(clone_url: str) -> tuple[str, str]:
@@ -37,11 +87,10 @@ class GitHubPRClient:
         title: str,
         body: str = "",
     ) -> dict:
-        resp = httpx.post(
+        resp = self._request(
+            "POST",
             f"{self._API}/repos/{owner}/{repo}/pulls",
-            headers=self._headers,
             json={"title": title, "head": head, "base": base, "body": body},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
@@ -52,86 +101,74 @@ class GitHubPRClient:
         Returns the full PR resource as a dict (see GitHub docs for schema).
         Raises ``httpx.HTTPStatusError`` on non-2xx responses.
         """
-        resp = httpx.get(
-            f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
-            headers=self._headers,
-            timeout=30,
-        )
+        resp = self._request("GET", f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}")
         resp.raise_for_status()
         return resp.json()
 
     def merge_pr(self, owner: str, repo: str, pr_number: int, *, merge_method: str = "squash") -> dict:
-        resp = httpx.put(
+        resp = self._request(
+            "PUT",
             f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/merge",
-            headers=self._headers,
             json={"merge_method": merge_method},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def delete_branch(self, owner: str, repo: str, branch: str) -> None:
-        resp = httpx.delete(
+        resp = self._request(
+            "DELETE",
             f"{self._API}/repos/{owner}/{repo}/git/refs/heads/{branch}",
-            headers=self._headers,
-            timeout=30,
         )
         resp.raise_for_status()
 
     def get_pr_reactions(self, owner: str, repo: str, pr_number: int) -> list[dict]:
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/issues/{pr_number}/reactions",
-            headers=self._headers,
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def list_pr_comments(self, owner: str, repo: str, pr_number: int) -> list[dict]:
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/issues/{pr_number}/comments",
-            headers=self._headers,
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def list_pr_review_comments(self, owner: str, repo: str, pr_number: int) -> list[dict]:
         """Fetch inline/line-level review comments from the PR review comments API."""
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/comments",
-            headers=self._headers,
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def get_comment_reactions(self, owner: str, repo: str, comment_id: int) -> list[dict]:
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions",
-            headers=self._headers,
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def post_comment(self, owner: str, repo: str, pr_number: int, body: str) -> dict:
-        resp = httpx.post(
+        resp = self._request(
+            "POST",
             f"{self._API}/repos/{owner}/{repo}/issues/{pr_number}/comments",
-            headers=self._headers,
             json={"body": body},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def get_check_runs(self, owner: str, repo: str, ref: str) -> list[dict]:
         """Return all check-runs for a given commit SHA or ref."""
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/commits/{ref}/check-runs",
-            headers=self._headers,
             params={"per_page": 100},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json().get("check_runs", [])
@@ -158,11 +195,10 @@ class GitHubPRClient:
         return failed
 
     def list_open_prs(self, owner: str, repo: str) -> list[dict]:
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/pulls",
-            headers=self._headers,
             params={"state": "open", "per_page": 100},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
@@ -175,11 +211,10 @@ class GitHubPRClient:
         on completeness for correctness).
         """
         try:
-            resp = httpx.get(
+            resp = self._request(
+                "GET",
                 f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/files",
-                headers=self._headers,
                 params={"per_page": 100},
-                timeout=30,
             )
             resp.raise_for_status()
             return [item["filename"] for item in resp.json() if isinstance(item, dict) and "filename" in item]
@@ -199,22 +234,20 @@ class GitHubPRClient:
 
     def close_pr(self, owner: str, repo: str, pr_number: int) -> dict:
         """Close a pull request without merging it."""
-        resp = httpx.patch(
+        resp = self._request(
+            "PATCH",
             f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
-            headers=self._headers,
             json={"state": "closed"},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()
 
     def list_pr_reviews(self, owner: str, repo: str, pr_number: int) -> list[dict]:
         """Return all submitted reviews for a PR."""
-        resp = httpx.get(
+        resp = self._request(
+            "GET",
             f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
-            headers=self._headers,
             params={"per_page": 100},
-            timeout=30,
         )
         resp.raise_for_status()
         return resp.json()

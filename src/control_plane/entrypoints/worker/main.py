@@ -1091,6 +1091,512 @@ def validate_credentials(
 
 
 # ---------------------------------------------------------------------------
+# Pre-execution task validation (Item 2)
+# ---------------------------------------------------------------------------
+
+_MIN_GOAL_LENGTH = 30
+_MAX_GOAL_LENGTH = 8000
+_INVALID_GOAL_MARKERS = ("fix everything", "fix all", "improve everything", "do everything")
+
+_PRE_EXEC_VALIDATION_MARKER = "[Goal] Task rejected by pre-execution validation"
+
+
+def validate_task_pre_execution(
+    client: PlaneClient,
+    service: "ExecutionService",
+    task_id: str,
+    issue: dict[str, Any],
+) -> bool:
+    """Validate a task is actionable before claiming it for execution.
+
+    Checks:
+    1. Goal text is non-empty and within a useful length range.
+    2. Goal text is not a vague catch-all phrase.
+    3. If the goal mentions specific source files by extension, at least one
+       of them exists in a configured repo's local_path.
+
+    On failure posts a comment and moves the task to Backlog so it can be
+    refined before retrying.  Returns True when the task passes all checks.
+    """
+    try:
+        board_task = service.parse_task(client, task_id)
+        goal_text = (board_task.goal_text or "").strip()
+    except Exception:
+        goal_text = str(issue.get("description") or issue.get("description_stripped") or "").strip()
+
+    # If we cannot determine the goal at all, pass through rather than block.
+    # Blocking unknown tasks would reject every task in environments that don't
+    # carry explicit goal_text (e.g. bare Plane issues created by hand).
+    if not goal_text:
+        return True
+
+    reasons: list[str] = []
+
+    if len(goal_text) < _MIN_GOAL_LENGTH:
+        reasons.append(f"goal text too short ({len(goal_text)} chars, minimum {_MIN_GOAL_LENGTH})")
+
+    if len(goal_text) > _MAX_GOAL_LENGTH:
+        reasons.append(f"goal text too long ({len(goal_text)} chars, maximum {_MAX_GOAL_LENGTH}) — split into sub-tasks")
+
+    lower_goal = goal_text.lower()
+    for marker in _INVALID_GOAL_MARKERS:
+        if marker in lower_goal:
+            reasons.append(f"goal contains vague catch-all phrase: '{marker}'")
+            break
+
+    # File-existence check: if goal mentions foo.py / bar.ts etc., at least one must exist.
+    if not reasons:
+        mentioned_files = re.findall(r"\b[\w/.-]+\.(?:py|ts|js|go|rs|java|rb|sh|yaml|yml|json|md)\b", goal_text)
+        if mentioned_files:
+            local_paths = [
+                Path(str(repo_cfg.local_path))
+                for repo_cfg in service.settings.repos.values()
+                if getattr(repo_cfg, "local_path", None)
+            ]
+            if local_paths:
+                found_any = any(
+                    (lp / fname).exists() or any(lp.rglob(fname))
+                    for fname in mentioned_files[:5]
+                    for lp in local_paths
+                )
+                if not found_any:
+                    reasons.append(
+                        f"mentioned files not found in any configured local_path: {', '.join(mentioned_files[:3])}"
+                    )
+
+    if not reasons:
+        return True
+
+    # Reject: post comment, move to Backlog
+    reason_text = "; ".join(reasons)
+    try:
+        client.comment_issue(
+            task_id,
+            render_worker_comment(
+                _PRE_EXEC_VALIDATION_MARKER,
+                [
+                    f"task_id: {task_id}",
+                    "task_kind: goal",
+                    "result_status: backlog",
+                    f"reason: {reason_text}",
+                    "next_action: refine the goal text and re-queue to Ready for AI",
+                ],
+            ),
+        )
+        client.transition_issue(task_id, "Backlog")
+    except Exception:
+        pass
+    _logger.info(json.dumps({
+        "event": "pre_exec_validation_rejected",
+        "task_id": task_id,
+        "reasons": reasons,
+    }))
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Feedback loop automation (Item 3)
+# ---------------------------------------------------------------------------
+
+_FEEDBACK_DIR = Path("state/proposal_feedback")
+_FEEDBACK_LOOP_CYCLE_INTERVAL = 15
+_FEEDBACK_LOOP_SCAN_MARKER = "[Improve] Feedback auto-recorded"
+
+
+def handle_feedback_loop_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+    now: datetime | None = None,
+) -> list[str]:
+    """Auto-record feedback for Done tasks whose PR was merged or closed.
+
+    Runs on a cycle gate in the goal or improve watcher.  For each Done issue
+    that has a ``pull_request_url`` in its artifact and no existing feedback
+    file in ``state/proposal_feedback/``, the PR state is fetched from GitHub.
+    A feedback record is written automatically, closing the learning loop
+    without requiring the operator to call the feedback CLI.
+
+    Returns a list of task IDs for which feedback was recorded this cycle.
+    """
+    _now = now or datetime.now(UTC)
+    if issues is None:
+        issues = client.list_issues()
+
+    recorded_ids: list[str] = []
+
+    for issue in issues:
+        status = issue_status_name(issue).lower()
+        if status != "done":
+            continue
+
+        task_id = str(issue.get("id", ""))
+        if not task_id:
+            continue
+
+        feedback_path = _FEEDBACK_DIR / f"{task_id}.json"
+        if feedback_path.exists():
+            continue  # Already recorded
+
+        artifact = service.usage_store.get_task_artifact(task_id)
+        if not artifact:
+            continue
+        pr_url = str(artifact.get("pull_request_url") or "")
+        if not pr_url:
+            continue
+
+        pr_num = _pr_number_from_url(pr_url)
+        if pr_num is None:
+            continue
+
+        repo_key = str(artifact.get("repo_key") or _extract_repo_key(issue, service))
+        _rgit = getattr(service.settings, "repo_git_token", None)
+        token = _rgit(repo_key) if callable(_rgit) else None
+        if not token:
+            _git = getattr(service.settings, "git_token", None)
+            token = _git() if callable(_git) else None
+        if not token:
+            continue
+
+        repo_cfg = service.settings.repos.get(repo_key)
+        if not repo_cfg:
+            continue
+
+        try:
+            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+        except Exception:
+            continue
+
+        gh = GitHubPRClient(token)
+        try:
+            pr_data = gh.get_pr(owner, repo_name, pr_num)
+        except Exception:
+            continue
+
+        pr_state = str(pr_data.get("state") or "").lower()
+        merged = bool(pr_data.get("merged") or pr_data.get("merged_at"))
+
+        if merged:
+            outcome = "merged"
+        elif pr_state == "closed":
+            outcome = "abandoned"
+        else:
+            continue  # Still open — nothing to record yet
+
+        try:
+            _FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
+            import json as _json
+            feedback_path.write_text(_json.dumps({
+                "recorded_at": _now.isoformat(),
+                "task_id": task_id,
+                "outcome": outcome,
+                "source": "feedback_loop_scan",
+                "pr_number": pr_num,
+                "pr_url": pr_url,
+            }, indent=2))
+            recorded_ids.append(task_id)
+            # Also update proposal_success_rate via usage_store
+            service.usage_store.record_proposal_outcome(
+                category=issue_task_kind(issue),
+                succeeded=(outcome == "merged"),
+                now=_now,
+            )
+            _logger.info(json.dumps({
+                "event": "feedback_auto_recorded",
+                "task_id": task_id,
+                "outcome": outcome,
+                "pr_url": pr_url,
+            }))
+        except Exception:
+            pass
+
+    return recorded_ids
+
+
+# ---------------------------------------------------------------------------
+# Workspace health monitoring (Item 4)
+# ---------------------------------------------------------------------------
+
+_WORKSPACE_HEALTH_CYCLE_INTERVAL = 25
+_WORKSPACE_HEALTH_MARKER = "[Improve] Workspace environment unhealthy"
+
+
+def handle_workspace_health_check(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    now: datetime | None = None,
+) -> list[str]:
+    """Verify and repair the execution environment for each configured repo.
+
+    For every repo in settings that has a ``local_path`` set, runs a minimal
+    Python sanity check inside the repo's venv.  On failure, attempts to
+    re-run ``bootstrap.prepare()`` to restore the environment.  If bootstrap
+    also fails, creates a high-priority goal task so a human can investigate.
+
+    Returns a list of newly created task IDs (one per unhealthy repo that
+    couldn't be self-repaired).
+    """
+    from control_plane.adapters.workspace.bootstrap import RepoEnvironmentBootstrapper
+
+    _now = now or datetime.now(UTC)
+    created_ids: list[str] = []
+
+    for repo_key, repo_cfg in service.settings.repos.items():
+        local_path_str = getattr(repo_cfg, "local_path", None)
+        if not local_path_str:
+            continue
+        repo_path = Path(local_path_str)
+        if not repo_path.exists():
+            continue
+
+        # Determine venv python path
+        venv_dir = getattr(repo_cfg, "venv_dir", ".venv")
+        python_bin = repo_path / venv_dir / "bin" / "python"
+        if not python_bin.exists():
+            python_bin = repo_path / venv_dir / "Scripts" / "python.exe"  # Windows fallback
+
+        # Quick sanity check: run python -c "import sys; sys.exit(0)"
+        healthy = False
+        if python_bin.exists():
+            try:
+                import subprocess
+                proc = subprocess.run(
+                    [str(python_bin), "-c", "import sys; sys.exit(0)"],
+                    cwd=str(repo_path),
+                    capture_output=True,
+                    timeout=15,
+                )
+                healthy = proc.returncode == 0
+            except Exception:
+                healthy = False
+
+        if healthy:
+            continue
+
+        _logger.warning(json.dumps({
+            "event": "workspace_health_unhealthy",
+            "repo_key": repo_key,
+            "local_path": local_path_str,
+        }))
+
+        # Attempt bootstrap repair
+        repaired = False
+        try:
+            bootstrapper = RepoEnvironmentBootstrapper()
+            bootstrapper.prepare(
+                repo_path,
+                python_binary=getattr(repo_cfg, "python_binary", "python3"),
+                venv_dir=venv_dir,
+                install_dev_command=getattr(repo_cfg, "install_dev_command", None),
+                enabled=getattr(repo_cfg, "bootstrap_enabled", True),
+                bootstrap_commands=getattr(repo_cfg, "bootstrap_commands", None),
+            )
+            repaired = True
+            _logger.info(json.dumps({
+                "event": "workspace_health_repaired",
+                "repo_key": repo_key,
+            }))
+        except Exception as exc:
+            _logger.warning(json.dumps({
+                "event": "workspace_health_repair_failed",
+                "repo_key": repo_key,
+                "error": str(exc)[:300],
+            }))
+
+        if repaired:
+            continue
+
+        # Bootstrap failed — create a task for human investigation
+        existing_names = existing_issue_names(client)
+        task_title = f"[Workspace] Repair environment for {repo_key}"
+        if task_title.lower() in existing_names:
+            continue
+
+        try:
+            new_task = client.create_issue(
+                name=task_title,
+                description=(
+                    f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+                    "## Goal\n"
+                    f"The workspace environment for `{repo_key}` at `{local_path_str}` "
+                    "failed its health check and could not be automatically repaired via bootstrap.\n\n"
+                    "Investigate and restore the Python venv or bootstrap configuration so tasks can execute.\n\n"
+                    "## Context\n"
+                    f"- repo_key: {repo_key}\n"
+                    f"- local_path: {local_path_str}\n"
+                    f"- venv_dir: {venv_dir}\n"
+                    "- source: workspace_health_monitor\n"
+                    "- priority: high\n"
+                ),
+                state="Ready for AI",
+                label_names=["task-kind: goal", "priority: high", f"repo: {repo_key}", "source: improve-worker"],
+            )
+            new_id = str(new_task.get("id", ""))
+            if new_id:
+                created_ids.append(new_id)
+            _logger.info(json.dumps({
+                "event": "workspace_health_task_created",
+                "repo_key": repo_key,
+                "task_id": new_id,
+            }))
+        except Exception:
+            pass
+
+    return created_ids
+
+
+# ---------------------------------------------------------------------------
+# Multi-step dependency planning (Item 8)
+# ---------------------------------------------------------------------------
+
+_MULTI_STEP_LABEL = "plan: multi-step"
+_MULTI_STEP_TITLE_KEYWORDS = (
+    "refactor", "migrate", "redesign", "modernize", "audit",
+    "overhaul", "restructure", "rewrite",
+)
+_MULTI_STEP_PLAN_MARKER = "[Plan] Multi-step plan created"
+
+
+def _is_multi_step_task(issue: dict[str, Any]) -> bool:
+    """Return True when the task warrants a multi-step execution plan."""
+    labels = [lbl.lower() for lbl in issue_label_names(issue)]
+    if _MULTI_STEP_LABEL in labels:
+        return True
+    title = str(issue.get("name") or "").lower()
+    return any(kw in title for kw in _MULTI_STEP_TITLE_KEYWORDS)
+
+
+def build_multi_step_plan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    task_id: str,
+    issue: dict[str, Any],
+) -> list[str]:
+    """Decompose a complex task into Analyze → Implement → Verify subtasks.
+
+    When *issue* qualifies as multi-step (keyword in title or explicit label),
+    creates three dependent tasks:
+    - ``[Step 1/3: Analyze] <title>`` — scoped investigation, no code changes
+    - ``[Step 2/3: Implement] <title>`` — depends_on step 1
+    - ``[Step 3/3: Verify] <title>`` — depends_on step 2
+
+    Moves the original task to Backlog (it is superseded by the plan).
+    Returns the list of created task IDs (empty if the task does not qualify
+    or if any of the step tasks already exist on the board).
+    """
+    if not _is_multi_step_task(issue):
+        return []
+
+    original_title = str(issue.get("name") or "task")
+    repo_key = _extract_repo_key(issue, service)
+    base_labels = ["task-kind: goal", f"repo: {repo_key}", "source: multi-step-plan"]
+
+    existing_names = existing_issue_names(client)
+
+    step_titles = [
+        f"[Step 1/3: Analyze] {original_title}",
+        f"[Step 2/3: Implement] {original_title}",
+        f"[Step 3/3: Verify] {original_title}",
+    ]
+    if any(t.lower() in existing_names for t in step_titles):
+        return []  # Plan already created
+
+    try:
+        board_task = service.parse_task(client, task_id)
+        goal_text = board_task.goal_text or ""
+    except Exception:
+        goal_text = ""
+
+    created_ids: list[str] = []
+    prev_id: str | None = None
+
+    step_goals = [
+        (
+            f"Analyze the scope of: {original_title}\n\n"
+            f"Original goal: {goal_text[:600]}\n\n"
+            "Produce a written plan (as a Plane comment or artifact) that:\n"
+            "- identifies the files/modules to change\n"
+            "- lists the concrete changes needed\n"
+            "- flags any risks or dependencies\n"
+            "Do NOT make any code changes in this step."
+        ),
+        (
+            f"Implement the changes for: {original_title}\n\n"
+            f"Original goal: {goal_text[:600]}\n\n"
+            "Follow the analysis from [Step 1/3: Analyze].  Make only the changes "
+            "identified there.  Run existing tests after each significant change."
+        ),
+        (
+            f"Verify the implementation for: {original_title}\n\n"
+            "Run the full validation suite and confirm:\n"
+            "- all pre-existing tests pass\n"
+            "- the original goal is satisfied\n"
+            "- no regressions introduced\n"
+            "Fix any failures found during verification."
+        ),
+    ]
+
+    for i, (step_title, step_goal) in enumerate(zip(step_titles, step_goals)):
+        depends_line = f"\n- depends_on: {prev_id}" if prev_id else ""
+        description = (
+            f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+            f"## Goal\n{step_goal}\n\n"
+            f"## Constraints\n"
+            f"- source_task_id: {task_id}\n"
+            f"- step: {i + 1} of 3\n"
+            f"- plan_title: {original_title}\n"
+            f"{depends_line}"
+        )
+        # Steps 2 and 3 start in Backlog; step 1 is Ready for AI
+        state = "Ready for AI" if i == 0 else "Backlog"
+        try:
+            new_task = client.create_issue(
+                name=step_title,
+                description=description,
+                state=state,
+                label_names=base_labels,
+            )
+            new_id = str(new_task.get("id", ""))
+            created_ids.append(new_id)
+            prev_id = new_id
+        except Exception as exc:
+            _logger.warning(json.dumps({
+                "event": "multi_step_plan_step_failed",
+                "step": i + 1,
+                "error": str(exc)[:200],
+            }))
+            break
+
+    if created_ids:
+        try:
+            client.transition_issue(task_id, "Backlog")
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    _MULTI_STEP_PLAN_MARKER,
+                    [
+                        f"task_id: {task_id}",
+                        "result_status: backlog",
+                        f"reason: complex task decomposed into {len(created_ids)}-step plan",
+                        f"step_task_ids: {', '.join(created_ids)}",
+                        "next_action: step 1 is Ready for AI; steps 2 and 3 will activate after each predecessor completes",
+                    ],
+                ),
+            )
+        except Exception:
+            pass
+        _logger.info(json.dumps({
+            "event": "multi_step_plan_created",
+            "source_task_id": task_id,
+            "step_task_ids": created_ids,
+        }))
+
+    return created_ids
+
+
+# ---------------------------------------------------------------------------
 # PR review revision cycle
 # ---------------------------------------------------------------------------
 
@@ -3590,6 +4096,12 @@ def handle_propose_cycle(
 
 def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
+
+    # Multi-step planning: decompose complex tasks before executing
+    plan_ids = build_multi_step_plan(client, service, task_id, issue)
+    if plan_ids:
+        return plan_ids
+
     selected_evidence = selected_evidence_from_issue(issue)
     target_area_hint = target_area_hint_from_issue(issue)
     result = run_service_task(service, client, task_id, worker_role="goal")
@@ -3741,6 +4253,19 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
         )
     except Exception:
         pass
+    # Cost telemetry
+    try:
+        _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
+        if _cost > 0:
+            _repo_key = _extract_repo_key(issue, service)
+            service.usage_store.record_execution_cost(
+                task_id=task_id,
+                repo_key=_repo_key,
+                estimated_usd=_cost,
+                now=datetime.now(UTC),
+            )
+    except Exception:
+        pass
     rewrite_worker_summary(result, service, task_id)
     return created_ids
 
@@ -3860,6 +4385,20 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
             ],
         ),
     )
+    # Cost telemetry
+    try:
+        _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
+        if _cost > 0:
+            _issue_t = client.fetch_issue(task_id)
+            _repo_key_t = _extract_repo_key(_issue_t, service)
+            service.usage_store.record_execution_cost(
+                task_id=task_id,
+                repo_key=_repo_key_t,
+                estimated_usd=_cost,
+                now=datetime.now(UTC),
+            )
+    except Exception:
+        pass
     rewrite_worker_summary(result, service, task_id)
     return result.follow_up_task_ids
 
@@ -4023,16 +4562,25 @@ def run_watch_loop(
     poll_interval_seconds: int,
     max_cycles: int | None,
     status_dir: Path | None = None,
+    _slot_id: int = 0,
 ) -> None:
+    """Single-threaded polling loop for a watcher role.
+
+    *_slot_id* is 0 for the primary slot and > 0 for additional parallel
+    slots.  Periodic scans (heartbeat write, improve sub-scans, config drift
+    check) only run when ``_slot_id == 0`` to prevent duplicate work when
+    ``parallel_slots > 1``.
+    """
     logger = logging.getLogger(__name__)
     poll_interval_seconds = max(poll_interval_seconds, service.settings.execution_controls().min_watch_interval_seconds)
     cycle = 0
     known_triaged_blocked_ids: set[str] = set()
     counters = {"follow_up_tasks_created": 0, "blocked_tasks_triaged": 0}
+    _is_primary_slot = _slot_id == 0
 
     while True:
         cycle += 1
-        cycle_run_id = f"{role}-cycle-{cycle}"
+        cycle_run_id = f"{role}-slot{_slot_id}-cycle-{cycle}"
         logger.info(json.dumps({"event": "watch_cycle_start", "role": role, "cycle": cycle, "poll_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
         write_watch_status(
             status_dir=status_dir,
@@ -4043,10 +4591,10 @@ def run_watch_loop(
             last_action="cycle_start",
             counters=counters,
         )
-        if status_dir is not None:
+        if status_dir is not None and _is_primary_slot:
             write_heartbeat(status_dir, role, now=datetime.now(UTC))
         try:
-            if cycle == 1:
+            if cycle == 1 and _is_primary_slot:
                 if not validate_credentials(
                     service.settings,
                     usage_store=service.usage_store,
@@ -4061,31 +4609,64 @@ def run_watch_loop(
                 reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
-            # Review revision scan — every 3 cycles for the improve watcher.
-            if role == "improve" and cycle % 3 == 0:
-                revision_ids = handle_review_revision_scan(client, service)
-                if revision_ids:
-                    counters["follow_up_tasks_created"] += len(revision_ids)
-                    logger.info(json.dumps({"event": "watch_review_revisions_created", "role": role, "cycle": cycle, "task_ids": revision_ids}))
-            # Merge conflict scan — every 5 cycles for the improve watcher.
-            if role == "improve" and cycle % 5 == 0:
-                conflict_ids = handle_merge_conflict_scan(client, service)
-                if conflict_ids:
-                    counters["follow_up_tasks_created"] += len(conflict_ids)
-                    logger.info(json.dumps({"event": "watch_merge_conflicts_handled", "role": role, "cycle": cycle, "task_ids": conflict_ids}))
-            # Stale PR TTL scan — every 20 cycles.
-            if role == "improve" and cycle % _STALE_PR_SCAN_CYCLE_INTERVAL == 0:
-                stale_ids = handle_stale_pr_scan(client, service, now=datetime.now(UTC))
-                if stale_ids:
-                    counters["follow_up_tasks_created"] += len(stale_ids)
-                    logger.info(json.dumps({"event": "watch_stale_prs_closed", "role": role, "cycle": cycle, "task_ids": stale_ids}))
-            # Point 4+6: Post-merge CI regression scan — runs every 10 cycles for the
-            # improve watcher so CI failures on merged PRs create follow-up tasks.
-            if role == "improve" and cycle % 10 == 0:
-                reg_ids = detect_post_merge_regressions(client, service)
-                if reg_ids:
-                    counters["follow_up_tasks_created"] += len(reg_ids)
-                    logger.info(json.dumps({"event": "watch_post_merge_regressions", "role": role, "cycle": cycle, "regression_task_ids": reg_ids}))
+                # Config drift check — log warnings for missing config keys
+                _drift_config = os.environ.get("CONTROL_PLANE_CONFIG", "")
+                _example_path = Path(_drift_config).parent / "control_plane.example.yaml" if _drift_config else None
+                if _drift_config and _example_path and _example_path.exists():
+                    try:
+                        from control_plane.config.drift import detect_config_drift
+                        _drift_gaps = detect_config_drift(_drift_config, _example_path)
+                        for _gap in _drift_gaps:
+                            logger.warning(json.dumps({
+                                "event": "config_drift_detected",
+                                "missing_key": _gap,
+                                "action": "feature may be silently disabled — add the key to your config",
+                            }))
+                        if _drift_gaps:
+                            logger.warning(json.dumps({
+                                "event": "config_drift_summary",
+                                "missing_count": len(_drift_gaps),
+                                "missing_keys": _drift_gaps,
+                            }))
+                    except Exception:
+                        pass
+            # Periodic scans run only on the primary slot to avoid duplicate work.
+            if _is_primary_slot:
+                # Review revision scan — every 3 cycles for the improve watcher.
+                if role == "improve" and cycle % 3 == 0:
+                    revision_ids = handle_review_revision_scan(client, service)
+                    if revision_ids:
+                        counters["follow_up_tasks_created"] += len(revision_ids)
+                        logger.info(json.dumps({"event": "watch_review_revisions_created", "role": role, "cycle": cycle, "task_ids": revision_ids}))
+                # Merge conflict scan — every 5 cycles for the improve watcher.
+                if role == "improve" and cycle % 5 == 0:
+                    conflict_ids = handle_merge_conflict_scan(client, service)
+                    if conflict_ids:
+                        counters["follow_up_tasks_created"] += len(conflict_ids)
+                        logger.info(json.dumps({"event": "watch_merge_conflicts_handled", "role": role, "cycle": cycle, "task_ids": conflict_ids}))
+                # Stale PR TTL scan — every 20 cycles.
+                if role == "improve" and cycle % _STALE_PR_SCAN_CYCLE_INTERVAL == 0:
+                    stale_ids = handle_stale_pr_scan(client, service, now=datetime.now(UTC))
+                    if stale_ids:
+                        counters["follow_up_tasks_created"] += len(stale_ids)
+                        logger.info(json.dumps({"event": "watch_stale_prs_closed", "role": role, "cycle": cycle, "task_ids": stale_ids}))
+                # Post-merge CI regression scan — every 10 cycles.
+                if role == "improve" and cycle % 10 == 0:
+                    reg_ids = detect_post_merge_regressions(client, service)
+                    if reg_ids:
+                        counters["follow_up_tasks_created"] += len(reg_ids)
+                        logger.info(json.dumps({"event": "watch_post_merge_regressions", "role": role, "cycle": cycle, "regression_task_ids": reg_ids}))
+                # Feedback loop scan — every 15 improve cycles.
+                if role == "improve" and cycle % _FEEDBACK_LOOP_CYCLE_INTERVAL == 0:
+                    fb_ids = handle_feedback_loop_scan(client, service, now=datetime.now(UTC))
+                    if fb_ids:
+                        logger.info(json.dumps({"event": "watch_feedback_auto_recorded", "role": role, "cycle": cycle, "task_ids": fb_ids}))
+                # Workspace health check — every 25 improve cycles.
+                if role == "improve" and cycle % _WORKSPACE_HEALTH_CYCLE_INTERVAL == 0:
+                    ws_ids = handle_workspace_health_check(client, service, now=datetime.now(UTC))
+                    if ws_ids:
+                        counters["follow_up_tasks_created"] += len(ws_ids)
+                        logger.info(json.dumps({"event": "watch_workspace_health_tasks", "role": role, "cycle": cycle, "task_ids": ws_ids}))
             task_id, action = select_watch_candidate(
                 client,
                 ready_state=ready_state,
@@ -4180,6 +4761,26 @@ def run_watch_loop(
                     logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
                     time.sleep(poll_interval_seconds)
                     continue
+                # Pre-execution validation for goal tasks
+                if role == "goal" and action == "execute":
+                    if not validate_task_pre_execution(client, service, task_id, issue):
+                        write_watch_status(
+                            status_dir=status_dir,
+                            role=role,
+                            cycle=cycle,
+                            state="idle",
+                            run_id=cycle_run_id,
+                            last_action="pre_exec_rejected",
+                            task_id=task_id,
+                            task_kind=task_kind,
+                            counters=counters,
+                        )
+                        if max_cycles is not None and cycle >= max_cycles:
+                            logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
+                            return
+                        logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
+                        time.sleep(poll_interval_seconds)
+                        continue
                 claimed = False
                 try:
                     client.transition_issue(task_id, "Running")
@@ -4396,6 +4997,77 @@ def run_watch_loop(
         time.sleep(poll_interval_seconds)
 
 
+def run_parallel_watch_loop(
+    client: PlaneClient,
+    service: ExecutionService,
+    *,
+    role: str,
+    ready_state: str,
+    poll_interval_seconds: int,
+    max_cycles: int | None,
+    status_dir: Path | None = None,
+    n_slots: int = 1,
+) -> None:
+    """Launch *n_slots* parallel task-execution threads for a watcher role.
+
+    When *n_slots* == 1 this is identical to calling ``run_watch_loop``
+    directly.  When *n_slots* > 1, slot 0 is the primary slot (runs periodic
+    scans, heartbeat, credential validation); remaining slots only execute
+    tasks.  All threads share the same ``client`` and ``service`` objects —
+    the Plane API's state machine is the distributed lock that prevents two
+    slots from claiming the same task.
+    """
+    import threading
+
+    if n_slots <= 1:
+        run_watch_loop(
+            client,
+            service,
+            role=role,
+            ready_state=ready_state,
+            poll_interval_seconds=poll_interval_seconds,
+            max_cycles=max_cycles,
+            status_dir=status_dir,
+            _slot_id=0,
+        )
+        return
+
+    threads: list[threading.Thread] = []
+    for slot_id in range(n_slots):
+        t = threading.Thread(
+            target=run_watch_loop,
+            kwargs={
+                "client": client,
+                "service": service,
+                "role": role,
+                "ready_state": ready_state,
+                "poll_interval_seconds": poll_interval_seconds,
+                "max_cycles": max_cycles,
+                "status_dir": status_dir,
+                "_slot_id": slot_id,
+            },
+            name=f"watch-{role}-slot{slot_id}",
+            daemon=True,
+        )
+        threads.append(t)
+
+    logger = logging.getLogger(__name__)
+    logger.info(json.dumps({
+        "event": "parallel_watch_start",
+        "role": role,
+        "n_slots": n_slots,
+    }))
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    logger.info(json.dumps({
+        "event": "parallel_watch_complete",
+        "role": role,
+        "n_slots": n_slots,
+    }))
+
+
 def main() -> None:
     import sys
 
@@ -4411,6 +5083,17 @@ def main() -> None:
             sys.exit(1)
         sys.exit(0)
 
+    if len(sys.argv) >= 2 and sys.argv[1] == "spend-report":
+        sr_parser = argparse.ArgumentParser(description="Show execution spend report")
+        sr_parser.add_argument("--window-days", type=int, default=1)
+        sr_parser.add_argument("--usage-path", default=None)
+        sr_args = sr_parser.parse_args(sys.argv[2:])
+        from control_plane.execution.usage_store import UsageStore
+        store = UsageStore(Path(sr_args.usage_path) if sr_args.usage_path else None)
+        report = store.get_spend_report(window_days=sr_args.window_days, now=datetime.now(UTC))
+        print(json.dumps(report, indent=2))
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="Run Plane task(s) through Kodo wrapper")
     parser.add_argument("--config", required=True)
     target = parser.add_mutually_exclusive_group(required=True)
@@ -4422,6 +5105,12 @@ def main() -> None:
     parser.add_argument("--poll-interval-seconds", type=int, default=15)
     parser.add_argument("--max-cycles", type=int)
     parser.add_argument("--status-dir")
+    parser.add_argument(
+        "--parallel-slots",
+        type=int,
+        default=None,
+        help="Number of parallel task-execution threads (overrides config parallel_slots; default 1)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -4438,7 +5127,8 @@ def main() -> None:
     try:
         service = ExecutionService(settings)
         if args.watch:
-            run_watch_loop(
+            _n_slots = args.parallel_slots if args.parallel_slots is not None else int(getattr(settings, "parallel_slots", 1))
+            run_parallel_watch_loop(
                 client,
                 service,
                 role=args.role,
@@ -4446,6 +5136,7 @@ def main() -> None:
                 poll_interval_seconds=args.poll_interval_seconds,
                 max_cycles=args.max_cycles,
                 status_dir=Path(args.status_dir) if args.status_dir else None,
+                n_slots=_n_slots,
             )
             return
 
