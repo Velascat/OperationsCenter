@@ -690,8 +690,14 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
             "unsupported execution mode",
             "base branch",
             "phase: fetch_task",
-            "parse",
-            "config",
+            "taskcontracterror",
+            "contract validation",
+            "config error",
+            "parse error",
+            "missing execution metadata",
+            "no clone_url configured",
+            "unknown repo key",
+            "no repo key",
         ]
     ):
         return "parse_config", "The work item contract or repo configuration is invalid for execution."

@@ -12,6 +12,7 @@ from control_plane.execution import ExecutionControlSettings, UsageStore
 from control_plane.domain.models import ExecutionResult
 from control_plane.entrypoints.worker.main import (
     ProposalSpec,
+    UNKNOWN_BLOCKED_CLASSIFICATION,
     build_improve_triage_result,
     classify_blocked_issue,
     handle_goal_task,
@@ -202,6 +203,50 @@ def test_classify_blocked_issue_detects_verification_failure_for_test_tasks() ->
     )
     assert classification == "verification_failure"
     assert "Verification failed" in rationale
+
+
+def test_classify_blocked_issue_no_false_positive_on_configured() -> None:
+    classification, _ = classify_blocked_issue(
+        {"name": "Task", "description": "The configured validation commands ran successfully"},
+        [{"comment_html": "<p>We verified this in a properly configured environment.</p>"}],
+    )
+
+    assert classification == UNKNOWN_BLOCKED_CLASSIFICATION
+
+
+def test_classify_blocked_issue_no_false_positive_on_parse() -> None:
+    classification, _ = classify_blocked_issue(
+        {"name": "Task", "description": "Failed to parse the input data correctly"},
+        [{"comment_html": "<p>We need to parse the output format.</p>"}],
+    )
+
+    assert classification == UNKNOWN_BLOCKED_CLASSIFICATION
+
+
+def test_classify_blocked_issue_true_positive_taskcontracterror() -> None:
+    classification, _ = classify_blocked_issue(
+        {"name": "Task"},
+        [{"comment_html": "<p>TaskContractError: Unknown repo key 'my-repo'</p>"}],
+    )
+    assert classification == "parse_config"
+
+    classification, _ = classify_blocked_issue(
+        {"name": "Task"},
+        [{"comment_html": "<p>Missing execution metadata in task contract</p>"}],
+    )
+    assert classification == "parse_config"
+
+
+def test_classify_blocked_issue_no_false_positive_code_youtube_shorts_scenario() -> None:
+    classification, _ = classify_blocked_issue(
+        {
+            "name": "code_youtube_shorts: Fix validation errors",
+            "description": "The configured validation commands are failing",
+        },
+        [{"comment_html": "<p>Need to parse and fix the validation output.</p>"}],
+    )
+
+    assert classification == UNKNOWN_BLOCKED_CLASSIFICATION
 
 
 def test_run_watch_loop_claims_and_runs_one_goal_task(caplog: pytest.LogCaptureFixture) -> None:
