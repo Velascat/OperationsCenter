@@ -140,15 +140,25 @@ def test_issue_status_name_prefers_state_name() -> None:
 
 
 class FakeUsageStore(UsageStore):
-    """UsageStore backed by in-memory task_attempts dict."""
+    """UsageStore backed by in-memory task_attempts and task_signatures dicts."""
 
-    def __init__(self, *, task_attempts: dict[str, int] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        task_attempts: dict[str, int] | None = None,
+        task_signatures: dict[str, str] | None = None,
+    ) -> None:
         import tempfile
         super().__init__(Path(tempfile.mkdtemp()) / "usage.json")
         self._fake_attempts = task_attempts or {}
+        self._fake_signatures = task_signatures or {}
 
     def load(self) -> dict:  # type: ignore[override]
-        return {"task_attempts": dict(self._fake_attempts), "last_task_signatures": {}, "events": []}
+        return {
+            "task_attempts": dict(self._fake_attempts),
+            "last_task_signatures": dict(self._fake_signatures),
+            "events": [],
+        }
 
 
 def test_select_ready_task_id_returns_first_matching_issue() -> None:
@@ -716,8 +726,51 @@ def test_handle_test_task_does_not_mark_done_for_internal_only_no_op() -> None:
     assert any("target_area_hint: test/conftest.py, src/main.py" in comment for _, comment in client.issue_comments)
 
 
-def test_reconcile_stale_running_issues_moves_owned_running_tasks_to_blocked() -> None:
-    """Task with prior execution attempts → Blocked for human review."""
+def test_reconcile_stale_running_issues_requeues_never_executed_task() -> None:
+    """Task with zero execution attempts (just claimed) → re-queued to Ready for AI."""
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-FRESH",
+                "name": "Just claimed goal",
+                "state": {"name": "Running"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ]
+    )
+    store = FakeUsageStore(task_attempts={})
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
+
+    assert reconciled == ["GOAL-FRESH"]
+    assert ("GOAL-FRESH", "Ready for AI") in client.transitions
+    assert ("GOAL-FRESH", "Blocked") not in client.transitions
+    assert any("re-queued" in c.lower() or "interrupted" in c.lower() for _, c in client.issue_comments)
+
+
+def test_reconcile_stale_running_issues_requeues_one_attempt_no_signature() -> None:
+    """Task with 1 attempt but no signature → interrupted mid-run, safe to re-queue."""
+    client = FakePlaneClient(
+        [
+            {
+                "id": "GOAL-RUN",
+                "name": "Stale goal",
+                "state": {"name": "Running"},
+                "labels": [{"name": "task-kind: goal"}],
+            },
+        ]
+    )
+    store = FakeUsageStore(task_attempts={"GOAL-RUN": 1})  # ran once, no signature
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
+
+    assert reconciled == ["GOAL-RUN"]
+    assert ("GOAL-RUN", "Ready for AI") in client.transitions
+    assert ("GOAL-RUN", "Blocked") not in client.transitions
+
+
+def test_reconcile_stale_running_issues_blocks_when_has_signature() -> None:
+    """Task with 1 attempt AND a recorded signature → ran to completion, block for review."""
     client = FakePlaneClient(
         [
             {
@@ -734,7 +787,7 @@ def test_reconcile_stale_running_issues_moves_owned_running_tasks_to_blocked() -
             },
         ]
     )
-    store = FakeUsageStore(task_attempts={"GOAL-RUN": 1})
+    store = FakeUsageStore(task_attempts={"GOAL-RUN": 1}, task_signatures={"GOAL-RUN": "sha:abc123"})
 
     reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
 
@@ -742,29 +795,28 @@ def test_reconcile_stale_running_issues_moves_owned_running_tasks_to_blocked() -
     assert ("GOAL-RUN", "Blocked") in client.transitions
     assert ("GOAL-RUN", "Ready for AI") not in client.transitions
     assert ("TEST-RUN", "Blocked") not in client.transitions
-    assert any("human review" in comment.lower() for _, comment in client.issue_comments)
+    assert any("human review" in c.lower() for _, c in client.issue_comments)
 
 
-def test_reconcile_stale_running_issues_requeues_never_executed_task() -> None:
-    """Task with zero execution attempts (just claimed) → re-queued to Ready for AI."""
+def test_reconcile_stale_running_issues_blocks_on_multiple_attempts() -> None:
+    """Task with 2+ attempts → retried and failed repeatedly, block for human review."""
     client = FakePlaneClient(
         [
             {
-                "id": "GOAL-FRESH",
-                "name": "Just claimed goal",
+                "id": "GOAL-RETRY",
+                "name": "Repeatedly failing goal",
                 "state": {"name": "Running"},
                 "labels": [{"name": "task-kind: goal"}],
             },
         ]
     )
-    store = FakeUsageStore(task_attempts={})  # no attempts recorded
+    store = FakeUsageStore(task_attempts={"GOAL-RETRY": 2})
 
     reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
 
-    assert reconciled == ["GOAL-FRESH"]
-    assert ("GOAL-FRESH", "Ready for AI") in client.transitions
-    assert ("GOAL-FRESH", "Blocked") not in client.transitions
-    assert any("re-queued" in comment.lower() for _, comment in client.issue_comments)
+    assert reconciled == ["GOAL-RETRY"]
+    assert ("GOAL-RETRY", "Blocked") in client.transitions
+    assert ("GOAL-RETRY", "Ready for AI") not in client.transitions
 
 
 def test_handle_blocked_triage_does_not_recurse_for_improve_generated_task() -> None:

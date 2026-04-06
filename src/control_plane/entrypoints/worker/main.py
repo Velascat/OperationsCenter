@@ -674,6 +674,7 @@ def reconcile_stale_running_issues(
     task_attempts: dict[str, int] = {
         k: int(v) for k, v in usage_data.get("task_attempts", {}).items()
     }
+    task_signatures: dict[str, str | None] = usage_data.get("last_task_signatures", {})
     reconciled: list[str] = []
     for issue in client.list_issues():
         if issue_status_name(issue) != "Running":
@@ -685,19 +686,28 @@ def reconcile_stale_running_issues(
         elif task_kind != role:
             continue
         task_id = str(issue["id"])
-        # If kodo never ran on this task (attempts == 0), the watcher was
-        # restarted right after claiming — re-queue rather than blocking.
-        if task_attempts.get(task_id, 0) == 0:
+        attempts = task_attempts.get(task_id, 0)
+        has_signature = bool(task_signatures.get(task_id))
+        # Re-queue when the interruption was clearly operational (not a real failure):
+        #   - attempts == 0: watcher restarted right after claiming, kodo never ran
+        #   - attempts == 1 and no signature: kodo started but was interrupted before
+        #     writing a completion signature — treat as a clean retry
+        # Block (human review) when kodo actually completed at least one round:
+        #   - attempts >= 2: retried and failed more than once
+        #   - attempts >= 1 and has_signature: executed to completion but left Running
+        should_requeue = attempts == 0 or (attempts == 1 and not has_signature)
+        if should_requeue:
             client.transition_issue(task_id, ready_state)
             client.comment_issue(
                 task_id,
                 render_worker_comment(
-                    f"[{worker_title(role)}] Re-queued after interrupted claim",
+                    f"[{worker_title(role)}] Re-queued after interrupted execution",
                     [
                         f"task_id: {task_id}",
                         f"task_kind: {task_kind}",
                         f"result_status: {ready_state.lower().replace(' ', '_')}",
-                        "reason: task was claimed but execution never started — re-queued for retry",
+                        f"attempts: {attempts}",
+                        "reason: execution was interrupted before completion — safe to retry",
                     ],
                 ),
             )
@@ -711,7 +721,8 @@ def reconcile_stale_running_issues(
                         f"task_id: {task_id}",
                         f"task_kind: {task_kind}",
                         "result_status: blocked",
-                        "reason: task was left in Running without a clean completion — moved to Blocked for human review before retry",
+                        f"attempts: {attempts}",
+                        "reason: task ran to completion or retried multiple times without success",
                     ],
                 ),
             )
