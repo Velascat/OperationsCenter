@@ -518,6 +518,159 @@ the function is a no-op.
 | S4-8 | Execution profiles per kind | before each kodo run | `Settings.kodo_profiles`, `KodoAdapter.build_command` |
 | S4-9 | Dry-run quiet diagnosis | after autonomy-cycle report | `_write_quiet_diagnosis` |
 | S4-10 | Long-lived deduplication | before each proposal | `ProposalRejectionStore`, `ProposerGuardrailAdapter` |
+| S5-1 | Plane write retry | every Plane transition/comment/create call | `PlaneClient._request` |
+| S5-2 | Kodo process tree cleanup | kodo timeout | `KodoAdapter._run_subprocess`, `os.killpg` |
+| S5-3 | Per-task-kind running TTL | reconcile at watcher startup | `reconcile_stale_running_issues`, `_RUNNING_TTL_MINUTES` |
+| S5-4 | Disk space guardrail | before usage store and cycle report writes | `_check_disk_space`, `UsageStore.save()` |
+| S5-5 | Quota exhaustion detection | after each kodo execution | `KodoAdapter.is_quota_exhausted`, `record_kodo_quota_event` |
+| S5-6 | Task urgency scoring | watcher candidate selection | `issue_urgency_score`, `select_watch_candidate` |
+| S5-7 | Board saturation backpressure | before proposing (watcher + autonomy-cycle) | `handle_propose_cycle`, `autonomy_cycle/main.py` |
+| S5-8 | Scope violation recording | after policy-retry violations | `record_scope_violation`, `service.py` |
+| S5-9 | Improve → propose feedback | when escalation threshold fires | `handle_blocked_triage` |
+| S5-10 | Kodo quality erosion detection | after each kodo execution with diff | `_count_quality_suppressions`, `record_quality_warning` |
+
+---
+
+## Session 5 — 10 Reliability and Observability Improvements
+
+### S5-1. Plane Write Retry
+
+**Problem:** `transition_issue` and `comment_issue` were fire-and-forget — a single 5xx or connection error left the task in the wrong state (e.g. still `Running` after kodo finished) with no recovery path. Over time this caused board state drift.
+
+**Fix:** `PlaneClient._request` now retries up to 3 additional times (4 total) on:
+- `httpx.ConnectError`, `httpx.TimeoutException`, `httpx.RemoteProtocolError` — connection-level failures (linear backoff)
+- HTTP 502, 503, 504 — transient gateway/server errors (linear backoff)
+- HTTP 429 already had retry logic; that is unchanged
+
+Duplicate comment side-effects are acceptable — a missed transition is far more damaging.
+
+**Files:** `adapters/plane/client.py` (`_request`)
+
+---
+
+### S5-2. Kodo Process Tree Cleanup on Timeout
+
+**Problem:** `subprocess.run()` with `timeout` called `process.kill()` on the kodo wrapper process, but kodo may have spawned Claude sub-processes. Those orphaned processes continued consuming CPU and API quota indefinitely. Over days of operation they accumulated until they exhausted the process table or system memory.
+
+**Fix:** `KodoAdapter._run_subprocess()` replaces the `subprocess.run()` call. It uses `subprocess.Popen(start_new_session=True)` to place kodo in its own process group. On `TimeoutExpired`, `os.killpg(os.getpgid(proc.pid), signal.SIGKILL)` kills the entire group — the wrapper and all children — before returning. Both `run()` and `_run_with_claude_fallback()` now delegate to `_run_subprocess`.
+
+**Files:** `adapters/kodo/adapter.py` (`_run_subprocess`, `run`, `_run_with_claude_fallback`)
+
+---
+
+### S5-3. Per-Task-Kind Running TTL in Reconcile
+
+**Problem:** `reconcile_stale_running_issues` used a single generic TTL for all task kinds. A goal task legitimately running a complex refactor (2+ hours) would be killed early; a test task stuck for 4 hours would wait too long before reclamation.
+
+**Fix:** `_RUNNING_TTL_MINUTES` maps task kind to its expected maximum runtime:
+
+| Kind | TTL |
+|------|-----|
+| `goal` | 120 min |
+| `test` | 45 min |
+| `improve` | 30 min |
+| `fix_pr` | 45 min |
+| (other) | 90 min |
+
+Before acting on a Running task, `reconcile_stale_running_issues` checks `issue.updated_at`. If the task was updated within its TTL, it is skipped — it may still be legitimately running. Tasks whose `updated_at` is older than the TTL fall through to the existing re-queue/block logic.
+
+**Files:** `entrypoints/worker/main.py` (`reconcile_stale_running_issues`, `_RUNNING_TTL_MINUTES`, `_RUNNING_TTL_DEFAULT_MINUTES`)
+
+---
+
+### S5-4. Disk Space Guardrail
+
+**Problem:** The janitor cleans old artifacts, but runs as a pre-command wrapper rather than before each write. If disk filled between janitor runs (large snapshot, parallel slots writing simultaneously), `write_text` would raise `OSError` and crash the watcher. The crash triggered the S4-1 restart loop — which would immediately crash again on the next write attempt.
+
+**Fix:** `_check_disk_space(path)` in `usage_store.py` checks `shutil.disk_usage()` before writing. Below 50 MB free it raises `OSError` with a descriptive message including a remediation hint. Below 200 MB it logs a `disk_space_low` structured warning (non-fatal). Called in `UsageStore.save()` and in `_write_cycle_report` in `autonomy_cycle/main.py`.
+
+Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
+
+**Files:** `execution/usage_store.py` (`_check_disk_space`, `_DISK_MIN_MB`, `_DISK_WARN_MB`, `save()`), `entrypoints/autonomy_cycle/main.py` (`_write_cycle_report`)
+
+---
+
+### S5-5. Kodo API Quota Exhaustion Detection
+
+**Problem:** When kodo's upstream API hit a hard quota limit (billing exhaustion, not a transient rate limit), the system treated it as a generic task failure. The circuit breaker (S4-3) would open after 5 such failures, blocking all further tasks — the right symptom but with `reason="circuit_breaker_open"` rather than something diagnostic. The operator had to manually inspect kodo stderr to understand why.
+
+**Fix:**
+- `KodoAdapter._HARD_QUOTA_EXHAUSTED_SIGNALS` — phrases that indicate a billing-level limit (`insufficient_quota`, `you've exceeded your usage limit`, `upgrade your plan`, etc.)
+- `KodoAdapter.is_quota_exhausted(result)` — returns True when the result contains these signals
+- `UsageStore.record_kodo_quota_event(task_id, role, now)` — records a `kodo_quota_event` that does **not** feed the circuit breaker
+- `_is_quota_exhausted_result(result)` in `main.py` — checks `execution_stderr_excerpt` for the same patterns
+- In `handle_goal_task` and `handle_test_task`: when quota is exhausted, calls `record_kodo_quota_event` instead of `record_execution_outcome`. This prevents the circuit breaker from opening on an infrastructure failure rather than a task-quality failure.
+
+**Files:** `adapters/kodo/adapter.py` (`_HARD_QUOTA_EXHAUSTED_SIGNALS`, `is_quota_exhausted`), `execution/usage_store.py` (`record_kodo_quota_event`), `entrypoints/worker/main.py` (`_QUOTA_EXHAUSTED_EXCERPT_SIGNALS`, `_is_quota_exhausted_result`, `handle_goal_task`, `handle_test_task`)
+
+---
+
+### S5-6. Task Urgency Scoring
+
+**Problem:** `select_watch_candidate` sorted Ready-for-AI tasks only by priority label (high/medium/low/unset). A post-merge regression fix and a background lint cleanup in the same priority tier were picked in arbitrary board order. No mechanism existed to prefer time-sensitive work over maintenance work.
+
+**Fix:** `issue_urgency_score(issue)` computes a composite integer score combining:
+- **Priority label weight** — high=30, medium=20, low=10, unset=15
+- **Title prefix boost** — `[Regression]`/`post-merge regression`=+25, `[Fix]`/`[Rebase]`=+15, `[Revise]`/`[Verify]`=+8, `[Workspace]`/`[Step 1`=+5
+- **Task age** — capped at +3 (one point per day in Ready state, max 3 days)
+
+`select_watch_candidate` now sorts by `issue_urgency_score(issue)` descending instead of `issue_priority` ascending.
+
+**Files:** `entrypoints/worker/main.py` (`issue_urgency_score`, `select_watch_candidate`)
+
+---
+
+### S5-7. Board Saturation Backpressure
+
+**Problem:** The satiation signal (S1-8) detected when proposals weren't being consumed over multiple cycles, but couldn't directly observe the current board queue depth. A burst `autonomy-cycle --execute` run could flood the board with 30+ tasks when the watcher queue was already backed up, far exceeding what the goal/test lanes could drain in a reasonable time.
+
+**Fix:**
+- `MAX_QUEUED_AUTONOMY_TASKS = 15` constant in `main.py` (configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS` env var)
+- In `handle_propose_cycle`: after the `board_congested` check, counts `source: autonomy` tasks in `Ready for AI` or `Backlog`. If ≥ threshold, returns `decision="board_saturated"` immediately
+- In `autonomy_cycle/main.py`: performs the same count via `client.list_issues()` before calling `proposer_svc.run()`. Skips the propose stage and writes the cycle report with 0 created tasks
+
+**Files:** `entrypoints/worker/main.py` (`MAX_QUEUED_AUTONOMY_TASKS`, `handle_propose_cycle`), `entrypoints/autonomy_cycle/main.py` (board saturation check before `proposer_svc.run()`)
+
+---
+
+### S5-8. Scope Violation Usage Store Recording
+
+**Problem:** When kodo modified files outside `allowed_paths` (triggering the policy retry and eventual Blocked state), no persistent record was kept beyond the Plane comment and run artifact. The improve watcher and operators could not detect patterns — e.g. a task family that consistently escapes its allowed scope.
+
+**Fix:** `UsageStore.record_scope_violation(task_id, repo_key, violated_files, now)` appends a `scope_violation` event to the usage store. Called from `service.py` after the policy-retry pass when `policy_violations` is non-empty (capped to 10 files per event to avoid bloat). These events are visible in the usage store JSON alongside execution and outcome events.
+
+**Files:** `execution/usage_store.py` (`record_scope_violation`), `application/service.py` (call after policy violations)
+
+---
+
+### S5-9. Improve → Propose Systemic Feedback Channel
+
+**Problem:** When the improve watcher detected a systemic failure pattern (same classification ≥N times in 24 hours), it sent a webhook escalation and stopped. The operator received a notification but had to manually create a root-cause investigation task. The system had no path to self-generate that task.
+
+**Fix:** In `handle_blocked_triage`, when `should_escalate` fires and a webhook fires, the code also calls `client.create_issue` to create a single bounded `[Systemic] Investigate recurring <classification> failures` improve task. The task is:
+- `task-kind: improve`, `source: improve`, `urgency: high`
+- Goal: investigate and fix root cause (not scatter fixes across individual children)
+- Constraint: produce a direct fix or a single bounded follow-up, not recursive children
+- Deduped by title — if the task already exists on the board, no duplicate is created
+
+**Files:** `entrypoints/worker/main.py` (`handle_blocked_triage`)
+
+---
+
+### S5-10. Kodo Quality Erosion Detection
+
+**Problem:** The circuit breaker (S4-3) measures binary pass/fail. Kodo could consistently "succeed" (validation passes, PR opened) while adding `# noqa`, `# type: ignore`, or bare `pass` bodies that suppress the very errors the task was meant to fix. These pass validation and close the circuit breaker window as successes, but erode code quality over time.
+
+**Fix:**
+- `ExecutionService._count_quality_suppressions(diff_patch)` counts lines beginning with `+` in the unified diff that contain `# noqa`, `# type: ignore`/`# type:ignore`, or bare `pass`
+- Runs after `diff_patch` is available; if total suppressions ≥ 3, calls `UsageStore.record_quality_warning(task_id, repo_key, suppression_counts, now)`
+- `ExecutionResult.quality_suppression_counts` field carries counts to callers
+- `_comment_markdown` appends a `quality_warning:` line to the Plane comment when counts are non-empty, flagging the PR for human review
+- `record_quality_warning` stores `kodo_quality_warning` events (distinct from circuit-breaker events) for operator inspection
+
+**Config:** Threshold is hardcoded at 3 total suppressions. Future: make it a settings field.
+
+**Files:** `domain/models.py` (`ExecutionResult.quality_suppression_counts`), `application/service.py` (`_count_quality_suppressions`, quality analysis block, `_comment_markdown`), `execution/usage_store.py` (`record_quality_warning`)
 
 ---
 

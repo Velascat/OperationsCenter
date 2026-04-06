@@ -26,6 +26,43 @@ Both thresholds are tunable:
 
 The window requires ≥3 samples before the circuit can open (startup safety margin).
 
+## Disk Space Guardrail
+
+Before writing to the usage store, `_check_disk_space(path)` is called using `shutil.disk_usage()`:
+
+- **below 50 MB free**: raises `OSError` — the write is blocked
+- **below 200 MB free**: logs `"event": "disk_space_low"` warning but continues
+
+The same check also runs in `autonomy-cycle` before writing the cycle report. This prevents silent data loss on full disks.
+
+## Board Saturation Backpressure
+
+Before the propose watcher or `autonomy-cycle` creates new tasks, it counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds `MAX_QUEUED_AUTONOMY_TASKS`, the propose stage is skipped entirely for that cycle.
+
+Default: 15. Configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`.
+
+## Quality Erosion Tracking
+
+After each Kodo run, the execution service scans added diff lines (`+` prefix) for quality suppressions:
+
+- `# noqa` additions
+- `# type: ignore` additions
+- bare `pass` statement additions
+
+When the total meets or exceeds 3, a `kodo_quality_warning` event is written to the usage store with the suppression counts. This does not affect task status or circuit breaker state — it is observability-only.
+
+## Scope Violation Recording
+
+When a Kodo run modifies files outside `allowed_paths`, the violations are enforced (branch not pushed) and a `scope_violation` event is written to the usage store with `violated_files` and `repo_key`. This is observability alongside the enforcement that was already in place.
+
+## Quota Exhaustion Bypass
+
+Hard quota exhaustion (`is_quota_exhausted(result)` is true) is treated differently from ordinary failures:
+
+- calls `usage_store.record_kodo_quota_event()` instead of `record_execution_outcome()`
+- does **not** feed the circuit breaker window (quota exhaustion is an infrastructure event, not a code quality signal)
+- task is moved to `Blocked` with `blocked_classification: quota_exhausted`
+
 ## Operator Knobs
 
 - `CONTROL_PLANE_MAX_EXEC_PER_HOUR`
@@ -34,6 +71,7 @@ The window requires ≥3 samples before the circuit can open (startup safety mar
 - `CONTROL_PLANE_MIN_REMAINING_EXEC_FOR_PROPOSALS`
 - `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD`
 - `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW`
+- `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`
 - `CONTROL_PLANE_WATCH_INTERVAL_GOAL_SECONDS`
 - `CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS`
 - `CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS`
@@ -44,6 +82,12 @@ The window requires ≥3 samples before the circuit can open (startup safety mar
 - execution usage ledger: `tools/report/control_plane/execution/usage.json`
 - per-run control outcome: `control_outcome.json` inside retained run directories
 - proposal rejection store: `state/proposal_rejections.json`
+
+Usage store event kinds:
+- `execution_outcome` — normal success/failure (feeds circuit breaker)
+- `kodo_quota_event` — hard quota exhaustion (does not feed circuit breaker)
+- `kodo_quality_warning` — quality suppression count above threshold
+- `scope_violation` — changed files outside `allowed_paths`
 
 ## Execution Profiles Per Task Kind
 

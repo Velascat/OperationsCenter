@@ -123,6 +123,30 @@ also fails, a high-priority `[Workspace] Repair environment for <repo>` goal tas
 created.  This prevents a broken venv from causing every subsequent task to fail silently
 with `dependency_missing` or `infra_tooling`.
 
+## Per-Task-Kind Running TTL
+
+The stale-running reconciler uses per-kind timeouts rather than a single global TTL. When a task has been in `Running` state longer than its TTL, it is moved to `Blocked` for triage.
+
+| Task kind | TTL |
+|-----------|-----|
+| `goal` | 120 minutes |
+| `test` | 45 minutes |
+| `improve` | 30 minutes |
+| `fix_pr` | 45 minutes |
+| (other / unknown) | 90 minutes |
+
+TTL evaluation uses `issue.updated_at`. A task that updated recently (e.g. still receiving comments from an active run) is left alone even if its wall-clock age exceeds the TTL. This prevents false-positive stale detection on long-running but active executions.
+
+## Systemic Feedback from Escalation
+
+When the escalation webhook fires (`should_escalate` is true — ≥5 blocked events for the same classification in 24 hours), the improve watcher now also creates a dedicated `[Systemic] Investigate recurring <classification> failures` task on the board with:
+
+- `task-kind: improve`
+- `source: improve`
+- `urgency: high`
+
+This ensures systemic issues produce actionable board work, not just a webhook notification. The task is deduplicated: if a `[Systemic]` task with the same title already exists on the board, no duplicate is created.
+
 ## Escalation
 
 When the same classification appears in ≥5 blocked-triage events within 24 hours, an HTTP POST is sent to `escalation.webhook_url` (if configured). A cooldown prevents repeated POSTs for the same classification. This is a signal to the operator that a systemic issue exists.

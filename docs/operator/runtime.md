@@ -143,6 +143,39 @@ cost_per_execution_usd: 0.15   # rough estimate per task run
 - decision artifacts: `tools/report/control_plane/decision/`
 - proposer result artifacts: `tools/report/control_plane/proposer/`
 
+## Board Saturation Backpressure
+
+The propose watcher and `autonomy-cycle` both enforce a board saturation limit to prevent flooding the queue with unexecuted autonomy tasks. Before creating any new proposals, the system counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds the limit, the propose stage is skipped for that cycle.
+
+Default limit is 15. Configurable via environment variable:
+
+```bash
+CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS=20 ./scripts/control-plane.sh watch --role propose
+```
+
+When saturated, look for `"event": "propose_skipped_board_saturated"` in the propose watcher log. This is not an error — it means the board already has more work than the workers are consuming.
+
+## Task Urgency Scoring
+
+When the watcher selects which task to pick up next, candidates are ranked by a composite urgency score rather than priority label alone:
+
+| Component | Weight |
+|-----------|--------|
+| Priority label (`urgent`=4, `high`=3, `medium`=2, `low`=1) | base |
+| Title prefix boost (`[Regression]`=+3, `[Systemic]`=+2, `[Workspace]`=+1) | additive |
+| Task age (days since creation) | additive |
+
+This ensures regression and systemic investigation tasks are processed before routine backlog, even when they share the same priority label.
+
+## Disk Space Guardrail
+
+Before writing to the usage store, a disk space check runs against the storage path:
+
+- **below 50 MB free**: raises `OSError` — the usage store write is blocked and the event is logged
+- **below 200 MB free**: logs a `disk_space_low` warning but continues
+
+The check also runs in `autonomy-cycle` before writing the cycle report. If you see `OSError: insufficient disk space`, free space on the device hosting `tools/report/`.
+
 ## Autonomy-Cycle
 
 The preferred way to run the full autonomy pipeline in one command:

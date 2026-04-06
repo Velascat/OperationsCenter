@@ -198,6 +198,41 @@ cat state/proposal_rejections.json
 
 Each entry has `reason`, `task_id`, `task_title`, and `recorded_at`. These are checked before budget, cooldown, or dedup — a rejected key will never be proposed again. To allow a re-proposal, delete the entry from the JSON file and rerun `autonomy-cycle`.
 
+## Quality Erosion Warnings
+
+After each Kodo run, the execution service scans the diff for quality-suppressing additions:
+
+- `# noqa` annotations
+- `# type: ignore` annotations
+- bare `pass` statements
+
+When the combined total reaches or exceeds 3, a `kodo_quality_warning` event is written to the usage store and a note is appended to the PR comment:
+
+```
+> [quality] This run added N quality suppressions: {"noqa": N, "type_ignore": N}. Review before merging.
+```
+
+To audit suppression trends, filter the usage store for `"kind": "kodo_quality_warning"` entries. These are tracked for observability only — they do not affect task status.
+
+## Scope Violation Observability
+
+When `allowed_paths` is configured and a Kodo run modifies files outside the allowed set, the policy is enforced (changes are not pushed) and a `scope_violation` event is written to the usage store. Fields include `violated_files` and `repo_key`.
+
+Filter for `"kind": "scope_violation"` in `tools/report/control_plane/execution/usage.json` to see which tasks have exceeded their path budget. Recurring violations may indicate the `allowed_paths` config is too narrow for the goal.
+
+## Quota Exhaustion Detection
+
+Hard quota exhaustion from the Kodo orchestrator (e.g. Anthropic API quota exceeded) is detected separately from rate limiting. When detected:
+
+- a `kodo_quota_event` is written to the usage store (does **not** feed the circuit breaker)
+- the task is moved to `Blocked` with `blocked_classification: quota_exhausted`
+
+Filter for `"kind": "kodo_quota_event"` to track frequency. Unlike transient rate limits, quota exhaustion typically requires manual intervention (quota increase or wait for reset).
+
+## Disk Space Check
+
+See the [Disk Space Guardrail](../operator/runtime.md#disk-space-guardrail) section in the Runtime Guide. If writes to the usage store are failing with `OSError`, disk space is the first thing to check.
+
 ## Suggested Debugging Order
 
 1. `watch-all-status`
@@ -210,6 +245,10 @@ Each entry has `reason`, `task_id`, `task_title`, and `recorded_at`. These are c
 8. workspace health: look for `workspace_health_*` events in improve watcher log
 9. circuit breaker: look for `reason: circuit_breaker_open` in watcher log
 10. connection backoff: look for `watch_error` with `consecutive_errors > 1` in watcher log
+11. quota exhaustion: look for `"kind": "kodo_quota_event"` in usage store
+12. quality erosion: look for `"kind": "kodo_quality_warning"` in usage store
+13. scope violations: look for `"kind": "scope_violation"` in usage store
+14. board saturation: look for `"event": "propose_skipped_board_saturated"` in propose watcher log
 
 For autonomy-layer inputs:
 

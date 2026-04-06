@@ -61,6 +61,28 @@ Improve reporting output and ensure policy violations are visible.
 - Default bootstrap commands are `python3 -m venv .venv`, pip upgrade, and `.venv/bin/pip install -e .[dev]`.
 - Repos can override `python_binary`, `venv_dir`, `install_dev_command`, or disable bootstrap with `bootstrap_enabled: false`.
 
+## Plane API Write Retry
+
+`PlaneClient._request` retries transient failures automatically before raising:
+
+- **Connection errors** (`ConnectError`, `TimeoutException`, `RemoteProtocolError`): up to 4 attempts with linear backoff (2s, 4s, 6s between retries)
+- **5xx responses** (502, 503, 504): same retry logic
+- **429 rate-limit responses**: existing retry logic (unchanged)
+
+On the 4th attempt, errors are re-raised. This prevents transient Plane API blips from failing an otherwise successful execution.
+
+## Kodo Process Tree Cleanup
+
+The Kodo adapter uses `subprocess.Popen` with `start_new_session=True`. This places Kodo in its own process group, enabling full cleanup on timeout:
+
+```python
+os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+```
+
+This kills the entire process group (Kodo + any spawned subprocesses) when the configured timeout expires. Previously, orphan Kodo processes could outlive a timed-out run and continue consuming resources.
+
+On timeout, the run result carries `exit_code=-1` and a `[timeout: process group killed after Ns]` note appended to stderr.
+
 ## Smoke verification
 
 - Use `python -m control_plane.entrypoints.smoke.plane --config ... --task-id ... --comment-only` to verify Plane connectivity and parsing without invoking Kodo.

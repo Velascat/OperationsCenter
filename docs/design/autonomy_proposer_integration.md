@@ -134,6 +134,14 @@ When `ProposerGuardrailAdapter.evaluate()` finds a match, it returns `reason="pe
 
 To allow a candidate to be re-proposed after a human rejection, delete its entry from `state/proposal_rejections.json` and run `autonomy-cycle` again.
 
+## Board Saturation Guard (autonomy-cycle path)
+
+Before `propose-from-candidates` runs inside `autonomy-cycle`, the orchestrator counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds `MAX_QUEUED_AUTONOMY_TASKS` (default 15, configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`), the entire propose stage is skipped for that cycle.
+
+This prevents the proposer from outpacing the workers during idle stretches (e.g. after a watcher restart or overnight backlog buildup). The saturation check runs before dry-run expansion, so it also applies in `--execute` mode.
+
+When the board is saturated, the cycle report records `"propose_skipped": true` with `"reason": "board_saturated"`.
+
 ## Safety Boundaries
 
 - only `status=emit` decision candidates may become Plane tasks
@@ -141,3 +149,4 @@ To allow a candidate to be re-proposed after a human rejection, delete its entry
 - one candidate failure does not void the whole proposer run
 - zero-created runs are valid and retained
 - permanently rejected candidates are suppressed indefinitely (`state/proposal_rejections.json`)
+- propose stage is skipped when `source: autonomy` task count ≥ `MAX_QUEUED_AUTONOMY_TASKS`
