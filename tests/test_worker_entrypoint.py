@@ -3774,7 +3774,7 @@ def test_record_scope_violation_stored_in_events(tmp_path) -> None:
 def test_systemic_fix_task_created_on_escalation(tmp_path) -> None:
     """When should_escalate fires, a systemic-fix goal task should be created."""
     from control_plane.entrypoints.worker.main import handle_blocked_triage
-    from unittest.mock import MagicMock, call
+    from unittest.mock import MagicMock
 
     issue = {
         "id": "task-blk",

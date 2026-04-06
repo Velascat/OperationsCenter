@@ -4037,7 +4037,7 @@ def _scheduled_tasks_due(
     from datetime import timedelta
 
     try:
-        from croniter import croniter  # type: ignore[import-untyped]
+        from croniter import croniter  # type: ignore[import-untyped]  # ty: ignore[unresolved-import]
     except ImportError:
         return []
 
