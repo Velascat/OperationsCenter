@@ -882,6 +882,7 @@ class ExecutionService:
 
             description = self._build_fix_validation_description(
                 repo_key=task.repo_key,
+                base_branch=task.base_branch,
                 baseline_error_text=baseline_error_text,
                 occurrence_count=occurrence_count,
                 validation_results=validation_results,
@@ -892,6 +893,7 @@ class ExecutionService:
                 name=dedup_prefix,
                 description=description,
                 state="Backlog",
+                label_names=["task-kind: goal"],
             )
             new_id = str(created.get("id", ""))
             self._log_event("fix_validation_task_created", run_id, new_id=new_id, repo_key=task.repo_key)
@@ -907,16 +909,24 @@ class ExecutionService:
         cls,
         *,
         repo_key: str,
+        base_branch: str = "",
         baseline_error_text: str,
         occurrence_count: int,
         validation_results: list["ValidationResult"] | None = None,
         repo_target: "RepoTarget" | None = None,
     ) -> str:
         """Build the description body for a fix-validation issue."""
+        exec_block = "\n".join([
+            "## Execution",
+            f"repo: {repo_key}",
+            *([ f"base_branch: {base_branch}" ] if base_branch else []),
+            "mode: goal",
+        ])
+
         if validation_results is None:
             # Fallback: original compact format.
             return "\n".join([
-                f"repo: {repo_key}",
+                exec_block,
                 "",
                 "## Goal",
                 f"Fix a pre-existing validation failure in the `{repo_key}` repository.",
@@ -934,7 +944,7 @@ class ExecutionService:
             ])
 
         lines: list[str] = [
-            f"repo: {repo_key}",
+            exec_block,
             "",
             "## Goal",
             f"Fix a pre-existing validation failure in the `{repo_key}` repository.",
