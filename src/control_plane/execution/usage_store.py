@@ -21,6 +21,7 @@ class UsageStore:
                 "events": [],
                 "task_attempts": {},
                 "last_task_signatures": {},
+                "task_artifacts": {},
                 "hourly_exec_count": 0,
                 "daily_exec_count": 0,
                 "skipped_due_to_budget": 0,
@@ -223,6 +224,29 @@ class UsageStore:
             },
             now=now,
         )
+
+    def record_task_artifact(self, *, task_id: str, artifact: dict[str, Any], now: datetime) -> None:
+        """Persist a structured execution artifact keyed by task_id.
+
+        Callers should pass fields like ``outcome_status``, ``changed_files``,
+        ``validation_passed``, ``blocked_classification``, and
+        ``pull_request_url`` so that future runs and the improve watcher can
+        make better-informed decisions without re-reading every comment.
+        """
+        data = self.load()
+        artifacts = dict(data.get("task_artifacts", {}))
+        artifacts[task_id] = {**artifact, "recorded_at": now.isoformat()}
+        data["task_artifacts"] = artifacts
+        self.save(data, now=now)
+
+    def get_task_artifact(self, task_id: str) -> dict[str, Any] | None:
+        """Return the most recent execution artifact for *task_id*, or ``None``."""
+        data = self.load()
+        artifacts = data.get("task_artifacts", {})
+        result = artifacts.get(task_id)
+        if result is None:
+            return None
+        return dict(result) if isinstance(result, dict) else None
 
     def _append_event(self, data: dict[str, Any], event: dict[str, Any], *, now: datetime) -> None:
         events = list(data.get("events", []))

@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 
+from control_plane.adapters.github_pr import GitHubPRClient
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService, TaskParser
 from control_plane.config import load_settings
@@ -117,6 +118,81 @@ def notify_human_attention(task_id: str, task_title: str, classification: str, r
             http.post(webhook_url, json=payload)
     except Exception:
         pass  # Notification is best-effort; never block the workflow
+
+
+def _record_execution_artifact(service: ExecutionService, task_id: str, result: ExecutionResult) -> None:
+    """Persist a structured execution artifact in the usage store after each run.
+
+    This feeds scope-policy learning (avoid_paths extraction), PR merge feedback
+    (auto-close blocked tasks whose PR was merged), and future kodo context.
+    Best-effort — never raises.
+    """
+    try:
+        service.usage_store.record_task_artifact(
+            task_id=task_id,
+            artifact={
+                "outcome_status": result.outcome_status,
+                "changed_files": list(result.changed_files or []),
+                "validation_passed": result.validation_passed,
+                "blocked_classification": result.blocked_classification or "",
+                "pull_request_url": result.pull_request_url or "",
+                "success": result.success,
+            },
+            now=datetime.now(UTC),
+        )
+    except Exception:
+        pass
+
+
+def _extract_filename_tokens(title: str) -> set[str]:
+    """Extract *.py filename tokens from a task title for conflict detection."""
+    return {m.group(0).lower() for m in re.finditer(r"\b\w[\w.]*\.py\b", title)}
+
+
+def _has_conflict_with_active_task(proposal_title: str, issues: list[dict[str, Any]]) -> bool:
+    """Return True if *proposal_title* shares a .py filename token with a Running/Ready task.
+
+    Used to avoid proposing work that would stomp on in-flight changes to the
+    same source file.
+    """
+    proposal_tokens = _extract_filename_tokens(proposal_title)
+    if not proposal_tokens:
+        return False
+    for issue in issues:
+        if issue_status_name(issue) not in ("Running", "Ready for AI"):
+            continue
+        running_tokens = _extract_filename_tokens(str(issue.get("name", "")))
+        if proposal_tokens & running_tokens:
+            return True
+    return False
+
+
+def _check_task_pr_merged(task_id: str, usage_store: UsageStore) -> bool:
+    """Return True if the PR recorded in task_id's artifact has been merged on GitHub.
+
+    Requires GITHUB_TOKEN env var.  Returns False on any error or missing data.
+    """
+    artifact = usage_store.get_task_artifact(task_id)
+    if not artifact:
+        return False
+    pr_url = str(artifact.get("pull_request_url") or "").strip()
+    if not pr_url:
+        return False
+    m = re.search(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", pr_url)
+    if not m:
+        return False
+    owner, repo_name, pr_number = m.group(1), m.group(2), int(m.group(3))
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if not token:
+        return False
+    try:
+        gh = GitHubPRClient(token)
+        pr = gh.get_pr(owner, repo_name, pr_number)
+        return bool(pr.get("merged")) or (
+            pr.get("state") == "closed" and pr.get("merged_at") is not None
+        )
+    except Exception:
+        return False
 
 
 def render_worker_comment(title: str, bullets: list[str]) -> str:
@@ -334,7 +410,13 @@ def run_service_task(service: ExecutionService, client: PlaneClient, task_id: st
         return service.run_task(client, task_id)  # type: ignore[call-arg]
 
 
-def rewrite_worker_summary(result: ExecutionResult, service: ExecutionService) -> None:
+def rewrite_worker_summary(
+    result: ExecutionResult,
+    service: ExecutionService,
+    task_id: str | None = None,
+) -> None:
+    if task_id is not None:
+        _record_execution_artifact(service, task_id, result)
     run_dir = latest_run_dir(result)
     if run_dir is None:
         return
@@ -590,6 +672,10 @@ def select_watch_candidate(
                     known_triaged_blocked_ids.add(task_id)
                 continue
             if not blocked_issue_already_triaged(client, task_id):
+                # Check if the task's PR was already merged before triaging — if so,
+                # the implementation succeeded and we can auto-close without triage.
+                if _check_task_pr_merged(task_id, UsageStore()):
+                    return task_id, "blocked_pr_merged"
                 return task_id, "blocked_triage"
             if blocked_resolution_is_complete(client, task_id):
                 return task_id, "blocked_resolution_complete"
@@ -1028,6 +1114,17 @@ def build_improve_triage_result(
     ]
     if prior_context:
         constraints_lines.append(f"- prior_failure_context: {prior_context}")
+    # Scope policy learning: inject the changed_files from the prior execution as
+    # avoid_paths so the resolve task knows which files went out-of-scope.
+    if classification == "scope_policy":
+        task_artifact = UsageStore().get_task_artifact(str(issue.get("id", "")))
+        if task_artifact:
+            changed = [str(f) for f in task_artifact.get("changed_files", []) if f]
+            if changed:
+                constraints_lines.append(f"- avoid_paths: {', '.join(sorted(changed))}")
+                constraints_lines.append(
+                    "- reason: these paths were modified in the blocked run and triggered a scope policy violation; stay within the allowed paths"
+                )
     follow_up = ImproveFollowUpSpec(
         task_kind=task_kind,
         title=f"Resolve blocked {issue_title}",
@@ -2423,6 +2520,10 @@ def handle_propose_cycle(
     for proposal in proposals:
         if len(created_ids) >= MAX_PROPOSALS_PER_CYCLE:
             break
+        # Skip proposals that conflict with an in-flight task touching the same file.
+        if _has_conflict_with_active_task(proposal.title, issues):
+            _logger.info(json.dumps({"event": "propose_conflict_skipped", "title": proposal.title}))
+            continue
         created = create_proposed_task_if_missing(
             client,
             service,
@@ -2486,7 +2587,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ],
             ),
         )
-        rewrite_worker_summary(result, service)
+        rewrite_worker_summary(result, service, task_id)
         return created_ids
     if goal_failure_needs_manual_env_fix(result):
         result.blocked_classification = "infra_tooling"
@@ -2509,7 +2610,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ],
             ),
         )
-        rewrite_worker_summary(result, service)
+        rewrite_worker_summary(result, service, task_id)
         return created_ids
 
     if result.success:
@@ -2593,7 +2694,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ],
             ),
         )
-    rewrite_worker_summary(result, service)
+    rewrite_worker_summary(result, service, task_id)
     return created_ids
 
 
@@ -2638,7 +2739,7 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ],
             ),
         )
-        rewrite_worker_summary(result, service)
+        rewrite_worker_summary(result, service, task_id)
         return []
     if result.success:
         client.transition_issue(task_id, "Done")
@@ -2661,7 +2762,7 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ],
             ),
         )
-        rewrite_worker_summary(result, service)
+        rewrite_worker_summary(result, service, task_id)
         return []
 
     blocked_classification = classify_execution_result(result)
@@ -2706,7 +2807,7 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
             ],
         ),
     )
-    rewrite_worker_summary(result, service)
+    rewrite_worker_summary(result, service, task_id)
     return result.follow_up_task_ids
 
 
@@ -2881,7 +2982,7 @@ def run_watch_loop(
                 eligible = status_name == ready_state and task_kind == role
             elif action == "improve_task":
                 eligible = status_name == ready_state and task_kind == "improve"
-            elif action in ("blocked_triage", "blocked_resolution_complete"):
+            elif action in ("blocked_triage", "blocked_resolution_complete", "blocked_pr_merged"):
                 eligible = status_name == "Blocked"
 
             if not eligible:
@@ -3022,6 +3123,28 @@ def run_watch_loop(
                             known_triaged_blocked_ids.discard(task_id)
                             logger.info(json.dumps({"event": "watch_unblocked", "role": role, "cycle": cycle, "task_id": task_id, "task_kind": task_kind, "resolved_by": follow_up_ids, "run_id": cycle_run_id}))
                             write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_resolution_complete", task_id=task_id, task_kind=task_kind, counters=counters)
+                        elif action == "blocked_pr_merged":
+                            # PR for this task was merged — implementation succeeded; close the task.
+                            artifact = UsageStore().get_task_artifact(task_id)
+                            pr_url = str((artifact or {}).get("pull_request_url") or "")
+                            issue_for_pr = client.fetch_issue(task_id)
+                            client.transition_issue(task_id, "Done")
+                            client.comment_issue(
+                                task_id,
+                                render_worker_comment(
+                                    "[Improve] Blocked task auto-closed: PR already merged",
+                                    [
+                                        f"task_id: {task_id}",
+                                        f"task_kind: {task_kind}",
+                                        "result_status: done",
+                                        f"pull_request_url: {pr_url}",
+                                        "reason: the PR created by the previous execution was merged — task is complete",
+                                    ],
+                                ),
+                            )
+                            known_triaged_blocked_ids.add(task_id)
+                            logger.info(json.dumps({"event": "watch_pr_merged_autoclosed", "role": role, "cycle": cycle, "task_id": task_id, "pr_url": pr_url, "run_id": cycle_run_id}))
+                            write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="idle", run_id=cycle_run_id, last_action="blocked_pr_merged", task_id=task_id, task_kind=task_kind, counters=counters)
                         elif action == "blocked_stale_escalation":
                             # Task has been blocked with human_attention for >7 days with no follow-up.
                             # Create a re-triage goal task and mark this one as escalated.
@@ -3078,7 +3201,7 @@ def run_watch_loop(
                         raise ValueError(f"Unsupported worker role '{role}'")
                 except Exception:
                     if claimed:
-                        _blocked_actions = {"blocked_triage", "blocked_resolution_complete", "blocked_stale_escalation"}
+                        _blocked_actions = {"blocked_triage", "blocked_resolution_complete", "blocked_stale_escalation", "blocked_pr_merged"}
                         _error_state = "Blocked" if action in _blocked_actions else ready_state
                         client.transition_issue(task_id, _error_state)
                         client.comment_issue(

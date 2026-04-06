@@ -14,6 +14,10 @@ from control_plane.entrypoints.worker.main import (
     ProposalSpec,
     UNBLOCK_COMMENT_MARKER,
     UNKNOWN_BLOCKED_CLASSIFICATION,
+    _check_task_pr_merged,
+    _extract_filename_tokens,
+    _has_conflict_with_active_task,
+    _record_execution_artifact,
     blocked_resolution_is_complete,
     build_improve_triage_result,
     classify_blocked_issue,
@@ -1805,3 +1809,232 @@ def test_blocked_issue_is_stale_recent_task() -> None:
     now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
     recent = {"updated_at": "2026-04-05T00:00:00+00:00"}
     assert blocked_issue_is_stale(recent, now=now) is False
+
+
+# ---------------------------------------------------------------------------
+# Item 1: _record_execution_artifact / UsageStore.get_task_artifact
+# ---------------------------------------------------------------------------
+
+def test_record_execution_artifact_persists_fields() -> None:
+    service = FakeService(success=True)
+    result = ExecutionResult(
+        run_id="run-art",
+        success=True,
+        changed_files=["src/foo.py", "src/bar.py"],
+        validation_passed=True,
+        validation_results=[],
+        branch_pushed=True,
+        draft_branch_pushed=False,
+        push_reason=None,
+        pull_request_url="https://github.com/owner/repo/pull/42",
+        summary="ok",
+        artifacts=[],
+        policy_violations=[],
+    )
+    _record_execution_artifact(service, "TASK-ART", result)
+    artifact = service.usage_store.get_task_artifact("TASK-ART")
+    assert artifact is not None
+    assert artifact["changed_files"] == ["src/foo.py", "src/bar.py"]
+    assert artifact["pull_request_url"] == "https://github.com/owner/repo/pull/42"
+    assert artifact["success"] is True
+    assert "recorded_at" in artifact
+
+
+def test_record_execution_artifact_missing_task_returns_none() -> None:
+    service = FakeService()
+    assert service.usage_store.get_task_artifact("NO-SUCH") is None
+
+
+def test_rewrite_worker_summary_records_artifact(monkeypatch) -> None:
+    """rewrite_worker_summary with task_id writes artifact as a side-effect."""
+    from control_plane.entrypoints.worker.main import rewrite_worker_summary
+    service = FakeService(success=False)
+    result = ExecutionResult(
+        run_id="run-x",
+        success=False,
+        changed_files=["src/a.py"],
+        validation_passed=False,
+        blocked_classification="scope_policy",
+        validation_results=[],
+        branch_pushed=False,
+        draft_branch_pushed=False,
+        push_reason=None,
+        pull_request_url=None,
+        summary="fail",
+        artifacts=[],
+        policy_violations=["src/a.py: out of scope"],
+    )
+    # run_dir lookup will return None (no reporter) so we skip the summary write
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.latest_run_dir", lambda r: None
+    )
+    rewrite_worker_summary(result, service, "TASK-RWS")
+    artifact = service.usage_store.get_task_artifact("TASK-RWS")
+    assert artifact is not None
+    assert artifact["blocked_classification"] == "scope_policy"
+
+
+# ---------------------------------------------------------------------------
+# Item 2: _extract_filename_tokens / _has_conflict_with_active_task
+# ---------------------------------------------------------------------------
+
+def test_extract_filename_tokens_finds_py_files() -> None:
+    tokens = _extract_filename_tokens("Decompose stage_driver.py (2960L, 17 oversized function(s))")
+    assert tokens == {"stage_driver.py"}
+
+
+def test_extract_filename_tokens_multiple_files() -> None:
+    tokens = _extract_filename_tokens("Fix test_git_client.py and client.py")
+    assert tokens == {"test_git_client.py", "client.py"}
+
+
+def test_extract_filename_tokens_no_py_files() -> None:
+    tokens = _extract_filename_tokens("Add return type annotations to 142 public functions")
+    assert tokens == set()
+
+
+def test_has_conflict_with_active_task_detects_overlap() -> None:
+    issues = [
+        {"id": "T1", "state": {"name": "Running"}, "name": "Decompose stage_driver.py (2960L)"},
+    ]
+    assert _has_conflict_with_active_task("Add tests for stage_driver.py", issues) is True
+
+
+def test_has_conflict_skips_non_active_tasks() -> None:
+    issues = [
+        {"id": "T1", "state": {"name": "Done"}, "name": "Decompose stage_driver.py (2960L)"},
+    ]
+    assert _has_conflict_with_active_task("Add tests for stage_driver.py", issues) is False
+
+
+def test_has_conflict_no_py_tokens_never_conflicts() -> None:
+    issues = [
+        {"id": "T1", "state": {"name": "Running"}, "name": "Decompose stage_driver.py"},
+    ]
+    assert _has_conflict_with_active_task("Add return type annotations to 10 functions", issues) is False
+
+
+def test_handle_propose_cycle_skips_conflicting_proposals(monkeypatch) -> None:
+    """Proposals whose .py filename overlaps with a Running task should be skipped."""
+    from control_plane.entrypoints.worker.main import build_proposal_candidates
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+
+    service = FakeService()
+    conflicting_proposal = ProposalSpec(
+        task_kind="goal",
+        title="Decompose main.py (2823L)",
+        goal_text="Decompose main.py",
+        reason_summary="oversized file",
+        source_signal="repo_scan",
+        confidence="high",
+        recommended_state="Backlog",
+        handoff_reason="scan",
+        dedup_key="cp|decompose|main_py",
+    )
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.build_proposal_candidates",
+        lambda *a, **kw: ([conflicting_proposal], [], True),
+    )
+    client = FakePlaneClient(
+        issues=[
+            # Running task touching main.py
+            {"id": "T-RUN", "state": {"name": "Running"}, "name": "Decompose main.py (2800L)", "labels": []},
+        ]
+    )
+    result = handle_propose_cycle(client, service, now=now)
+    # Proposal should be skipped, no new tasks created
+    assert result.created_task_ids == []
+
+
+# ---------------------------------------------------------------------------
+# Item 3: _check_task_pr_merged
+# ---------------------------------------------------------------------------
+
+def test_check_task_pr_merged_returns_false_when_no_artifact() -> None:
+    service = FakeService()
+    assert _check_task_pr_merged("NO-TASK", service.usage_store) is False
+
+
+def test_check_task_pr_merged_returns_false_when_no_pr_url() -> None:
+    service = FakeService()
+    service.usage_store.record_task_artifact(
+        task_id="TASK-1",
+        artifact={"pull_request_url": "", "success": True, "changed_files": []},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+    assert _check_task_pr_merged("TASK-1", service.usage_store) is False
+
+
+def test_check_task_pr_merged_returns_false_without_token(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    service = FakeService()
+    service.usage_store.record_task_artifact(
+        task_id="TASK-2",
+        artifact={"pull_request_url": "https://github.com/owner/repo/pull/5", "success": True, "changed_files": []},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+    assert _check_task_pr_merged("TASK-2", service.usage_store) is False
+
+
+def test_check_task_pr_merged_true_when_github_reports_merged(monkeypatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    service = FakeService()
+    service.usage_store.record_task_artifact(
+        task_id="TASK-3",
+        artifact={"pull_request_url": "https://github.com/owner/repo/pull/7", "success": True, "changed_files": []},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+
+    class FakeGHClient:
+        def get_pr(self, owner, repo, pr_number):
+            return {"merged": True, "state": "closed", "merged_at": "2026-04-05T10:00:00Z"}
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.GitHubPRClient", lambda token: FakeGHClient())
+    assert _check_task_pr_merged("TASK-3", service.usage_store) is True
+
+
+# ---------------------------------------------------------------------------
+# Item 4: avoid_paths injection in scope_policy triage
+# ---------------------------------------------------------------------------
+
+def test_build_improve_triage_result_injects_avoid_paths_for_scope_policy(monkeypatch) -> None:
+    """When scope_policy + artifact with changed_files, constraints should include avoid_paths."""
+    import tempfile
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    usage_path = Path(tempfile.mkdtemp()) / "usage.json"
+    store = UsageStore(usage_path)
+    store.record_task_artifact(
+        task_id="BLOCKED-1",
+        artifact={
+            "outcome_status": "executed",
+            "changed_files": ["scripts/deploy.sh", "src/main.py"],
+            "validation_passed": False,
+            "blocked_classification": "scope_policy",
+            "pull_request_url": "",
+            "success": False,
+        },
+        now=now,
+    )
+
+    # Patch UsageStore() constructor to return our pre-seeded store
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.UsageStore",
+        lambda *args, **kwargs: store,
+    )
+
+    issue = {
+        "id": "BLOCKED-1",
+        "name": "Fix something",
+        "labels": [{"name": "task-kind: goal"}],
+    }
+    comments = [
+        {"comment_html": "<p>policy_violations: scripts/deploy.sh</p>"},
+    ]
+    client = FakePlaneClient(issues=[issue], comments={"BLOCKED-1": comments})
+    result = build_improve_triage_result(client, issue, comments, include_failure_context=False)
+
+    assert result.follow_up is not None
+    constraints = result.follow_up.constraints_text or ""
+    assert "avoid_paths:" in constraints
+    assert "scripts/deploy.sh" in constraints
+    assert "src/main.py" in constraints
