@@ -22,11 +22,19 @@ class ExecutionHealthDeriver:
       suggesting tasks are being generated but kodo cannot act on them.
     - persistent_validation_failures: multiple executed runs failed validation,
       suggesting a systemic quality issue or overly complex task descriptions.
+    - repeated_unknown_failures: multiple runs ended with unknown or error outcomes,
+      suggesting the repo is producing repeated unexplained failures.
     """
 
-    def __init__(self, normalizer: InsightNormalizer, validation_failure_threshold: int = 2) -> None:
+    def __init__(
+        self,
+        normalizer: InsightNormalizer,
+        validation_failure_threshold: int = 2,
+        unknown_failure_threshold: int = 2,
+    ) -> None:
         self.normalizer = normalizer
         self.validation_failure_threshold = validation_failure_threshold
+        self.unknown_failure_threshold = unknown_failure_threshold
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
         if not snapshots:
@@ -56,6 +64,27 @@ class ExecutionHealthDeriver:
                         last_seen_at=current.observed_at,
                     )
                 )
+
+        unknown_error_total = sig.unknown_count + sig.error_count
+        if unknown_error_total >= self.unknown_failure_threshold:
+            insights.append(
+                self.normalizer.normalize(
+                    kind="execution_health",
+                    subject=repo_name,
+                    status="present",
+                    key_parts=[repo_name, "repeated_unknown_failures"],
+                    evidence={
+                        "repo": repo_name,
+                        "total_runs": sig.total_runs,
+                        "unknown_count": sig.unknown_count,
+                        "error_count": sig.error_count,
+                        "unknown_error_total": unknown_error_total,
+                        "pattern": "repeated_unknown_failures",
+                    },
+                    first_seen_at=current.observed_at,
+                    last_seen_at=current.observed_at,
+                )
+            )
 
         if sig.validation_failed_count >= self.validation_failure_threshold:
             insights.append(
