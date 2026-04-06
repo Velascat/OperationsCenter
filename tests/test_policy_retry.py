@@ -210,7 +210,7 @@ def test_policy_retry_fails_writes_artifact_routes_to_blocked(
     def changed_files_fn(repo_path):  # type: ignore[no-untyped-def]
         return ["src/a.py", "deploy/config.yml"]
 
-    workspace = _wire_service(service, tmp_path, kodo_run, changed_files_fn)
+    _wire_service(service, tmp_path, kodo_run, changed_files_fn)
     client = TrackingPlaneClient(allowed_paths=["src/"])
 
     result = service.run_task(client, "TASK-POL2", preauthorized=True)
