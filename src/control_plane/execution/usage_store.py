@@ -267,6 +267,169 @@ class UsageStore:
             return False
         return (total_deduped + total_skipped) / total >= dedup_ratio_threshold
 
+    def record_proposal_outcome(self, *, category: str, succeeded: bool, now: datetime) -> None:
+        """Record whether a task of a given category succeeded or failed."""
+        data = self.load()
+        self._append_event(
+            data,
+            {
+                "kind": "proposal_outcome",
+                "category": category,
+                "succeeded": succeeded,
+                "timestamp": now.isoformat(),
+            },
+            now=now,
+        )
+
+    def proposal_success_rate(
+        self,
+        category: str,
+        *,
+        window: int = 20,
+        now: datetime | None = None,
+    ) -> float:
+        """Return success rate for *category* over the last *window* outcomes.
+
+        Returns 0.5 (neutral) if fewer than 3 samples exist.
+        """
+        now = now or datetime.now()
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        outcomes = [
+            e for e in reversed(events)
+            if e.get("kind") == "proposal_outcome" and e.get("category") == category
+        ][:window]
+        if len(outcomes) < 3:
+            return 0.5
+        successes = sum(1 for e in outcomes if e.get("succeeded"))
+        return successes / len(outcomes)
+
+    def record_validation_outcome(self, *, command: str, passed: bool, now: datetime) -> None:
+        """Append a validation_outcome event for flaky-test tracking."""
+        data = self.load()
+        self._append_event(
+            data,
+            {
+                "kind": "validation_outcome",
+                "command": command,
+                "passed": passed,
+                "timestamp": now.isoformat(),
+            },
+            now=now,
+        )
+
+    def is_command_flaky(
+        self,
+        command: str,
+        *,
+        window: int = 10,
+        fail_ratio: float = 0.3,
+        now: datetime | None = None,
+    ) -> bool:
+        """Return True if >= *fail_ratio* of the last *window* runs for *command* failed.
+
+        Requires at least *window* samples before returning True to avoid
+        false-positives on new commands.
+        """
+        now = now or datetime.now()
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        outcomes = [
+            e for e in reversed(events)
+            if e.get("kind") == "validation_outcome" and e.get("command") == command
+        ][:window]
+        if len(outcomes) < window:
+            return False
+        failures = sum(1 for e in outcomes if not e.get("passed"))
+        return (failures / window) >= fail_ratio
+
+    def record_escalation(self, *, classification: str, task_ids: list[str], now: datetime) -> None:
+        """Record that an escalation webhook was fired for *classification*."""
+        data = self.load()
+        self._append_event(
+            data,
+            {
+                "kind": "escalation_sent",
+                "classification": classification,
+                "task_ids": task_ids,
+                "timestamp": now.isoformat(),
+            },
+            now=now,
+        )
+
+    def should_escalate(
+        self,
+        *,
+        classification: str,
+        threshold: int,
+        cooldown_seconds: int,
+        window_seconds: int = 86400,
+        now: datetime,
+    ) -> tuple[bool, list[str]]:
+        """Return ``(True, matching_task_ids)`` when escalation should fire.
+
+        Fires when there are at least *threshold* ``blocked_triage`` events with
+        *classification* within *window_seconds* AND no ``escalation_sent`` event
+        for this classification within *cooldown_seconds*.
+        """
+        from datetime import timezone, timedelta
+
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        window_start = now - timedelta(seconds=window_seconds)
+        cooldown_start = now - timedelta(seconds=cooldown_seconds)
+
+        # Check cooldown
+        for ev in reversed(events):
+            if ev.get("kind") != "escalation_sent":
+                continue
+            if ev.get("classification") != classification:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(ev["timestamp"]))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if ts >= cooldown_start:
+                    return False, []
+            except (ValueError, KeyError):
+                pass
+
+        # Count matching block events in window
+        matching_ids: list[str] = []
+        for ev in events:
+            if ev.get("kind") != "blocked_triage":
+                continue
+            if ev.get("classification") != classification:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(ev["timestamp"]))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if ts >= window_start:
+                    tid = str(ev.get("task_id", ""))
+                    if tid:
+                        matching_ids.append(tid)
+            except (ValueError, KeyError):
+                pass
+
+        if len(matching_ids) >= threshold:
+            return True, matching_ids
+        return False, []
+
+    def record_blocked_triage(self, *, task_id: str, classification: str, now: datetime) -> None:
+        """Record a single blocked-triage event for escalation tracking."""
+        data = self.load()
+        self._append_event(
+            data,
+            {
+                "kind": "blocked_triage",
+                "task_id": task_id,
+                "classification": classification,
+                "timestamp": now.isoformat(),
+            },
+            now=now,
+        )
+
     def record_proposal_budget_suppression(self, *, reason: str, now: datetime, evidence: dict[str, object]) -> None:
         data = self.load()
         self._append_event(

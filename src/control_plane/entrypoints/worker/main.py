@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 
+from control_plane.adapters.escalation import post_escalation
 from control_plane.adapters.github_pr import GitHubPRClient
 from control_plane.adapters.plane import PlaneClient
 from control_plane.application import ExecutionService, TaskParser
@@ -137,6 +138,7 @@ def _record_execution_artifact(service: ExecutionService, task_id: str, result: 
                 "blocked_classification": result.blocked_classification or "",
                 "pull_request_url": result.pull_request_url or "",
                 "success": result.success,
+                "summary": result.summary or "",
             },
             now=datetime.now(UTC),
         )
@@ -272,6 +274,7 @@ def blocked_classification_token(raw: str) -> str:
         "parse/config issue": "parse_config",
         "context limit": "context_limit",
         "dependency missing": "dependency_missing",
+        "flaky test": "flaky_test",
         "unknown/manual attention": UNKNOWN_BLOCKED_CLASSIFICATION,
     }
     return mapping.get(raw, UNKNOWN_BLOCKED_CLASSIFICATION)
@@ -299,7 +302,10 @@ def goal_requires_test_follow_up(issue: dict[str, Any], result: ExecutionResult)
     return result.success and bool(result.changed_files)
 
 
-def classify_execution_result(result: ExecutionResult) -> str:
+def classify_execution_result(
+    result: ExecutionResult,
+    usage_store: "UsageStore | None" = None,
+) -> str:
     if result.policy_violations:
         return "scope_policy"
     excerpt = (result.execution_stderr_excerpt or "").lower()
@@ -331,6 +337,13 @@ def classify_execution_result(result: ExecutionResult) -> str:
     ):
         return "dependency_missing"
     if not result.validation_passed:
+        # Check if the failure is due to a known-flaky test command
+        if usage_store is not None:
+            for vr in result.validation_results:
+                if vr.exit_code != 0 and usage_store.is_command_flaky(
+                    vr.command, now=datetime.now(UTC)
+                ):
+                    return "flaky_test"
         return "validation_failure"
     # Infrastructure / auth / tooling failures
     if any(
@@ -430,6 +443,48 @@ def write_watch_status(
         "counters": counters or {},
     }
     path.write_text(json.dumps(payload, indent=2))
+
+
+_HEARTBEAT_MAX_AGE_SECONDS = 300  # 5 minutes
+
+
+def _heartbeat_path(status_dir: Path, role: str) -> Path:
+    return status_dir / f"heartbeat_{role}.json"
+
+
+def write_heartbeat(status_dir: Path, role: str, *, now: datetime) -> None:
+    """Write current timestamp to logs/local/heartbeat_{role}.json."""
+    try:
+        status_dir.mkdir(parents=True, exist_ok=True)
+        _heartbeat_path(status_dir, role).write_text(
+            json.dumps({"role": role, "ts": now.isoformat()})
+        )
+    except Exception:
+        pass
+
+
+def check_heartbeats(log_dir: Path, *, now: datetime | None = None) -> list[str]:
+    """Return list of role names whose heartbeat is stale or missing."""
+    from datetime import timezone
+
+    now = now or datetime.now(UTC)
+    stale: list[str] = []
+    try:
+        hb_files = list(log_dir.glob("heartbeat_*.json"))
+    except Exception:
+        return []
+    for hb_file in hb_files:
+        try:
+            payload = json.loads(hb_file.read_text())
+            ts = datetime.fromisoformat(str(payload["ts"]))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age = (now - ts).total_seconds()
+            if age > _HEARTBEAT_MAX_AGE_SECONDS:
+                stale.append(str(payload.get("role", hb_file.stem)))
+        except Exception:
+            stale.append(hb_file.stem)
+    return stale
 
 
 def execution_gate_decision(
@@ -956,6 +1011,442 @@ def detect_post_merge_regressions(
 
 
 # ---------------------------------------------------------------------------
+# Token/credential validation
+# ---------------------------------------------------------------------------
+
+def validate_credentials(
+    settings: "Any",
+    *,
+    usage_store: "UsageStore",
+    now: datetime,
+) -> bool:
+    """Validate GitHub and Plane API tokens.
+
+    Returns True if all configured credentials are valid.  On 401/403 writes
+    an escalation event and logs clearly.  Network errors are logged as warnings
+    but do not block the loop (connectivity issue ≠ invalid token).
+    """
+    valid = True
+
+    # GitHub
+    token = settings.git_token() if callable(getattr(settings, "git_token", None)) else None
+    if token:
+        try:
+            resp = httpx.get(
+                "https://api.github.com/user",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                timeout=10,
+            )
+            if resp.status_code in (401, 403):
+                _logger.error(json.dumps({
+                    "event": "credential_invalid",
+                    "provider": "github",
+                    "status": resp.status_code,
+                }))
+                usage_store.record_escalation(
+                    classification="credential_github_invalid",
+                    task_ids=[],
+                    now=now,
+                )
+                valid = False
+        except Exception as exc:
+            _logger.warning(json.dumps({
+                "event": "credential_check_failed",
+                "provider": "github",
+                "error": str(exc),
+            }))
+
+    # Plane
+    try:
+        plane_token = settings.plane_token()
+        resp = httpx.get(
+            f"{settings.plane.base_url}/api/v1/workspaces/{settings.plane.workspace_slug}/",
+            headers={"X-API-Key": plane_token},
+            timeout=10,
+        )
+        if resp.status_code in (401, 403):
+            _logger.error(json.dumps({
+                "event": "credential_invalid",
+                "provider": "plane",
+                "status": resp.status_code,
+            }))
+            usage_store.record_escalation(
+                classification="credential_plane_invalid",
+                task_ids=[],
+                now=now,
+            )
+            valid = False
+    except Exception as exc:
+        _logger.warning(json.dumps({
+            "event": "credential_check_failed",
+            "provider": "plane",
+            "error": str(exc),
+        }))
+
+    return valid
+
+
+# ---------------------------------------------------------------------------
+# PR review revision cycle
+# ---------------------------------------------------------------------------
+
+_REVIEW_REVISION_MARKER = "[Improve] PR review revision"
+_IN_REVIEW_STATES = {"in review", "review", "in_review"}
+
+
+def handle_review_revision_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    """Create [Revise] tasks for issues in review with CHANGES_REQUESTED.
+
+    Returns list of newly created task IDs.
+    """
+    if issues is None:
+        issues = client.list_issues()
+
+    reviewer_cfg = service.settings.reviewer
+    bot_logins = {lbl.lower() for lbl in reviewer_cfg.bot_logins}
+    allowed_logins = {lbl.lower() for lbl in reviewer_cfg.allowed_reviewer_logins}
+    created_ids: list[str] = []
+    existing_names = existing_issue_names(client)
+
+    for issue in issues:
+        status = issue_status_name(issue).lower()
+        if status not in _IN_REVIEW_STATES:
+            continue
+        task_id = str(issue.get("id", ""))
+        issue_title = str(issue.get("name", ""))
+        repo_key = _extract_repo_key(issue, service)
+
+        artifact = service.usage_store.get_task_artifact(task_id)
+        if not artifact:
+            continue
+        pr_url = str(artifact.get("pull_request_url") or "")
+        if not pr_url:
+            continue
+
+        pr_num = _pr_number_from_url(pr_url)
+        if pr_num is None:
+            continue
+
+        repo_cfg = service.settings.repos.get(repo_key)
+        if not repo_cfg:
+            continue
+        token = service.settings.repo_git_token(repo_key)
+        if not token:
+            continue
+        gh = GitHubPRClient(token)
+        try:
+            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+        except Exception:
+            continue
+
+        try:
+            reviews = gh.list_pr_reviews(owner, repo_name, pr_num)
+        except Exception:
+            continue
+
+        changes_requested = [
+            r for r in reviews
+            if r.get("state") == "CHANGES_REQUESTED"
+            and r.get("user", {}).get("login", "").lower() not in bot_logins
+            and (not allowed_logins or r.get("user", {}).get("login", "").lower() in allowed_logins)
+        ]
+        if not changes_requested:
+            continue
+
+        revision_title = f"[Revise] {issue_title} — address review feedback"
+        if revision_title.strip().lower() in existing_names:
+            continue
+
+        # Summarise review comments for context
+        review_summary_parts: list[str] = []
+        try:
+            inline = gh.list_pr_review_comments(owner, repo_name, pr_num)
+            for c in inline[:10]:
+                body = str(c.get("body") or "").strip()
+                path = str(c.get("path") or "").strip()
+                if body:
+                    review_summary_parts.append(f"- [{path}] {body[:200]}")
+        except Exception:
+            pass
+        for r in changes_requested[:3]:
+            body = str(r.get("body") or "").strip()
+            reviewer = str(r.get("user", {}).get("login") or "reviewer")
+            if body:
+                review_summary_parts.append(f"- [{reviewer}] {body[:300]}")
+        review_summary = "\n".join(review_summary_parts)[:1200] if review_summary_parts else "(see PR for details)"
+
+        new_task = client.create_issue(
+            name=revision_title,
+            description=(
+                f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+                f"## Goal\n"
+                f"Address the review feedback on PR {pr_url} for task '{issue_title}'.\n\n"
+                f"## Review feedback\n{review_summary}\n\n"
+                "## Context\n"
+                f"- source_task_id: {task_id}\n"
+                f"- pr_url: {pr_url}\n"
+                "- source: review_revision_scan\n"
+            ),
+            state="Ready for AI",
+            label_names=["task-kind: goal", f"repo: {repo_key}", "source: improve-worker"],
+        )
+        created_ids.append(str(new_task.get("id", "")))
+        _logger.info(json.dumps({
+            "event": "review_revision_task_created",
+            "task_id": task_id,
+            "revision_task_id": new_task.get("id"),
+            "pr_url": pr_url,
+        }))
+
+    return created_ids
+
+
+# ---------------------------------------------------------------------------
+# Merge conflict detection + rebase + stale PR TTL
+# ---------------------------------------------------------------------------
+
+_MERGE_CONFLICT_MARKER = "[Improve] PR merge conflict detected"
+_STALE_PR_COMMENT_MARKER = "[Improve] Stale PR closed"
+_STALE_PR_SCAN_CYCLE_INTERVAL = 20
+
+
+def _pr_number_from_url(pr_url: str) -> int | None:
+    m = re.search(r"/pull/(\d+)$", pr_url)
+    return int(m.group(1)) if m else None
+
+
+def _gh_client_for_repo(service: "ExecutionService", repo_key: str) -> "GitHubPRClient | None":
+    token = service.settings.repo_git_token(repo_key)
+    if not token:
+        return None
+    return GitHubPRClient(token)
+
+
+def handle_merge_conflict_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    """Scan open PRs for merge conflicts; attempt rebase or create a task.
+
+    Returns list of newly created task IDs.
+    """
+    from control_plane.adapters.git.client import GitClient
+
+    created_ids: list[str] = []
+    git = GitClient()
+
+    for repo_key, repo_cfg in service.settings.repos.items():
+        token = service.settings.repo_git_token(repo_key)
+        if not token:
+            continue
+        gh = GitHubPRClient(token)
+        try:
+            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+        except Exception:
+            continue
+
+        try:
+            open_prs = gh.list_open_prs(owner, repo_name)
+        except Exception:
+            continue
+
+        for pr in open_prs:
+            pr_number = pr.get("number")
+            pr_url = pr.get("html_url", "")
+            if not pr_number or not pr_url:
+                continue
+            mergeable = gh.get_mergeable(owner, repo_name, pr_number)
+            if mergeable is None or mergeable is True:
+                continue  # True = fine; None = GitHub still computing
+
+            local_path = getattr(repo_cfg, "local_path", None)
+            if local_path:
+                repo_path = Path(local_path)
+                pr_branch = (pr.get("head") or {}).get("ref", "")
+                base_branch = (pr.get("base") or {}).get("ref", repo_cfg.default_branch)
+                if pr_branch:
+                    try:
+                        git.checkout_branch(repo_path, pr_branch)
+                        ok = git.rebase_onto_origin(repo_path, base_branch)
+                        if ok:
+                            git.push_branch_force(repo_path, pr_branch)
+                            _logger.info(json.dumps({
+                                "event": "merge_conflict_rebased",
+                                "repo": repo_key,
+                                "pr_number": pr_number,
+                                "branch": pr_branch,
+                            }))
+                            continue
+                    except Exception as exc:
+                        _logger.info(json.dumps({
+                            "event": "merge_conflict_rebase_failed",
+                            "repo": repo_key,
+                            "pr_number": pr_number,
+                            "error": str(exc),
+                        }))
+
+            # Rebase failed or no local path — create a conflict-fix task
+            pr_title = pr.get("title", f"PR #{pr_number}")
+            task_title = f"[Rebase] {pr_title}"
+            existing_names = existing_issue_names(client)
+            if task_title.strip().lower() in existing_names:
+                continue
+            new_task = client.create_issue(
+                name=task_title,
+                description=(
+                    f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+                    f"## Goal\n"
+                    f"The pull request '{pr_title}' ({pr_url}) has a merge conflict with "
+                    f"`{repo_cfg.default_branch}`. Resolve the conflict, commit the resolution, "
+                    "and push the branch so the PR can proceed to review.\n\n"
+                    "## Context\n"
+                    f"- pr_url: {pr_url}\n"
+                    f"- pr_number: {pr_number}\n"
+                    f"- base_branch: {repo_cfg.default_branch}\n"
+                    "- source: merge_conflict_scan\n"
+                ),
+                state="Ready for AI",
+                label_names=["task-kind: goal", f"repo: {repo_key}", "source: improve-worker"],
+            )
+            created_ids.append(str(new_task.get("id", "")))
+            _logger.info(json.dumps({
+                "event": "merge_conflict_task_created",
+                "repo": repo_key,
+                "pr_number": pr_number,
+                "task_id": new_task.get("id"),
+            }))
+    return created_ids
+
+
+def handle_stale_pr_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+    now: datetime | None = None,
+) -> list[str]:
+    """Close PRs older than stale_pr_days; requeue the originating task.
+
+    Returns list of task IDs acted upon.
+    """
+    from datetime import timedelta
+    from control_plane.adapters.git.client import GitClient
+
+    now = now or datetime.now(UTC)
+    stale_days = max(1, getattr(service.settings, "stale_pr_days", 7))
+    cutoff = now - timedelta(days=stale_days)
+    acted: list[str] = []
+    git = GitClient()
+
+    for repo_key, repo_cfg in service.settings.repos.items():
+        token = service.settings.repo_git_token(repo_key)
+        if not token:
+            continue
+        gh = GitHubPRClient(token)
+        try:
+            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+        except Exception:
+            continue
+        try:
+            open_prs = gh.list_open_prs(owner, repo_name)
+        except Exception:
+            continue
+
+        for pr in open_prs:
+            pr_number = pr.get("number")
+            pr_url = pr.get("html_url", "")
+            created_at_str = pr.get("created_at", "")
+            if not pr_number or not pr_url or not created_at_str:
+                continue
+            try:
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                if created_at > cutoff:
+                    continue
+            except ValueError:
+                continue
+
+            # Already commented → skip
+            try:
+                existing_comments = gh.list_pr_comments(owner, repo_name, pr_number)
+                if any(_STALE_PR_COMMENT_MARKER in (c.get("body") or "") for c in existing_comments):
+                    continue
+            except Exception:
+                pass
+
+            # Try rebase first
+            local_path = getattr(repo_cfg, "local_path", None)
+            rebased = False
+            if local_path:
+                pr_branch = (pr.get("head") or {}).get("ref", "")
+                base_branch = (pr.get("base") or {}).get("ref", repo_cfg.default_branch)
+                if pr_branch:
+                    try:
+                        git.checkout_branch(Path(local_path), pr_branch)
+                        ok = git.rebase_onto_origin(Path(local_path), base_branch)
+                        if ok:
+                            git.push_branch_force(Path(local_path), pr_branch)
+                            rebased = True
+                    except Exception:
+                        pass
+
+            if rebased:
+                continue
+
+            # Close the PR and requeue the task
+            try:
+                gh.post_comment(
+                    owner, repo_name, pr_number,
+                    f"{_STALE_PR_COMMENT_MARKER}\n\nThis PR has been open for more than "
+                    f"{stale_days} days and could not be automatically rebased. "
+                    "Closing and re-queuing the task for fresh execution.",
+                )
+                gh.close_pr(owner, repo_name, pr_number)
+            except Exception as exc:
+                _logger.info(json.dumps({
+                    "event": "stale_pr_close_failed",
+                    "pr_number": pr_number,
+                    "error": str(exc),
+                }))
+                continue
+
+            # Find matching Plane task via artifact pull_request_url
+            if issues is None:
+                issues = client.list_issues()
+            for iss in issues:
+                tid = str(iss.get("id", ""))
+                artifact = service.usage_store.get_task_artifact(tid)
+                if artifact and artifact.get("pull_request_url") == pr_url:
+                    client.transition_issue(tid, "Backlog")
+                    client.comment_issue(
+                        tid,
+                        render_worker_comment(
+                            _STALE_PR_COMMENT_MARKER,
+                            [
+                                f"task_id: {tid}",
+                                f"pr_url: {pr_url}",
+                                f"pr_number: {pr_number}",
+                                f"stale_days: {stale_days}",
+                                "reason: PR closed after stale TTL; task re-queued to Backlog",
+                            ],
+                        ),
+                    )
+                    acted.append(tid)
+                    break
+    return acted
+
+
+# ---------------------------------------------------------------------------
 # Point 5: Self-modification controls
 # ---------------------------------------------------------------------------
 
@@ -1375,6 +1866,8 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
         ]
     ):
         return "dependency_missing", "A required dependency or tool was not installed in the execution environment."
+    if "blocked_classification: flaky_test" in lowered:
+        return "flaky_test", "The validation command is intermittently failing — the test itself needs to be stabilized."
     if any(
         token in lowered
         for token in [
@@ -1421,6 +1914,7 @@ def build_improve_triage_result(
     comments: list[dict[str, Any]],
     *,
     include_failure_context: bool = True,
+    usage_store: "UsageStore | None" = None,
 ) -> ImproveTriageResult:
     classification, rationale = classify_blocked_issue(issue, comments)
     classification_counts = recent_classification_counts(client)
@@ -1478,10 +1972,25 @@ def build_improve_triage_result(
             f"The task '{issue_title}' was too large for a single kodo run. "
             "Break the work into a smaller, bounded scope and re-attempt with a focused goal that can be completed within one context window."
         )
+        # Inject prior progress so the follow-up doesn't start from scratch
+        _store = usage_store or UsageStore()
+        prior_artifact = _store.get_task_artifact(str(issue.get("id", "")))
+        if prior_artifact:
+            raw_summary = str(prior_artifact.get("summary") or "").strip()
+            if raw_summary:
+                truncated = raw_summary[:800] + ("\u2026" if len(raw_summary) > 800 else "")
+                indented = truncated.replace("\n", "\n  ")
+                goal_text += f"\n\nprior_progress: |\n  {indented}"
     if classification == "dependency_missing":
         goal_text = (
             f"The task '{issue_title}' failed because a required dependency was not available. "
             "Install or configure the missing dependency in the repo bootstrap, then re-attempt the original task."
+        )
+    if classification == "flaky_test":
+        goal_text = (
+            f"The task '{issue_title}' failed due to an intermittently-failing test. "
+            "Identify the flaky test command, diagnose the root cause (race condition, external dependency, "
+            "timing issue), and stabilize it — either by fixing the test or marking it appropriately."
         )
 
     prior_context = _summarise_prior_failures(client, str(issue.get("id", ""))) if include_failure_context else ""
@@ -1496,7 +2005,7 @@ def build_improve_triage_result(
     # Scope policy learning: inject the changed_files from the prior execution as
     # avoid_paths so the resolve task knows which files went out-of-scope.
     if classification == "scope_policy":
-        task_artifact = UsageStore().get_task_artifact(str(issue.get("id", "")))
+        task_artifact = (usage_store or UsageStore()).get_task_artifact(str(issue.get("id", "")))
         if task_artifact:
             changed = [str(f) for f in task_artifact.get("changed_files", []) if f]
             if changed:
@@ -2626,6 +3135,18 @@ def build_proposal_candidates(
         if demoted:
             notes.append(f"focus_gate: demoted {demoted} proposal(s) to Backlog (no focus area match)")
 
+    # Success/failure learning: boost high-success categories to Ready for AI;
+    # demote low-success categories to Backlog.
+    _now_sr = datetime.now(UTC)
+    for proposal in proposals:
+        rate = service.usage_store.proposal_success_rate(proposal.task_kind, now=_now_sr)
+        if rate > 0.7 and proposal.recommended_state == "Backlog":
+            proposal.recommended_state = "Ready for AI"
+            notes.append(f"success_boost: {proposal.task_kind} rate={rate:.2f}")
+        elif rate < 0.3 and proposal.recommended_state == "Ready for AI":
+            proposal.recommended_state = "Backlog"
+            notes.append(f"success_demotion: {proposal.task_kind} rate={rate:.2f}")
+
     # Point 5: Self-repo proposals always go to Backlog — they need explicit
     # "self-modify: approved" before the goal watcher will auto-execute them.
     if _is_self_repo(repo_key, service):
@@ -2753,6 +3274,37 @@ def proposal_quota_exhausted(memory: dict[str, Any], now: datetime) -> bool:
     return len(timestamps) >= MAX_PROPOSALS_PER_DAY
 
 
+def _scheduled_tasks_due(
+    scheduled: list[Any],
+    existing_names: set[str],
+    *,
+    now: datetime,
+    lookback_seconds: int = 120,
+) -> list[Any]:
+    """Return scheduled tasks whose cron expression fired within *lookback_seconds* of *now*.
+
+    Requires ``croniter``; silently returns [] if not installed.
+    """
+    from datetime import timedelta
+
+    try:
+        from croniter import croniter  # type: ignore[import-untyped]
+    except ImportError:
+        return []
+
+    due = []
+    for st in scheduled:
+        try:
+            it = croniter(st.cron, now - timedelta(seconds=lookback_seconds))
+            next_ts = it.get_next(datetime)
+            if next_ts <= now:
+                if st.title.strip().lower() not in existing_names:
+                    due.append(st)
+        except Exception:
+            pass
+    return due
+
+
 def _normalise_proposal_title(title: str) -> str:
     """Strip volatile metric suffixes so scan-drift doesn't create duplicate tasks.
 
@@ -2808,6 +3360,39 @@ def handle_propose_cycle(
 ) -> ProposalCycleResult:
     now = now or datetime.now(UTC)
     issues = client.list_issues()
+
+    # Scheduled tasks: create any that are due and not already on the board
+    scheduled = list(getattr(service.settings, "scheduled_tasks", None) or [])
+    if scheduled:
+        _sch_names = existing_issue_names(client, issues=issues)
+        _due = _scheduled_tasks_due(scheduled, _sch_names, now=now)
+        _sch_created: list[str] = []
+        for st in _due:
+            repo_cfg = service.settings.repos.get(st.repo_key)
+            if repo_cfg is None:
+                continue
+            new_t = client.create_issue(
+                name=st.title,
+                description=(
+                    f"## Execution\nrepo: {st.repo_key}\nmode: goal\n\n"
+                    f"## Goal\n{st.goal}\n\n"
+                    "## Context\n"
+                    f"- source: scheduled_task\n"
+                    f"- cron: {st.cron}\n"
+                ),
+                state="Ready for AI",
+                label_names=[f"task-kind: {st.kind}", f"repo: {st.repo_key}", "source: scheduler"],
+            )
+            _sch_created.append(str(new_t.get("id", "")))
+        if _sch_created:
+            return ProposalCycleResult(
+                created_task_ids=_sch_created,
+                decision="scheduled_tasks_created",
+                board_idle=False,
+                reason_summary=f"Created {len(_sch_created)} scheduled task(s).",
+                proposed_state="Ready for AI",
+            )
+
     board_idle = board_is_idle_for_proposals_from_issues(issues)
 
     # When board is idle (no active tasks), promote existing Backlog tasks before
@@ -3116,7 +3701,13 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ),
             )
     else:
-        result.blocked_classification = classify_execution_result(result)
+        # Record validation outcomes for flaky-test detection
+        _now_vr = datetime.now(UTC)
+        for vr in result.validation_results:
+            service.usage_store.record_validation_outcome(
+                command=vr.command, passed=(vr.exit_code == 0), now=_now_vr
+            )
+        result.blocked_classification = classify_execution_result(result, service.usage_store)
         client.comment_issue(
             task_id,
             render_worker_comment(
@@ -3135,6 +3726,21 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 ],
             ),
         )
+    # Record success/failure for proposal-category learning
+    try:
+        category = next(
+            (lbl.split(":", 1)[1].strip()
+             for lbl in issue_label_names(issue)
+             if lbl.lower().startswith("task-kind:")),
+            "goal",
+        )
+        service.usage_store.record_proposal_outcome(
+            category=category,
+            succeeded=result.success,
+            now=datetime.now(UTC),
+        )
+    except Exception:
+        pass
     rewrite_worker_summary(result, service, task_id)
     return created_ids
 
@@ -3206,7 +3812,13 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
         rewrite_worker_summary(result, service, task_id)
         return []
 
-    blocked_classification = classify_execution_result(result)
+    # Record validation outcomes for flaky-test detection
+    _now_vr2 = datetime.now(UTC)
+    for vr in result.validation_results:
+        service.usage_store.record_validation_outcome(
+            command=vr.command, passed=(vr.exit_code == 0), now=_now_vr2
+        )
+    blocked_classification = classify_execution_result(result, service.usage_store)
     follow_up = create_follow_up_task(
         client,
         service,
@@ -3317,7 +3929,7 @@ def handle_fix_pr_task(client: PlaneClient, service: ExecutionService, task_id: 
 def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_id: str) -> tuple[str, list[str]]:
     issue = client.fetch_issue(task_id)
     comments = client.list_comments(task_id)
-    triage = build_improve_triage_result(client, issue, comments)
+    triage = build_improve_triage_result(client, issue, comments, usage_store=service.usage_store)
     created_ids: list[str] = []
 
     existing_names = existing_issue_names(client)
@@ -3364,6 +3976,12 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
         ),
     )
     client.transition_issue(task_id, "Blocked")
+    # Record triage event for escalation tracking
+    service.usage_store.record_blocked_triage(
+        task_id=task_id,
+        classification=triage.classification,
+        now=datetime.now(UTC),
+    )
     if triage.human_attention_required:
         notify_human_attention(
             task_id=task_id,
@@ -3371,6 +3989,28 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
             classification=triage.classification,
             reason=triage.reason_summary,
         )
+        esc = getattr(service.settings, "escalation", None)
+        if esc and getattr(esc, "webhook_url", ""):
+            _now = datetime.now(UTC)
+            should, ids = service.usage_store.should_escalate(
+                classification=triage.classification,
+                threshold=esc.block_threshold,
+                cooldown_seconds=esc.cooldown_seconds,
+                now=_now,
+            )
+            if should:
+                post_escalation(
+                    esc.webhook_url,
+                    classification=triage.classification,
+                    count=len(ids),
+                    task_ids=ids,
+                    now=_now,
+                )
+                service.usage_store.record_escalation(
+                    classification=triage.classification,
+                    task_ids=ids,
+                    now=_now,
+                )
     return triage.classification, created_ids
 
 
@@ -3403,11 +4043,42 @@ def run_watch_loop(
             last_action="cycle_start",
             counters=counters,
         )
+        if status_dir is not None:
+            write_heartbeat(status_dir, role, now=datetime.now(UTC))
         try:
             if cycle == 1:
+                if not validate_credentials(
+                    service.settings,
+                    usage_store=service.usage_store,
+                    now=datetime.now(UTC),
+                ):
+                    logger.error(json.dumps({
+                        "event": "watch_credential_failure",
+                        "role": role,
+                        "action": "aborting",
+                    }))
+                    return
                 reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
+            # Review revision scan — every 3 cycles for the improve watcher.
+            if role == "improve" and cycle % 3 == 0:
+                revision_ids = handle_review_revision_scan(client, service)
+                if revision_ids:
+                    counters["follow_up_tasks_created"] += len(revision_ids)
+                    logger.info(json.dumps({"event": "watch_review_revisions_created", "role": role, "cycle": cycle, "task_ids": revision_ids}))
+            # Merge conflict scan — every 5 cycles for the improve watcher.
+            if role == "improve" and cycle % 5 == 0:
+                conflict_ids = handle_merge_conflict_scan(client, service)
+                if conflict_ids:
+                    counters["follow_up_tasks_created"] += len(conflict_ids)
+                    logger.info(json.dumps({"event": "watch_merge_conflicts_handled", "role": role, "cycle": cycle, "task_ids": conflict_ids}))
+            # Stale PR TTL scan — every 20 cycles.
+            if role == "improve" and cycle % _STALE_PR_SCAN_CYCLE_INTERVAL == 0:
+                stale_ids = handle_stale_pr_scan(client, service, now=datetime.now(UTC))
+                if stale_ids:
+                    counters["follow_up_tasks_created"] += len(stale_ids)
+                    logger.info(json.dumps({"event": "watch_stale_prs_closed", "role": role, "cycle": cycle, "task_ids": stale_ids}))
             # Point 4+6: Post-merge CI regression scan — runs every 10 cycles for the
             # improve watcher so CI failures on merged PRs create follow-up tasks.
             if role == "improve" and cycle % 10 == 0:
@@ -3576,7 +4247,6 @@ def run_watch_loop(
                             # PR for this task was merged — implementation succeeded; close the task.
                             artifact = UsageStore().get_task_artifact(task_id)
                             pr_url = str((artifact or {}).get("pull_request_url") or "")
-                            issue_for_pr = client.fetch_issue(task_id)
                             client.transition_issue(task_id, "Done")
                             client.comment_issue(
                                 task_id,
@@ -3727,6 +4397,20 @@ def run_watch_loop(
 
 
 def main() -> None:
+    import sys
+
+    # Quick subcommands that don't need a Plane connection
+    if len(sys.argv) >= 2 and sys.argv[1] == "heartbeat-check":
+        hb_parser = argparse.ArgumentParser(description="Check watcher heartbeats")
+        hb_parser.add_argument("--log-dir", default="logs/local")
+        hb_args = hb_parser.parse_args(sys.argv[2:])
+        log_dir = Path(hb_args.log_dir)
+        stale = check_heartbeats(log_dir)
+        if stale:
+            print(f"STALE watchers: {', '.join(stale)}", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="Run Plane task(s) through Kodo wrapper")
     parser.add_argument("--config", required=True)
     target = parser.add_mutually_exclusive_group(required=True)

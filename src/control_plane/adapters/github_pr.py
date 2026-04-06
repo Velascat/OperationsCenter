@@ -186,6 +186,47 @@ class GitHubPRClient:
         except Exception:
             return []
 
+    def get_mergeable(self, owner: str, repo: str, pr_number: int) -> bool | None:
+        """Return the GitHub ``mergeable`` flag, or ``None`` while GitHub is computing it."""
+        try:
+            pr = self.get_pr(owner, repo, pr_number)
+            val = pr.get("mergeable")
+            if val is None:
+                return None
+            return bool(val)
+        except Exception:
+            return None
+
+    def close_pr(self, owner: str, repo: str, pr_number: int) -> dict:
+        """Close a pull request without merging it."""
+        resp = httpx.patch(
+            f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
+            headers=self._headers,
+            json={"state": "closed"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_pr_reviews(self, owner: str, repo: str, pr_number: int) -> list[dict]:
+        """Return all submitted reviews for a PR."""
+        resp = httpx.get(
+            f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
+            headers=self._headers,
+            params={"per_page": 100},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def pr_has_changes_requested(self, owner: str, repo: str, pr_number: int) -> bool:
+        """Return True if any reviewer submitted CHANGES_REQUESTED."""
+        try:
+            reviews = self.list_pr_reviews(owner, repo, pr_number)
+            return any(r.get("state") == "CHANGES_REQUESTED" for r in reviews)
+        except Exception:
+            return False
+
     @staticmethod
     def has_thumbs_up(reactions: list[dict]) -> bool:
         return any(r["content"] == "+1" for r in reactions)

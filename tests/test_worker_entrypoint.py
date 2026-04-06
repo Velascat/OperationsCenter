@@ -15,16 +15,19 @@ from control_plane.entrypoints.worker.main import (
     UNBLOCK_COMMENT_MARKER,
     UNKNOWN_BLOCKED_CLASSIFICATION,
     _check_task_pr_merged,
-    _collect_open_pr_files,
     _extract_filename_tokens,
     _has_conflict_with_active_task,
+    _heartbeat_path,
     _is_self_repo,
+    _pr_number_from_url,
     _proposal_matches_focus_areas,
     _record_execution_artifact,
+    _scheduled_tasks_due,
     _self_modify_approved,
     _split_oversized_finding,
     blocked_resolution_is_complete,
     build_improve_triage_result,
+    check_heartbeats,
     classify_blocked_issue,
     classify_execution_result,
     detect_post_merge_regressions,
@@ -44,6 +47,8 @@ from control_plane.entrypoints.worker.main import (
     select_ready_task_id,
     task_dependencies_met,
     select_watch_candidate,
+    validate_credentials,
+    write_heartbeat,
 )
 
 
@@ -2497,3 +2502,311 @@ def test_handle_propose_cycle_returns_satiated_when_store_satiated(monkeypatch) 
     client = FakePlaneClient(issues=[])
     result = handle_propose_cycle(client, service, now=now)
     assert result.decision == "satiated"
+
+
+# ---------------------------------------------------------------------------
+# New autonomy improvements — tests
+# ---------------------------------------------------------------------------
+
+# Item 1: Human escalation channel
+
+def test_usage_store_should_escalate_fires_after_threshold() -> None:
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service = FakeService()
+    # Record 5 blocked_triage events with same classification within 24h
+    for i in range(5):
+        service.usage_store.record_blocked_triage(
+            task_id=f"T-{i}", classification="validation_failure", now=now
+        )
+    should, ids = service.usage_store.should_escalate(
+        classification="validation_failure",
+        threshold=5,
+        cooldown_seconds=3600,
+        now=now,
+    )
+    assert should is True
+    assert len(ids) == 5
+
+
+def test_usage_store_should_escalate_false_below_threshold() -> None:
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service = FakeService()
+    for i in range(3):
+        service.usage_store.record_blocked_triage(
+            task_id=f"T-{i}", classification="validation_failure", now=now
+        )
+    should, _ = service.usage_store.should_escalate(
+        classification="validation_failure",
+        threshold=5,
+        cooldown_seconds=3600,
+        now=now,
+    )
+    assert should is False
+
+
+def test_usage_store_should_escalate_false_during_cooldown() -> None:
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service = FakeService()
+    for i in range(6):
+        service.usage_store.record_blocked_triage(
+            task_id=f"T-{i}", classification="validation_failure", now=now
+        )
+    # Record that we already escalated 30 min ago (within cooldown)
+    from datetime import timedelta
+    service.usage_store.record_escalation(
+        classification="validation_failure",
+        task_ids=["T-0"],
+        now=now - timedelta(minutes=30),
+    )
+    should, _ = service.usage_store.should_escalate(
+        classification="validation_failure",
+        threshold=5,
+        cooldown_seconds=3600,
+        now=now,
+    )
+    assert should is False
+
+
+# Item 3: Watcher heartbeat monitoring
+
+def test_write_and_check_heartbeat_healthy(tmp_path) -> None:
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    write_heartbeat(tmp_path, "goal", now=now)
+    # Check immediately — should be healthy
+    stale = check_heartbeats(tmp_path, now=now)
+    assert stale == []
+
+
+def test_check_heartbeats_detects_stale(tmp_path) -> None:
+    from datetime import timedelta
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    old = now - timedelta(minutes=10)
+    write_heartbeat(tmp_path, "goal", now=old)
+    stale = check_heartbeats(tmp_path, now=now)
+    assert "goal" in stale
+
+
+def test_check_heartbeats_empty_dir(tmp_path) -> None:
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    stale = check_heartbeats(tmp_path, now=now)
+    assert stale == []
+
+
+def test_heartbeat_path_naming(tmp_path) -> None:
+    p = _heartbeat_path(tmp_path, "improve")
+    assert p.name == "heartbeat_improve.json"
+
+
+# Item 4: Context handoff — prior_progress injection
+
+def test_context_limit_goal_text_includes_prior_progress() -> None:
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service = FakeService()
+    task_id = "TASK-CTX"
+    service.usage_store.record_task_artifact(
+        task_id=task_id,
+        artifact={"summary": "completed steps 1-3 of refactor"},
+        now=now,
+    )
+    issue = {
+        "id": task_id,
+        "name": "Decompose big.py",
+        "labels": [{"name": "task-kind: goal"}],
+        "description": "blocked_classification: context_limit",
+    }
+    comments = [{"comment_html": "<p>blocked_classification: context_limit</p>"}]
+    client = FakePlaneClient(issues=[issue])
+    result = build_improve_triage_result(client, issue, comments, usage_store=service.usage_store)
+    assert result.follow_up is not None
+    assert "prior_progress" in result.follow_up.goal_text
+    assert "completed steps 1-3" in result.follow_up.goal_text
+
+
+def test_context_limit_goal_text_no_prior_progress_when_no_artifact() -> None:
+    issue = {
+        "id": "TASK-NO-ART",
+        "name": "Decompose big.py",
+        "labels": [{"name": "task-kind: goal"}],
+        "description": "",
+    }
+    comments = [{"comment_html": "<p>blocked_classification: context_limit</p>"}]
+    client = FakePlaneClient(issues=[issue])
+    result = build_improve_triage_result(client, issue, comments, usage_store=FakeService().usage_store)
+    assert result.follow_up is not None
+    assert "prior_progress" not in result.follow_up.goal_text
+
+
+# Item 5: Flaky test detection
+
+def test_is_command_flaky_returns_false_insufficient_data() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    # Only 5 samples, need 10
+    for _ in range(5):
+        service.usage_store.record_validation_outcome(command="pytest -q", passed=False, now=now)
+    assert service.usage_store.is_command_flaky("pytest -q", now=now) is False
+
+
+def test_is_command_flaky_returns_true_when_frequently_fails() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    # 4 failures out of 10 = 40% > 30% threshold
+    for _ in range(6):
+        service.usage_store.record_validation_outcome(command="pytest -q", passed=True, now=now)
+    for _ in range(4):
+        service.usage_store.record_validation_outcome(command="pytest -q", passed=False, now=now)
+    assert service.usage_store.is_command_flaky("pytest -q", now=now) is True
+
+
+def test_is_command_flaky_returns_false_when_mostly_passing() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    # 1 failure out of 10 = 10% < 30%
+    for _ in range(9):
+        service.usage_store.record_validation_outcome(command="pytest -q", passed=True, now=now)
+    service.usage_store.record_validation_outcome(command="pytest -q", passed=False, now=now)
+    assert service.usage_store.is_command_flaky("pytest -q", now=now) is False
+
+
+def test_classify_execution_result_flaky_test() -> None:
+    """classify_execution_result returns flaky_test when command is known flaky."""
+    from control_plane.domain.models import ValidationResult
+
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    # Make the command known-flaky
+    for _ in range(6):
+        service.usage_store.record_validation_outcome(command=".venv/bin/pytest", passed=True, now=now)
+    for _ in range(4):
+        service.usage_store.record_validation_outcome(command=".venv/bin/pytest", passed=False, now=now)
+    result = ExecutionResult(
+        run_id="r", success=False, changed_files=[], validation_passed=False,
+        execution_stderr_excerpt="assert failed",
+        summary="fail", validation_results=[
+            ValidationResult(command=".venv/bin/pytest", exit_code=1, stdout="", stderr="", duration_ms=0)
+        ],
+        branch_pushed=False, draft_branch_pushed=False, push_reason=None,
+        pull_request_url=None, artifacts=[], policy_violations=[],
+    )
+    assert classify_execution_result(result, service.usage_store) == "flaky_test"
+
+
+# Item 7: Token/credential validation
+
+def test_validate_credentials_returns_true_on_401(monkeypatch) -> None:
+    """validate_credentials returns False when GitHub returns 401."""
+    service = FakeService()
+    service.settings.git_token = lambda: "fake-token"
+    service.settings.plane_token = lambda: "fake-plane-token"
+    service.settings.plane = SimpleNamespace(
+        base_url="http://plane.test", workspace_slug="ws"
+    )
+
+    responses = [
+        httpx.Response(401, request=httpx.Request("GET", "https://api.github.com/user")),
+        httpx.Response(200, request=httpx.Request("GET", "http://plane.test/api/v1/workspaces/ws/")),
+    ]
+    call_count = 0
+
+    def fake_get(url, **kwargs):
+        nonlocal call_count
+        resp = responses[call_count]
+        call_count += 1
+        return resp
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = validate_credentials(
+        service.settings, usage_store=service.usage_store, now=datetime(2026, 4, 6, tzinfo=UTC)
+    )
+    assert result is False
+
+
+def test_validate_credentials_returns_true_when_all_ok(monkeypatch) -> None:
+    service = FakeService()
+    service.settings.git_token = lambda: "fake-token"
+    service.settings.plane_token = lambda: "fake-plane-token"
+    service.settings.plane = SimpleNamespace(
+        base_url="http://plane.test", workspace_slug="ws"
+    )
+
+    def fake_get(url, **kwargs):
+        return httpx.Response(200, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = validate_credentials(
+        service.settings, usage_store=service.usage_store, now=datetime(2026, 4, 6, tzinfo=UTC)
+    )
+    assert result is True
+
+
+# Item 8: Success/failure learning
+
+def test_proposal_success_rate_neutral_with_few_samples() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    service.usage_store.record_proposal_outcome(category="goal", succeeded=True, now=now)
+    rate = service.usage_store.proposal_success_rate("goal", now=now)
+    assert rate == 0.5  # < 3 samples → neutral
+
+
+def test_proposal_success_rate_high() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    for _ in range(8):
+        service.usage_store.record_proposal_outcome(category="goal", succeeded=True, now=now)
+    for _ in range(2):
+        service.usage_store.record_proposal_outcome(category="goal", succeeded=False, now=now)
+    rate = service.usage_store.proposal_success_rate("goal", now=now)
+    assert rate == 0.8
+
+
+def test_proposal_success_rate_category_isolation() -> None:
+    """Rates for different categories don't bleed into each other."""
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    for _ in range(5):
+        service.usage_store.record_proposal_outcome(category="goal", succeeded=True, now=now)
+    for _ in range(5):
+        service.usage_store.record_proposal_outcome(category="test", succeeded=False, now=now)
+    assert service.usage_store.proposal_success_rate("goal", now=now) == 1.0
+    assert service.usage_store.proposal_success_rate("test", now=now) == 0.0
+
+
+# Item 9: Scheduled tasks
+
+def test_scheduled_tasks_due_no_croniter(monkeypatch) -> None:
+    """_scheduled_tasks_due returns [] when croniter is not installed."""
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "croniter":
+            raise ImportError("not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    now = datetime(2026, 4, 6, 9, 0, tzinfo=UTC)
+    task = SimpleNamespace(cron="0 9 * * *", title="Weekly check", goal="check", repo_key="r", kind="goal")
+    result = _scheduled_tasks_due([task], set(), now=now)
+    assert result == []
+
+
+def test_pr_number_from_url() -> None:
+    assert _pr_number_from_url("https://github.com/owner/repo/pull/42") == 42
+    assert _pr_number_from_url("https://github.com/owner/repo/pull/42/files") is None
+    assert _pr_number_from_url("https://github.com/owner/repo") is None
+
+
+# Item 2+10: Merge conflict helpers
+
+def test_get_mergeable_returns_none_on_error(monkeypatch) -> None:
+    from control_plane.adapters.github_pr import GitHubPRClient
+
+    gh = GitHubPRClient("token")
+
+    def boom(*a, **k):
+        raise httpx.NetworkError("down")
+
+    monkeypatch.setattr(httpx, "get", boom)
+    result = gh.get_mergeable("owner", "repo", 1)
+    assert result is None

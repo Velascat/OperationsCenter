@@ -37,6 +37,22 @@ class KodoSettings(BaseModel):
     timeout_seconds: int = 3600
 
 
+class EscalationSettings(BaseModel):
+    webhook_url: str = ""
+    # Number of same-classification blocks within 24h before escalating
+    block_threshold: int = 5
+    # Minimum seconds between two escalation POSTs for the same classification
+    cooldown_seconds: int = 3600
+
+
+class ScheduledTask(BaseModel):
+    cron: str  # e.g. "0 9 * * 1" (Monday 09:00 UTC)
+    title: str
+    goal: str
+    repo_key: str
+    kind: str = "goal"
+
+
 class ReviewerSettings(BaseModel):
     # GitHub logins whose comments are always ignored (bots, CI accounts)
     bot_logins: list[str] = Field(default_factory=list)
@@ -84,6 +100,11 @@ class Settings(BaseModel):
     # the goal/test watcher will auto-execute them, and proposals for it are
     # always placed in Backlog rather than Ready for AI.
     self_repo_key: str | None = None
+    escalation: EscalationSettings = Field(default_factory=EscalationSettings)
+    scheduled_tasks: list[ScheduledTask] = Field(default_factory=list)
+    # Number of days a PR can remain open without activity before stale-PR scan
+    # closes it and requeues the task.
+    stale_pr_days: int = 7
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]
