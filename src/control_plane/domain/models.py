@@ -85,3 +85,6 @@ class ExecutionResult(BaseModel):
     final_status: str | None = None
     blocked_classification: str | None = None
     follow_up_task_ids: list[str] = Field(default_factory=list)
+    # Counts of quality-eroding suppressions added by this kodo run.
+    # Non-empty only when the total exceeds the warning threshold (default 3).
+    quality_suppression_counts: dict[str, int] = Field(default_factory=dict)

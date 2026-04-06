@@ -72,6 +72,8 @@ Scans GitHub for open PRs on all `await_review`-enabled repos and creates missin
 - writes separate logs and PID files
 - not a scheduler cluster or distributed supervisor
 
+Each watcher lane runs inside a bash restart loop. If the python process exits with a non-zero code (crash, OOM, unhandled exception), the loop logs a `watcher_restart` event and relaunches after 5 seconds. An exit code of 0 (intentional stop — e.g. credential failure) breaks the loop. `watch-all-stop` sends SIGTERM, which the trap handler catches before killing the python child cleanly.
+
 ## Heartbeat And Status
 
 `watch-all-status` reports:
@@ -95,6 +97,41 @@ python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/l
 
 Exits with code 0 when all watchers are healthy, code 1 when any heartbeat is stale (> 5 minutes old). Suitable for cron-based monitoring.
 
+## Parallel Execution
+
+Each watcher lane runs one task at a time by default. For higher throughput, set `parallel_slots` in config or pass `--parallel-slots N` on the CLI:
+
+```bash
+./scripts/control-plane.sh watch --role goal --parallel-slots 3
+```
+
+Or in config:
+```yaml
+parallel_slots: 2
+```
+
+Slot 0 is the primary slot and runs all periodic scans (heartbeat, improve sub-scans, config drift check, credential validation). Additional slots only execute tasks. The Plane API's state machine prevents two slots from claiming the same task.
+
+**Always review board throughput before increasing slots** — parallel execution amplifies any misconfiguration in task scope or execution budget.
+
+## Spend Report
+
+To see how many tasks have been executed and their estimated cost:
+
+```bash
+# Last 24 hours (default)
+python -m control_plane.entrypoints.worker.main spend-report
+
+# Last 7 days
+python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+```
+
+Cost tracking requires `cost_per_execution_usd` to be set in config (default 0.0 = disabled). The value is operator-supplied; ControlPlane does not parse Kodo billing output.
+
+```yaml
+cost_per_execution_usd: 0.15   # rough estimate per task run
+```
+
 ## Logs And Artifacts
 
 - command logs: `logs/local/`
@@ -105,6 +142,39 @@ Exits with code 0 when all watchers are healthy, code 1 when any heartbeat is st
 - insight artifacts: `tools/report/control_plane/insights/`
 - decision artifacts: `tools/report/control_plane/decision/`
 - proposer result artifacts: `tools/report/control_plane/proposer/`
+
+## Board Saturation Backpressure
+
+The propose watcher and `autonomy-cycle` both enforce a board saturation limit to prevent flooding the queue with unexecuted autonomy tasks. Before creating any new proposals, the system counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds the limit, the propose stage is skipped for that cycle.
+
+Default limit is 15. Configurable via environment variable:
+
+```bash
+CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS=20 ./scripts/control-plane.sh watch --role propose
+```
+
+When saturated, look for `"event": "propose_skipped_board_saturated"` in the propose watcher log. This is not an error — it means the board already has more work than the workers are consuming.
+
+## Task Urgency Scoring
+
+When the watcher selects which task to pick up next, candidates are ranked by a composite urgency score rather than priority label alone:
+
+| Component | Weight |
+|-----------|--------|
+| Priority label (`urgent`=4, `high`=3, `medium`=2, `low`=1) | base |
+| Title prefix boost (`[Regression]`=+3, `[Systemic]`=+2, `[Workspace]`=+1) | additive |
+| Task age (days since creation) | additive |
+
+This ensures regression and systemic investigation tasks are processed before routine backlog, even when they share the same priority label.
+
+## Disk Space Guardrail
+
+Before writing to the usage store, a disk space check runs against the storage path:
+
+- **below 50 MB free**: raises `OSError` — the usage store write is blocked and the event is logged
+- **below 200 MB free**: logs a `disk_space_low` warning but continues
+
+The check also runs in `autonomy-cycle` before writing the cycle report. If you see `OSError: insufficient disk space`, free space on the device hosting `tools/report/`.
 
 ## Autonomy-Cycle
 
@@ -127,6 +197,8 @@ The preferred way to run the full autonomy pipeline in one command:
 - promoting a new candidate family from gated to active
 
 The dry-run output shows which families fired, which candidates would be emitted vs. suppressed, and suppression reasons. Every run writes a structured report to `logs/autonomy_cycle/cycle_<ts>.json`.
+
+If the proposer has emitted 0 candidates for 5 consecutive cycles, a `logs/autonomy_cycle/quiet_diagnosis.json` file is written automatically. It aggregates suppression reasons across those cycles (counted and sorted by frequency) with a human-readable `advice` field. The file is deleted when the proposer starts emitting again. This removes the need to manually diff multiple cycle JSON files to diagnose silence.
 
 ## Tune-Autonomy
 

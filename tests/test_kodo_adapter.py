@@ -44,20 +44,21 @@ def test_run_retries_with_claude_fallback_on_codex_quota(
 
     calls: list[list[str]] = []
 
-    def fake_run(command, **kwargs):
-        calls.append(command)
+    class FakePopen:
+        def __init__(self, command, **kwargs):
+            calls.append(command)
+            self._call_index = len(calls)
 
-        class FakeProc:
-            returncode = 0
-            stdout = ""
-            stderr = ""
+        def communicate(self, timeout=None):
+            if self._call_index == 1:
+                return ("Error: 429 Too Many Requests from codex", "")
+            return ("", "")
 
-        if len(calls) == 1:
-            FakeProc.returncode = 1
-            FakeProc.stdout = "Error: 429 Too Many Requests from codex"
-        return FakeProc()
+        @property
+        def returncode(self):
+            return 1 if self._call_index == 1 else 0
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("subprocess.Popen", FakePopen)
 
     adapter = KodoAdapter(KodoSettings())
     result = adapter.run(goal_file, repo_path)
@@ -78,17 +79,16 @@ def test_run_does_not_retry_on_non_quota_failure(
 
     calls: list[list[str]] = []
 
-    def fake_run(command, **kwargs):
-        calls.append(command)
+    class FakePopen:
+        returncode = 1
 
-        class FakeProc:
-            returncode = 1
-            stdout = ""
-            stderr = "some other error"
+        def __init__(self, command, **kwargs):
+            calls.append(command)
 
-        return FakeProc()
+        def communicate(self, timeout=None):
+            return ("", "some other error")
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("subprocess.Popen", FakePopen)
 
     adapter = KodoAdapter(KodoSettings())
     result = adapter.run(goal_file, repo_path)

@@ -105,6 +105,28 @@ class Settings(BaseModel):
     # Number of days a PR can remain open without activity before stale-PR scan
     # closes it and requeues the task.
     stale_pr_days: int = 7
+    # Estimated USD cost per Kodo execution for spend telemetry.  Set to 0.0
+    # (the default) to disable cost recording.  The value is operator-supplied;
+    # ControlPlane does not parse Kodo billing output.
+    cost_per_execution_usd: float = 0.0
+    # Number of parallel task-execution slots per watcher lane.  1 = serial
+    # (default).  Values > 1 launch that many threads that each poll and execute
+    # tasks independently.  Periodic scans (heartbeat, merge-conflict, etc.)
+    # only run in slot 0 to avoid duplicate work.
+    parallel_slots: int = 1
+    # Per-task-kind Kodo execution profile overrides.  Keys are task_kind values
+    # (e.g. "goal", "improve", "test") or a special "default" fallback.  Any
+    # field omitted in a profile inherits from the top-level ``kodo`` block.
+    # Example:
+    #   kodo_profiles:
+    #     lint_fix:           # task created with task-kind: goal + source_family: lint_fix
+    #       cycles: 2
+    #       effort: low
+    #     context_limit:
+    #       cycles: 6
+    #       exchanges: 40
+    #       effort: high
+    kodo_profiles: dict[str, KodoSettings] = Field(default_factory=dict)
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]

@@ -34,8 +34,28 @@ def main() -> None:
         if tuning_config is not None
         else 2
     )
+    loader = SnapshotLoader()
+    # Warn when the latest observer snapshot is stale (> 2 hours old).
+    # Stale snapshots mean insights are derived from an outdated repo view.
+    _stale_warn_hours = 2.0
+    age_hours = loader.latest_snapshot_age_hours(repo=args.repo)
+    if age_hours is None:
+        print(
+            "[warn] No observer snapshots found. "
+            "Run 'control-plane.sh observe-repo' before generating insights.",
+            flush=True,
+        )
+    elif age_hours > _stale_warn_hours:
+        print(
+            f"[warn] Latest observer snapshot is {age_hours:.1f}h old "
+            f"(threshold: {_stale_warn_hours}h). "
+            f"Insights may not reflect the current repo state. "
+            f"Re-run 'control-plane.sh observe-repo' for fresh data.",
+            flush=True,
+        )
+
     service = InsightEngineService(
-        loader=SnapshotLoader(),
+        loader=loader,
         derivers=[
             DirtyTreeDeriver(normalizer),
             CommitActivityDeriver(normalizer),

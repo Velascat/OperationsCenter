@@ -26,6 +26,45 @@ class TaskContractError(ValueError):
     """Raised when a task fails contract validation before execution begins."""
 
 
+def _build_scope_constraints_section(task: BoardTask) -> str | None:
+    """Build a ``## Scope Constraints`` markdown section from *task* metadata.
+
+    Returns ``None`` when *task.allowed_paths* is empty (no constraints to
+    inject).
+    """
+    if not task.allowed_paths:
+        return None
+
+    lines: list[str] = [
+        "## Scope Constraints",
+        "",
+        "You MUST only modify files within these allowed paths:",
+    ]
+    for p in task.allowed_paths:
+        lines.append(f"- {p}")
+
+    # Extract avoid_paths from constraints_text if present.
+    avoid_paths: list[str] = []
+    if task.constraints_text:
+        for raw_line in task.constraints_text.splitlines():
+            stripped = raw_line.strip().removeprefix("-").strip()
+            if stripped.startswith("avoid_paths:"):
+                values = stripped.removeprefix("avoid_paths:").strip()
+                avoid_paths = [v.strip() for v in values.split(",") if v.strip()]
+                break
+
+    if avoid_paths:
+        lines.append("")
+        lines.append("Do NOT modify these paths (prior scope violations):")
+        for p in avoid_paths:
+            lines.append(f"- {p}")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines)
+
+
 class _SelfReviewVerdict:
     """Result of a kodo self-review pass."""
 
@@ -391,6 +430,9 @@ class ExecutionService:
 
             goal_file = workspace_path / "goal.md"
             goal_text = task.goal_text
+            scope_section = _build_scope_constraints_section(task)
+            if scope_section:
+                goal_text = scope_section + goal_text
             if merge_conflict_files:
                 conflict_list = "\n".join(f"- `{f}`" for f in merge_conflict_files)
                 goal_text = (
@@ -432,7 +474,13 @@ class ExecutionService:
 
             phase = "kodo"
             self._log_event("phase", run_id, phase=phase)
-            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
+            # Resolve per-task-kind execution profile (if configured).
+            # Checks task_kind first, then falls back to "default" profile key.
+            _kodo_profile = None
+            _profiles = getattr(self.settings, "kodo_profiles", {})
+            if _profiles:
+                _kodo_profile = _profiles.get(task.execution_mode) or _profiles.get("default")
+            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
             artifacts.extend(
                 self.reporter.write_kodo(
                     run_dir,
@@ -499,7 +547,7 @@ class ExecutionService:
                         # Kodo introduced the failure: keep original goal, append as feedback
                         with open(goal_file, "a") as f:
                             f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
-                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,
@@ -548,7 +596,7 @@ class ExecutionService:
                         f"Revert all changes to out-of-scope files. Keep only changes within the allowed paths.\n"
                     )
                 self._log_event("policy_retry_start", run_id, violations=policy_violations)
-                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,
@@ -566,6 +614,18 @@ class ExecutionService:
 
             if policy_violations:
                 artifacts.append(self.reporter.write_policy_violation(run_dir, policy_violations))
+                # Record scope violation in usage store for pattern observability.
+                # This lets operators and the improve watcher detect task families
+                # that consistently escape their allowed_paths scope.
+                try:
+                    self.usage_store.record_scope_violation(
+                        task_id=task.task_id,
+                        repo_key=task.repo_key,
+                        violated_files=policy_violations,
+                        now=datetime.now(UTC),
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
             self._log_event(
                 "policy_evaluated",
                 run_id,
@@ -599,6 +659,38 @@ class ExecutionService:
                     f"changed_files={len(changed_files)}"
                 )
             execution_stderr_excerpt = self._stderr_excerpt(kodo_result.stderr)
+
+            # Quality-erosion analysis: count new inline suppressions added by
+            # this kodo run.  Lines starting with '+' in the unified diff that
+            # contain # noqa, # type: ignore, or bare `pass` in test bodies
+            # are quality-eroding patterns that pass validation but degrade code
+            # quality over time.  Emit a kodo_quality_warning event and annotate
+            # the PR comment when the total exceeds the threshold.
+            _quality_suppression_counts: dict[str, int] = {}
+            _quality_warning_threshold = 3
+            if diff_patch:
+                try:
+                    _quality_suppression_counts = self._count_quality_suppressions(diff_patch)
+                    _total_suppressions = sum(_quality_suppression_counts.values())
+                    if _total_suppressions >= _quality_warning_threshold:
+                        try:
+                            self.usage_store.record_quality_warning(
+                                task_id=task.task_id,
+                                repo_key=task.repo_key,
+                                suppression_counts=_quality_suppression_counts,
+                                now=datetime.now(UTC),
+                            )
+                        except Exception:  # noqa: BLE001
+                            pass
+                        self._log_event(
+                            "kodo_quality_warning",
+                            run_id,
+                            task_id=task.task_id,
+                            suppression_counts=_quality_suppression_counts,
+                            total=_total_suppressions,
+                        )
+                except Exception:  # noqa: BLE001
+                    _quality_suppression_counts = {}
 
             branch_pushed = False
             draft_branch_pushed = False
@@ -709,6 +801,7 @@ class ExecutionService:
                 policy_violations=policy_violations,
                 final_status=status,
                 follow_up_task_ids=[fix_validation_task_id] if fix_validation_task_id else [],
+                quality_suppression_counts=_quality_suppression_counts,
             )
             artifacts.append(self.reporter.write_summary(run_dir, result))
             artifacts.append(
@@ -857,6 +950,13 @@ class ExecutionService:
                 lines.append(f"- validation_errors:\n```\n{excerpt}\n```")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
+        if result.quality_suppression_counts:
+            _total = sum(result.quality_suppression_counts.values())
+            _detail = ", ".join(f"{k}={v}" for k, v in result.quality_suppression_counts.items() if v > 0)
+            lines.append(
+                f"- quality_warning: {_total} new inline suppression(s) added ({_detail}). "
+                "Review before merging — suppression patterns erode code quality over time."
+            )
         return "\n".join(lines)
 
     @staticmethod
@@ -888,6 +988,35 @@ class ExecutionService:
         if not lines:
             return None
         return "\n".join(lines[:4])
+
+    @staticmethod
+    def _count_quality_suppressions(diff_patch: str) -> dict[str, int]:
+        """Count quality-eroding suppressions in new lines of a unified diff.
+
+        Only lines beginning with ``+`` (additions) are counted.  Removals of
+        suppressions are not penalised — we only flag net additions.
+
+        Returns a dict with keys ``noqa``, ``type_ignore``, and ``bare_pass``.
+        Non-zero values indicate patterns that pass validation but erode code
+        quality over time (e.g. silencing lint violations instead of fixing them,
+        suppressing type errors with blanket ignores, or leaving empty test bodies).
+        """
+        noqa = 0
+        type_ignore = 0
+        bare_pass = 0
+        for raw_line in diff_patch.splitlines():
+            if not raw_line.startswith("+") or raw_line.startswith("+++"):
+                continue
+            line = raw_line[1:]  # strip leading '+'
+            stripped = line.strip()
+            lowered = line.lower()
+            if "# noqa" in lowered:
+                noqa += 1
+            if "# type: ignore" in lowered or "# type:ignore" in lowered:
+                type_ignore += 1
+            if stripped == "pass" or stripped.startswith("pass  #") or stripped.startswith("pass #"):
+                bare_pass += 1
+        return {"noqa": noqa, "type_ignore": type_ignore, "bare_pass": bare_pass}
 
     @staticmethod
     def _is_internal_execution_path(path: str) -> bool:

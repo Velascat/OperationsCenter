@@ -14,10 +14,12 @@ from control_plane.entrypoints.worker.main import (
     ProposalSpec,
     UNBLOCK_COMMENT_MARKER,
     UNKNOWN_BLOCKED_CLASSIFICATION,
+    _STALE_AUTONOMY_CANCEL_MARKER,
     _check_task_pr_merged,
     _extract_filename_tokens,
     _has_conflict_with_active_task,
     _heartbeat_path,
+    _is_multi_step_task,
     _is_self_repo,
     _pr_number_from_url,
     _proposal_matches_focus_areas,
@@ -27,27 +29,33 @@ from control_plane.entrypoints.worker.main import (
     _split_oversized_finding,
     blocked_resolution_is_complete,
     build_improve_triage_result,
+    build_multi_step_plan,
     check_heartbeats,
     classify_blocked_issue,
     classify_execution_result,
     detect_post_merge_regressions,
     extract_triage_follow_up_ids,
+    handle_feedback_loop_scan,
     handle_goal_task,
     handle_improve_task,
     handle_propose_cycle,
     handle_blocked_triage,
+    handle_stale_autonomy_task_scan,
     handle_test_task,
+    handle_workspace_health_check,
     issue_status_name,
     issue_task_kind,
     parse_task_dependencies,
     recently_proposed,
     record_proposed,
     reconcile_stale_running_issues,
+    run_parallel_watch_loop,
     run_watch_loop,
     select_ready_task_id,
     task_dependencies_met,
     select_watch_candidate,
     validate_credentials,
+    validate_task_pre_execution,
     write_heartbeat,
 )
 
@@ -2810,3 +2818,1048 @@ def test_get_mergeable_returns_none_on_error(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "get", boom)
     result = gh.get_mergeable("owner", "repo", 1)
     assert result is None
+
+
+# ===========================================================================
+# Session 3 — 8 Full-Autonomy Gap Tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Item 1: GitHub rate-limit handling
+# ---------------------------------------------------------------------------
+
+def test_github_request_retries_on_429(monkeypatch) -> None:
+    """_request retries up to _GH_RATE_LIMIT_MAX_RETRIES times on 429."""
+    from control_plane.adapters.github_pr import GitHubPRClient
+    import httpx as _httpx
+
+    gh = GitHubPRClient("token")
+    call_count = 0
+
+    def fake_request(method, url, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            return _httpx.Response(
+                429,
+                headers={"Retry-After": "0"},
+                request=_httpx.Request(method, url),
+            )
+        return _httpx.Response(200, json={"ok": True}, request=_httpx.Request(method, url))
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    # Silence the sleep so test runs fast
+    monkeypatch.setattr("control_plane.adapters.github_pr.time.sleep", lambda _: None)
+    resp = gh._request("GET", "https://api.github.com/user")
+    assert resp.status_code == 200
+    assert call_count == 3
+
+
+def test_github_request_warns_on_low_remaining(monkeypatch, caplog) -> None:
+    """_request logs a warning when X-RateLimit-Remaining < threshold."""
+    import logging
+    from control_plane.adapters.github_pr import GitHubPRClient
+    import httpx as _httpx
+
+    gh = GitHubPRClient("token")
+
+    def fake_request(method, url, **kwargs):
+        return _httpx.Response(
+            200,
+            json={},
+            headers={"X-RateLimit-Remaining": "3"},
+            request=_httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    with caplog.at_level(logging.WARNING, logger="control_plane.adapters.github_pr"):
+        gh._request("GET", "https://api.github.com/user")
+    assert any("github_rate_limit_low" in r.message for r in caplog.records)
+
+
+def test_github_request_no_warn_on_high_remaining(monkeypatch, caplog) -> None:
+    """No warning is emitted when X-RateLimit-Remaining is comfortable."""
+    import logging
+    from control_plane.adapters.github_pr import GitHubPRClient
+    import httpx as _httpx
+
+    gh = GitHubPRClient("token")
+
+    def fake_request(method, url, **kwargs):
+        return _httpx.Response(
+            200,
+            json={},
+            headers={"X-RateLimit-Remaining": "500"},
+            request=_httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    with caplog.at_level(logging.WARNING, logger="control_plane.adapters.github_pr"):
+        gh._request("GET", "https://api.github.com/user")
+    assert not any("github_rate_limit_low" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Item 2: Pre-execution task validation
+# ---------------------------------------------------------------------------
+
+def test_validate_task_pre_execution_passes_with_good_goal() -> None:
+    issue = {"id": "T-1", "state": {"name": "Ready for AI"}, "description": ""}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    # Service.parse_task will raise AttributeError; fallback to description
+    # Give a description long enough to pass
+    issue["description"] = "Refactor the authentication module to use JWT tokens instead of sessions."
+    # parse_task not on FakeService → falls back to description field
+    result = validate_task_pre_execution(client, service, "T-1", issue)
+    assert result is True
+
+
+def test_validate_task_pre_execution_passes_empty_goal() -> None:
+    """Empty goal passes (conservative — we cannot determine it's bad)."""
+    issue = {"id": "T-1", "state": {"name": "Ready for AI"}}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    result = validate_task_pre_execution(client, service, "T-1", issue)
+    assert result is True
+
+
+def test_validate_task_pre_execution_rejects_vague_goal() -> None:
+    issue = {
+        "id": "T-1",
+        "state": {"name": "Ready for AI"},
+        "description": "fix everything in the codebase please",
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    result = validate_task_pre_execution(client, service, "T-1", issue)
+    assert result is False
+    # Task should have been moved to Backlog
+    assert ("T-1", "Backlog") in client.transitions
+
+
+def test_validate_task_pre_execution_rejects_too_short() -> None:
+    issue = {
+        "id": "T-2",
+        "state": {"name": "Ready for AI"},
+        "description": "fix it",
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    result = validate_task_pre_execution(client, service, "T-2", issue)
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Item 3: Feedback loop automation
+# ---------------------------------------------------------------------------
+
+def test_handle_feedback_loop_scan_records_merged_pr(tmp_path, monkeypatch) -> None:
+    """handle_feedback_loop_scan writes a merged feedback record for a Done task."""
+    import httpx as _httpx
+
+    task_id = "aabbccdd-0000-0000-0000-000000000099"
+    issue = {
+        "id": task_id,
+        "state": {"name": "Done"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: control-plane"}],
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    service.settings.git_token = lambda: "gh-token"
+    service.settings.repos["control-plane"] = SimpleNamespace(
+        clone_url="git@github.com:Owner/Repo.git",
+        default_branch="main",
+    )
+    # Store artifact with a PR URL
+    pr_url = "https://github.com/Owner/Repo/pull/7"
+    service.usage_store.record_task_artifact(
+        task_id=task_id,
+        artifact={"pull_request_url": pr_url, "repo_key": "control-plane"},
+        now=datetime(2026, 4, 6, tzinfo=UTC),
+    )
+
+    def fake_request(method, url, **kwargs):
+        return _httpx.Response(
+            200,
+            json={"state": "closed", "merged_at": "2026-04-06T10:00:00Z", "merged": True},
+            request=_httpx.Request(method, url),
+        )
+
+    monkeypatch.setattr(_httpx, "request", fake_request)
+    monkeypatch.setattr("control_plane.adapters.github_pr.time.sleep", lambda _: None)
+
+    feedback_dir = tmp_path / "state" / "proposal_feedback"
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main._FEEDBACK_DIR",
+        feedback_dir,
+    )
+
+    recorded = handle_feedback_loop_scan(
+        client, service, now=datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    )
+    assert task_id in recorded
+    feedback_file = feedback_dir / f"{task_id}.json"
+    assert feedback_file.exists()
+    import json as _json
+    data = _json.loads(feedback_file.read_text())
+    assert data["outcome"] == "merged"
+    assert data["source"] == "feedback_loop_scan"
+
+
+def test_handle_feedback_loop_scan_skips_already_recorded(tmp_path, monkeypatch) -> None:
+    """handle_feedback_loop_scan skips tasks that already have a feedback file."""
+    task_id = "aabbccdd-0000-0000-0000-000000000098"
+    issue = {"id": task_id, "state": {"name": "Done"}, "labels": []}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+
+    feedback_dir = tmp_path / "state" / "proposal_feedback"
+    feedback_dir.mkdir(parents=True)
+    (feedback_dir / f"{task_id}.json").write_text('{"outcome":"merged"}')
+
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main._FEEDBACK_DIR",
+        feedback_dir,
+    )
+    recorded = handle_feedback_loop_scan(client, service)
+    assert task_id not in recorded
+
+
+# ---------------------------------------------------------------------------
+# Item 4: Workspace health monitoring
+# ---------------------------------------------------------------------------
+
+def test_handle_workspace_health_check_healthy_repo(tmp_path) -> None:
+    """No tasks created when the venv python is healthy."""
+    # Create a fake python binary that exits 0
+    fake_venv = tmp_path / ".venv" / "bin"
+    fake_venv.mkdir(parents=True)
+    fake_python = fake_venv / "python"
+    fake_python.write_text("#!/bin/sh\nexit 0\n")
+    fake_python.chmod(0o755)
+
+    issue = {"id": "T-WH", "state": {"name": "Ready for AI"}, "labels": []}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    service.settings.repos["control-plane"] = SimpleNamespace(
+        clone_url="git@github.com:Owner/Repo.git",
+        default_branch="main",
+        local_path=str(tmp_path),
+        venv_dir=".venv",
+        python_binary="python3",
+        install_dev_command=None,
+        bootstrap_enabled=False,
+        bootstrap_commands=None,
+    )
+
+    created = handle_workspace_health_check(client, service)
+    assert created == []
+
+
+def test_handle_workspace_health_check_no_local_path() -> None:
+    """Repos without local_path are skipped silently."""
+    issue = {"id": "T-X", "state": {"name": "Ready for AI"}, "labels": []}
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    # Default FakeService repo has no local_path
+    created = handle_workspace_health_check(client, service)
+    assert created == []
+
+
+# ---------------------------------------------------------------------------
+# Item 5: Config schema drift detection
+# ---------------------------------------------------------------------------
+
+def test_detect_config_drift_no_gaps(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    config = tmp_path / "config.yaml"
+    example = tmp_path / "example.yaml"
+    config.write_text("plane:\n  base_url: x\nescalation:\n  webhook_url: ''\n")
+    example.write_text("plane:\n  base_url: x\nescalation:\n  webhook_url: ''\n")
+    assert detect_config_drift(config, example) == []
+
+
+def test_detect_config_drift_missing_top_level(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    config = tmp_path / "config.yaml"
+    example = tmp_path / "example.yaml"
+    config.write_text("plane:\n  base_url: x\n")
+    example.write_text("plane:\n  base_url: x\nescalation:\n  webhook_url: ''\n")
+    gaps = detect_config_drift(config, example)
+    assert "escalation" in gaps
+
+
+def test_detect_config_drift_missing_nested_key(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    config = tmp_path / "config.yaml"
+    example = tmp_path / "example.yaml"
+    config.write_text("escalation:\n  webhook_url: ''\n")
+    example.write_text("escalation:\n  webhook_url: ''\n  block_threshold: 5\n")
+    gaps = detect_config_drift(config, example)
+    assert "escalation.block_threshold" in gaps
+
+
+def test_detect_config_drift_missing_files_returns_empty(tmp_path) -> None:
+    from control_plane.config.drift import detect_config_drift
+
+    gaps = detect_config_drift(tmp_path / "nonexistent.yaml", tmp_path / "also_missing.yaml")
+    assert gaps == []
+
+
+# ---------------------------------------------------------------------------
+# Item 6: Cost/spend telemetry
+# ---------------------------------------------------------------------------
+
+def test_record_execution_cost_and_get_report() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service.usage_store.record_execution_cost(
+        task_id="T-1", repo_key="repo-a", estimated_usd=0.05, now=now
+    )
+    service.usage_store.record_execution_cost(
+        task_id="T-2", repo_key="repo-a", estimated_usd=0.10, now=now
+    )
+    service.usage_store.record_execution_cost(
+        task_id="T-3", repo_key="repo-b", estimated_usd=0.02, now=now
+    )
+    report = service.usage_store.get_spend_report(window_days=1, now=now)
+    assert report["total_executions"] == 3
+    assert abs(report["total_estimated_usd"] - 0.17) < 1e-6
+    assert report["per_repo"]["repo-a"]["executions"] == 2
+    assert abs(report["per_repo"]["repo-a"]["estimated_usd"] - 0.15) < 1e-6
+    assert report["per_repo"]["repo-b"]["executions"] == 1
+
+
+def test_get_spend_report_outside_window() -> None:
+    """Events older than window_days are excluded."""
+    service = FakeService()
+    old = datetime(2026, 3, 1, tzinfo=UTC)
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    service.usage_store.record_execution_cost(
+        task_id="T-old", repo_key="r", estimated_usd=9.99, now=old
+    )
+    report = service.usage_store.get_spend_report(window_days=1, now=now)
+    assert report["total_executions"] == 0
+    assert report["total_estimated_usd"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Item 7: Parallel execution
+# ---------------------------------------------------------------------------
+
+def test_run_parallel_watch_loop_single_slot() -> None:
+    """With n_slots=1, parallel loop runs one task exactly like run_watch_loop."""
+    client = FakePlaneClient(
+        [{"id": "TASK-P1", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]}]
+    )
+    service = FakeService()
+    run_parallel_watch_loop(
+        client,
+        service,
+        role="goal",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=1,
+        n_slots=1,
+    )
+    assert ("TASK-P1", "Running") in client.transitions
+
+
+def test_run_parallel_watch_loop_two_slots(tmp_path) -> None:
+    """Two parallel slots both attempt to claim tasks and at least one succeeds."""
+
+    # Give enough tasks for both slots
+    tasks = [
+        {"id": f"T-{i}", "state": {"name": "Ready for AI"}, "labels": [{"name": "task-kind: goal"}]}
+        for i in range(4)
+    ]
+    client = FakePlaneClient(tasks)
+    service = FakeService()
+
+    run_parallel_watch_loop(
+        client,
+        service,
+        role="goal",
+        ready_state="Ready for AI",
+        poll_interval_seconds=0,
+        max_cycles=2,
+        n_slots=2,
+    )
+    # At least one transition to Running happened
+    running_transitions = [t for t in client.transitions if t[1] == "Running"]
+    assert len(running_transitions) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Item 8: Multi-step dependency planning
+# ---------------------------------------------------------------------------
+
+def test_is_multi_step_task_keyword_in_title() -> None:
+    for kw in ("refactor", "migrate", "redesign"):
+        issue = {"id": "T", "name": f"Please {kw} the auth module", "labels": []}
+        assert _is_multi_step_task(issue), f"keyword '{kw}' should trigger multi-step"
+
+
+def test_is_multi_step_task_explicit_label() -> None:
+    issue = {"id": "T", "name": "Update logging", "labels": [{"name": "plan: multi-step"}]}
+    assert _is_multi_step_task(issue)
+
+
+def test_is_multi_step_task_normal_task_is_false() -> None:
+    issue = {"id": "T", "name": "Fix typo in README", "labels": [{"name": "task-kind: goal"}]}
+    assert not _is_multi_step_task(issue)
+
+
+def test_build_multi_step_plan_creates_three_steps() -> None:
+    issue = {
+        "id": "SOURCE-1",
+        "name": "Refactor authentication module",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: control-plane"}],
+        "description": "## Execution\nrepo: control-plane\nmode: goal\n\n## Goal\nRefactor auth.\n",
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+
+    created = build_multi_step_plan(client, service, "SOURCE-1", issue)
+    assert len(created) == 3
+    # Step titles should include step numbers
+    names = [c["name"] for c in client.created]
+    assert any("Step 1/3" in n for n in names)
+    assert any("Step 2/3" in n for n in names)
+    assert any("Step 3/3" in n for n in names)
+    # Source task should be moved to Backlog
+    assert ("SOURCE-1", "Backlog") in client.transitions
+
+
+def test_build_multi_step_plan_skips_non_complex_task() -> None:
+    issue = {
+        "id": "SIMPLE-1",
+        "name": "Fix typo in docstring",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}],
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    created = build_multi_step_plan(client, service, "SIMPLE-1", issue)
+    assert created == []
+    assert client.created == []
+
+
+def test_build_multi_step_plan_skips_if_steps_exist() -> None:
+    """Plan is not recreated if step tasks are already on the board."""
+    issue = {
+        "id": "SOURCE-2",
+        "name": "Redesign database layer",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: control-plane"}],
+    }
+    existing_step = {
+        "id": "STEP-EXISTING",
+        "name": "[Step 1/3: Analyze] Redesign database layer",
+        "state": {"name": "Ready for AI"},
+        "labels": [],
+    }
+    client = FakePlaneClient([issue, existing_step])
+    service = FakeService()
+    created = build_multi_step_plan(client, service, "SOURCE-2", issue)
+    assert created == []
+
+# ---------------------------------------------------------------------------
+# Session 5 tests
+# ---------------------------------------------------------------------------
+
+# ---- Circuit breaker ----
+
+def test_budget_decision_circuit_breaker_opens_on_high_failure_rate() -> None:
+    """Circuit breaker blocks when ≥80% of last 5 outcomes failed."""
+    import os
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD"] = "0.8"
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW"] = "5"
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(4):
+        store.record_execution_outcome(task_id=f"T-{i}", role="goal", succeeded=False, now=now)
+    store.record_execution_outcome(task_id="T-4", role="goal", succeeded=True, now=now)
+    decision = store.budget_decision(now=now)
+    assert not decision.allowed
+    assert decision.reason == "circuit_breaker_open"
+
+
+def test_budget_decision_circuit_breaker_stays_open_below_minimum_samples() -> None:
+    """Circuit breaker requires ≥3 samples before triggering."""
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(2):
+        store.record_execution_outcome(task_id=f"T-{i}", role="goal", succeeded=False, now=now)
+    decision = store.budget_decision(now=now)
+    assert decision.allowed  # Only 2 samples, should not trigger
+
+
+def test_budget_decision_circuit_breaker_does_not_fire_on_mixed_outcomes() -> None:
+    """Circuit breaker stays open when success rate is acceptable (40% success = 60% fail)."""
+    import os
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD"] = "0.8"
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(3):
+        store.record_execution_outcome(task_id=f"F-{i}", role="goal", succeeded=False, now=now)
+    for i in range(2):
+        store.record_execution_outcome(task_id=f"S-{i}", role="goal", succeeded=True, now=now)
+    decision = store.budget_decision(now=now)
+    # 3/5 = 60% failure, below 80% threshold
+    assert decision.allowed
+
+
+# ---- Stale autonomy task scan ----
+
+def test_handle_stale_autonomy_task_scan_cancels_stale_task() -> None:
+    """Tasks with source:autonomy in Backlog older than stale_days are cancelled."""
+    from datetime import timedelta, timezone as _tz
+    stale_created = (datetime.now(_tz.utc) - timedelta(days=25)).isoformat()
+    issue = {
+        "id": "AUTO-1",
+        "name": "Fix lint issues",
+        "state": {"name": "Backlog"},
+        "labels": [{"name": "source: autonomy"}, {"name": "task-kind: goal"}],
+        "created_at": stale_created,
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    cancelled = handle_stale_autonomy_task_scan(client, service, stale_days=21)
+    assert "AUTO-1" in cancelled
+    assert ("AUTO-1", "Cancelled") in client.transitions
+    # Comment should contain the stale marker
+    comments = [c for _, c in client.issue_comments if _ == "AUTO-1"]
+    assert any(_STALE_AUTONOMY_CANCEL_MARKER in c for c in comments)
+
+
+def test_handle_stale_autonomy_task_scan_skips_fresh_task() -> None:
+    """Tasks created within stale_days are not cancelled."""
+    from datetime import timedelta, timezone as _tz
+    fresh_created = (datetime.now(_tz.utc) - timedelta(days=5)).isoformat()
+    issue = {
+        "id": "AUTO-FRESH",
+        "name": "Fix type errors",
+        "state": {"name": "Backlog"},
+        "labels": [{"name": "source: autonomy"}],
+        "created_at": fresh_created,
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    cancelled = handle_stale_autonomy_task_scan(client, service, stale_days=21)
+    assert cancelled == []
+    assert not client.transitions
+
+
+def test_handle_stale_autonomy_task_scan_skips_non_autonomy_task() -> None:
+    """Tasks without source:autonomy label are not touched even if stale."""
+    from datetime import timedelta, timezone as _tz
+    stale_created = (datetime.now(_tz.utc) - timedelta(days=30)).isoformat()
+    issue = {
+        "id": "MANUAL-1",
+        "name": "Some manual task",
+        "state": {"name": "Backlog"},
+        "labels": [{"name": "task-kind: goal"}],
+        "created_at": stale_created,
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    cancelled = handle_stale_autonomy_task_scan(client, service, stale_days=21)
+    assert cancelled == []
+
+
+# ---- Human rejection capture ----
+
+def test_handle_feedback_loop_scan_records_cancelled_autonomy_task() -> None:
+    """Cancelled autonomy tasks without stale-scan marker are recorded as abandoned."""
+    issue = {
+        "id": "CANCELLED-AUTO-1",
+        "name": "Improve test coverage",
+        "state": {"name": "Cancelled"},
+        "labels": [{"name": "source: autonomy"}, {"name": "task-kind: goal"}],
+        "description": "candidate_dedup_key: test_coverage:myrepo\n",
+    }
+    client = FakePlaneClient([issue], comments={"CANCELLED-AUTO-1": []})
+    service = FakeService()
+    feedback_dir = Path(tempfile.mkdtemp())
+    # Patch feedback dir
+    import control_plane.entrypoints.worker.main as _wm
+    original = _wm._FEEDBACK_DIR
+    _wm._FEEDBACK_DIR = feedback_dir
+    try:
+        recorded = handle_feedback_loop_scan(client, service)
+    finally:
+        _wm._FEEDBACK_DIR = original
+    assert "CANCELLED-AUTO-1" in recorded
+    feedback_file = feedback_dir / "CANCELLED-AUTO-1.json"
+    assert feedback_file.exists()
+    import json as _json
+    data = _json.loads(feedback_file.read_text())
+    assert data["outcome"] == "abandoned"
+    assert data["source"] == "human_rejection_capture"
+
+
+def test_handle_feedback_loop_scan_skips_stale_scan_cancelled_task() -> None:
+    """Tasks cancelled by the stale-autonomy-scan are NOT recorded as human rejections."""
+    issue = {
+        "id": "STALE-CANCELLED-1",
+        "name": "Fix something",
+        "state": {"name": "Cancelled"},
+        "labels": [{"name": "source: autonomy"}],
+        "description": "candidate_dedup_key: something:repo\n",
+    }
+    stale_comment = {"comment_html": f"<p>Cancelled {_STALE_AUTONOMY_CANCEL_MARKER}</p>"}
+    client = FakePlaneClient([issue], comments={"STALE-CANCELLED-1": [stale_comment]})
+    service = FakeService()
+    feedback_dir = Path(tempfile.mkdtemp())
+    import control_plane.entrypoints.worker.main as _wm
+    original = _wm._FEEDBACK_DIR
+    _wm._FEEDBACK_DIR = feedback_dir
+    try:
+        recorded = handle_feedback_loop_scan(client, service)
+    finally:
+        _wm._FEEDBACK_DIR = original
+    assert "STALE-CANCELLED-1" not in recorded
+
+
+# ---- Rejection store ----
+
+def test_proposal_rejection_store_records_and_blocks() -> None:
+    from control_plane.proposer.rejection_store import ProposalRejectionStore
+    store = ProposalRejectionStore(Path(tempfile.mkdtemp()) / "rejections.json")
+    assert not store.is_rejected("lint_fix:myrepo")
+    store.record_rejection("lint_fix:myrepo", reason="human_cancelled_autonomy_task", task_id="T1")
+    assert store.is_rejected("lint_fix:myrepo")
+    assert not store.is_rejected("type_fix:myrepo")  # Different key
+
+
+def test_proposal_rejection_store_deduplicates() -> None:
+    from control_plane.proposer.rejection_store import ProposalRejectionStore
+    store = ProposalRejectionStore(Path(tempfile.mkdtemp()) / "rejections.json")
+    store.record_rejection("k1", reason="r1", task_id="T1")
+    store.record_rejection("k1", reason="r2", task_id="T2")  # Should not duplicate
+    records = store.all_rejections()
+    assert len(records) == 1
+
+
+# ---- Execution profiles ----
+
+def test_kodo_build_command_with_profile_uses_profile_values() -> None:
+    from control_plane.adapters.kodo.adapter import KodoAdapter
+    from control_plane.config.settings import KodoSettings
+    default_settings = KodoSettings(cycles=3, exchanges=20, effort="standard")
+    profile = KodoSettings(cycles=2, exchanges=10, effort="low", binary="kodo", team="full", orchestrator="codex:gpt-5.4", timeout_seconds=3600)
+    adapter = KodoAdapter(default_settings)
+    cmd = adapter.build_command(Path("/tmp/goal.md"), Path("/tmp/repo"), profile=profile)
+    assert "--cycles" in cmd
+    cycles_idx = cmd.index("--cycles")
+    assert cmd[cycles_idx + 1] == "2"
+    effort_idx = cmd.index("--effort")
+    assert cmd[effort_idx + 1] == "low"
+
+
+def test_kodo_build_command_without_profile_uses_default_settings() -> None:
+    from control_plane.adapters.kodo.adapter import KodoAdapter
+    from control_plane.config.settings import KodoSettings
+    settings = KodoSettings(cycles=5, exchanges=30, effort="high")
+    adapter = KodoAdapter(settings)
+    cmd = adapter.build_command(Path("/tmp/goal.md"), Path("/tmp/repo"))
+    cycles_idx = cmd.index("--cycles")
+    assert cmd[cycles_idx + 1] == "5"
+
+
+# ---- Snapshot staleness ----
+
+def test_snapshot_loader_latest_age_hours_none_when_no_snapshots() -> None:
+    from control_plane.insights.loader import SnapshotLoader
+    loader = SnapshotLoader(root=Path(tempfile.mkdtemp()))
+    assert loader.latest_snapshot_age_hours() is None
+
+
+def test_snapshot_loader_latest_age_hours_returns_float() -> None:
+    from control_plane.insights.loader import SnapshotLoader
+    root = Path(tempfile.mkdtemp())
+    snap_dir = root / "run_001"
+    snap_dir.mkdir()
+    # Write a minimal valid snapshot file
+    import json as _j
+    snap_data = {
+        "run_id": "run_001",
+        "generated_at": "2026-01-01T00:00:00Z",
+        "repo": {"name": "myrepo", "path": "/repos/myrepo"},
+        "signals": {
+            "git": {"recent_commits": [], "active_branches": [], "files_changed_last_30_days": 0},
+            "file_hotspots": {"hotspots": []},
+            "test_signal": {"status": "unknown", "command": "", "exit_code": 0, "failing_tests": []},
+            "dependency_drift": {"status": "unknown", "outdated": [], "vulnerable": []},
+            "todo_signal": {"todo_count": 0, "fixme_count": 0, "samples": []},
+            "execution_health": {"total_runs": 0, "no_op_count": 0, "validation_failed_count": 0, "recent_runs": []},
+            "backlog": {"items": []},
+            "lint_signal": {"status": "unavailable", "violation_count": 0, "violations": []},
+            "type_signal": {"status": "unavailable", "error_count": 0, "errors": []},
+            "ci_history": {"status": "unavailable", "failure_rate": 0.0, "failing_checks": [], "flaky_checks": [], "runs": []},
+            "validation_history": {"status": "unavailable", "tasks_analyzed": 0, "tasks_with_repeated_failures": [], "overall_failure_rate": 0.0},
+        },
+        "collector_errors": [],
+    }
+    (snap_dir / "repo_state_snapshot.json").write_text(_j.dumps(snap_data))
+    loader = SnapshotLoader(root=root)
+    age = loader.latest_snapshot_age_hours()
+    assert age is not None
+    assert age >= 0.0  # Just written, should be very recent
+
+
+# ---------------------------------------------------------------------------
+# Session 5 gap tests
+# ---------------------------------------------------------------------------
+
+# S5-1: Plane write retry on transient errors
+def test_plane_client_retries_on_503(monkeypatch) -> None:
+    """_request should retry on 503 and return the final response."""
+    import httpx
+    from unittest.mock import MagicMock
+    from control_plane.adapters.plane.client import PlaneClient
+
+    call_count = 0
+    responses = [httpx.Response(503), httpx.Response(503), httpx.Response(200)]
+
+    inner = MagicMock()
+    def fake_request(method, url, **kwargs):
+        nonlocal call_count
+        resp = responses[call_count]
+        call_count += 1
+        return resp
+    inner.request.side_effect = fake_request
+
+    client = PlaneClient.__new__(PlaneClient)
+    client._client = inner
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    resp = client._request("GET", "/test")
+    assert resp.status_code == 200
+    assert call_count == 3
+
+
+def test_plane_client_retries_on_connection_error(monkeypatch) -> None:
+    """_request should retry on ConnectError and eventually succeed."""
+    import httpx
+    from unittest.mock import MagicMock
+    from control_plane.adapters.plane.client import PlaneClient
+
+    call_count = 0
+    inner = MagicMock()
+    def fake_request(method, url, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 2:
+            raise httpx.ConnectError("refused")
+        return httpx.Response(200)
+    inner.request.side_effect = fake_request
+
+    client = PlaneClient.__new__(PlaneClient)
+    client._client = inner
+    monkeypatch.setattr("time.sleep", lambda _: None)
+
+    resp = client._request("GET", "/test")
+    assert resp.status_code == 200
+    assert call_count == 2
+
+
+# S5-2: Kodo process tree cleanup
+def test_kodo_adapter_uses_popen_with_new_session(tmp_path, monkeypatch) -> None:
+    """run() should call Popen with start_new_session=True."""
+    from control_plane.adapters.kodo.adapter import KodoAdapter
+    from control_plane.config.settings import KodoSettings
+
+    popen_kwargs: list[dict] = []
+
+    class FakePopen:
+        returncode = 0
+        def __init__(self, command, **kwargs):
+            popen_kwargs.append(kwargs)
+        def communicate(self, timeout=None):
+            return ("", "")
+
+    monkeypatch.setattr("subprocess.Popen", FakePopen)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    goal = tmp_path / "goal.md"
+    goal.write_text("## Goal\nTest.\n")
+
+    KodoAdapter(KodoSettings()).run(goal, repo)
+
+    assert popen_kwargs, "Popen was not called"
+    assert popen_kwargs[0].get("start_new_session") is True
+
+
+# S5-3: Per-task-kind running TTL in reconcile
+def test_reconcile_skips_recently_updated_running_task() -> None:
+    """Running tasks updated within the kind TTL should NOT be reconciled."""
+    from control_plane.entrypoints.worker.main import reconcile_stale_running_issues
+    from unittest.mock import MagicMock
+    import tempfile
+
+    recent_ts = (datetime.now(UTC) - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    issue = {
+        "id": "task-r1",
+        "state": {"name": "Running"},
+        "labels": [{"name": "task-kind: goal"}],
+        "updated_at": recent_ts,
+        "description": "",
+        "name": "Test",
+    }
+    client = MagicMock()
+    client.list_issues.return_value = [issue]
+
+    store = UsageStore(Path(tempfile.mktemp(suffix=".json")))
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
+    assert reconciled == [], "Recent running task should not be reconciled"
+
+
+def test_reconcile_acts_on_stale_running_task() -> None:
+    """Running tasks updated beyond the kind TTL should be reconciled."""
+    from control_plane.entrypoints.worker.main import reconcile_stale_running_issues
+    from unittest.mock import MagicMock
+    import tempfile
+
+    stale_ts = (datetime.now(UTC) - timedelta(hours=4)).isoformat().replace("+00:00", "Z")
+    issue = {
+        "id": "task-r2",
+        "state": {"name": "Running"},
+        "labels": [{"name": "task-kind: goal"}],
+        "updated_at": stale_ts,
+        "description": "",
+        "name": "Test",
+    }
+    client = MagicMock()
+    client.list_issues.return_value = [issue]
+    client.list_comments.return_value = []
+
+    store = UsageStore(Path(tempfile.mktemp(suffix=".json")))
+
+    reconciled = reconcile_stale_running_issues(client, role="goal", ready_state="Ready for AI", usage_store=store)
+    assert "task-r2" in reconciled
+
+
+# S5-4: Disk space guardrail
+def test_disk_space_check_raises_on_critically_low_space(monkeypatch, tmp_path) -> None:
+    """_check_disk_space should raise OSError when free space is critically low."""
+    import shutil
+    from control_plane.execution.usage_store import _check_disk_space, _DISK_MIN_MB
+
+    DiskUsage = type("DiskUsage", (), {"free": int((_DISK_MIN_MB - 1) * 1024 * 1024)})
+    monkeypatch.setattr(shutil, "disk_usage", lambda _: DiskUsage())
+
+    with pytest.raises(OSError, match="disk_space_critical"):
+        _check_disk_space(tmp_path / "test.json")
+
+
+def test_disk_space_check_passes_with_adequate_space(monkeypatch, tmp_path) -> None:
+    """_check_disk_space should not raise when plenty of space is available."""
+    import shutil
+    from control_plane.execution.usage_store import _check_disk_space
+
+    DiskUsage = type("DiskUsage", (), {"free": 10 * 1024 * 1024 * 1024})  # 10 GB
+    monkeypatch.setattr(shutil, "disk_usage", lambda _: DiskUsage())
+
+    _check_disk_space(tmp_path / "test.json")  # should not raise
+
+
+# S5-5: Kodo quota exhaustion detection
+def test_kodo_quota_exhausted_detection() -> None:
+    """is_quota_exhausted should return True for hard quota signals."""
+    from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+
+    quota_result = KodoRunResult(1, "", "Error: insufficient_quota for this account", [])
+    assert KodoAdapter.is_quota_exhausted(quota_result) is True
+
+    ok_result = KodoRunResult(0, "completed", "", [])
+    assert KodoAdapter.is_quota_exhausted(ok_result) is False
+
+
+def test_usage_store_records_kodo_quota_event(tmp_path) -> None:
+    """record_kodo_quota_event should append a kodo_quota_event entry."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_kodo_quota_event(task_id="t1", role="goal", now=now)
+
+    data = store.load()
+    quota_events = [e for e in data["events"] if e["kind"] == "kodo_quota_event"]
+    assert len(quota_events) == 1
+    assert quota_events[0]["task_id"] == "t1"
+
+
+# S5-6: Task urgency scoring
+def test_issue_urgency_score_boosts_regression_tasks() -> None:
+    """Regression tasks should score higher than routine goal tasks."""
+    from control_plane.entrypoints.worker.main import issue_urgency_score
+
+    regression = {"name": "[Regression] CI broke after merge", "labels": []}
+    routine = {"name": "Fix lint violations", "labels": []}
+
+    assert issue_urgency_score(regression) > issue_urgency_score(routine)
+
+
+def test_issue_urgency_score_respects_priority_labels() -> None:
+    """High-priority label should yield a higher score than unset priority."""
+    from control_plane.entrypoints.worker.main import issue_urgency_score
+
+    high_pri = {"name": "Fix something", "labels": [{"name": "priority: high"}]}
+    no_pri = {"name": "Fix something", "labels": []}
+
+    assert issue_urgency_score(high_pri) > issue_urgency_score(no_pri)
+
+
+# S5-7: Board saturation backpressure
+def test_handle_propose_cycle_suppressed_when_board_saturated(tmp_path) -> None:
+    """Proposal creation should be suppressed when autonomy queue is full."""
+    from control_plane.entrypoints.worker.main import (
+        handle_propose_cycle,
+        MAX_QUEUED_AUTONOMY_TASKS,
+    )
+    from unittest.mock import MagicMock
+
+    autonomy_issues = [
+        {
+            "id": f"task-{i}",
+            "state": {"name": "Backlog"},
+            "labels": [
+                {"name": "task-kind: goal"},
+                {"name": "source: autonomy"},
+            ],
+            "name": f"Autonomy task {i}",
+            "description": "",
+        }
+        for i in range(MAX_QUEUED_AUTONOMY_TASKS)
+    ]
+    client = MagicMock()
+    client.list_issues.return_value = autonomy_issues
+
+    service = MagicMock()
+    service.settings.execution_controls.return_value = MagicMock(min_remaining_exec_for_proposals=1)
+    service.usage_store.remaining_exec_capacity.return_value = 10
+    service.usage_store.is_proposal_satiated.return_value = False
+    service.settings.scheduled_tasks = None
+
+    result = handle_propose_cycle(client, service, now=datetime.now(UTC))
+    assert result.decision == "board_saturated"
+
+
+# S5-8: Scope violation usage store recording
+def test_record_scope_violation_stored_in_events(tmp_path) -> None:
+    """record_scope_violation should persist a scope_violation event."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_scope_violation(
+        task_id="t1",
+        repo_key="myrepo",
+        violated_files=["src/outside.py"],
+        now=now,
+    )
+
+    data = store.load()
+    events = [e for e in data["events"] if e["kind"] == "scope_violation"]
+    assert len(events) == 1
+    assert events[0]["repo_key"] == "myrepo"
+    assert "src/outside.py" in events[0]["violated_files"]
+
+
+# S5-9: Improve → propose systemic feedback
+def test_systemic_fix_task_created_on_escalation(tmp_path) -> None:
+    """When should_escalate fires, a systemic-fix goal task should be created."""
+    from control_plane.entrypoints.worker.main import handle_blocked_triage
+    from unittest.mock import MagicMock, call
+
+    issue = {
+        "id": "task-blk",
+        "name": "Failing task",
+        "state": {"name": "Blocked"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: myrepo"}],
+        "description": "## Execution\nrepo: myrepo\nmode: goal\n\n## Goal\nDo stuff.",
+    }
+
+    client = MagicMock()
+    client.fetch_issue.return_value = issue
+    client.list_comments.return_value = []
+    client.list_issues.return_value = []
+
+    esc_settings = MagicMock()
+    esc_settings.webhook_url = "http://hook.test"
+    esc_settings.block_threshold = 1
+    esc_settings.cooldown_seconds = 0
+
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    # Pre-load a triage event so should_escalate fires immediately
+    for _ in range(2):
+        store.record_blocked_triage(task_id="task-blk", classification="validation_failure", now=now)
+
+    service = MagicMock()
+    service.usage_store = store
+    service.settings.escalation = esc_settings
+    service.settings.repos = {"myrepo": MagicMock(default_branch="main")}
+
+    handle_blocked_triage(client, service, "task-blk")
+
+    create_calls = client.create_issue.call_args_list
+    systemic_calls = [
+        c for c in create_calls
+        if "Systemic" in (c.kwargs.get("name") or (c.args[0] if c.args else ""))
+    ]
+    assert len(systemic_calls) >= 1, "Systemic fix task was not created"
+
+
+# S5-10: Kodo quality erosion detection
+def test_count_quality_suppressions_counts_noqa_additions() -> None:
+    """_count_quality_suppressions should count +noqa lines in diff."""
+    from control_plane.application.service import ExecutionService
+
+    diff = """\
+diff --git a/src/foo.py b/src/foo.py
+--- a/src/foo.py
++++ b/src/foo.py
+@@ -1,3 +1,5 @@
+ existing = 1
++bad_line = True  # noqa: E501
++another = "x"  # noqa
+-removed_line  # noqa
+ other = 2
+"""
+    counts = ExecutionService._count_quality_suppressions(diff)
+    assert counts["noqa"] == 2   # only '+' lines counted
+    assert counts["type_ignore"] == 0
+
+
+def test_count_quality_suppressions_counts_type_ignore() -> None:
+    """_count_quality_suppressions should count +type: ignore lines."""
+    from control_plane.application.service import ExecutionService
+
+    diff = """\
++result = bad_fn()  # type: ignore
++value: int = other()  # type:ignore[assignment]
+"""
+    counts = ExecutionService._count_quality_suppressions(diff)
+    assert counts["type_ignore"] == 2
+
+
+def test_quality_warning_event_recorded_in_usage_store(tmp_path) -> None:
+    """record_quality_warning should persist a kodo_quality_warning event."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_quality_warning(
+        task_id="t1",
+        repo_key="myrepo",
+        suppression_counts={"noqa": 4, "type_ignore": 0, "bare_pass": 0},
+        now=now,
+    )
+
+    data = store.load()
+    events = [e for e in data["events"] if e["kind"] == "kodo_quality_warning"]
+    assert len(events) == 1
+    assert events[0]["suppression_counts"]["noqa"] == 4

@@ -1,18 +1,83 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import threading
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Generator, cast
 
 from control_plane.execution.models import BudgetDecision, ExecutionControlSettings, NoOpDecision, RetryDecision
+
+# ---------------------------------------------------------------------------
+# Module-level path-keyed threading locks.
+# All UsageStore instances that share the same on-disk path share a lock so
+# that load-modify-save triples are atomic even when parallel_slots > 1.
+# ---------------------------------------------------------------------------
+_path_locks: dict[str, threading.RLock] = {}
+_meta_lock = threading.Lock()
+
+
+def _get_lock(path: Path) -> threading.RLock:
+    key = str(path.resolve())
+    with _meta_lock:
+        if key not in _path_locks:
+            _path_locks[key] = threading.RLock()
+        return _path_locks[key]
+
+
+# ---------------------------------------------------------------------------
+# Circuit-breaker constants (configurable via env).
+# ---------------------------------------------------------------------------
+_CB_THRESHOLD = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
+_CB_WINDOW = max(3, int(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW", "5")))
+
+# ---------------------------------------------------------------------------
+# Disk-space guardrail constants.
+# ---------------------------------------------------------------------------
+_DISK_WARN_MB = 200   # Log a warning below this threshold
+_DISK_MIN_MB = 50     # Raise OSError below this threshold (avoids partial writes)
+
+
+def _check_disk_space(path: Path) -> None:
+    """Raise OSError when free space near *path* is critically low.
+
+    Logs a structured warning when space is low but above the hard minimum.
+    This prevents the watcher from entering a crash-restart loop caused by
+    failed artifact writes when disk fills between janitor runs.
+    """
+    try:
+        free_mb = shutil.disk_usage(path.parent if not path.is_dir() else path).free / (1024 * 1024)
+    except OSError:
+        return  # Can't check — don't block the write
+    if free_mb < _DISK_MIN_MB:
+        raise OSError(
+            f"disk_space_critical: only {free_mb:.0f} MB free near {path} "
+            f"(minimum {_DISK_MIN_MB} MB required). "
+            "Run 'control-plane.sh janitor' or free disk space before retrying."
+        )
+    # Warn (non-fatal) when space is getting low
+    if free_mb < _DISK_WARN_MB:
+        import logging
+        logging.getLogger(__name__).warning(
+            '{"event": "disk_space_low", "free_mb": %.0f, "warn_threshold_mb": %d, "path": "%s"}',
+            free_mb, _DISK_WARN_MB, path,
+        )
 
 
 class UsageStore:
     def __init__(self, path: Path | None = None) -> None:
         self.settings = ExecutionControlSettings.from_env()
         self.path = path or self.settings.usage_path
+
+    @contextmanager
+    def _exclusive(self) -> Generator[None, None, None]:
+        """Acquire an exclusive per-path reentrant lock for load-modify-save."""
+        with _get_lock(self.path):
+            yield
 
     def load(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -34,6 +99,7 @@ class UsageStore:
 
     def save(self, data: dict[str, Any], *, now: datetime) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        _check_disk_space(self.path)
         events = self._prune_events(list(data.get("events", [])), now=now)
         data["events"] = events
         data["updated_at"] = now.isoformat()
@@ -45,7 +111,10 @@ class UsageStore:
         data["skipped_due_to_cooldown"] = counts.get("skip_cooldown", 0)
         data["blocked_due_to_retry_cap"] = counts.get("retry_cap_block", 0)
         data["suppressed_due_to_proposal_budget"] = counts.get("proposal_budget_suppressed", 0)
-        self.path.write_text(json.dumps(data, indent=2))
+        # Atomic write: write to a temp file then rename (rename is atomic on Linux).
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2))
+        tmp.replace(self.path)
 
     def budget_decision(self, *, now: datetime) -> BudgetDecision:
         data = self.load()
@@ -68,6 +137,23 @@ class UsageStore:
                 limit=self.settings.max_exec_per_day,
                 current=daily,
             )
+        # Circuit breaker: if ≥ threshold fraction of last _CB_WINDOW execution
+        # outcomes failed, pause execution until the operator investigates.
+        # Requires at least 3 samples to avoid false positives at startup.
+        outcomes = [
+            e for e in reversed(events)
+            if e.get("kind") == "execution_outcome"
+        ][:_CB_WINDOW]
+        if len(outcomes) >= 3:
+            failures = sum(1 for e in outcomes if not e.get("succeeded"))
+            if failures / len(outcomes) >= _CB_THRESHOLD:
+                return BudgetDecision(
+                    allowed=False,
+                    reason="circuit_breaker_open",
+                    window="recent",
+                    limit=_CB_WINDOW,
+                    current=failures,
+                )
         return BudgetDecision(allowed=True)
 
     def remaining_exec_capacity(self, *, now: datetime) -> int:
@@ -145,24 +231,132 @@ class UsageStore:
         return NoOpDecision(should_skip=False)
 
     def record_execution(self, *, role: str, task_id: str, signature: str, now: datetime) -> None:
-        data = self.load()
-        attempts = dict(data.get("task_attempts", {}))
-        attempts[task_id] = int(attempts.get(task_id, 0)) + 1
-        data["task_attempts"] = attempts
-        signatures = dict(data.get("last_task_signatures", {}))
-        signatures[f"{role}:{task_id}"] = signature
-        data["last_task_signatures"] = signatures
-        self._append_event(
-            data,
-            {
-                "kind": "execution",
-                "role": role,
-                "task_id": task_id,
-                "signature": signature,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            attempts = dict(data.get("task_attempts", {}))
+            attempts[task_id] = int(attempts.get(task_id, 0)) + 1
+            data["task_attempts"] = attempts
+            signatures = dict(data.get("last_task_signatures", {}))
+            signatures[f"{role}:{task_id}"] = signature
+            data["last_task_signatures"] = signatures
+            self._append_event(
+                data,
+                {
+                    "kind": "execution",
+                    "role": role,
+                    "task_id": task_id,
+                    "signature": signature,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_execution_outcome(
+        self,
+        *,
+        task_id: str,
+        role: str,
+        succeeded: bool,
+        now: datetime,
+    ) -> None:
+        """Record whether a goal/test execution produced a successful result.
+
+        These events feed the circuit breaker in ``budget_decision``.  Record
+        after the task handler has determined the final outcome — not before.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_outcome",
+                    "task_id": task_id,
+                    "role": role,
+                    "succeeded": succeeded,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_quality_warning(
+        self,
+        *,
+        task_id: str,
+        repo_key: str,
+        suppression_counts: dict[str, int],
+        now: datetime,
+    ) -> None:
+        """Record a kodo quality-erosion warning for the given task.
+
+        Quality warnings are emitted when a kodo run adds an above-threshold
+        number of inline suppressions (``# noqa``, ``# type: ignore``, bare
+        ``pass`` in test bodies).  These pass validation but erode code quality
+        over time.  Recording them provides a queryable signal for operators and
+        the self-tuning regulator.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "kodo_quality_warning",
+                    "task_id": task_id,
+                    "repo_key": repo_key,
+                    "suppression_counts": suppression_counts,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_scope_violation(
+        self,
+        *,
+        task_id: str,
+        repo_key: str,
+        violated_files: list[str],
+        now: datetime,
+    ) -> None:
+        """Record a scope-policy violation for observability.
+
+        Scope violations occur when kodo modifies files outside the task's
+        ``allowed_paths`` after both the initial run and the policy-retry pass.
+        Recording them enables the improve watcher and operators to detect
+        patterns (e.g. a task family that consistently escapes its scope) via
+        the usage store events.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "scope_violation",
+                    "task_id": task_id,
+                    "repo_key": repo_key,
+                    "violated_files": violated_files[:10],  # cap to avoid bloat
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_kodo_quota_event(self, *, task_id: str, role: str, now: datetime) -> None:
+        """Record a hard quota exhaustion event from a kodo execution.
+
+        Unlike execution_outcome failures, quota events do NOT feed the circuit
+        breaker — they are an infrastructure problem, not a task-quality signal.
+        The operator must top up credits or wait for a monthly reset.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "kodo_quota_event",
+                    "task_id": task_id,
+                    "role": role,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_skip(
         self,
@@ -175,42 +369,44 @@ class UsageStore:
         now: datetime,
         evidence: dict[str, object] | None = None,
     ) -> None:
-        data = self.load()
-        signatures = dict(data.get("last_task_signatures", {}))
-        signatures[f"{role}:{task_id}"] = signature
-        data["last_task_signatures"] = signatures
-        kind = "skip_noop" if reason == "no_op" else "skip_budget"
-        if reason == "cooldown_active":
-            kind = "skip_cooldown"
-        self._append_event(
-            data,
-            {
-                "kind": kind,
-                "role": role,
-                "task_id": task_id,
-                "signature": signature,
-                "reason": reason,
-                "detail": detail,
-                "evidence": evidence or {},
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            signatures = dict(data.get("last_task_signatures", {}))
+            signatures[f"{role}:{task_id}"] = signature
+            data["last_task_signatures"] = signatures
+            kind = "skip_noop" if reason == "no_op" else "skip_budget"
+            if reason == "cooldown_active":
+                kind = "skip_cooldown"
+            self._append_event(
+                data,
+                {
+                    "kind": kind,
+                    "role": role,
+                    "task_id": task_id,
+                    "signature": signature,
+                    "reason": reason,
+                    "detail": detail,
+                    "evidence": evidence or {},
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_retry_cap(self, *, role: str, task_id: str, now: datetime, attempts: int, limit: int) -> None:
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "retry_cap_block",
-                "role": role,
-                "task_id": task_id,
-                "attempts": attempts,
-                "limit": limit,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "retry_cap_block",
+                    "role": role,
+                    "task_id": task_id,
+                    "attempts": attempts,
+                    "limit": limit,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_proposal_cycle(
         self,
@@ -226,18 +422,19 @@ class UsageStore:
         ``deduped``  — proposals that already existed on the board.
         ``skipped``  — proposals skipped due to conflict or focus-area gate.
         """
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "proposal_cycle",
-                "created": created,
-                "deduped": deduped,
-                "skipped": skipped,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "proposal_cycle",
+                    "created": created,
+                    "deduped": deduped,
+                    "skipped": skipped,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def is_proposal_satiated(
         self,
@@ -269,17 +466,18 @@ class UsageStore:
 
     def record_proposal_outcome(self, *, category: str, succeeded: bool, now: datetime) -> None:
         """Record whether a task of a given category succeeded or failed."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "proposal_outcome",
-                "category": category,
-                "succeeded": succeeded,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "proposal_outcome",
+                    "category": category,
+                    "succeeded": succeeded,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def proposal_success_rate(
         self,
@@ -306,17 +504,18 @@ class UsageStore:
 
     def record_validation_outcome(self, *, command: str, passed: bool, now: datetime) -> None:
         """Append a validation_outcome event for flaky-test tracking."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "validation_outcome",
-                "command": command,
-                "passed": passed,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "validation_outcome",
+                    "command": command,
+                    "passed": passed,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def is_command_flaky(
         self,
@@ -345,17 +544,18 @@ class UsageStore:
 
     def record_escalation(self, *, classification: str, task_ids: list[str], now: datetime) -> None:
         """Record that an escalation webhook was fired for *classification*."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "escalation_sent",
-                "classification": classification,
-                "task_ids": task_ids,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "escalation_sent",
+                    "classification": classification,
+                    "task_ids": task_ids,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def should_escalate(
         self,
@@ -418,30 +618,108 @@ class UsageStore:
 
     def record_blocked_triage(self, *, task_id: str, classification: str, now: datetime) -> None:
         """Record a single blocked-triage event for escalation tracking."""
-        data = self.load()
-        self._append_event(
-            data,
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "blocked_triage",
+                    "task_id": task_id,
+                    "classification": classification,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_execution_cost(
+        self,
+        *,
+        task_id: str,
+        repo_key: str,
+        estimated_usd: float,
+        now: datetime,
+    ) -> None:
+        """Append an execution_cost event for spend telemetry.
+
+        *estimated_usd* is a caller-supplied estimate (e.g. from
+        ``Settings.cost_per_execution_usd``).  Zero is valid and means cost
+        tracking is disabled for this repo.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_cost",
+                    "task_id": task_id,
+                    "repo_key": repo_key,
+                    "estimated_usd": estimated_usd,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def get_spend_report(self, *, window_days: int = 1, now: datetime | None = None) -> dict[str, Any]:
+        """Return a spend summary for the last *window_days* days.
+
+        Returns::
+
             {
-                "kind": "blocked_triage",
-                "task_id": task_id,
-                "classification": classification,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+                "window_days": int,
+                "total_executions": int,
+                "total_estimated_usd": float,
+                "per_repo": {
+                    "<repo_key>": {
+                        "executions": int,
+                        "estimated_usd": float,
+                    },
+                    ...
+                },
+            }
+        """
+        _now = now or datetime.now()
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=_now)
+        cutoff = _now - timedelta(days=window_days)
+        per_repo: dict[str, dict[str, Any]] = {}
+        total_executions = 0
+        total_usd = 0.0
+        for ev in events:
+            if ev.get("kind") != "execution_cost":
+                continue
+            try:
+                ts = datetime.fromisoformat(str(ev["timestamp"]))
+            except (ValueError, KeyError):
+                continue
+            if ts < cutoff:
+                continue
+            repo_key = str(ev.get("repo_key") or "unknown")
+            usd = float(ev.get("estimated_usd") or 0.0)
+            bucket = per_repo.setdefault(repo_key, {"executions": 0, "estimated_usd": 0.0})
+            bucket["executions"] += 1
+            bucket["estimated_usd"] = round(bucket["estimated_usd"] + usd, 6)
+            total_executions += 1
+            total_usd += usd
+        return {
+            "window_days": window_days,
+            "total_executions": total_executions,
+            "total_estimated_usd": round(total_usd, 6),
+            "per_repo": per_repo,
+        }
 
     def record_proposal_budget_suppression(self, *, reason: str, now: datetime, evidence: dict[str, object]) -> None:
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "proposal_budget_suppressed",
-                "reason": reason,
-                "evidence": evidence,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "proposal_budget_suppressed",
+                    "reason": reason,
+                    "evidence": evidence,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_task_artifact(self, *, task_id: str, artifact: dict[str, Any], now: datetime) -> None:
         """Persist a structured execution artifact keyed by task_id.
@@ -451,11 +729,12 @@ class UsageStore:
         ``pull_request_url`` so that future runs and the improve watcher can
         make better-informed decisions without re-reading every comment.
         """
-        data = self.load()
-        artifacts = dict(data.get("task_artifacts", {}))
-        artifacts[task_id] = {**artifact, "recorded_at": now.isoformat()}
-        data["task_artifacts"] = artifacts
-        self.save(data, now=now)
+        with self._exclusive():
+            data = self.load()
+            artifacts = dict(data.get("task_artifacts", {}))
+            artifacts[task_id] = {**artifact, "recorded_at": now.isoformat()}
+            data["task_artifacts"] = artifacts
+            self.save(data, now=now)
 
     def get_task_artifact(self, task_id: str) -> dict[str, Any] | None:
         """Return the most recent execution artifact for *task_id*, or ``None``."""

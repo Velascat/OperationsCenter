@@ -126,9 +126,27 @@ python -m control_plane.entrypoints.feedback.main record \
     --task-id <uuid> --outcome merged --pr-number 42
 ```
 
+## Long-Lived Deduplication
+
+Beyond the rolling 7-day dedup window on `candidate_dedup_key`, the proposer checks a permanent rejection store before any other guardrail. `ProposalRejectionStore` (`state/proposal_rejections.json`) records keys that were permanently rejected when a human cancelled the task. Records are never pruned.
+
+When `ProposerGuardrailAdapter.evaluate()` finds a match, it returns `reason="permanently_rejected_by_human"` and the candidate is suppressed regardless of budget, cooldown, or board state.
+
+To allow a candidate to be re-proposed after a human rejection, delete its entry from `state/proposal_rejections.json` and run `autonomy-cycle` again.
+
+## Board Saturation Guard (autonomy-cycle path)
+
+Before `propose-from-candidates` runs inside `autonomy-cycle`, the orchestrator counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds `MAX_QUEUED_AUTONOMY_TASKS` (default 15, configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`), the entire propose stage is skipped for that cycle.
+
+This prevents the proposer from outpacing the workers during idle stretches (e.g. after a watcher restart or overnight backlog buildup). The saturation check runs before dry-run expansion, so it also applies in `--execute` mode.
+
+When the board is saturated, the cycle report records `"propose_skipped": true` with `"reason": "board_saturated"`.
+
 ## Safety Boundaries
 
 - only `status=emit` decision candidates may become Plane tasks
 - dry-run performs full mapping and guardrails but does not write to Plane
 - one candidate failure does not void the whole proposer run
 - zero-created runs are valid and retained
+- permanently rejected candidates are suppressed indefinitely (`state/proposal_rejections.json`)
+- propose stage is skipped when `source: autonomy` task count ≥ `MAX_QUEUED_AUTONOMY_TASKS`
