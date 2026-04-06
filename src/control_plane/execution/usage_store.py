@@ -212,6 +212,61 @@ class UsageStore:
             now=now,
         )
 
+    def record_proposal_cycle(
+        self,
+        *,
+        created: int,
+        deduped: int,
+        skipped: int,
+        now: datetime,
+    ) -> None:
+        """Record one proposal cycle outcome for satiation tracking.
+
+        ``created``  — new tasks actually created this cycle.
+        ``deduped``  — proposals that already existed on the board.
+        ``skipped``  — proposals skipped due to conflict or focus-area gate.
+        """
+        data = self.load()
+        self._append_event(
+            data,
+            {
+                "kind": "proposal_cycle",
+                "created": created,
+                "deduped": deduped,
+                "skipped": skipped,
+                "timestamp": now.isoformat(),
+            },
+            now=now,
+        )
+
+    def is_proposal_satiated(
+        self,
+        *,
+        now: datetime,
+        window_cycles: int = 5,
+        dedup_ratio_threshold: float = 0.9,
+    ) -> bool:
+        """Return True if the last *window_cycles* proposal cycles produced nothing new.
+
+        When the dedup+skipped fraction of all proposals across the window
+        exceeds *dedup_ratio_threshold* the repo is considered stable and no
+        further proposals are needed until something changes externally.
+        """
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        recent = [e for e in reversed(events) if e.get("kind") == "proposal_cycle"][:window_cycles]
+        if len(recent) < window_cycles:
+            return False
+        total_created = sum(int(e.get("created", 0)) for e in recent)
+        total_deduped = sum(int(e.get("deduped", 0)) for e in recent)
+        total_skipped = sum(int(e.get("skipped", 0)) for e in recent)
+        total = total_created + total_deduped + total_skipped
+        if total == 0:
+            return False
+        if total_created > 0:
+            return False
+        return (total_deduped + total_skipped) / total >= dedup_ratio_threshold
+
     def record_proposal_budget_suppression(self, *, reason: str, now: datetime, evidence: dict[str, object]) -> None:
         data = self.load()
         self._append_event(

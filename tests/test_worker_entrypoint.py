@@ -18,10 +18,16 @@ from control_plane.entrypoints.worker.main import (
     _collect_open_pr_files,
     _extract_filename_tokens,
     _has_conflict_with_active_task,
+    _is_self_repo,
+    _proposal_matches_focus_areas,
     _record_execution_artifact,
+    _self_modify_approved,
+    _split_oversized_finding,
     blocked_resolution_is_complete,
     build_improve_triage_result,
     classify_blocked_issue,
+    classify_execution_result,
+    detect_post_merge_regressions,
     extract_triage_follow_up_ids,
     handle_goal_task,
     handle_improve_task,
@@ -30,11 +36,13 @@ from control_plane.entrypoints.worker.main import (
     handle_test_task,
     issue_status_name,
     issue_task_kind,
+    parse_task_dependencies,
     recently_proposed,
     record_proposed,
     reconcile_stale_running_issues,
     run_watch_loop,
     select_ready_task_id,
+    task_dependencies_met,
     select_watch_candidate,
 )
 
@@ -2092,3 +2100,400 @@ def test_build_improve_triage_result_injects_avoid_paths_for_scope_policy(monkey
     assert "avoid_paths:" in constraints
     assert "scripts/deploy.sh" in constraints
     assert "src/main.py" in constraints
+
+
+# ===========================================================================
+# Tests for the 8 autonomy gap improvements
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Point 1: Goal coherence — _proposal_matches_focus_areas
+# ---------------------------------------------------------------------------
+
+def test_proposal_matches_focus_areas_returns_true_when_no_areas() -> None:
+    p = ProposalSpec(
+        task_kind="goal", title="Anything", goal_text="Anything",
+        reason_summary="", source_signal="", confidence="medium",
+        recommended_state="Backlog", handoff_reason="", dedup_key="k",
+    )
+    assert _proposal_matches_focus_areas(p, []) is True
+
+
+def test_proposal_matches_focus_areas_matches_title() -> None:
+    p = ProposalSpec(
+        task_kind="goal", title="Add test coverage for auth module", goal_text="Write tests.",
+        reason_summary="", source_signal="", confidence="medium",
+        recommended_state="Backlog", handoff_reason="", dedup_key="k",
+    )
+    assert _proposal_matches_focus_areas(p, ["test coverage"]) is True
+
+
+def test_proposal_matches_focus_areas_misses_unrelated() -> None:
+    p = ProposalSpec(
+        task_kind="goal", title="Decompose stage_driver.py", goal_text="Extract large functions.",
+        reason_summary="", source_signal="", confidence="medium",
+        recommended_state="Backlog", handoff_reason="", dedup_key="k",
+    )
+    assert _proposal_matches_focus_areas(p, ["test coverage", "type safety"]) is False
+
+
+def test_build_proposal_candidates_demotes_off_focus_proposals(monkeypatch) -> None:
+    """Proposals not matching focus_areas should be demoted to Backlog."""
+    from control_plane.entrypoints.worker.main import build_proposal_candidates
+    service = FakeService()
+    # Give the service focus_areas
+    service.settings.focus_areas = ["subprocess safety"]
+
+    off_focus = ProposalSpec(
+        task_kind="goal", title="Decompose main.py (2823L)",
+        goal_text="Extract large functions from main.py.",
+        reason_summary="oversized", source_signal="cp:repo_scan:goal",
+        confidence="high", recommended_state="Ready for AI",
+        handoff_reason="scan", dedup_key="cp:repo_scan:decompose_main_py",
+        repo_key="control-plane",
+    )
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.discover_improvement_candidates",
+        lambda *a, **kw: ([], []),
+    )
+    monkeypatch.setattr(
+        "control_plane.entrypoints.worker.main.proposal_specs_from_findings",
+        lambda *a, **kw: [off_focus],
+    )
+    client = FakePlaneClient(issues=[])
+    proposals, _, _ = build_proposal_candidates(client, service, repo_key="control-plane")
+    assert all(p.recommended_state == "Backlog" for p in proposals if p.title == off_focus.title)
+
+
+# ---------------------------------------------------------------------------
+# Point 2: Task dependency ordering
+# ---------------------------------------------------------------------------
+
+def test_parse_task_dependencies_finds_uuid() -> None:
+    desc = "## Constraints\n- depends_on: abc12345-1234-1234-1234-abcdef012345"
+    deps = parse_task_dependencies(desc)
+    assert deps == ["abc12345-1234-1234-1234-abcdef012345"]
+
+
+def test_parse_task_dependencies_empty_when_no_marker() -> None:
+    assert parse_task_dependencies("## Goal\nDo something.") == []
+
+
+def test_parse_task_dependencies_multiple() -> None:
+    desc = "depends_on: aabbccdd-0000-0000-0000-000000000001, aabbccdd-0000-0000-0000-000000000002"
+    deps = parse_task_dependencies(desc)
+    assert len(deps) == 2
+
+
+def test_task_dependencies_met_true_when_no_deps() -> None:
+    issue = {"id": "T-1", "state": {"name": "Ready for AI"}, "description": "## Goal\nNo deps.", "labels": []}
+    client = FakePlaneClient(issues=[issue])
+    assert task_dependencies_met(client, "T-1") is True
+
+
+def test_task_dependencies_met_false_when_dep_not_done() -> None:
+    _DEP_UUID = "aabbccdd-0000-0000-0000-000000000001"
+    dep = {"id": _DEP_UUID, "state": {"name": "Running"}, "description": "", "labels": []}
+    task = {
+        "id": "T-2", "state": {"name": "Ready for AI"},
+        "description": f"depends_on: {_DEP_UUID}",
+        "labels": [],
+    }
+
+    class ClientWithDep(FakePlaneClient):
+        def fetch_issue(self, task_id):
+            if task_id == _DEP_UUID:
+                return dep
+            return super().fetch_issue(task_id)
+
+    client = ClientWithDep(issues=[task, dep])
+    assert task_dependencies_met(client, "T-2") is False
+
+
+def test_select_watch_candidate_skips_task_with_unmet_deps(monkeypatch) -> None:
+    """Tasks with unmet depends_on should be skipped even when Ready for AI."""
+    _DEP_UUID = "aabbccdd-0000-0000-0000-000000000002"
+    dep = {"id": "DEP-1", "state": {"name": "Running"}, "description": "", "labels": [{"name": "task-kind: goal"}]}
+    task = {
+        "id": "GOAL-1",
+        "state": {"name": "Ready for AI"},
+        "description": f"depends_on: {_DEP_UUID}",
+        "labels": [{"name": "task-kind: goal"}],
+        "name": "Do something",
+    }
+    task2 = {
+        "id": "GOAL-2",
+        "state": {"name": "Ready for AI"},
+        "description": "",
+        "labels": [{"name": "task-kind: goal"}],
+        "name": "Do something else",
+    }
+
+    class MultiClient(FakePlaneClient):
+        def fetch_issue(self, tid):
+            if tid == _DEP_UUID:
+                return dep
+            return super().fetch_issue(tid)
+
+    client = MultiClient(issues=[task, dep, task2])
+    task_id, action = select_watch_candidate(client, ready_state="Ready for AI", role="goal")
+    assert task_id == "GOAL-2"  # GOAL-1 skipped due to unmet dep
+
+
+# ---------------------------------------------------------------------------
+# Point 3: Task sizing gate — _split_oversized_finding
+# ---------------------------------------------------------------------------
+
+def test_split_oversized_finding_passthrough_small() -> None:
+    finding = {
+        "kind": "goal",
+        "title": "Decompose small.py (400L, 3 oversized function(s))",
+        "goal": "Decompose small.py",
+        "constraints": "- source: size scan",
+        "note": "small",
+    }
+    result = _split_oversized_finding(finding)
+    assert len(result) == 1
+    assert result[0]["title"] == finding["title"]
+
+
+def test_split_oversized_finding_splits_large() -> None:
+    finding = {
+        "kind": "goal",
+        "title": "Decompose main.py (2823L, 16 oversized function(s))",
+        "goal": "Decompose main.py",
+        "constraints": "- source: size scan",
+        "note": "oversized",
+    }
+    result = _split_oversized_finding(finding)
+    assert len(result) >= 2
+    for i, part in enumerate(result, 1):
+        assert f"part {i} of {len(result)}" in part["title"]
+        assert "decomposition_part:" in part["constraints"]
+
+
+def test_split_oversized_finding_non_decompose_passthrough() -> None:
+    finding = {
+        "kind": "goal",
+        "title": "Fix 212 type errors found by ty",
+        "goal": "Fix types",
+        "constraints": "",
+        "note": "",
+    }
+    assert _split_oversized_finding(finding) == [finding]
+
+
+# ---------------------------------------------------------------------------
+# Point 4+6: Post-merge CI feedback — detect_post_merge_regressions
+# ---------------------------------------------------------------------------
+
+def test_detect_post_merge_regressions_no_token_returns_empty(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    service = FakeService()
+    # settings.git_token() returns None when no token
+    service.settings.git_token = lambda: None
+    client = FakePlaneClient(issues=[{"id": "T-1", "state": {"name": "Done"}, "labels": []}])
+    assert detect_post_merge_regressions(client, service) == []
+
+
+def test_detect_post_merge_regressions_skips_tasks_without_artifact() -> None:
+    service = FakeService()
+    service.settings.git_token = lambda: "fake-token"
+    client = FakePlaneClient(issues=[{"id": "T-1", "state": {"name": "Done"}, "labels": [], "name": "Task 1"}])
+    assert detect_post_merge_regressions(client, service) == []
+
+
+def test_detect_post_merge_regressions_creates_task_on_ci_failure(monkeypatch) -> None:
+    service = FakeService()
+    service.settings.git_token = lambda: "fake-token"
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    service.usage_store.record_task_artifact(
+        task_id="DONE-1",
+        artifact={
+            "pull_request_url": "https://github.com/owner/repo/pull/10",
+            "success": True, "changed_files": [],
+        },
+        now=now,
+    )
+
+    class FakeGH:
+        def get_pr(self, owner, repo, pr_number):
+            return {"merged": True, "merged_at": "2026-04-05T10:00:00Z", "head": {"sha": "abc123"}, "state": "closed"}
+        def get_failed_checks(self, owner, repo, pr_number, **kw):
+            return ["tests: FAILED"]
+
+    monkeypatch.setattr("control_plane.entrypoints.worker.main.GitHubPRClient", lambda token: FakeGH())
+
+    issue = {"id": "DONE-1", "state": {"name": "Done"}, "labels": [], "name": "Implement feature X"}
+    client = FakePlaneClient(issues=[issue])
+    created = detect_post_merge_regressions(client, service, issues=[issue])
+    assert len(created) == 1
+    assert any("Regression from" in c.get("name", "") for c in client.created)
+
+
+def test_detect_post_merge_regressions_skips_if_already_flagged(monkeypatch) -> None:
+    service = FakeService()
+    service.settings.git_token = lambda: "fake-token"
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    service.usage_store.record_task_artifact(
+        task_id="DONE-2",
+        artifact={"pull_request_url": "https://github.com/owner/repo/pull/11", "success": True, "changed_files": []},
+        now=now,
+    )
+    existing_marker_comment = {"comment_html": "<p>[Improve] Post-merge regression detected</p>"}
+    issue = {"id": "DONE-2", "state": {"name": "Done"}, "labels": [], "name": "Some task"}
+    client = FakePlaneClient(issues=[issue], comments={"DONE-2": [existing_marker_comment]})
+    assert detect_post_merge_regressions(client, service, issues=[issue]) == []
+
+
+# ---------------------------------------------------------------------------
+# Point 5: Self-modification controls
+# ---------------------------------------------------------------------------
+
+def test_is_self_repo_matches_self_repo_key() -> None:
+    service = FakeService()
+    service.settings.self_repo_key = "ControlPlane"
+    assert _is_self_repo("ControlPlane", service) is True
+    assert _is_self_repo("code_youtube_shorts", service) is False
+
+
+def test_is_self_repo_case_insensitive() -> None:
+    service = FakeService()
+    service.settings.self_repo_key = "ControlPlane"
+    assert _is_self_repo("controlplane", service) is True
+
+
+def test_self_modify_approved_detects_label() -> None:
+    issue_with = {"labels": [{"name": "self-modify: approved"}]}
+    issue_without = {"labels": [{"name": "task-kind: goal"}]}
+    assert _self_modify_approved(issue_with) is True
+    assert _self_modify_approved(issue_without) is False
+
+
+def test_select_watch_candidate_skips_self_repo_without_label() -> None:
+    """Self-repo tasks without 'self-modify: approved' must be skipped."""
+    task_self = {
+        "id": "SELF-1", "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: ControlPlane"}],
+        "name": "Decompose main.py",
+        "description": "",
+    }
+    task_other = {
+        "id": "OTHER-1", "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: code_youtube_shorts"}],
+        "name": "Fix something",
+        "description": "",
+    }
+    service = FakeService()
+    service.settings.self_repo_key = "ControlPlane"
+    client = FakePlaneClient(issues=[task_self, task_other])
+    task_id, _ = select_watch_candidate(
+        client, ready_state="Ready for AI", role="goal", service=service
+    )
+    assert task_id == "OTHER-1"
+
+
+def test_select_watch_candidate_allows_self_repo_with_approved_label() -> None:
+    task_self = {
+        "id": "SELF-2", "state": {"name": "Ready for AI"},
+        "labels": [
+            {"name": "task-kind: goal"},
+            {"name": "repo: ControlPlane"},
+            {"name": "self-modify: approved"},
+        ],
+        "name": "Decompose main.py",
+        "description": "",
+    }
+    service = FakeService()
+    service.settings.self_repo_key = "ControlPlane"
+    client = FakePlaneClient(issues=[task_self])
+    task_id, _ = select_watch_candidate(
+        client, ready_state="Ready for AI", role="goal", service=service
+    )
+    assert task_id == "SELF-2"
+
+
+# ---------------------------------------------------------------------------
+# Point 7: Better failure attribution
+# ---------------------------------------------------------------------------
+
+def test_classify_execution_result_context_limit() -> None:
+    result = ExecutionResult(
+        run_id="r", success=False, changed_files=[], validation_passed=False,
+        execution_stderr_excerpt="context window exceeded: token limit reached",
+        summary="fail", validation_results=[], branch_pushed=False,
+        draft_branch_pushed=False, push_reason=None, pull_request_url=None,
+        artifacts=[], policy_violations=[],
+    )
+    assert classify_execution_result(result) == "context_limit"
+
+
+def test_classify_execution_result_dependency_missing() -> None:
+    result = ExecutionResult(
+        run_id="r", success=False, changed_files=[], validation_passed=False,
+        execution_stderr_excerpt="ModuleNotFoundError: No module named 'httpx'",
+        summary="fail", validation_results=[], branch_pushed=False,
+        draft_branch_pushed=False, push_reason=None, pull_request_url=None,
+        artifacts=[], policy_violations=[],
+    )
+    assert classify_execution_result(result) == "dependency_missing"
+
+
+def test_classify_blocked_issue_context_limit() -> None:
+    issue = {"name": "Fix something", "description": "", "labels": [{"name": "task-kind: goal"}]}
+    comments = [{"comment_html": "<p>blocked_classification: context_limit</p>"}]
+    classification, _ = classify_blocked_issue(issue, comments)
+    assert classification == "context_limit"
+
+
+def test_build_improve_triage_context_limit_gets_follow_up() -> None:
+    """context_limit should produce a scoping follow-up, not human_attention."""
+    issue = {"id": "T-CL", "name": "Decompose main.py", "labels": [{"name": "task-kind: goal"}]}
+    comments = [{"comment_html": "<p>blocked_classification: context_limit</p>"}]
+    client = FakePlaneClient(issues=[issue], comments={"T-CL": comments})
+    result = build_improve_triage_result(client, issue, comments, include_failure_context=False)
+    assert result.classification == "context_limit"
+    assert result.human_attention_required is False
+    assert result.follow_up is not None
+
+
+# ---------------------------------------------------------------------------
+# Point 8: Satiation signal
+# ---------------------------------------------------------------------------
+
+def test_is_proposal_satiated_false_with_insufficient_data() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    # Only 3 cycles recorded, need 5
+    for _ in range(3):
+        service.usage_store.record_proposal_cycle(created=0, deduped=4, skipped=0, now=now)
+    assert service.usage_store.is_proposal_satiated(now=now) is False
+
+
+def test_is_proposal_satiated_true_when_all_deduped() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    for _ in range(5):
+        service.usage_store.record_proposal_cycle(created=0, deduped=5, skipped=0, now=now)
+    assert service.usage_store.is_proposal_satiated(now=now) is True
+
+
+def test_is_proposal_satiated_false_when_creating_tasks() -> None:
+    service = FakeService()
+    now = datetime(2026, 4, 6, tzinfo=UTC)
+    for _ in range(4):
+        service.usage_store.record_proposal_cycle(created=0, deduped=5, skipped=0, now=now)
+    service.usage_store.record_proposal_cycle(created=2, deduped=1, skipped=0, now=now)
+    assert service.usage_store.is_proposal_satiated(now=now) is False
+
+
+def test_handle_propose_cycle_returns_satiated_when_store_satiated(monkeypatch) -> None:
+    """handle_propose_cycle should short-circuit with 'satiated' decision."""
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
+    service = FakeService()
+    # Seed 5 all-deduped cycles so is_proposal_satiated returns True
+    for _ in range(5):
+        service.usage_store.record_proposal_cycle(created=0, deduped=5, skipped=0, now=now)
+    client = FakePlaneClient(issues=[])
+    result = handle_propose_cycle(client, service, now=now)
+    assert result.decision == "satiated"

@@ -73,6 +73,17 @@ class Settings(BaseModel):
     repos: dict[str, RepoSettings]
     reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")
+    # Keywords/phrases the proposer uses to prioritise proposals.  Proposals
+    # whose title or goal text match any entry are kept at their natural
+    # confidence; those that don't match are demoted to Backlog so the system
+    # works on what matters before filling the board with lower-priority noise.
+    # Leave empty (the default) to disable filtering.
+    focus_areas: list[str] = Field(default_factory=list)
+    # The repo key that identifies this ControlPlane installation itself.
+    # Tasks targeting this repo require a "self-modify: approved" label before
+    # the goal/test watcher will auto-execute them, and proposals for it are
+    # always placed in Backlog rather than Ready for AI.
+    self_repo_key: str | None = None
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]

@@ -270,6 +270,8 @@ def blocked_classification_token(raw: str) -> str:
         "validation failure": "validation_failure",
         "infra/tooling": "infra_tooling",
         "parse/config issue": "parse_config",
+        "context limit": "context_limit",
+        "dependency missing": "dependency_missing",
         "unknown/manual attention": UNKNOWN_BLOCKED_CLASSIFICATION,
     }
     return mapping.get(raw, UNKNOWN_BLOCKED_CLASSIFICATION)
@@ -300,9 +302,37 @@ def goal_requires_test_follow_up(issue: dict[str, Any], result: ExecutionResult)
 def classify_execution_result(result: ExecutionResult) -> str:
     if result.policy_violations:
         return "scope_policy"
+    excerpt = (result.execution_stderr_excerpt or "").lower()
+    # Context-window exhaustion — kodo ran out of tokens mid-task (check before validation_failure)
+    if any(
+        token in excerpt
+        for token in [
+            "context window",
+            "context length",
+            "maximum context",
+            "context_length_exceeded",
+            "token limit",
+            "exceeds the maximum",
+            "too long for",
+        ]
+    ):
+        return "context_limit"
+    # Missing Python/Node dependency (check before validation_failure)
+    if any(
+        token in excerpt
+        for token in [
+            "modulenotfounderror",
+            "importerror",
+            "no module named",
+            "cannot import name",
+            "command not found",
+            "npm err",
+        ]
+    ):
+        return "dependency_missing"
     if not result.validation_passed:
         return "validation_failure"
-    excerpt = (result.execution_stderr_excerpt or "").lower()
+    # Infrastructure / auth / tooling failures
     if any(
         token in excerpt
         for token in [
@@ -701,6 +731,254 @@ def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI",
     raise ValueError(f"No work item found in state '{ready_state}'")
 
 
+# ---------------------------------------------------------------------------
+# Point 1: Goal coherence — focus_areas proposal scoring
+# ---------------------------------------------------------------------------
+
+def _proposal_matches_focus_areas(proposal: "ProposalSpec", focus_areas: list[str]) -> bool:
+    """Return True if any focus_area keyword appears in the proposal title or goal text."""
+    if not focus_areas:
+        return True  # No filter configured — all proposals pass
+    text = f"{proposal.title} {proposal.goal_text}".lower()
+    return any(area.lower() in text for area in focus_areas)
+
+
+# ---------------------------------------------------------------------------
+# Point 2: Task dependency ordering
+# ---------------------------------------------------------------------------
+
+_DEPENDS_ON_PATTERN = re.compile(r"^\s*(?:-\s*)?depends_on:\s*(.+)", re.MULTILINE)
+_UUID_LIKE = re.compile(r"^[0-9a-f][-0-9a-f]{7,}$", re.I)
+
+
+def parse_task_dependencies(description: str) -> list[str]:
+    """Return task IDs listed under ``depends_on:`` in *description*.
+
+    Supports both plain and bullet-list format::
+
+        depends_on: uuid-1, uuid-2
+        - depends_on: uuid-1
+    """
+    match = _DEPENDS_ON_PATTERN.search(description)
+    if not match:
+        return []
+    raw = match.group(1).strip()
+    parts = [p.strip() for p in re.split(r"[,\s]+", raw) if p.strip()]
+    return [p for p in parts if _UUID_LIKE.match(p)]
+
+
+def task_dependencies_met(client: PlaneClient, task_id: str) -> bool:
+    """Return True if all ``depends_on`` task IDs for *task_id* are Done or Cancelled."""
+    try:
+        issue = client.fetch_issue(task_id)
+        description = issue_description_text(issue)
+        dep_ids = parse_task_dependencies(description)
+        if not dep_ids:
+            return True
+        for dep_id in dep_ids:
+            try:
+                dep = client.fetch_issue(dep_id)
+                if issue_status_name(dep) not in ("Done", "Cancelled"):
+                    return False
+            except Exception:
+                return False  # Can't fetch dep → treat as unmet
+    except Exception:
+        return True  # Defensive: don't block tasks we can't inspect
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Point 3: Task sizing gate — split oversized decompose findings
+# ---------------------------------------------------------------------------
+
+# Proposals for files with more than this many lines get split into bounded parts.
+MAX_TASK_LINES_FOR_DIRECT_EXECUTION = 800
+_MAX_FNS_PER_PART = 5
+_DECOMPOSE_TITLE_RE = re.compile(
+    r"^Decompose (\S+\.py) \((\d+)[lL],\s*(\d+) oversized function",
+    re.IGNORECASE,
+)
+
+
+def _split_oversized_finding(finding: dict[str, str]) -> list[dict[str, str]]:
+    """Split a 'Decompose X.py (NL, M oversized functions)' finding into bounded parts.
+
+    Returns the original finding unchanged if it doesn't match the pattern or is
+    already small enough.  Otherwise returns 2–4 part-specific findings so kodo
+    has a tractable scope per execution.
+    """
+    title = finding.get("title", "")
+    m = _DECOMPOSE_TITLE_RE.match(title)
+    if not m:
+        return [finding]
+    filename, line_count, fn_count = m.group(1), int(m.group(2)), int(m.group(3))
+    if line_count <= MAX_TASK_LINES_FOR_DIRECT_EXECUTION and fn_count <= _MAX_FNS_PER_PART:
+        return [finding]
+    n_parts = min(4, max(2, (fn_count + _MAX_FNS_PER_PART - 1) // _MAX_FNS_PER_PART))
+    fns_per_part = max(1, fn_count // n_parts)
+    result = []
+    for i in range(n_parts):
+        part = i + 1
+        result.append({
+            **finding,
+            "title": f"Decompose {filename} — part {part} of {n_parts}",
+            "goal": (
+                f"{finding.get('goal', '')} "
+                f"This is part {part} of {n_parts}: extract approximately {fns_per_part} of the "
+                f"oversized functions into well-named helpers or sub-modules. "
+                f"Leave the remaining functions for subsequent parts."
+            ),
+            "constraints": (
+                f"{finding.get('constraints', '')}\n"
+                f"- decomposition_part: {part} of {n_parts}\n"
+                f"- target_functions_this_part: ~{fns_per_part}\n"
+                f"- do not touch functions not in scope for this part\n"
+                f"- ensure all existing tests still pass after each extraction"
+            ),
+        })
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Points 4 + 6: Post-merge CI feedback and regression task creation
+# ---------------------------------------------------------------------------
+
+_REGRESSION_MARKER = "[Improve] Post-merge regression detected"
+_MAX_POST_MERGE_CHECKS_PER_CYCLE = 5
+
+
+def _regression_already_created(client: PlaneClient, task_id: str) -> bool:
+    for comment in client.list_comments(task_id):
+        if _REGRESSION_MARKER.lower() in extract_comment_text(comment).lower():
+            return True
+    return False
+
+
+def _repo_key_from_pr_url(pr_url: str, service: "ExecutionService") -> str:
+    for repo_key, repo_cfg in service.settings.repos.items():
+        clone_url = getattr(repo_cfg, "clone_url", "")
+        try:
+            owner, repo = GitHubPRClient.owner_repo_from_clone_url(clone_url)
+            if f"github.com/{owner}/{repo}" in pr_url:
+                return repo_key
+        except Exception:
+            pass
+    return default_repo_key(service)
+
+
+def detect_post_merge_regressions(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    """Scan Done tasks for post-merge CI failures and create regression tasks.
+
+    For each Done task whose execution artifact holds a ``pull_request_url``
+    pointing to a merged PR, checks if CI passed on the merge commit.  If CI
+    failed and no regression task exists yet, creates a high-priority goal task
+    and leaves a marker comment so the check isn't repeated.
+
+    Returns a list of newly-created regression task IDs.
+    """
+    token = service.settings.git_token()
+    if not token:
+        return []
+    issues = issues or client.list_issues()
+    store = service.usage_store
+    created_ids: list[str] = []
+    checked = 0
+    for issue in issues:
+        if checked >= _MAX_POST_MERGE_CHECKS_PER_CYCLE:
+            break
+        if issue_status_name(issue) != "Done":
+            continue
+        task_id = str(issue["id"])
+        artifact = store.get_task_artifact(task_id)
+        if not artifact:
+            continue
+        pr_url = str(artifact.get("pull_request_url") or "").strip()
+        if not pr_url:
+            continue
+        mpr = re.search(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", pr_url)
+        if not mpr:
+            continue
+        if _regression_already_created(client, task_id):
+            continue
+        owner, repo_name, pr_number = mpr.group(1), mpr.group(2), int(mpr.group(3))
+        checked += 1
+        try:
+            gh = GitHubPRClient(token)
+            pr = gh.get_pr(owner, repo_name, pr_number)
+            if not (pr.get("merged") or pr.get("merged_at")):
+                continue
+            merged_sha = (pr.get("head") or {}).get("sha", "")
+            failed_checks = gh.get_failed_checks(owner, repo_name, pr_number, pr_data=pr)
+            if not failed_checks:
+                continue  # CI clean — nothing to do
+            task_title = str(issue.get("name", "unknown task"))
+            repo_key = _repo_key_from_pr_url(pr_url, service)
+            regression_task = client.create_issue(
+                name=f"Regression from: {task_title}",
+                description=(
+                    f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+                    "## Goal\n"
+                    f"CI failed after merging the PR from task '{task_title}'. "
+                    "Investigate the failing checks and either fix the regression or "
+                    "revert the change if the fix is not straightforward.\n\n"
+                    "## Context\n"
+                    f"- source_task_id: {task_id}\n"
+                    f"- pull_request_url: {pr_url}\n"
+                    + (f"- merged_sha: {merged_sha}\n" if merged_sha else "")
+                    + f"- failed_checks: {'; '.join(failed_checks[:3])}\n"
+                    "- recommended_action: fix_or_revert\n"
+                    "- priority: high\n"
+                ),
+                state="Ready for AI",
+                label_names=["task-kind: goal", "priority: high", "source: post-merge-ci"],
+            )
+            reg_id = str(regression_task.get("id", ""))
+            created_ids.append(reg_id)
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    _REGRESSION_MARKER,
+                    [
+                        f"regression_task_id: {reg_id}",
+                        f"failed_checks: {'; '.join(failed_checks[:3])}",
+                        f"pull_request_url: {pr_url}",
+                    ],
+                ),
+            )
+        except Exception:
+            pass
+    return created_ids
+
+
+# ---------------------------------------------------------------------------
+# Point 5: Self-modification controls
+# ---------------------------------------------------------------------------
+
+def _is_self_repo(repo_key: str, service: "ExecutionService") -> bool:
+    """Return True if *repo_key* identifies the ControlPlane installation itself."""
+    self_key = getattr(service.settings, "self_repo_key", None)
+    if self_key:
+        return repo_key.lower() == self_key.lower()
+    # Fallback: any repo whose local_path equals cwd is "self"
+    cwd = Path.cwd().resolve()
+    repo_cfg = service.settings.repos.get(repo_key)
+    if repo_cfg:
+        local = getattr(repo_cfg, "local_path", None)
+        if local and Path(local).resolve() == cwd:
+            return True
+    return False
+
+
+def _self_modify_approved(issue: dict[str, Any]) -> bool:
+    """Return True if the task carries a 'self-modify: approved' label."""
+    return any("self-modify: approved" in lbl.lower() for lbl in issue_label_names(issue))
+
+
 def select_watch_candidate(
     client: PlaneClient,
     *,
@@ -708,6 +986,7 @@ def select_watch_candidate(
     role: str,
     known_triaged_blocked_ids: set[str] | None = None,
     skip_ids: set[str] | None = None,
+    service: "ExecutionService | None" = None,
 ) -> tuple[str, str]:
     issues = client.list_issues()
     if role == "improve":
@@ -772,6 +1051,15 @@ def select_watch_candidate(
         if _has_active_pr_review(task_id):
             continue
         if status_name == ready_state:
+            # Point 5: Self-modification guard — require explicit approval label
+            if service is not None:
+                iss = detailed_issue if issue_needs_detail(issue) else issue
+                repo_key = _extract_repo_key(iss, service)
+                if _is_self_repo(repo_key, service) and not _self_modify_approved(iss):
+                    continue  # Skip until "self-modify: approved" label is added
+            # Point 2: Skip tasks with unmet dependencies
+            if not task_dependencies_met(client, task_id):
+                continue
             return task_id, "execute"
     raise ValueError(f"No work item found in state '{ready_state}'")
 
@@ -1072,6 +1360,24 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
     if any(
         token in lowered
         for token in [
+            "context window", "context length", "maximum context",
+            "context_length_exceeded", "token limit", "exceeds the maximum",
+            "blocked_classification: context_limit",
+        ]
+    ):
+        return "context_limit", "Kodo exhausted its context window before completing the task — break it into a smaller scope."
+    if any(
+        token in lowered
+        for token in [
+            "modulenotfounderror", "importerror", "no module named",
+            "cannot import name", "command not found",
+            "blocked_classification: dependency_missing",
+        ]
+    ):
+        return "dependency_missing", "A required dependency or tool was not installed in the execution environment."
+    if any(
+        token in lowered
+        for token in [
             "anthropic_api_key not set",
             "api key not set",
             "login required",
@@ -1166,6 +1472,16 @@ def build_improve_triage_result(
     if classification == "verification_failure":
         goal_text = (
             f"Fix the implementation gap exposed by verification in '{issue_title}' so the verification task can pass on the next run."
+        )
+    if classification == "context_limit":
+        goal_text = (
+            f"The task '{issue_title}' was too large for a single kodo run. "
+            "Break the work into a smaller, bounded scope and re-attempt with a focused goal that can be completed within one context window."
+        )
+    if classification == "dependency_missing":
+        goal_text = (
+            f"The task '{issue_title}' failed because a required dependency was not available. "
+            "Install or configure the missing dependency in the repo bootstrap, then re-attempt the original task."
         )
 
     prior_context = _summarise_prior_failures(client, str(issue.get("id", ""))) if include_failure_context else ""
@@ -2276,6 +2592,16 @@ def build_proposal_candidates(
         base_branch=service.settings.repos[repo_key].default_branch,
     )
     notes.extend(report_notes)
+
+    # Point 3: Split oversized decompose findings into bounded subtasks so kodo
+    # receives tractable scope rather than a multi-thousand-line file at once.
+    split_findings: list[dict[str, str]] = []
+    for finding in findings:
+        split_findings.extend(_split_oversized_finding(finding))
+    if len(split_findings) != len(findings):
+        notes.append(f"sizing_gate: split {len(findings)} finding(s) into {len(split_findings)} bounded subtask(s)")
+    findings = split_findings
+
     proposals.extend(proposal_specs_from_findings(findings, repo_key=repo_key, signal_prefix="repo_scan"))
 
     if board_idle and not proposals:
@@ -2285,6 +2611,28 @@ def build_proposal_candidates(
             notes.append("fallback_proposal: idle_board evidence-anchored repo improvement")
         else:
             notes.append("fallback_suppressed: idle_board evidence too weak")
+
+    # Point 1: Focus area scoring — proposals not matching configured focus_areas
+    # are demoted to Backlog so the system works on what matters first.
+    focus_areas = list(getattr(service.settings, "focus_areas", None) or [])
+    if focus_areas:
+        demoted = 0
+        for proposal in proposals:
+            if not _proposal_matches_focus_areas(proposal, focus_areas):
+                proposal.recommended_state = "Backlog"
+                if proposal.confidence == "high":
+                    proposal.confidence = "medium"
+                    demoted += 1
+        if demoted:
+            notes.append(f"focus_gate: demoted {demoted} proposal(s) to Backlog (no focus area match)")
+
+    # Point 5: Self-repo proposals always go to Backlog — they need explicit
+    # "self-modify: approved" before the goal watcher will auto-execute them.
+    if _is_self_repo(repo_key, service):
+        for proposal in proposals:
+            if proposal.recommended_state == "Ready for AI":
+                proposal.recommended_state = "Backlog"
+        notes.append("self_repo_gate: self-repo proposals capped at Backlog (require self-modify:approved label)")
 
     unique: dict[str, ProposalSpec] = {}
     for proposal in proposals:
@@ -2490,6 +2838,20 @@ def handle_propose_cycle(
             ),
         )
 
+    # Point 8: Satiation — if the last several cycles produced nothing new, the
+    # repo is in a stable state.  Stop generating proposals until something changes.
+    if service.usage_store.is_proposal_satiated(now=now):
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="satiated",
+            board_idle=board_idle,
+            reason_summary=(
+                "Proposal cycle satiated: recent cycles produced no new unique proposals. "
+                "The repo appears to be in a stable state — no further proposals until "
+                "external changes or board activity create new signal."
+            ),
+        )
+
     remaining = service.usage_store.remaining_exec_capacity(now=now)
     min_remaining = service.settings.execution_controls().min_remaining_exec_for_proposals
     if remaining < min_remaining:
@@ -2579,6 +2941,8 @@ def handle_propose_cycle(
     proposal_keys = existing_proposal_keys(client, issues=issues)
     created_ids: list[str] = []
     created_states: set[str] = set()
+    skipped_conflict = 0
+    deduped_count = 0
 
     # Build a set of open-PR file basenames once for the whole cycle so the
     # per-proposal conflict check doesn't fan out into multiple GitHub API calls.
@@ -2590,6 +2954,7 @@ def handle_propose_cycle(
         # Skip proposals that conflict with an in-flight task touching the same file.
         if _has_conflict_with_active_task(proposal.title, issues, service.usage_store, open_pr_files):
             _logger.info(json.dumps({"event": "propose_conflict_skipped", "title": proposal.title, "open_pr_files_count": len(open_pr_files)}))
+            skipped_conflict += 1
             continue
         created = create_proposed_task_if_missing(
             client,
@@ -2601,9 +2966,18 @@ def handle_propose_cycle(
             now=now,
         )
         if created is None:
+            deduped_count += 1
             continue
         created_ids.append(str(created.get("id")))
         created_states.add(proposal.recommended_state)
+
+    # Point 8: Record cycle outcome for satiation tracking.
+    service.usage_store.record_proposal_cycle(
+        created=len(created_ids),
+        deduped=deduped_count,
+        skipped=skipped_conflict,
+        now=now,
+    )
 
     if created_ids:
         memory["last_proposal_at"] = now.isoformat()
@@ -3034,11 +3408,19 @@ def run_watch_loop(
                 reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
+            # Point 4+6: Post-merge CI regression scan — runs every 10 cycles for the
+            # improve watcher so CI failures on merged PRs create follow-up tasks.
+            if role == "improve" and cycle % 10 == 0:
+                reg_ids = detect_post_merge_regressions(client, service)
+                if reg_ids:
+                    counters["follow_up_tasks_created"] += len(reg_ids)
+                    logger.info(json.dumps({"event": "watch_post_merge_regressions", "role": role, "cycle": cycle, "regression_task_ids": reg_ids}))
             task_id, action = select_watch_candidate(
                 client,
                 ready_state=ready_state,
                 role=role,
                 known_triaged_blocked_ids=known_triaged_blocked_ids,
+                service=service,
             )
             logger.info(json.dumps({"event": "watch_task_selected", "role": role, "cycle": cycle, "task_id": task_id, "action": action, "run_id": cycle_run_id}))
             issue = client.fetch_issue(task_id)
