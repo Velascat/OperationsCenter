@@ -14,6 +14,7 @@ from control_plane.entrypoints.worker.main import (
     ProposalSpec,
     UNBLOCK_COMMENT_MARKER,
     UNKNOWN_BLOCKED_CLASSIFICATION,
+    _STALE_AUTONOMY_CANCEL_MARKER,
     _check_task_pr_merged,
     _extract_filename_tokens,
     _has_conflict_with_active_task,
@@ -39,6 +40,7 @@ from control_plane.entrypoints.worker.main import (
     handle_improve_task,
     handle_propose_cycle,
     handle_blocked_triage,
+    handle_stale_autonomy_task_scan,
     handle_test_task,
     handle_workspace_health_check,
     issue_status_name,
@@ -3266,3 +3268,247 @@ def test_build_multi_step_plan_skips_if_steps_exist() -> None:
     service = FakeService()
     created = build_multi_step_plan(client, service, "SOURCE-2", issue)
     assert created == []
+
+# ---------------------------------------------------------------------------
+# Session 5 tests
+# ---------------------------------------------------------------------------
+
+# ---- Circuit breaker ----
+
+def test_budget_decision_circuit_breaker_opens_on_high_failure_rate() -> None:
+    """Circuit breaker blocks when ≥80% of last 5 outcomes failed."""
+    import os
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD"] = "0.8"
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW"] = "5"
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(4):
+        store.record_execution_outcome(task_id=f"T-{i}", role="goal", succeeded=False, now=now)
+    store.record_execution_outcome(task_id="T-4", role="goal", succeeded=True, now=now)
+    decision = store.budget_decision(now=now)
+    assert not decision.allowed
+    assert decision.reason == "circuit_breaker_open"
+
+
+def test_budget_decision_circuit_breaker_stays_open_below_minimum_samples() -> None:
+    """Circuit breaker requires ≥3 samples before triggering."""
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(2):
+        store.record_execution_outcome(task_id=f"T-{i}", role="goal", succeeded=False, now=now)
+    decision = store.budget_decision(now=now)
+    assert decision.allowed  # Only 2 samples, should not trigger
+
+
+def test_budget_decision_circuit_breaker_does_not_fire_on_mixed_outcomes() -> None:
+    """Circuit breaker stays open when success rate is acceptable (40% success = 60% fail)."""
+    import os
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD"] = "0.8"
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    for i in range(3):
+        store.record_execution_outcome(task_id=f"F-{i}", role="goal", succeeded=False, now=now)
+    for i in range(2):
+        store.record_execution_outcome(task_id=f"S-{i}", role="goal", succeeded=True, now=now)
+    decision = store.budget_decision(now=now)
+    # 3/5 = 60% failure, below 80% threshold
+    assert decision.allowed
+
+
+# ---- Stale autonomy task scan ----
+
+def test_handle_stale_autonomy_task_scan_cancels_stale_task() -> None:
+    """Tasks with source:autonomy in Backlog older than stale_days are cancelled."""
+    from datetime import timedelta, timezone as _tz
+    stale_created = (datetime.now(_tz.utc) - timedelta(days=25)).isoformat()
+    issue = {
+        "id": "AUTO-1",
+        "name": "Fix lint issues",
+        "state": {"name": "Backlog"},
+        "labels": [{"name": "source: autonomy"}, {"name": "task-kind: goal"}],
+        "created_at": stale_created,
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    cancelled = handle_stale_autonomy_task_scan(client, service, stale_days=21)
+    assert "AUTO-1" in cancelled
+    assert ("AUTO-1", "Cancelled") in client.transitions
+    # Comment should contain the stale marker
+    comments = [c for _, c in client.issue_comments if _ == "AUTO-1"]
+    assert any(_STALE_AUTONOMY_CANCEL_MARKER in c for c in comments)
+
+
+def test_handle_stale_autonomy_task_scan_skips_fresh_task() -> None:
+    """Tasks created within stale_days are not cancelled."""
+    from datetime import timedelta, timezone as _tz
+    fresh_created = (datetime.now(_tz.utc) - timedelta(days=5)).isoformat()
+    issue = {
+        "id": "AUTO-FRESH",
+        "name": "Fix type errors",
+        "state": {"name": "Backlog"},
+        "labels": [{"name": "source: autonomy"}],
+        "created_at": fresh_created,
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    cancelled = handle_stale_autonomy_task_scan(client, service, stale_days=21)
+    assert cancelled == []
+    assert not client.transitions
+
+
+def test_handle_stale_autonomy_task_scan_skips_non_autonomy_task() -> None:
+    """Tasks without source:autonomy label are not touched even if stale."""
+    from datetime import timedelta, timezone as _tz
+    stale_created = (datetime.now(_tz.utc) - timedelta(days=30)).isoformat()
+    issue = {
+        "id": "MANUAL-1",
+        "name": "Some manual task",
+        "state": {"name": "Backlog"},
+        "labels": [{"name": "task-kind: goal"}],
+        "created_at": stale_created,
+    }
+    client = FakePlaneClient([issue])
+    service = FakeService()
+    cancelled = handle_stale_autonomy_task_scan(client, service, stale_days=21)
+    assert cancelled == []
+
+
+# ---- Human rejection capture ----
+
+def test_handle_feedback_loop_scan_records_cancelled_autonomy_task() -> None:
+    """Cancelled autonomy tasks without stale-scan marker are recorded as abandoned."""
+    issue = {
+        "id": "CANCELLED-AUTO-1",
+        "name": "Improve test coverage",
+        "state": {"name": "Cancelled"},
+        "labels": [{"name": "source: autonomy"}, {"name": "task-kind: goal"}],
+        "description": "candidate_dedup_key: test_coverage:myrepo\n",
+    }
+    client = FakePlaneClient([issue], comments={"CANCELLED-AUTO-1": []})
+    service = FakeService()
+    feedback_dir = Path(tempfile.mkdtemp())
+    # Patch feedback dir
+    import control_plane.entrypoints.worker.main as _wm
+    original = _wm._FEEDBACK_DIR
+    _wm._FEEDBACK_DIR = feedback_dir
+    try:
+        recorded = handle_feedback_loop_scan(client, service)
+    finally:
+        _wm._FEEDBACK_DIR = original
+    assert "CANCELLED-AUTO-1" in recorded
+    feedback_file = feedback_dir / "CANCELLED-AUTO-1.json"
+    assert feedback_file.exists()
+    import json as _json
+    data = _json.loads(feedback_file.read_text())
+    assert data["outcome"] == "abandoned"
+    assert data["source"] == "human_rejection_capture"
+
+
+def test_handle_feedback_loop_scan_skips_stale_scan_cancelled_task() -> None:
+    """Tasks cancelled by the stale-autonomy-scan are NOT recorded as human rejections."""
+    issue = {
+        "id": "STALE-CANCELLED-1",
+        "name": "Fix something",
+        "state": {"name": "Cancelled"},
+        "labels": [{"name": "source: autonomy"}],
+        "description": "candidate_dedup_key: something:repo\n",
+    }
+    stale_comment = {"comment_html": f"<p>Cancelled {_STALE_AUTONOMY_CANCEL_MARKER}</p>"}
+    client = FakePlaneClient([issue], comments={"STALE-CANCELLED-1": [stale_comment]})
+    service = FakeService()
+    feedback_dir = Path(tempfile.mkdtemp())
+    import control_plane.entrypoints.worker.main as _wm
+    original = _wm._FEEDBACK_DIR
+    _wm._FEEDBACK_DIR = feedback_dir
+    try:
+        recorded = handle_feedback_loop_scan(client, service)
+    finally:
+        _wm._FEEDBACK_DIR = original
+    assert "STALE-CANCELLED-1" not in recorded
+
+
+# ---- Rejection store ----
+
+def test_proposal_rejection_store_records_and_blocks() -> None:
+    from control_plane.proposer.rejection_store import ProposalRejectionStore
+    store = ProposalRejectionStore(Path(tempfile.mkdtemp()) / "rejections.json")
+    assert not store.is_rejected("lint_fix:myrepo")
+    store.record_rejection("lint_fix:myrepo", reason="human_cancelled_autonomy_task", task_id="T1")
+    assert store.is_rejected("lint_fix:myrepo")
+    assert not store.is_rejected("type_fix:myrepo")  # Different key
+
+
+def test_proposal_rejection_store_deduplicates() -> None:
+    from control_plane.proposer.rejection_store import ProposalRejectionStore
+    store = ProposalRejectionStore(Path(tempfile.mkdtemp()) / "rejections.json")
+    store.record_rejection("k1", reason="r1", task_id="T1")
+    store.record_rejection("k1", reason="r2", task_id="T2")  # Should not duplicate
+    records = store.all_rejections()
+    assert len(records) == 1
+
+
+# ---- Execution profiles ----
+
+def test_kodo_build_command_with_profile_uses_profile_values() -> None:
+    from control_plane.adapters.kodo.adapter import KodoAdapter
+    from control_plane.config.settings import KodoSettings
+    default_settings = KodoSettings(cycles=3, exchanges=20, effort="standard")
+    profile = KodoSettings(cycles=2, exchanges=10, effort="low", binary="kodo", team="full", orchestrator="codex:gpt-5.4", timeout_seconds=3600)
+    adapter = KodoAdapter(default_settings)
+    cmd = adapter.build_command(Path("/tmp/goal.md"), Path("/tmp/repo"), profile=profile)
+    assert "--cycles" in cmd
+    cycles_idx = cmd.index("--cycles")
+    assert cmd[cycles_idx + 1] == "2"
+    effort_idx = cmd.index("--effort")
+    assert cmd[effort_idx + 1] == "low"
+
+
+def test_kodo_build_command_without_profile_uses_default_settings() -> None:
+    from control_plane.adapters.kodo.adapter import KodoAdapter
+    from control_plane.config.settings import KodoSettings
+    settings = KodoSettings(cycles=5, exchanges=30, effort="high")
+    adapter = KodoAdapter(settings)
+    cmd = adapter.build_command(Path("/tmp/goal.md"), Path("/tmp/repo"))
+    cycles_idx = cmd.index("--cycles")
+    assert cmd[cycles_idx + 1] == "5"
+
+
+# ---- Snapshot staleness ----
+
+def test_snapshot_loader_latest_age_hours_none_when_no_snapshots() -> None:
+    from control_plane.insights.loader import SnapshotLoader
+    loader = SnapshotLoader(root=Path(tempfile.mkdtemp()))
+    assert loader.latest_snapshot_age_hours() is None
+
+
+def test_snapshot_loader_latest_age_hours_returns_float() -> None:
+    from control_plane.insights.loader import SnapshotLoader
+    root = Path(tempfile.mkdtemp())
+    snap_dir = root / "run_001"
+    snap_dir.mkdir()
+    # Write a minimal valid snapshot file
+    import json as _j
+    snap_data = {
+        "run_id": "run_001",
+        "generated_at": "2026-01-01T00:00:00Z",
+        "repo": {"name": "myrepo", "path": "/repos/myrepo"},
+        "signals": {
+            "git": {"recent_commits": [], "active_branches": [], "files_changed_last_30_days": 0},
+            "file_hotspots": {"hotspots": []},
+            "test_signal": {"status": "unknown", "command": "", "exit_code": 0, "failing_tests": []},
+            "dependency_drift": {"status": "unknown", "outdated": [], "vulnerable": []},
+            "todo_signal": {"todo_count": 0, "fixme_count": 0, "samples": []},
+            "execution_health": {"total_runs": 0, "no_op_count": 0, "validation_failed_count": 0, "recent_runs": []},
+            "backlog": {"items": []},
+            "lint_signal": {"status": "unavailable", "violation_count": 0, "violations": []},
+            "type_signal": {"status": "unavailable", "error_count": 0, "errors": []},
+            "ci_history": {"status": "unavailable", "failure_rate": 0.0, "failing_checks": [], "flaky_checks": [], "runs": []},
+            "validation_history": {"status": "unavailable", "tasks_analyzed": 0, "tasks_with_repeated_failures": [], "overall_failure_rate": 0.0},
+        },
+        "collector_errors": [],
+    }
+    (snap_dir / "repo_state_snapshot.json").write_text(_j.dumps(snap_data))
+    loader = SnapshotLoader(root=root)
+    age = loader.latest_snapshot_age_hours()
+    assert age is not None
+    assert age >= 0.0  # Just written, should be very recent

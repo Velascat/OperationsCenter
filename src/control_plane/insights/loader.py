@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from control_plane.observer.models import RepoStateSnapshot
@@ -35,6 +36,36 @@ class SnapshotLoader:
         if not snapshots:
             raise ValueError("No observer snapshots found for the requested repo/context")
         return snapshots[: history_limit + 1]
+
+    def latest_snapshot_age_hours(self, *, repo: str | None = None) -> float | None:
+        """Return how many hours ago the most recent snapshot was written.
+
+        Returns ``None`` when no snapshots exist.  Optionally filters by repo
+        name so the caller can check staleness for a specific target.
+        """
+        paths = sorted(
+            self.root.glob("*/repo_state_snapshot.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not paths:
+            return None
+        if repo:
+            repo_norm = repo.strip().lower()
+            for path in paths:
+                try:
+                    snap = RepoStateSnapshot.model_validate_json(path.read_text())
+                    if snap.repo.name.strip().lower() == repo_norm or str(snap.repo.path).strip().lower() == repo_norm:
+                        mtime = path.stat().st_mtime
+                        age = (datetime.now(timezone.utc).timestamp() - mtime) / 3600
+                        return round(age, 2)
+                except Exception:
+                    continue
+            return None
+        # Newest snapshot overall
+        mtime = paths[0].stat().st_mtime
+        age = (datetime.now(timezone.utc).timestamp() - mtime) / 3600
+        return round(age, 2)
 
     def _all_snapshots(self) -> list[RepoStateSnapshot]:
         snapshot_paths = sorted(

@@ -179,33 +179,59 @@ start_watch_role() {
   mkdir -p "${WATCH_DIR}"
   local log_file
   log_file="$(watch_log_file "${role}")"
+  # The outer bash wrapper restarts the watcher automatically on non-zero exit.
+  # It traps SIGTERM so that stop_watch_role kills both the wrapper and any
+  # running python child.  A clean exit (exit code 0) breaks the loop — this
+  # covers deliberate stops such as credential failures at startup.
   if [[ "${role}" == "review" ]]; then
     setsid /bin/bash -lc "
       set -a
       source '${ENV_PATH}'
       set +a
-      exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.reviewer.main \
-        --config '${CONFIG_PATH}' \
-        --watch \
-        --poll-interval-seconds '${poll_interval}' \
-        --status-dir '${WATCH_DIR}'
+      _child_pid=''
+      trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
+      while true; do
+        '${VENV_DIR}/bin/python' -m control_plane.entrypoints.reviewer.main \
+          --config '${CONFIG_PATH}' \
+          --watch \
+          --poll-interval-seconds '${poll_interval}' \
+          --status-dir '${WATCH_DIR}' &
+        _child_pid=\$!
+        wait \$_child_pid
+        _exit=\$?
+        [[ ! -f '${pid_file}' ]] && exit 0
+        [[ \$_exit -eq 0 ]] && exit 0
+        echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
+        sleep 5
+      done
     " >>"${log_file}" 2>&1 < /dev/null &
   else
     setsid /bin/bash -lc "
       set -a
       source '${ENV_PATH}'
       set +a
-      exec '${VENV_DIR}/bin/python' -m control_plane.entrypoints.worker.main \
-        --config '${CONFIG_PATH}' \
-        --watch \
-        --role '${role}' \
-        --poll-interval-seconds '${poll_interval}' \
-        --status-dir '${WATCH_DIR}'
+      _child_pid=''
+      trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
+      while true; do
+        '${VENV_DIR}/bin/python' -m control_plane.entrypoints.worker.main \
+          --config '${CONFIG_PATH}' \
+          --watch \
+          --role '${role}' \
+          --poll-interval-seconds '${poll_interval}' \
+          --status-dir '${WATCH_DIR}' &
+        _child_pid=\$!
+        wait \$_child_pid
+        _exit=\$?
+        [[ ! -f '${pid_file}' ]] && exit 0
+        [[ \$_exit -eq 0 ]] && exit 0
+        echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
+        sleep 5
+      done
     " >>"${log_file}" 2>&1 < /dev/null &
   fi
   local pid=$!
   echo "${pid}" > "${pid_file}"
-  echo "watch-${role} started: pid=${pid} poll_interval=${poll_interval}s log=${log_file}"
+  echo "watch-${role} started (auto-restart enabled): pid=${pid} poll_interval=${poll_interval}s log=${log_file}"
 }
 
 stop_watch_role() {

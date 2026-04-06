@@ -67,7 +67,7 @@ def test_service_uses_bootstrap_environment_for_validation(tmp_path: Path) -> No
     service.git.changed_files = lambda repo_path: []  # type: ignore[assignment]
     service.git.commit_all = lambda repo_path, message: False  # type: ignore[assignment]
     service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
-    service.kodo.run = lambda goal_file, repo_path, env=None: type(  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path, env=None, profile=None: type(  # type: ignore[assignment]
         "KodoResult",
         (),
         {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},

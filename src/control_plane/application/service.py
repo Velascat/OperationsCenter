@@ -432,7 +432,13 @@ class ExecutionService:
 
             phase = "kodo"
             self._log_event("phase", run_id, phase=phase)
-            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
+            # Resolve per-task-kind execution profile (if configured).
+            # Checks task_kind first, then falls back to "default" profile key.
+            _kodo_profile = None
+            _profiles = getattr(self.settings, "kodo_profiles", {})
+            if _profiles:
+                _kodo_profile = _profiles.get(task.execution_mode) or _profiles.get("default")
+            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
             artifacts.extend(
                 self.reporter.write_kodo(
                     run_dir,
@@ -499,7 +505,7 @@ class ExecutionService:
                         # Kodo introduced the failure: keep original goal, append as feedback
                         with open(goal_file, "a") as f:
                             f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
-                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,
@@ -548,7 +554,7 @@ class ExecutionService:
                         f"Revert all changes to out-of-scope files. Keep only changes within the allowed paths.\n"
                     )
                 self._log_event("policy_retry_start", run_id, violations=policy_violations)
-                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,

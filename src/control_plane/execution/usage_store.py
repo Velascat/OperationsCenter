@@ -1,18 +1,50 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Generator, cast
 
 from control_plane.execution.models import BudgetDecision, ExecutionControlSettings, NoOpDecision, RetryDecision
+
+# ---------------------------------------------------------------------------
+# Module-level path-keyed threading locks.
+# All UsageStore instances that share the same on-disk path share a lock so
+# that load-modify-save triples are atomic even when parallel_slots > 1.
+# ---------------------------------------------------------------------------
+_path_locks: dict[str, threading.RLock] = {}
+_meta_lock = threading.Lock()
+
+
+def _get_lock(path: Path) -> threading.RLock:
+    key = str(path.resolve())
+    with _meta_lock:
+        if key not in _path_locks:
+            _path_locks[key] = threading.RLock()
+        return _path_locks[key]
+
+
+# ---------------------------------------------------------------------------
+# Circuit-breaker constants (configurable via env).
+# ---------------------------------------------------------------------------
+_CB_THRESHOLD = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
+_CB_WINDOW = max(3, int(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW", "5")))
 
 
 class UsageStore:
     def __init__(self, path: Path | None = None) -> None:
         self.settings = ExecutionControlSettings.from_env()
         self.path = path or self.settings.usage_path
+
+    @contextmanager
+    def _exclusive(self) -> Generator[None, None, None]:
+        """Acquire an exclusive per-path reentrant lock for load-modify-save."""
+        with _get_lock(self.path):
+            yield
 
     def load(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -45,7 +77,10 @@ class UsageStore:
         data["skipped_due_to_cooldown"] = counts.get("skip_cooldown", 0)
         data["blocked_due_to_retry_cap"] = counts.get("retry_cap_block", 0)
         data["suppressed_due_to_proposal_budget"] = counts.get("proposal_budget_suppressed", 0)
-        self.path.write_text(json.dumps(data, indent=2))
+        # Atomic write: write to a temp file then rename (rename is atomic on Linux).
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2))
+        tmp.replace(self.path)
 
     def budget_decision(self, *, now: datetime) -> BudgetDecision:
         data = self.load()
@@ -68,6 +103,23 @@ class UsageStore:
                 limit=self.settings.max_exec_per_day,
                 current=daily,
             )
+        # Circuit breaker: if ≥ threshold fraction of last _CB_WINDOW execution
+        # outcomes failed, pause execution until the operator investigates.
+        # Requires at least 3 samples to avoid false positives at startup.
+        outcomes = [
+            e for e in reversed(events)
+            if e.get("kind") == "execution_outcome"
+        ][:_CB_WINDOW]
+        if len(outcomes) >= 3:
+            failures = sum(1 for e in outcomes if not e.get("succeeded"))
+            if failures / len(outcomes) >= _CB_THRESHOLD:
+                return BudgetDecision(
+                    allowed=False,
+                    reason="circuit_breaker_open",
+                    window="recent",
+                    limit=_CB_WINDOW,
+                    current=failures,
+                )
         return BudgetDecision(allowed=True)
 
     def remaining_exec_capacity(self, *, now: datetime) -> int:
@@ -145,24 +197,52 @@ class UsageStore:
         return NoOpDecision(should_skip=False)
 
     def record_execution(self, *, role: str, task_id: str, signature: str, now: datetime) -> None:
-        data = self.load()
-        attempts = dict(data.get("task_attempts", {}))
-        attempts[task_id] = int(attempts.get(task_id, 0)) + 1
-        data["task_attempts"] = attempts
-        signatures = dict(data.get("last_task_signatures", {}))
-        signatures[f"{role}:{task_id}"] = signature
-        data["last_task_signatures"] = signatures
-        self._append_event(
-            data,
-            {
-                "kind": "execution",
-                "role": role,
-                "task_id": task_id,
-                "signature": signature,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            attempts = dict(data.get("task_attempts", {}))
+            attempts[task_id] = int(attempts.get(task_id, 0)) + 1
+            data["task_attempts"] = attempts
+            signatures = dict(data.get("last_task_signatures", {}))
+            signatures[f"{role}:{task_id}"] = signature
+            data["last_task_signatures"] = signatures
+            self._append_event(
+                data,
+                {
+                    "kind": "execution",
+                    "role": role,
+                    "task_id": task_id,
+                    "signature": signature,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_execution_outcome(
+        self,
+        *,
+        task_id: str,
+        role: str,
+        succeeded: bool,
+        now: datetime,
+    ) -> None:
+        """Record whether a goal/test execution produced a successful result.
+
+        These events feed the circuit breaker in ``budget_decision``.  Record
+        after the task handler has determined the final outcome — not before.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_outcome",
+                    "task_id": task_id,
+                    "role": role,
+                    "succeeded": succeeded,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_skip(
         self,
@@ -175,42 +255,44 @@ class UsageStore:
         now: datetime,
         evidence: dict[str, object] | None = None,
     ) -> None:
-        data = self.load()
-        signatures = dict(data.get("last_task_signatures", {}))
-        signatures[f"{role}:{task_id}"] = signature
-        data["last_task_signatures"] = signatures
-        kind = "skip_noop" if reason == "no_op" else "skip_budget"
-        if reason == "cooldown_active":
-            kind = "skip_cooldown"
-        self._append_event(
-            data,
-            {
-                "kind": kind,
-                "role": role,
-                "task_id": task_id,
-                "signature": signature,
-                "reason": reason,
-                "detail": detail,
-                "evidence": evidence or {},
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            signatures = dict(data.get("last_task_signatures", {}))
+            signatures[f"{role}:{task_id}"] = signature
+            data["last_task_signatures"] = signatures
+            kind = "skip_noop" if reason == "no_op" else "skip_budget"
+            if reason == "cooldown_active":
+                kind = "skip_cooldown"
+            self._append_event(
+                data,
+                {
+                    "kind": kind,
+                    "role": role,
+                    "task_id": task_id,
+                    "signature": signature,
+                    "reason": reason,
+                    "detail": detail,
+                    "evidence": evidence or {},
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_retry_cap(self, *, role: str, task_id: str, now: datetime, attempts: int, limit: int) -> None:
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "retry_cap_block",
-                "role": role,
-                "task_id": task_id,
-                "attempts": attempts,
-                "limit": limit,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "retry_cap_block",
+                    "role": role,
+                    "task_id": task_id,
+                    "attempts": attempts,
+                    "limit": limit,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_proposal_cycle(
         self,
@@ -226,18 +308,19 @@ class UsageStore:
         ``deduped``  — proposals that already existed on the board.
         ``skipped``  — proposals skipped due to conflict or focus-area gate.
         """
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "proposal_cycle",
-                "created": created,
-                "deduped": deduped,
-                "skipped": skipped,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "proposal_cycle",
+                    "created": created,
+                    "deduped": deduped,
+                    "skipped": skipped,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def is_proposal_satiated(
         self,
@@ -269,17 +352,18 @@ class UsageStore:
 
     def record_proposal_outcome(self, *, category: str, succeeded: bool, now: datetime) -> None:
         """Record whether a task of a given category succeeded or failed."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "proposal_outcome",
-                "category": category,
-                "succeeded": succeeded,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "proposal_outcome",
+                    "category": category,
+                    "succeeded": succeeded,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def proposal_success_rate(
         self,
@@ -306,17 +390,18 @@ class UsageStore:
 
     def record_validation_outcome(self, *, command: str, passed: bool, now: datetime) -> None:
         """Append a validation_outcome event for flaky-test tracking."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "validation_outcome",
-                "command": command,
-                "passed": passed,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "validation_outcome",
+                    "command": command,
+                    "passed": passed,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def is_command_flaky(
         self,
@@ -345,17 +430,18 @@ class UsageStore:
 
     def record_escalation(self, *, classification: str, task_ids: list[str], now: datetime) -> None:
         """Record that an escalation webhook was fired for *classification*."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "escalation_sent",
-                "classification": classification,
-                "task_ids": task_ids,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "escalation_sent",
+                    "classification": classification,
+                    "task_ids": task_ids,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def should_escalate(
         self,
@@ -418,17 +504,18 @@ class UsageStore:
 
     def record_blocked_triage(self, *, task_id: str, classification: str, now: datetime) -> None:
         """Record a single blocked-triage event for escalation tracking."""
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "blocked_triage",
-                "task_id": task_id,
-                "classification": classification,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "blocked_triage",
+                    "task_id": task_id,
+                    "classification": classification,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_execution_cost(
         self,
@@ -444,18 +531,19 @@ class UsageStore:
         ``Settings.cost_per_execution_usd``).  Zero is valid and means cost
         tracking is disabled for this repo.
         """
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "execution_cost",
-                "task_id": task_id,
-                "repo_key": repo_key,
-                "estimated_usd": estimated_usd,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_cost",
+                    "task_id": task_id,
+                    "repo_key": repo_key,
+                    "estimated_usd": estimated_usd,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def get_spend_report(self, *, window_days: int = 1, now: datetime | None = None) -> dict[str, Any]:
         """Return a spend summary for the last *window_days* days.
@@ -506,17 +594,18 @@ class UsageStore:
         }
 
     def record_proposal_budget_suppression(self, *, reason: str, now: datetime, evidence: dict[str, object]) -> None:
-        data = self.load()
-        self._append_event(
-            data,
-            {
-                "kind": "proposal_budget_suppressed",
-                "reason": reason,
-                "evidence": evidence,
-                "timestamp": now.isoformat(),
-            },
-            now=now,
-        )
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "proposal_budget_suppressed",
+                    "reason": reason,
+                    "evidence": evidence,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
 
     def record_task_artifact(self, *, task_id: str, artifact: dict[str, Any], now: datetime) -> None:
         """Persist a structured execution artifact keyed by task_id.
@@ -526,11 +615,12 @@ class UsageStore:
         ``pull_request_url`` so that future runs and the improve watcher can
         make better-informed decisions without re-reading every comment.
         """
-        data = self.load()
-        artifacts = dict(data.get("task_artifacts", {}))
-        artifacts[task_id] = {**artifact, "recorded_at": now.isoformat()}
-        data["task_artifacts"] = artifacts
-        self.save(data, now=now)
+        with self._exclusive():
+            data = self.load()
+            artifacts = dict(data.get("task_artifacts", {}))
+            artifacts[task_id] = {**artifact, "recorded_at": now.isoformat()}
+            data["task_artifacts"] = artifacts
+            self.save(data, now=now)
 
     def get_task_artifact(self, task_id: str) -> dict[str, Any] | None:
         """Return the most recent execution artifact for *task_id*, or ``None``."""

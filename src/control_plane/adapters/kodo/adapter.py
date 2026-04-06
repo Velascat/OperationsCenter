@@ -59,23 +59,35 @@ class KodoAdapter:
         path.write_text("\n".join(lines).strip() + "\n")
         return path
 
-    def build_command(self, goal_file: Path, repo_path: Path) -> list[str]:
+    def build_command(
+        self,
+        goal_file: Path,
+        repo_path: Path,
+        profile: "KodoSettings | None" = None,
+    ) -> list[str]:
+        """Return the Kodo CLI command list.
+
+        *profile* overrides individual fields from ``self.settings``.  Only
+        fields present on a ``KodoSettings`` instance are considered; the
+        binary is always taken from ``self.settings``.
+        """
+        s = self.settings
         return [
-            self.settings.binary,
+            s.binary,
             "--goal-file",
             str(goal_file),
             "--project",
             str(repo_path),
             "--team",
-            self.settings.team,
+            (profile.team if profile else s.team),
             "--cycles",
-            str(self.settings.cycles),
+            str(profile.cycles if profile else s.cycles),
             "--exchanges",
-            str(self.settings.exchanges),
+            str(profile.exchanges if profile else s.exchanges),
             "--orchestrator",
-            self.settings.orchestrator,
+            (profile.orchestrator if profile else s.orchestrator),
             "--effort",
-            self.settings.effort,
+            (profile.effort if profile else s.effort),
             "--yes",
         ]
 
@@ -89,36 +101,51 @@ class KodoAdapter:
         combined = (result.stdout + result.stderr).lower()
         return any(signal in combined for signal in _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
 
-    def run(self, goal_file: Path, repo_path: Path, env: dict[str, str] | None = None) -> KodoRunResult:
-        command = self.build_command(goal_file, repo_path)
+    def run(
+        self,
+        goal_file: Path,
+        repo_path: Path,
+        env: dict[str, str] | None = None,
+        profile: "KodoSettings | None" = None,
+    ) -> KodoRunResult:
+        """Execute Kodo.  *profile* overrides individual settings fields."""
+        timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
+        command = self.build_command(goal_file, repo_path, profile=profile)
         proc = subprocess.run(
             command,
             cwd=repo_path,
             capture_output=True,
             text=True,
-            timeout=self.settings.timeout_seconds,
+            timeout=timeout,
             check=False,
             env=env,
         )
         result = KodoRunResult(proc.returncode, proc.stdout, proc.stderr, command)
 
         if result.exit_code != 0 and self._is_codex_quota_error(result):
-            result = self._run_with_claude_fallback(goal_file, repo_path, env=env)
+            result = self._run_with_claude_fallback(goal_file, repo_path, env=env, profile=profile)
 
         return result
 
-    def _run_with_claude_fallback(self, goal_file: Path, repo_path: Path, env: dict[str, str] | None = None) -> KodoRunResult:
+    def _run_with_claude_fallback(
+        self,
+        goal_file: Path,
+        repo_path: Path,
+        env: dict[str, str] | None = None,
+        profile: "KodoSettings | None" = None,
+    ) -> KodoRunResult:
         team_override = repo_path / ".kodo" / "team.json"
         team_override.parent.mkdir(exist_ok=True)
         team_override.write_text(json.dumps(_CLAUDE_FALLBACK_TEAM, indent=2))
         try:
-            command = self.build_command(goal_file, repo_path)
+            timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
+            command = self.build_command(goal_file, repo_path, profile=profile)
             proc = subprocess.run(
                 command,
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=self.settings.timeout_seconds,
+                timeout=timeout,
                 check=False,
                 env=env,
             )

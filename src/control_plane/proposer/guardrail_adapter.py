@@ -6,6 +6,7 @@ from pathlib import Path
 
 from control_plane.adapters.plane import PlaneClient
 from control_plane.execution import UsageStore
+from control_plane.proposer.rejection_store import ProposalRejectionStore
 from control_plane.proposer.result_models import ProposalResultsArtifact
 
 _RECENTLY_DONE_WINDOW_DAYS = 7
@@ -26,13 +27,22 @@ class ProposerGuardrailAdapter:
         cooldown_minutes: int = 120,
         recently_done_window_days: int = _RECENTLY_DONE_WINDOW_DAYS,
         usage_store: UsageStore | None = None,
+        rejection_store: ProposalRejectionStore | None = None,
     ) -> None:
         self.proposer_root = proposer_root or Path("tools/report/control_plane/proposer")
         self.cooldown_minutes = cooldown_minutes
         self.recently_done_window_days = recently_done_window_days
         self._usage_store = usage_store
+        self._rejection_store = rejection_store or ProposalRejectionStore()
 
     def evaluate(self, *, client: PlaneClient, dedup_key: str, title: str, now: datetime) -> GuardrailResult:
+        # Long-lived rejection check comes first — human "no" signals are permanent.
+        if self._rejection_store.is_rejected(dedup_key):
+            return GuardrailResult(
+                allowed=False,
+                reason="permanently_rejected_by_human",
+                evidence={"dedup_key": dedup_key},
+            )
         usage_store = self._usage_store or UsageStore()
         remaining = usage_store.remaining_exec_capacity(now=now)
         min_remaining = usage_store.settings.min_remaining_exec_for_proposals

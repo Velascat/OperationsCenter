@@ -23,6 +23,7 @@ from control_plane.application import ExecutionService, TaskParser
 from control_plane.config import load_settings
 from control_plane.domain import ExecutionResult
 from control_plane.execution.usage_store import UsageStore
+from control_plane.proposer.rejection_store import ProposalRejectionStore
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 UNBLOCK_COMMENT_MARKER = "[Improve] Resolution complete"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
@@ -1201,6 +1202,13 @@ def validate_task_pre_execution(
 _FEEDBACK_DIR = Path("state/proposal_feedback")
 _FEEDBACK_LOOP_CYCLE_INTERVAL = 15
 _FEEDBACK_LOOP_SCAN_MARKER = "[Improve] Feedback auto-recorded"
+# Marker appended to comments when the stale-autonomy-scan cancels a task.
+# The human-rejection capture skips tasks that carry this marker so they are
+# NOT written to the permanent rejection store (they were cancelled by the
+# system, not by a human).
+_STALE_AUTONOMY_CANCEL_MARKER = "<!-- cp:stale-autonomy-scan -->"
+_STALE_AUTONOMY_TASK_DAYS = 21
+_STALE_AUTONOMY_SCAN_CYCLE_INTERVAL = 30
 
 
 def handle_feedback_loop_scan(
@@ -1225,7 +1233,9 @@ def handle_feedback_loop_scan(
         issues = client.list_issues()
 
     recorded_ids: list[str] = []
+    rejection_store = ProposalRejectionStore()
 
+    # ---- Part A: record outcomes for Done tasks that have a merged/closed PR ----
     for issue in issues:
         status = issue_status_name(issue).lower()
         if status != "done":
@@ -1307,6 +1317,83 @@ def handle_feedback_loop_scan(
                 "task_id": task_id,
                 "outcome": outcome,
                 "pr_url": pr_url,
+            }))
+        except Exception:
+            pass
+
+    # ---- Part B: capture human rejections of autonomy proposals ----
+    # Detect Cancelled tasks with "source: autonomy" label that were cancelled
+    # by a human (not by the stale-autonomy-scan).  Write an abandoned feedback
+    # record and permanently register the dedup_key in the rejection store so
+    # that the proposer does not recreate the same proposal indefinitely.
+    for issue in issues:
+        status = issue_status_name(issue).lower()
+        if status != "cancelled":
+            continue
+
+        labels = issue_label_names(issue)
+        if not any("source: autonomy" in lbl.lower() for lbl in labels):
+            continue
+
+        task_id = str(issue.get("id", ""))
+        if not task_id:
+            continue
+
+        # Skip if the cancellation was produced by our own stale-autonomy-scan
+        try:
+            comments = client.list_comments(task_id)
+            if any(_STALE_AUTONOMY_CANCEL_MARKER in str(c.get("comment_html", "")) for c in comments):
+                continue
+        except Exception:
+            continue
+
+        feedback_path = _FEEDBACK_DIR / f"{task_id}.json"
+        if feedback_path.exists():
+            continue  # Already recorded
+
+        # Extract the candidate_dedup_key from the task description so we can
+        # write it to the permanent rejection store.
+        description = str(issue.get("description") or issue.get("description_stripped") or "")
+        dedup_key = ""
+        for line in description.splitlines():
+            stripped = line.strip().lower()
+            if stripped.startswith("candidate_dedup_key:"):
+                dedup_key = stripped.split(":", 1)[1].strip()
+                break
+            if stripped.startswith("- proposal_dedup_key:"):
+                dedup_key = stripped.split(":", 1)[1].strip()
+                break
+
+        try:
+            _FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
+            import json as _json2
+            feedback_path.write_text(_json2.dumps({
+                "recorded_at": _now.isoformat(),
+                "task_id": task_id,
+                "outcome": "abandoned",
+                "source": "human_rejection_capture",
+                "dedup_key": dedup_key,
+                "task_title": str(issue.get("name", "")),
+            }, indent=2))
+            recorded_ids.append(task_id)
+            # Permanently register so the proposer does not recreate this task
+            if dedup_key:
+                rejection_store.record_rejection(
+                    dedup_key,
+                    reason="human_cancelled_autonomy_task",
+                    task_id=task_id,
+                    task_title=str(issue.get("name", "")),
+                    now=_now,
+                )
+            service.usage_store.record_proposal_outcome(
+                category=issue_task_kind(issue),
+                succeeded=False,
+                now=_now,
+            )
+            _logger.info(json.dumps({
+                "event": "human_rejection_recorded",
+                "task_id": task_id,
+                "dedup_key": dedup_key,
             }))
         except Exception:
             pass
@@ -1466,6 +1553,90 @@ def _is_multi_step_task(issue: dict[str, Any]) -> bool:
         return True
     title = str(issue.get("name") or "").lower()
     return any(kw in title for kw in _MULTI_STEP_TITLE_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# Stale autonomy task scan (Session 5 gap 2)
+# ---------------------------------------------------------------------------
+
+def handle_stale_autonomy_task_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    now: datetime | None = None,
+    stale_days: int = _STALE_AUTONOMY_TASK_DAYS,
+) -> list[str]:
+    """Cancel Backlog autonomy-proposed tasks whose underlying signal has expired.
+
+    A task is considered stale when:
+    - It carries a ``source: autonomy`` label
+    - It is in ``Backlog`` state
+    - Its ``created_at`` (or earliest timestamp available) is older than
+      *stale_days* days
+
+    Stale tasks are transitioned to ``Cancelled`` with a comment containing
+    ``_STALE_AUTONOMY_CANCEL_MARKER`` so the feedback-loop scan skips them
+    and does NOT write them to the permanent rejection store.  (The signal may
+    have resolved but the proposal was never explicitly rejected by a human.)
+
+    Returns a list of cancelled task IDs.
+    """
+    _now = now or datetime.now(UTC)
+    cutoff = _now.timestamp() - (stale_days * 86400)
+    cancelled_ids: list[str] = []
+
+    for issue in client.list_issues():
+        if issue_status_name(issue).lower() != "backlog":
+            continue
+        labels = issue_label_names(issue)
+        if not any("source: autonomy" in lbl.lower() for lbl in labels):
+            continue
+
+        task_id = str(issue.get("id", ""))
+        if not task_id:
+            continue
+
+        # Determine task age from created_at or updated_at
+        created_raw = issue.get("created_at") or issue.get("updated_at") or ""
+        if not created_raw:
+            continue
+        try:
+            from datetime import timezone as _tz
+            created_dt = datetime.fromisoformat(str(created_raw).replace("Z", "+00:00"))
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=_tz.utc)
+            if created_dt.timestamp() > cutoff:
+                continue  # Task is fresh enough
+        except (ValueError, TypeError):
+            continue
+
+        # Cancel the task
+        try:
+            client.transition_issue(task_id, "Cancelled")
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Improve] Stale autonomy task cancelled",
+                    [
+                        f"task_id: {task_id}",
+                        "result_status: cancelled",
+                        f"reason: autonomy-proposed task sat in Backlog for >{stale_days} days — "
+                        "underlying signal has likely been resolved or superseded",
+                        "next_action: the proposer will re-create this task if the signal reappears",
+                        f"<!-- {_STALE_AUTONOMY_CANCEL_MARKER} -->",
+                    ],
+                ),
+            )
+            cancelled_ids.append(task_id)
+            _logger.info(json.dumps({
+                "event": "stale_autonomy_task_cancelled",
+                "task_id": task_id,
+                "age_days": round((_now.timestamp() - created_dt.timestamp()) / 86400, 1),
+            }))
+        except Exception:
+            pass
+
+    return cancelled_ids
 
 
 def build_multi_step_plan(
@@ -4253,6 +4424,16 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
         )
     except Exception:
         pass
+    # Circuit-breaker outcome recording
+    try:
+        service.usage_store.record_execution_outcome(
+            task_id=task_id,
+            role="goal",
+            succeeded=result.success,
+            now=datetime.now(UTC),
+        )
+    except Exception:
+        pass
     # Cost telemetry
     try:
         _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
@@ -4385,6 +4566,16 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
             ],
         ),
     )
+    # Circuit-breaker outcome recording
+    try:
+        service.usage_store.record_execution_outcome(
+            task_id=task_id,
+            role="test",
+            succeeded=result.success,
+            now=datetime.now(UTC),
+        )
+    except Exception:
+        pass
     # Cost telemetry
     try:
         _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
@@ -4577,6 +4768,10 @@ def run_watch_loop(
     known_triaged_blocked_ids: set[str] = set()
     counters = {"follow_up_tasks_created": 0, "blocked_tasks_triaged": 0}
     _is_primary_slot = _slot_id == 0
+    # Consecutive non-429 errors — used for exponential backoff on transient
+    # outages (Plane down, network partition).  Reset to 0 on any successful
+    # cycle completion.
+    _consecutive_errors = 0
 
     while True:
         cycle += 1
@@ -4667,6 +4862,11 @@ def run_watch_loop(
                     if ws_ids:
                         counters["follow_up_tasks_created"] += len(ws_ids)
                         logger.info(json.dumps({"event": "watch_workspace_health_tasks", "role": role, "cycle": cycle, "task_ids": ws_ids}))
+                # Stale autonomy task scan — every 30 improve cycles.
+                if role == "improve" and cycle % _STALE_AUTONOMY_SCAN_CYCLE_INTERVAL == 0:
+                    stale_auto_ids = handle_stale_autonomy_task_scan(client, service, now=datetime.now(UTC))
+                    if stale_auto_ids:
+                        logger.info(json.dumps({"event": "watch_stale_autonomy_cancelled", "role": role, "cycle": cycle, "task_ids": stale_auto_ids}))
             task_id, action = select_watch_candidate(
                 client,
                 ready_state=ready_state,
@@ -4984,11 +5184,36 @@ def run_watch_loop(
                     return
                 time.sleep(backoff_seconds)
                 continue
+            _consecutive_errors += 1
             logger.info(json.dumps({"event": "watch_error", "role": role, "cycle": cycle, "message": str(exc).replace('"', "'"), "run_id": cycle_run_id}))
             write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="error", run_id=cycle_run_id, last_action="watch_error", counters=counters)
         except Exception as exc:
-            logger.info(json.dumps({"event": "watch_error", "role": role, "cycle": cycle, "message": str(exc).replace('"', "'"), "run_id": cycle_run_id}))
+            # Transient errors (connection refused, DNS failure, timeout) use
+            # exponential backoff — cap at 5 minutes so recovery is timely once
+            # the API is reachable again.
+            _consecutive_errors += 1
+            _error_backoff = min(
+                poll_interval_seconds * (2 ** min(_consecutive_errors - 1, 4)),
+                300,
+            )
+            logger.info(json.dumps({
+                "event": "watch_error",
+                "role": role,
+                "cycle": cycle,
+                "consecutive_errors": _consecutive_errors,
+                "backoff_seconds": _error_backoff,
+                "message": str(exc).replace('"', "'"),
+                "run_id": cycle_run_id,
+            }))
             write_watch_status(status_dir=status_dir, role=role, cycle=cycle, state="error", run_id=cycle_run_id, last_action="watch_error", counters=counters)
+            if max_cycles is not None and cycle >= max_cycles:
+                logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
+                return
+            time.sleep(_error_backoff)
+            continue
+        else:
+            # Successful cycle: reset consecutive-error counter
+            _consecutive_errors = 0
 
         if max_cycles is not None and cycle >= max_cycles:
             logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))

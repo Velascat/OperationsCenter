@@ -161,6 +161,68 @@ def build_decision_service() -> DecisionEngineService:
 # See docs/design/roadmap.md §Phase 7.
 
 
+def _write_quiet_diagnosis(report_dir: Path, *, quiet_window: int = 5) -> None:
+    """If the last *quiet_window* cycle reports all had 0 candidates emitted,
+    write ``quiet_diagnosis.json`` aggregating suppression reasons.
+
+    This gives the operator a structured answer to "why has the proposer
+    produced nothing for N cycles?" without requiring manual log archaeology.
+    """
+    from collections import Counter
+
+    cycle_reports = sorted(
+        report_dir.glob("cycle_*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )[:quiet_window]
+
+    if len(cycle_reports) < quiet_window:
+        return  # Not enough history yet
+
+    all_zero = all(
+        json.loads(p.read_text()).get("stages", {}).get("decide", {}).get("candidates_emitted", -1) == 0
+        for p in cycle_reports
+    )
+    if not all_zero:
+        # Remove stale diagnosis if conditions improved
+        diag_path = report_dir / "quiet_diagnosis.json"
+        diag_path.unlink(missing_ok=True)
+        return
+
+    # Aggregate suppression reasons across all quiet cycles
+    reason_totals: Counter = Counter()
+    families_seen: set[str] = set()
+    for report_path in cycle_reports:
+        try:
+            report = json.loads(report_path.read_text())
+            decide = report.get("stages", {}).get("decide", {})
+            for reason, count in decide.get("suppression_reasons", {}).items():
+                reason_totals[reason] += int(count)
+            for family in decide.get("emitted_families", []):
+                families_seen.add(family)
+        except Exception:
+            continue
+
+    diag = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "quiet_window_cycles": quiet_window,
+        "all_cycles_had_zero_candidates": True,
+        "aggregated_suppression_reasons": dict(reason_totals.most_common()),
+        "families_active_in_window": sorted(families_seen),
+        "advice": (
+            "The proposer has emitted no candidates for the last "
+            f"{quiet_window} consecutive cycles.  Common causes: "
+            "cooldown_active (run more cycles or reduce --cooldown-minutes), "
+            "proposal_budget_too_low (executions are consuming capacity), "
+            "existing_open_equivalent_task (similar tasks already on board), "
+            "no emitted_families (all signal thresholds below decision rules)."
+        ),
+    }
+    diag_path = report_dir / "quiet_diagnosis.json"
+    diag_path.write_text(json.dumps(diag, indent=2))
+    print(f"\n  [warn] Proposer quiet for {quiet_window} cycles — diagnosis → {diag_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run the full observe→insights→decide→propose pipeline in one command. "
@@ -467,6 +529,12 @@ def _write_cycle_report(
     }
     report_path.write_text(json.dumps(report, indent=2))
     print(f"\n  Cycle report  → {report_path}")
+
+    # Quiet diagnosis: if the last _QUIET_WINDOW cycle reports all had 0
+    # candidates emitted, aggregate suppression reasons and write a diagnosis
+    # file so the operator knows why the proposer went silent.
+    _QUIET_WINDOW = 5
+    _write_quiet_diagnosis(report_dir, quiet_window=_QUIET_WINDOW)
 
 
 if __name__ == "__main__":
