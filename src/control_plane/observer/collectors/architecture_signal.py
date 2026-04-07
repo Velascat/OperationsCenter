@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import os
 from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path

@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
-import pytest
 
 from control_plane.observer.collectors.validation_history import ValidationHistoryCollector
 from control_plane.observer.models import ValidationFailureRecord

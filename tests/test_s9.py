@@ -383,7 +383,6 @@ def test_calibration_ratio_computation_for_low_performance() -> None:
 def test_coverage_signal_collector_reads_coverage_xml(tmp_path: Path) -> None:
     from control_plane.observer.collectors.coverage_signal import CoverageSignalCollector
     from control_plane.observer.service import ObserverContext
-    from control_plane.config import Settings
 
     xml_content = """<?xml version="1.0" ?>
 <coverage line-rate="0.74" branch-rate="0.5" timestamp="1234567890">
@@ -554,7 +553,7 @@ def test_extract_evidence_file_tokens_empty_for_no_paths() -> None:
 # S9-10: Theme aggregation deriver
 # ---------------------------------------------------------------------------
 
-def _make_snap_with_lint_file(tmp_path: Path, fpath: str, run_id: str) -> "RepoStateSnapshot":
+def _make_snap_with_lint_file(tmp_path: Path, fpath: str, run_id: str) -> "RepoStateSnapshot":  # noqa: F821
     from control_plane.observer.models import (
         LintSignal, LintViolation, RepoContextSnapshot, RepoSignalsSnapshot,
         RepoStateSnapshot, TestSignal, DependencyDriftSignal, TodoSignal,

@@ -665,7 +665,7 @@ class ExecutionService:
 
             # Quality-erosion analysis: count new inline suppressions added by
             # this kodo run.  Lines starting with '+' in the unified diff that
-            # contain # noqa, # type: ignore, or bare `pass` in test bodies
+            # contain noqa suppression, type-ignore, or bare ``pass`` in test bodies
             # are quality-eroding patterns that pass validation but degrade code
             # quality over time.  Emit a kodo_quality_warning event and annotate
             # the PR comment when the total exceeds the threshold.

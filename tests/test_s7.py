@@ -13,8 +13,6 @@ Coverage:
 from __future__ import annotations
 
 import json
-import subprocess
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,7 +31,6 @@ from control_plane.entrypoints.supervisor.main import (
     _maybe_restart,
     _spawn,
     _terminate,
-    run_supervisor,
 )
 
 
@@ -106,8 +103,8 @@ def test_supervisor_maybe_restart_after_exit(tmp_path: Path) -> None:
 # S7-2: Credential rotation detection
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.worker.main import validate_credentials
-from control_plane.execution.usage_store import UsageStore
+from control_plane.entrypoints.worker.main import validate_credentials  # noqa: E402
+from control_plane.execution.usage_store import UsageStore  # noqa: E402
 
 
 def test_credential_expiry_warning_logs_when_close(tmp_path: Path, caplog) -> None:
@@ -190,8 +187,8 @@ def test_credential_expiry_escalates_when_one_day_left(tmp_path: Path) -> None:
 # S7-3: Transcript failure classification
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.worker.main import classify_execution_result
-from control_plane.domain.models import ExecutionResult
+from control_plane.entrypoints.worker.main import classify_execution_result  # noqa: E402
+from control_plane.domain.models import ExecutionResult  # noqa: E402
 
 
 def _make_result(**kwargs) -> ExecutionResult:
@@ -293,7 +290,7 @@ def test_consecutive_blocks_ignores_other_tasks(tmp_path: Path) -> None:
 # S7-5: Dependency update loop
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.worker.main import handle_dependency_update_scan
+from control_plane.entrypoints.worker.main import handle_dependency_update_scan  # noqa: E402
 
 
 class _FakePlaneDep:
@@ -401,7 +398,7 @@ def test_dependency_update_scan_deduplicates_existing_tasks(tmp_path: Path) -> N
 # S7-6: Cross-repo impact analysis
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.worker.main import _check_cross_repo_impact
+from control_plane.entrypoints.worker.main import _check_cross_repo_impact  # noqa: E402
 
 
 def test_cross_repo_no_impact_when_no_shared_paths() -> None:
@@ -457,7 +454,7 @@ def test_cross_repo_multiple_repos_flagged() -> None:
 # S7-7: Circuit-breaker escalation + quiet-cycle escalation
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.autonomy_cycle.main import _write_quiet_diagnosis
+from control_plane.entrypoints.autonomy_cycle.main import _write_quiet_diagnosis  # noqa: E402
 
 
 def test_quiet_diagnosis_fires_escalation_when_quiet(tmp_path: Path) -> None:
