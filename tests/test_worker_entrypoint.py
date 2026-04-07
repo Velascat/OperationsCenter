@@ -17,7 +17,6 @@ from control_plane.entrypoints.worker.main import (
     _STALE_AUTONOMY_CANCEL_MARKER,
     _check_task_pr_merged,
     _extract_filename_tokens,
-    _get_kodo_version,
     _has_conflict_with_active_task,
     _heartbeat_path,
     _in_maintenance_window,
@@ -37,7 +36,6 @@ from control_plane.entrypoints.worker.main import (
     classify_blocked_issue,
     classify_execution_result,
     detect_post_merge_regressions,
-    execution_gate_decision,
     extract_triage_follow_up_ids,
     handle_feedback_loop_scan,
     handle_goal_task,
@@ -3875,7 +3873,6 @@ def test_quality_warning_event_recorded_in_usage_store(tmp_path) -> None:
 
 # S6-1: Maintenance window helper
 def test_in_maintenance_window_returns_true_when_in_window() -> None:
-    from control_plane.entrypoints.worker.main import _in_maintenance_window
 
     class FakeWindow:
         start_hour = 2
@@ -3890,7 +3887,6 @@ def test_in_maintenance_window_returns_true_when_in_window() -> None:
 
 
 def test_in_maintenance_window_returns_false_outside_window() -> None:
-    from control_plane.entrypoints.worker.main import _in_maintenance_window
 
     class FakeWindow:
         start_hour = 2
@@ -3905,7 +3901,6 @@ def test_in_maintenance_window_returns_false_outside_window() -> None:
 
 
 def test_in_maintenance_window_wraps_midnight() -> None:
-    from control_plane.entrypoints.worker.main import _in_maintenance_window
 
     class FakeWindow:
         start_hour = 22
@@ -3922,7 +3917,6 @@ def test_in_maintenance_window_wraps_midnight() -> None:
 
 
 def test_in_maintenance_window_day_filter_skips_wrong_day() -> None:
-    from control_plane.entrypoints.worker.main import _in_maintenance_window
 
     class FakeWindow:
         start_hour = 2
@@ -4114,7 +4108,6 @@ def test_audit_export_excludes_old_events(tmp_path) -> None:
 
 # S6-10: Board health check
 def test_board_health_check_detects_stuck_running(tmp_path) -> None:
-    from control_plane.entrypoints.worker.main import board_health_check
 
     issues = [
         {"id": str(i), "state": {"name": "Running"}, "labels": []}
@@ -4134,7 +4127,6 @@ def test_board_health_check_detects_stuck_running(tmp_path) -> None:
 
 
 def test_board_health_check_detects_clustered_blocked_reasons(tmp_path) -> None:
-    from control_plane.entrypoints.worker.main import board_health_check
 
     issues = [
         {"id": str(i), "state": {"name": "Blocked"}, "labels": [{"name": "blocked: scope_violation"}]}
@@ -4154,7 +4146,6 @@ def test_board_health_check_detects_clustered_blocked_reasons(tmp_path) -> None:
 
 
 def test_board_health_check_detects_quiet_repo(tmp_path) -> None:
-    from control_plane.entrypoints.worker.main import board_health_check
 
     issues: list[dict] = []  # no active tasks
 
@@ -4175,7 +4166,6 @@ def test_board_health_check_detects_quiet_repo(tmp_path) -> None:
 
 
 def test_board_health_check_returns_empty_for_healthy_board() -> None:
-    from control_plane.entrypoints.worker.main import board_health_check
 
     issues = [
         {"id": "1", "state": {"name": "Ready for AI"}, "labels": [{"name": "repo: myrepo"}]},

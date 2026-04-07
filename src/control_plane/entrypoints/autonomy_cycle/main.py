@@ -64,21 +64,11 @@ def build_observer_service() -> RepoObserverService:
         type_signal_collector=TypeSignalCollector(),
         ci_history_collector=CIHistoryCollector(),
         validation_history_collector=ValidationHistoryCollector(),
-        # TODO (Phase 5 — architecture signal): add ArchitectureSignalCollector() here once
-        # implemented. It runs static coupling/import-depth analysis over the source tree and
-        # emits an ArchitectureSignal. Prerequisite: arch_promotion family has ≥10 human-reviewed
-        # feedback records. See docs/design/roadmap.md §Phase 5.
+        # Deferred: Phase 5 — ArchitectureSignalCollector (see docs/design/roadmap.md §Phase 5)
         #
-        # TODO (Phase 5 — benchmark signal): add BenchmarkSignalCollector() here once implemented.
-        # It reads pre-existing benchmark output files (pytest-benchmark JSON, hyperfine JSON,
-        # report.json) from retained artifacts — never runs benchmarks itself. Prerequisite: at
-        # least one benchmark output format present in the repo and ≥5 retained outputs.
-        # See docs/design/roadmap.md §Phase 5.
+        # Deferred: Phase 5 — BenchmarkSignalCollector (see docs/design/roadmap.md §Phase 5)
         #
-        # TODO (Phase 5 — security signal): add SecuritySignalCollector() here once implemented.
-        # It reads pip-audit, npm audit, or trivy JSON output from retained artifacts and emits
-        # a SecuritySignal. Prerequisite: at least one audit tool is already running in CI and
-        # its output is being retained. See docs/design/roadmap.md §Phase 5.
+        # Deferred: Phase 5 — SecuritySignalCollector (see docs/design/roadmap.md §Phase 5)
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )
@@ -113,24 +103,12 @@ def build_insight_service() -> InsightEngineService:
             # CrossSignalDeriver runs last so all single-signal derivers have already fired.
             # Its insights are consumed by lint_fix and type_fix rules for confidence boosting.
             CrossSignalDeriver(normalizer),
-            # TODO (Phase 4 — execution feedback depth): add ExecutionOutcomeDeriver(normalizer)
-            # here once implemented. It reads execution transcripts (not just outcome records)
-            # to classify failure modes: timeout, test_regression, validation_loop,
-            # scope_violation. Emits execution_outcome/timeout_pattern,
-            # execution_outcome/test_regression, execution_outcome/validation_loop insights.
-            # These feed into a new execution_outcome rule family and make the ValidationPattern
-            # deriver failure reasons classifiable. See docs/design/roadmap.md §Phase 4.
-            # TODO (Phase 5 — architecture deriver): add ArchitectureDriftDeriver(normalizer) here
-            # once ArchitectureSignalCollector exists. Emits arch_drift/coupling_high and
-            # arch_drift/module_bloat insights consumed by the arch_promotion rule.
+            # Deferred: Phase 4 — ExecutionOutcomeDeriver (see docs/design/roadmap.md §Phase 4)
+            # Deferred: Phase 5 — ArchitectureDriftDeriver (see docs/design/roadmap.md §Phase 5)
             #
-            # TODO (Phase 5 — benchmark deriver): add BenchmarkRegressionDeriver(normalizer) here
-            # once BenchmarkSignalCollector exists. Emits benchmark_regression/present insights
-            # consumed by a new performance_regression rule.
+            # Deferred: Phase 5 — BenchmarkRegressionDeriver (see docs/design/roadmap.md §Phase 5)
             #
-            # TODO (Phase 5 — security deriver): add SecurityVulnDeriver(normalizer) here once
-            # SecuritySignalCollector exists. Emits security_vuln/present insights consumed by a
-            # new security_followup rule.
+            # Deferred: Phase 5 — SecurityVulnDeriver (see docs/design/roadmap.md §Phase 5)
         ],
         artifact_writer=InsightArtifactWriter(),
     )
@@ -146,19 +124,7 @@ def build_decision_service() -> DecisionEngineService:
     )
 
 
-# TODO (Phase 7 — experiment mode): add a new entrypoint or --experiment flag to
-# autonomy_cycle that, for tier-2 style families (lint_fix, type_fix) with
-# validation_profile=ruff_clean or ty_clean, skips the Plane task creation step and instead:
-#   1. creates a branch from base_branch
-#   2. applies the fix (ruff --fix or ty --fix) directly
-#   3. runs the validation profile check
-#   4. if clean: opens a PR for human review (never auto-merges)
-#   5. if not clean: abandons the branch and falls back to normal task creation
-#
-# Hard constraints: max 5 files changed, max 200 lines changed, no deletions.
-# Gate: lint_fix and type_fix must each have ≥30 feedback records at ≥80% acceptance rate
-# before this mode is enabled. Requires explicit env var: CONTROL_PLANE_EXPERIMENT_MODE=1.
-# See docs/design/roadmap.md §Phase 7.
+# Deferred: Phase 7 — experiment mode entrypoint (see docs/design/roadmap.md §Phase 7)
 
 
 def _write_quiet_diagnosis(report_dir: Path, *, quiet_window: int = 5) -> None:
@@ -535,10 +501,7 @@ def _write_cycle_report(
                     }
                     for c in emitted
                 ],
-                # TODO (Phase 4 — execution feedback depth): once ExecutionOutcomeDeriver
-                # exists, add "failure_classes_observed" here from the latest execution
-                # outcome insights so the cycle report shows failure patterns alongside
-                # emitted candidates. See docs/design/roadmap.md §Phase 4.
+                # Deferred: Phase 4 — failure_classes_observed (see docs/design/roadmap.md §Phase 4)
             },
             "propose": {
                 "run_id": prop_artifact.run_id if prop_artifact else None,
