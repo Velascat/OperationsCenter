@@ -164,6 +164,23 @@ class PlaneClient:
         response.raise_for_status()
         return response.json()
 
+    def update_issue_description(self, task_id: str, description: str) -> None:
+        """Replace the description of an existing work item."""
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
+        payload: dict[str, Any] = {
+            "description_stripped": description,
+            "description_html": self._render_text_html(description),
+        }
+        response = self._request("PATCH", url, json=payload)
+        response.raise_for_status()
+
+    def update_issue_labels(self, task_id: str, label_names: list[str]) -> None:
+        """Replace the label set on an existing work item."""
+        url = f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/work-items/{task_id}/"
+        label_ids = self._ensure_label_ids(label_names)
+        response = self._request("PATCH", url, json={"labels": label_ids})
+        response.raise_for_status()
+
     def comment_issue(self, task_id: str, comment_markdown: str) -> None:
         url = (
             f"/api/v1/workspaces/{self.workspace_slug}/projects/{self.project_id}/"

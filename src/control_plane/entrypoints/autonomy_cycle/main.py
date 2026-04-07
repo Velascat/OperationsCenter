@@ -35,6 +35,7 @@ from control_plane.insights.derivers.proposal_outcome import ProposalOutcomeDeri
 from control_plane.insights.derivers.type_health import TypeHealthDeriver
 from control_plane.insights.derivers.test_continuity import TestContinuityDeriver
 from control_plane.insights.derivers.todo_concentration import TodoConcentrationDeriver
+from control_plane.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
 from control_plane.insights.loader import SnapshotLoader
 from control_plane.insights.normalizer import InsightNormalizer
 from control_plane.insights.service import InsightEngineService, new_generation_context
@@ -128,6 +129,8 @@ def build_insight_service() -> InsightEngineService:
             CoverageGapDeriver(normalizer),
             # S9-10 — ThemeAggregationDeriver: groups persistent per-file violations
             ThemeAggregationDeriver(normalizer),
+            # S10-9 — CrossRepoSynthesisDeriver: surfaces insight kinds shared across ≥2 repos
+            CrossRepoSynthesisDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )

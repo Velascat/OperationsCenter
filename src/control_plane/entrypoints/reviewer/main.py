@@ -24,6 +24,9 @@ PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 PROPOSAL_FEEDBACK_DIR = Path("state/proposal_feedback")
 REVIEW_TIMEOUT_SECONDS = 86400  # 1 day
 MAX_CI_FIX_ATTEMPTS = 2
+# S10-3: After this many failed revision attempts (zero changed files), close
+# the PR and create a fresh goal task rather than spinning indefinitely.
+REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD = 2
 
 
 def _write_proposal_feedback(state: dict, outcome: str, merge_reason: str | None) -> None:
@@ -699,10 +702,27 @@ def _process_human_review(
     # Zero-change revision: don't burn a loop count — the comment was processed but
     # nothing was committed, so further loops are unlikely to help either.
     if not changed_files:
+        zero_change_count = state.get("zero_change_count", 0) + 1
+        state["zero_change_count"] = zero_change_count
+        # S10-3: After enough zero-change attempts, escalate to a fresh goal task
+        # instead of spinning indefinitely.
+        if zero_change_count >= REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD:
+            logger.info(json.dumps({
+                "event": "human_revision_requeue_as_goal",
+                "task_id": task_id,
+                "zero_change_count": zero_change_count,
+            }))
+            return _requeue_as_goal(
+                gh, state, state_file, plane_client, service, logger,
+                review_comment=review_comment,
+            )
+
         reply_body = (
             "Revision attempted but kodo made no changes. This may mean the request "
             "is already addressed, or kodo needs more specific instructions. "
-            "React with 👍 to merge as-is, or leave a more detailed comment."
+            "React with 👍 to merge as-is, or leave a more detailed comment.\n\n"
+            f"_(attempt {zero_change_count}/{REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD} — "
+            "further zero-change attempts will close this PR and create a fresh goal task)_"
         )
         logger.info(json.dumps({"event": "human_revision_no_changes", "task_id": task_id}))
         new_bot_comment_id: int | None = None
@@ -739,6 +759,109 @@ def _process_human_review(
     state["bot_comment_ids"] = updated_bot_ids
     state["processed_human_comment_ids"] = list(processed_human_ids | {latest_id})
     state_file.write_text(json.dumps(state, indent=2))
+    return 1
+
+
+def _requeue_as_goal(
+    gh: GitHubPRClient,
+    state: dict,
+    state_file: Path,
+    plane_client: PlaneClient,
+    service: ExecutionService,
+    logger: logging.Logger,
+    *,
+    review_comment: str,
+) -> int:
+    """Close the PR and create a fresh goal task with reviewer feedback injected.
+
+    Triggered when a human revision attempt produces zero changes after
+    ``REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD`` tries.  Instead of looping
+    indefinitely the reviewer closes the PR, marks the original task Done, and
+    creates a new goal task that includes the accumulated review feedback so
+    the next kodo run starts from a higher baseline.
+    """
+    owner = state["owner"]
+    repo = state["repo"]
+    pr_number = state["pr_number"]
+    task_id = state["task_id"]
+    marker = service.settings.reviewer.bot_comment_marker
+    original_goal = state.get("original_goal", "")
+    repo_key = state["repo_key"]
+
+    # 1. Close the PR with an explanatory comment
+    close_msg = (
+        "Closing this PR — multiple revision attempts produced no changes.\n\n"
+        "A fresh goal task has been created with the review feedback injected so the "
+        "next execution has a clearer starting point.\n\n"
+        "Original review concern:\n" + review_comment
+    )
+    try:
+        _post_bot_comment(gh, owner, repo, pr_number, close_msg, marker)
+        gh.close_pr(owner, repo, pr_number)
+        logger.info(json.dumps({
+            "event": "pr_closed_requeue_as_goal",
+            "task_id": task_id,
+            "pr_number": pr_number,
+        }))
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "pr_close_failed", "task_id": task_id, "error": str(exc)}))
+
+    # 2. Build the fresh goal description with feedback injected
+    feedback_section = (
+        "\n\n## Review Feedback\n"
+        "The previous attempt was closed after repeated revision failures.  "
+        "Address these concerns before opening a new PR:\n\n"
+        + review_comment
+    )
+    fresh_description = (
+        f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+        f"## Goal\n{original_goal}{feedback_section}\n\n"
+        "## Constraints\n"
+        f"- source_task_id: {task_id}\n"
+        "- source: reviewer_requeue\n"
+        "- note: prior PR closed after zero-change revision loops; start from scratch\n"
+    )
+
+    # 3. Create the fresh goal task
+    fresh_title = f"[Requeue] {str(state.get('task_title', original_goal[:60]))}"
+    try:
+        repo_cfg = service.settings.repos.get(repo_key)
+        new_task = plane_client.create_issue(
+            name=fresh_title,
+            description=fresh_description,
+            state="Ready for AI",
+            label_names=["task-kind: goal", f"repo: {repo_key}", "source: reviewer-requeue"],
+        )
+        new_id = str(new_task.get("id", ""))
+        logger.info(json.dumps({
+            "event": "requeue_as_goal_created",
+            "task_id": task_id,
+            "new_task_id": new_id,
+            "title": fresh_title,
+        }))
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "requeue_goal_create_failed", "task_id": task_id, "error": str(exc)}))
+        new_id = ""
+
+    # 4. Mark the original task Done and remove the state file
+    try:
+        plane_client.transition_issue(task_id, "Done")
+        comment_lines = [
+            f"task_id: {task_id}",
+            "result_status: done",
+            "reason: PR closed after repeated zero-change revision attempts",
+            f"requeue_task_id: {new_id}" if new_id else "requeue_task_id: none",
+        ]
+        plane_client.comment_issue(
+            task_id,
+            f"[Review] Closed and re-queued as fresh goal.\n"
+            + "\n".join(f"- {l}" for l in comment_lines),
+        )
+    except Exception:
+        pass
+
+    state_file.unlink(missing_ok=True)
+    _write_proposal_feedback(state, outcome="escalated", merge_reason="reviewer_requeue")
     return 1
 
 

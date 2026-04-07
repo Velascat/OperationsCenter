@@ -65,6 +65,26 @@ def _in_maintenance_window(settings: "Any", now: "datetime") -> bool:
     return False
 
 
+_REJECTION_PATTERNS_PATH = Path("state/rejection_patterns.json")
+
+
+def _load_rejection_patterns_for_proposal(*, family: str, repo_key: str) -> list[str]:
+    """Return the top-3 most common rejection patterns for (repo_key, family).
+
+    Reads the same ``state/rejection_patterns.json`` store that the reviewer
+    watcher maintains when it observes human PR rejections.  Returns [] when the
+    file is absent or the key has no data.
+    """
+    try:
+        data = json.loads(_REJECTION_PATTERNS_PATH.read_text())
+        key = f"{repo_key}:{family}" if (repo_key and family) else (family or repo_key or "unknown")
+        entry = data.get(key, {})
+        by_count = sorted(entry.get("patterns", {}).items(), key=lambda kv: kv[1], reverse=True)
+        return [p for p, _ in by_count[:3]]
+    except Exception:
+        return []
+
+
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 UNBLOCK_COMMENT_MARKER = "[Improve] Resolution complete"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
@@ -392,12 +412,37 @@ def goal_requires_test_follow_up(issue: dict[str, Any], result: ExecutionResult)
     return result.success and bool(result.changed_files)
 
 
+_CP_QUESTION_RE = re.compile(r"<!--\s*cp:question:(.+?)-->", re.DOTALL | re.IGNORECASE)
+
+
+def extract_cp_question(result: "ExecutionResult") -> str | None:
+    """Extract the question text from a ``<!-- cp:question: ... -->`` marker.
+
+    Checks both the summary and the execution_stderr_excerpt fields since the
+    question marker may appear in either depending on the kodo adapter.
+    Returns the stripped question text, or None when no marker is present.
+    """
+    for source in (
+        getattr(result, "execution_stdout", None) or "",
+        result.execution_stderr_excerpt or "",
+        result.summary or "",
+    ):
+        m = _CP_QUESTION_RE.search(source)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
 def classify_execution_result(
     result: ExecutionResult,
     usage_store: "UsageStore | None" = None,
 ) -> str:
     if result.policy_violations:
         return "scope_policy"
+    # S10-2: Detect question marker in any output field — Kodo signalled it
+    # needs human input before it can proceed.
+    if extract_cp_question(result) is not None:
+        return "awaiting_input"
     excerpt = (result.execution_stderr_excerpt or "").lower()
     # S7-3: Out-of-memory — check early, before infra_tooling catches "killed"
     if any(
@@ -1966,6 +2011,255 @@ def handle_workspace_health_check(
 
 
 # ---------------------------------------------------------------------------
+# S10-2: Awaiting-input scan — detect answered questions and re-queue tasks
+# ---------------------------------------------------------------------------
+
+_AWAITING_INPUT_SCAN_CYCLE_INTERVAL = 8
+_AWAITING_INPUT_ANSWER_MARKER = "<!-- cp:answer: "
+
+
+def handle_awaiting_input_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+    now: datetime | None = None,
+) -> list[str]:
+    """Re-queue blocked tasks whose ``awaiting_input`` question has been answered.
+
+    Scans Blocked tasks whose last triage comment carries
+    ``blocked_classification: awaiting_input``.  When a human comment posted
+    *after* the triage comment is found, the task description is updated to
+    inject the answer and the task is transitioned back to ``Ready for AI``.
+
+    Returns a list of task IDs re-queued.
+    """
+    _now = now or datetime.now(UTC)
+    if issues is None:
+        issues = client.list_issues()
+
+    requeued_ids: list[str] = []
+
+    for issue in issues:
+        if issue_status_name(issue).lower() != "blocked":
+            continue
+        task_id = str(issue.get("id", ""))
+        if not task_id:
+            continue
+
+        try:
+            comments = client.list_comments(task_id)
+        except Exception:
+            continue
+
+        # Find the most recent triage comment with awaiting_input classification
+        triage_comment_idx: int | None = None
+        for idx, c in enumerate(comments):
+            body = str(c.get("body") or "")
+            if TRIAGE_COMMENT_MARKER in body and "awaiting_input" in body:
+                triage_comment_idx = idx
+
+        if triage_comment_idx is None:
+            continue
+
+        # Check if any human comment was posted AFTER the triage comment
+        reviewer_cfg = service.settings.reviewer
+        bot_logins: set[str] = set(reviewer_cfg.bot_logins)
+        marker = _bot_marker_from_settings(service.settings) if hasattr(service.settings, "reviewer") else ""
+        bot_comment_ids: set[int] = set()
+
+        human_answers = [
+            c for c in comments[triage_comment_idx + 1:]
+            if not _is_bot_comment_simple(c, bot_logins, marker)
+        ]
+        if not human_answers:
+            continue
+
+        # Extract the answer text
+        answer_text = str(human_answers[-1].get("body") or "").strip()
+        if not answer_text:
+            continue
+
+        # Re-queue: update description to inject the answer and transition to Ready for AI
+        description = issue_description_text(issue)
+        answer_section = (
+            f"\n\n## Human Answer\n"
+            f"The following answer was provided in response to a clarification request:\n\n"
+            f"{answer_text}\n\n"
+            f"Use this answer to guide your implementation."
+        )
+        new_description = description.rstrip() + answer_section
+
+        try:
+            client.update_issue_description(task_id, new_description)
+        except Exception:
+            pass
+
+        try:
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Improve] Awaiting-input answer received",
+                    [
+                        f"task_id: {task_id}",
+                        "result_status: re_queued",
+                        "reason: human answered the clarification question",
+                        "next_action: task re-queued to Ready for AI with answer injected into description",
+                    ],
+                ),
+            )
+            client.transition_issue(task_id, "Ready for AI")
+            requeued_ids.append(task_id)
+            _logger.info(json.dumps({
+                "event": "awaiting_input_requeued",
+                "task_id": task_id,
+                "answer_length": len(answer_text),
+            }))
+        except Exception as exc:
+            _logger.warning(json.dumps({
+                "event": "awaiting_input_requeue_failed",
+                "task_id": task_id,
+                "error": str(exc)[:200],
+            }))
+
+    return requeued_ids
+
+
+def _bot_marker_from_settings(settings: "Any") -> str:
+    """Safely extract the bot comment marker from settings."""
+    try:
+        return settings.reviewer.bot_comment_marker
+    except Exception:
+        return ""
+
+
+def _is_bot_comment_simple(comment: dict, bot_logins: set[str], marker: str) -> bool:
+    """Lightweight bot comment check used by the awaiting-input scan."""
+    login = (comment.get("user") or {}).get("login", "")
+    if login in bot_logins:
+        return True
+    if marker and marker in (comment.get("body") or ""):
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# S10-10: Priority rescore scan — re-evaluate backlog autonomy task relevance
+# ---------------------------------------------------------------------------
+
+_PRIORITY_RESCORE_CYCLE_INTERVAL = 45
+
+
+def handle_priority_rescore_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+    *,
+    issues: list[dict[str, Any]] | None = None,
+    now: datetime | None = None,
+) -> list[str]:
+    """Re-score Backlog autonomy tasks to check whether their signal is still present.
+
+    For each Backlog task with ``source: autonomy`` label, reads the current
+    usage store and calibration to determine whether:
+
+    - The signal that generated the proposal is no longer relevant (demote:
+      add a ``signal_stale`` label and move to a lower priority).
+    - A freshly seen high-confidence signal makes the task more urgent
+      (promote: boost priority label).
+
+    Returns a list of task IDs whose priority changed.
+    """
+    _now = now or datetime.now(UTC)
+    if issues is None:
+        issues = client.list_issues()
+
+    from control_plane.tuning.calibration import ConfidenceCalibrationStore
+    calib = ConfidenceCalibrationStore()
+    changed_ids: list[str] = []
+
+    for issue in issues:
+        if issue_status_name(issue).lower() != "backlog":
+            continue
+        labels = issue_label_names(issue)
+        if not any("source: autonomy" == lbl.strip().lower() for lbl in labels):
+            continue
+
+        task_id = str(issue.get("id", ""))
+        if not task_id:
+            continue
+
+        # Extract family and repo_key from labels
+        family = next(
+            (lbl.split(":", 1)[1].strip() for lbl in labels if lbl.lower().startswith("task-kind:")),
+            "",
+        )
+        repo_key = next(
+            (lbl.split(":", 1)[1].strip() for lbl in labels if lbl.lower().startswith("repo:")),
+            default_repo_key(service),
+        )
+
+        # Get calibration acceptance rate for this family
+        acceptance_rate = calib.calibration_for(family, "high", repo_key=repo_key) if family else None
+
+        # Check proposal success rate from usage store
+        success_rate = service.usage_store.proposal_success_rate(family, now=_now) if family else None
+
+        action: str | None = None
+        new_label: str | None = None
+
+        # Demote: family with very low acceptance or success rate
+        if (acceptance_rate is not None and acceptance_rate < 0.2) or \
+                (success_rate is not None and success_rate < 0.2):
+            if not any("signal_stale" in lbl for lbl in labels):
+                action = "demoted"
+                new_label = "signal_stale"
+        # Promote: family with high acceptance rate that's already in Backlog
+        elif (acceptance_rate is not None and acceptance_rate >= 0.7):
+            if not any("priority: high" in lbl.lower() for lbl in labels):
+                action = "promoted"
+                new_label = "priority: high"
+
+        if action and new_label:
+            try:
+                # Add the new label
+                existing_labels = [lbl for lbl in labels if lbl]
+                existing_labels.append(new_label)
+                client.update_issue_labels(task_id, existing_labels)
+                client.comment_issue(
+                    task_id,
+                    render_worker_comment(
+                        "[Improve] Priority rescore",
+                        [
+                            f"task_id: {task_id}",
+                            f"action: {action}",
+                            f"family: {family}",
+                            f"acceptance_rate: {acceptance_rate}",
+                            f"success_rate: {success_rate}",
+                            f"label_added: {new_label}",
+                            f"rescored_at: {_now.isoformat()}",
+                        ],
+                    ),
+                )
+                changed_ids.append(task_id)
+                _logger.info(json.dumps({
+                    "event": "priority_rescore",
+                    "task_id": task_id,
+                    "action": action,
+                    "family": family,
+                    "acceptance_rate": acceptance_rate,
+                    "success_rate": success_rate,
+                }))
+            except Exception as exc:
+                _logger.warning(json.dumps({
+                    "event": "priority_rescore_failed",
+                    "task_id": task_id,
+                    "error": str(exc)[:200],
+                }))
+
+    return changed_ids
+
+
+# ---------------------------------------------------------------------------
 # Multi-step dependency planning (Item 8)
 # ---------------------------------------------------------------------------
 
@@ -2381,6 +2675,17 @@ def build_multi_step_plan(
             "source_task_id": task_id,
             "step_task_ids": created_ids,
         }))
+        # S10-4: Register the campaign so progress can be tracked via the
+        # campaign-status CLI without navigating individual Plane tasks.
+        try:
+            from control_plane.execution.campaign_store import CampaignStore
+            CampaignStore().create(
+                source_task_id=task_id,
+                title=original_title,
+                step_task_ids=created_ids,
+            )
+        except Exception:
+            pass
 
     return created_ids
 
@@ -3166,6 +3471,10 @@ def classify_blocked_issue(issue: dict[str, Any], comments: list[dict[str, Any]]
     chunks.extend(extract_comment_text(comment) for comment in comments)
     lowered = "\n".join(chunk for chunk in chunks if chunk).lower()
 
+    # S10-2: awaiting_input must be checked first — it is a positive signal that
+    # the agent was working and stopped to ask a question, not an error.
+    if "blocked_classification: awaiting_input" in lowered or "<!-- cp:question:" in lowered:
+        return "awaiting_input", "Kodo stopped to ask a clarifying question — provide an answer to resume."
     if "policy_violations:" in lowered or "policy=failed" in lowered:
         return "scope_policy", "Changes landed outside the allowed repo scope."
     if task_kind_for_issue(issue) == "test" and ("validation_passed: false" in lowered or "validation=failed" in lowered):
@@ -3247,6 +3556,40 @@ def build_improve_triage_result(
     repeated_pattern = classification_counts.get(classification, 0) >= 3
     issue_title = str(issue.get("name", "task"))
     issue_kind = task_kind_for_issue(issue)
+
+    # S10-2: awaiting_input — Kodo asked a question mid-execution.  Surface the
+    # question as a human-attention comment; when the human replies the improve
+    # watcher will detect the answer and re-run the original task.
+    if classification == "awaiting_input":
+        # Try to recover the question text from the latest worker comment.
+        # Check all raw comment fields because extract_comment_text strips HTML comments.
+        question_text = ""
+        for c in reversed(comments):
+            for field in ("comment_stripped", "comment", "body", "comment_html"):
+                raw = str(c.get(field) or "")
+                m = _CP_QUESTION_RE.search(raw)
+                if m:
+                    question_text = m.group(1).strip()
+                    break
+            if question_text:
+                break
+        reason = (
+            f"Kodo needs clarification before it can proceed with '{issue_title}'."
+        )
+        if question_text:
+            reason += f"\n\n**Question from Kodo:** {question_text}"
+        reason += (
+            "\n\nReply to this comment with an answer.  "
+            "The improve watcher will detect your response and re-run the task "
+            "with the answer injected into the goal description."
+        )
+        return ImproveTriageResult(
+            classification=classification,
+            certainty="high",
+            reason_summary=reason,
+            recommended_action="human_attention",
+            human_attention_required=True,
+        )
 
     if classification in {"infra_tooling", UNKNOWN_BLOCKED_CLASSIFICATION}:
         return ImproveTriageResult(
@@ -4350,6 +4693,31 @@ def proposal_specs_from_findings(
     return proposals
 
 
+_COMPLEXITY_FILE_THRESHOLD_HIGH = 8   # ≥8 affected files → "high" complexity
+_COMPLEXITY_FILE_THRESHOLD_MEDIUM = 3  # 3–7 files → "medium"
+
+
+def _estimate_task_complexity(proposal: "ProposalSpec") -> str:
+    """Estimate the implementation complexity of *proposal*.
+
+    Uses a simple heuristic:
+    - Count the number of distinct file paths mentioned in evidence_lines.
+    - Return ``"high"`` when ≥ 8 files, ``"medium"`` when 3–7, ``"low"`` otherwise.
+
+    This is intentionally conservative: it only suppresses tasks where many
+    files are clearly needed, not when the scope is merely ambiguous.
+    """
+    evidence_files = _extract_evidence_file_tokens(getattr(proposal, "evidence_lines", []))
+    # Also count explicit file references in the goal text
+    goal_files = _extract_filename_tokens(proposal.goal_text or "")
+    total_files = len(evidence_files | goal_files)
+    if total_files >= _COMPLEXITY_FILE_THRESHOLD_HIGH:
+        return "high"
+    if total_files >= _COMPLEXITY_FILE_THRESHOLD_MEDIUM:
+        return "medium"
+    return "low"
+
+
 def build_proposal_candidates(
     client: PlaneClient,
     service: ExecutionService,
@@ -4479,6 +4847,23 @@ def build_proposal_candidates(
                 proposal.recommended_state = "Backlog"
         notes.append("self_repo_gate: self-repo proposals capped at Backlog (require self-modify:approved label)")
 
+    # S10-6: Complexity gate — suppress proposals whose scope clearly exceeds
+    # what kodo can handle in one run.  High-complexity proposals are moved to
+    # Backlog (not suppressed entirely) so a human or multi-step plan can pick
+    # them up without the system repeatedly re-proposing them.
+    complexity_capped = 0
+    for proposal in proposals:
+        if proposal.recommended_state == "Backlog":
+            continue  # Already demoted; no need to re-evaluate
+        complexity = _estimate_task_complexity(proposal)
+        if complexity == "high":
+            proposal.recommended_state = "Backlog"
+            if proposal.confidence == "high":
+                proposal.confidence = "medium"
+            complexity_capped += 1
+    if complexity_capped:
+        notes.append(f"complexity_gate: capped {complexity_capped} high-complexity proposal(s) to Backlog")
+
     unique: dict[str, ProposalSpec] = {}
     for proposal in proposals:
         unique.setdefault(proposal.dedup_key.strip().lower(), proposal)
@@ -4521,6 +4906,16 @@ def build_proposal_description(
     if proposal.evidence_lines:
         lines.extend(["", "## Evidence"])
         lines.extend(f"- {line}" for line in proposal.evidence_lines)
+    # S10-1: Inject historical rejection patterns so Kodo knows what reviewers
+    # have flagged before for this family/repo combination.
+    _rej_patterns = _load_rejection_patterns_for_proposal(
+        family=proposal.task_kind, repo_key=proposal.repo_key or default_repo_key(service)
+    )
+    if _rej_patterns:
+        lines.extend(["", "## Prior Rejection Patterns",
+                       "Reviewers have previously flagged these concerns for similar tasks — "
+                       "proactively address them:"])
+        lines.extend(f"- {p}" for p in _rej_patterns)
     return "\n".join(lines).strip()
 
 
@@ -4683,6 +5078,52 @@ def record_proposed(memory: dict[str, Any], *, title: str, dedup_key: str, now: 
     index[_normalise_proposal_title(title)] = ts
     index[dedup_key.strip().lower()] = ts
     memory["proposed_index"] = index
+
+
+def _score_proposal_utility(
+    proposal: "ProposalSpec",
+    *,
+    now: datetime | None = None,
+) -> float:
+    """Return a utility score for *proposal* used to rank candidates before the cycle cap.
+
+    Higher score → higher priority within a cycle.  The score is the sum of:
+
+    - **Confidence weight** (high=1.0, medium=0.6, low=0.2)
+    - **Calibration bonus** (0–0.4): observed acceptance rate from
+      ``ConfidenceCalibrationStore`` when ≥5 records exist, otherwise 0.
+    - **Scope penalty** (-0.05 per affected file beyond 2, capped at -0.3):
+      proposals touching fewer files are cheaper to execute correctly.
+    - **State bonus** (0.2 when ``recommended_state == "Ready for AI"``): prefer
+      proposals that are immediately actionable.
+
+    The score is intentionally simple — it is meant to break ties, not to
+    be a rigorous ranking.
+    """
+    _now = now or datetime.now(UTC)
+    conf_map = {"high": 1.0, "medium": 0.6, "low": 0.2}
+    score = conf_map.get(proposal.confidence, 0.3)
+
+    # Calibration bonus
+    try:
+        from control_plane.tuning.calibration import ConfidenceCalibrationStore
+        _calib = ConfidenceCalibrationStore()
+        rate = _calib.calibration_for(proposal.task_kind, proposal.confidence, repo_key=proposal.repo_key or None)
+        if rate is not None:
+            score += rate * 0.4  # scale acceptance rate [0,1] → bonus [0,0.4]
+    except Exception:
+        pass
+
+    # Scope penalty
+    evidence_files = _extract_evidence_file_tokens(getattr(proposal, "evidence_lines", []))
+    extra_files = max(0, len(evidence_files) - 2)
+    score -= min(extra_files * 0.05, 0.3)
+
+    # State bonus
+    if proposal.recommended_state == "Ready for AI":
+        score += 0.2
+
+    return score
 
 
 def handle_propose_cycle(
@@ -4875,6 +5316,10 @@ def handle_propose_cycle(
             board_idle=board_idle,
             reason_summary="No sufficiently grounded autonomous proposal was available.",
         )
+
+    # S10-7: Sort proposals by utility score before applying the cycle cap so the
+    # highest-value proposals are created first within each cycle.
+    proposals.sort(key=lambda p: _score_proposal_utility(p, now=now), reverse=True)
 
     existing_names = existing_issue_names(client, issues=issues)
     proposal_keys = existing_proposal_keys(client, issues=issues)
@@ -5758,6 +6203,23 @@ def run_watch_loop(
                     stale_auto_ids = handle_stale_autonomy_task_scan(client, service, now=datetime.now(UTC), stale_days=_stale_days)
                     if stale_auto_ids:
                         logger.info(json.dumps({"event": "watch_stale_autonomy_cancelled", "role": role, "cycle": cycle, "task_ids": stale_auto_ids}))
+                # S10-2: Awaiting-input scan — every 8 improve cycles.
+                if role == "improve" and cycle % _AWAITING_INPUT_SCAN_CYCLE_INTERVAL == 0:
+                    try:
+                        ai_ids = handle_awaiting_input_scan(client, service, now=datetime.now(UTC))
+                        if ai_ids:
+                            counters["follow_up_tasks_created"] += len(ai_ids)
+                            logger.info(json.dumps({"event": "watch_awaiting_input_requeued", "role": role, "cycle": cycle, "task_ids": ai_ids}))
+                    except Exception:
+                        pass
+                # S10-10: Priority rescore scan — every 45 improve cycles.
+                if role == "improve" and cycle % _PRIORITY_RESCORE_CYCLE_INTERVAL == 0:
+                    try:
+                        pr_ids = handle_priority_rescore_scan(client, service, now=datetime.now(UTC))
+                        if pr_ids:
+                            logger.info(json.dumps({"event": "watch_priority_rescored", "role": role, "cycle": cycle, "task_ids": pr_ids}))
+                    except Exception:
+                        pass
                 # S7-5: Dependency update scan — every 50 improve cycles.
                 if role == "improve" and cycle % _DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL == 0:
                     try:
