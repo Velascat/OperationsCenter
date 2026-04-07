@@ -260,6 +260,18 @@ class GitHubPRClient:
         except Exception:
             return False
 
+    def get_branch_head(self, owner: str, repo: str, branch: str) -> str | None:
+        """Return the HEAD commit SHA of *branch*, or None on failure."""
+        try:
+            resp = self._request(
+                "GET",
+                f"{self._API}/repos/{owner}/{repo}/branches/{branch}",
+            )
+            resp.raise_for_status()
+            return str((resp.json().get("commit") or {}).get("sha", "")) or None
+        except Exception:
+            return None
+
     @staticmethod
     def has_thumbs_up(reactions: list[dict]) -> bool:
         return any(r["content"] == "+1" for r in reactions)

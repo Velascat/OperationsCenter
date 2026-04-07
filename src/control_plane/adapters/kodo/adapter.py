@@ -208,3 +208,25 @@ class KodoAdapter:
     @staticmethod
     def command_to_json(command: list[str]) -> str:
         return json.dumps({"command": command}, indent=2)
+
+    @staticmethod
+    def get_version(binary: str) -> str | None:
+        """Return the kodo binary version string, or None on failure.
+
+        The result is intentionally not cached at the module level so that
+        version-change detection (S6-8) works correctly across the lifetime of
+        a long-running watcher process.  Callers should cache it themselves if
+        they need to avoid repeated subprocess calls.
+        """
+        try:
+            import subprocess as _sub
+            result = _sub.run(
+                [binary, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            version = (result.stdout.strip() or result.stderr.strip())[:64]
+            return version or None
+        except Exception:
+            return None

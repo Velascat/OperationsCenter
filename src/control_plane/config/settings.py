@@ -53,6 +53,24 @@ class ScheduledTask(BaseModel):
     kind: str = "goal"
 
 
+class MaintenanceWindow(BaseModel):
+    """A recurring time window during which autonomous execution is paused.
+
+    ``start_hour`` and ``end_hour`` are in UTC (0–23, exclusive end).
+    If ``start_hour`` > ``end_hour`` the window wraps midnight.
+    ``days`` is a list of weekday numbers (0=Monday … 6=Sunday);
+    empty list means the window applies every day.
+
+    Example — suspend all execution from 02:00–04:00 UTC on weekdays:
+        start_hour: 2
+        end_hour: 4
+        days: [0, 1, 2, 3, 4]
+    """
+    start_hour: int   # 0–23
+    end_hour: int     # 0–23 (exclusive); wrap allowed (start > end)
+    days: list[int] = Field(default_factory=list)  # empty = all days
+
+
 class ReviewerSettings(BaseModel):
     # GitHub logins whose comments are always ignored (bots, CI accounts)
     bot_logins: list[str] = Field(default_factory=list)
@@ -62,6 +80,10 @@ class ReviewerSettings(BaseModel):
     max_self_review_loops: int = 2
     # HTML marker appended to every bot-posted comment — belt-and-suspenders filter
     bot_comment_marker: str = "<!-- controlplane:bot -->"
+    # When True, autonomy-sourced PRs are merged automatically once CI is green
+    # without waiting for a human 👍.  Only applies to tasks labelled
+    # "source: autonomy".  Requires repo-level auto_merge_on_ci_green = True too.
+    auto_merge_success_rate_threshold: float = 0.9
 
 
 class RepoSettings(BaseModel):
@@ -80,6 +102,12 @@ class RepoSettings(BaseModel):
     local_path: str | None = None
     bootstrap_commands: list[str] | None = None  # custom bootstrap (replaces Python venv setup for non-Python repos)
     validation_timeout_seconds: int = 300
+    # Per-repo daily execution cap (None = no per-repo limit, global budget applies).
+    # Use this to prevent one repo from exhausting the full day's budget.
+    max_daily_executions: int | None = None
+    # When True and the task is source: autonomy, the review watcher merges the PR
+    # automatically once CI is green without waiting for a human 👍.
+    auto_merge_on_ci_green: bool = False
 
 
 class Settings(BaseModel):
@@ -127,6 +155,10 @@ class Settings(BaseModel):
     #       exchanges: 40
     #       effort: high
     kodo_profiles: dict[str, KodoSettings] = Field(default_factory=dict)
+    # Recurring time windows during which proposal creation and task execution
+    # are suppressed.  Use this to prevent autonomous activity during planned
+    # deploy windows, maintenance periods, or overnight freezes.
+    maintenance_windows: list[MaintenanceWindow] = Field(default_factory=list)
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]

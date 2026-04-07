@@ -389,6 +389,34 @@ def _process_human_review(
     bot_logins: set[str] = set(reviewer_cfg.bot_logins)
     allowed_logins: set[str] = set(reviewer_cfg.allowed_reviewer_logins)
 
+    # S6-3: Auto-merge for autonomy tasks when CI is green and config permits.
+    repo_cfg = service.settings.repos.get(repo_key)
+    if repo_cfg and getattr(repo_cfg, "auto_merge_on_ci_green", False):
+        try:
+            _issue = plane_client.fetch_issue(task_id)
+            _labels = [
+                str(lbl.get("name", lbl) if isinstance(lbl, dict) else lbl)
+                for lbl in (_issue.get("labels") or [])
+            ]
+            _is_autonomy = any("source: autonomy" in lbl or lbl == "source: autonomy" for lbl in _labels)
+            if _is_autonomy:
+                _pr_data = gh.get_pr(owner, repo, pr_number)
+                _failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=_pr_data)
+                _threshold = float(getattr(reviewer_cfg, "auto_merge_success_rate_threshold", 0.9))
+                # Only auto-merge when recent success rate is healthy (or we have no data yet).
+                _rate = service.usage_store.check_failure_rate_degradation(now=datetime.now(UTC))
+                _rate_ok = _rate is None or _rate >= _threshold
+                if not _failed and _rate_ok and not _pr_data.get("merged") and _pr_data.get("state") == "open":
+                    logger.info(json.dumps({
+                        "event": "pr_auto_merge_ci_green",
+                        "task_id": task_id,
+                        "reason": "autonomy_task_ci_green",
+                    }))
+                    _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="auto_merge_ci_green")
+                    return 1
+        except Exception as _exc:
+            logger.warning(json.dumps({"event": "pr_auto_merge_check_failed", "task_id": task_id, "error": str(_exc)}))
+
     # Timeout: merge after 1 day with no action
     created_at = datetime.fromisoformat(state["created_at"])
     elapsed = (datetime.now(UTC) - created_at).total_seconds()

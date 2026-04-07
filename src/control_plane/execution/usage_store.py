@@ -140,20 +140,27 @@ class UsageStore:
         # Circuit breaker: if ≥ threshold fraction of last _CB_WINDOW execution
         # outcomes failed, pause execution until the operator investigates.
         # Requires at least 3 samples to avoid false positives at startup.
+        # S6-8: If the kodo binary was updated during the window (multiple versions
+        # present), skip the circuit breaker — failures from the old version should
+        # not block the newly deployed version.
         outcomes = [
             e for e in reversed(events)
             if e.get("kind") == "execution_outcome"
         ][:_CB_WINDOW]
         if len(outcomes) >= 3:
-            failures = sum(1 for e in outcomes if not e.get("succeeded"))
-            if failures / len(outcomes) >= _CB_THRESHOLD:
-                return BudgetDecision(
-                    allowed=False,
-                    reason="circuit_breaker_open",
-                    window="recent",
-                    limit=_CB_WINDOW,
-                    current=failures,
-                )
+            versions_in_window = {
+                str(e["kodo_version"]) for e in outcomes if e.get("kodo_version")
+            }
+            if len(versions_in_window) <= 1:  # only block if all outcomes same version
+                failures = sum(1 for e in outcomes if not e.get("succeeded"))
+                if failures / len(outcomes) >= _CB_THRESHOLD:
+                    return BudgetDecision(
+                        allowed=False,
+                        reason="circuit_breaker_open",
+                        window="recent",
+                        limit=_CB_WINDOW,
+                        current=failures,
+                    )
         return BudgetDecision(allowed=True)
 
     def remaining_exec_capacity(self, *, now: datetime) -> int:
@@ -230,7 +237,15 @@ class UsageStore:
             return NoOpDecision(should_skip=True, reason="no_op", detail="no_state_change")
         return NoOpDecision(should_skip=False)
 
-    def record_execution(self, *, role: str, task_id: str, signature: str, now: datetime) -> None:
+    def record_execution(
+        self,
+        *,
+        role: str,
+        task_id: str,
+        signature: str,
+        now: datetime,
+        repo_key: str | None = None,
+    ) -> None:
         with self._exclusive():
             data = self.load()
             attempts = dict(data.get("task_attempts", {}))
@@ -239,17 +254,16 @@ class UsageStore:
             signatures = dict(data.get("last_task_signatures", {}))
             signatures[f"{role}:{task_id}"] = signature
             data["last_task_signatures"] = signatures
-            self._append_event(
-                data,
-                {
-                    "kind": "execution",
-                    "role": role,
-                    "task_id": task_id,
-                    "signature": signature,
-                    "timestamp": now.isoformat(),
-                },
-                now=now,
-            )
+            event: dict[str, Any] = {
+                "kind": "execution",
+                "role": role,
+                "task_id": task_id,
+                "signature": signature,
+                "timestamp": now.isoformat(),
+            }
+            if repo_key:
+                event["repo_key"] = repo_key
+            self._append_event(data, event, now=now)
 
     def record_execution_outcome(
         self,
@@ -258,25 +272,28 @@ class UsageStore:
         role: str,
         succeeded: bool,
         now: datetime,
+        kodo_version: str | None = None,
     ) -> None:
         """Record whether a goal/test execution produced a successful result.
 
         These events feed the circuit breaker in ``budget_decision``.  Record
         after the task handler has determined the final outcome — not before.
+        ``kodo_version`` (S6-8) is stored alongside the outcome so the circuit
+        breaker can exclude version-transition windows from failure-rate
+        calculations.
         """
         with self._exclusive():
             data = self.load()
-            self._append_event(
-                data,
-                {
-                    "kind": "execution_outcome",
-                    "task_id": task_id,
-                    "role": role,
-                    "succeeded": succeeded,
-                    "timestamp": now.isoformat(),
-                },
-                now=now,
-            )
+            event: dict[str, Any] = {
+                "kind": "execution_outcome",
+                "task_id": task_id,
+                "role": role,
+                "succeeded": succeeded,
+                "timestamp": now.isoformat(),
+            }
+            if kodo_version:
+                event["kodo_version"] = kodo_version
+            self._append_event(data, event, now=now)
 
     def record_quality_warning(
         self,
@@ -357,6 +374,239 @@ class UsageStore:
                 },
                 now=now,
             )
+
+    # ---------------------------------------------------------------------------
+    # S6-2: Per-repo execution budget
+    # ---------------------------------------------------------------------------
+
+    def budget_decision_for_repo(
+        self,
+        repo_key: str,
+        max_daily: int,
+        *,
+        now: datetime,
+    ) -> "BudgetDecision":
+        """Return a BudgetDecision for a specific repo's daily execution cap.
+
+        Unlike the global budget, this only counts ``execution`` events for the
+        given ``repo_key``.  Callers should check this *after* the global
+        budget passes.
+        """
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        cutoff = now - timedelta(days=1)
+        repo_count = 0
+        for e in events:
+            if e.get("kind") != "execution":
+                continue
+            if e.get("repo_key") != repo_key:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(e["timestamp"]))
+            except (ValueError, KeyError):
+                continue
+            if ts >= cutoff:
+                repo_count += 1
+        if repo_count >= max_daily:
+            return BudgetDecision(
+                allowed=False,
+                reason="repo_budget_exceeded",
+                window="daily",
+                limit=max_daily,
+                current=repo_count,
+            )
+        return BudgetDecision(allowed=True)
+
+    # ---------------------------------------------------------------------------
+    # S6-4: Gradual failure rate degradation detection
+    # ---------------------------------------------------------------------------
+
+    def check_failure_rate_degradation(
+        self,
+        *,
+        window: int = 30,
+        warn_threshold: float = 0.6,
+        now: datetime,
+    ) -> float | None:
+        """Return the recent success rate when it has degraded below *warn_threshold*.
+
+        Returns ``None`` when the sample count is too low (< 5) or success rate
+        is healthy.  Returns the success rate (< warn_threshold) when degraded,
+        so callers can log or act on it.
+
+        This is a *warning* signal — it fires before the circuit breaker
+        (which opens at ≥80% failure), giving operators earlier notice.
+        """
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        outcomes = [
+            e for e in reversed(events)
+            if e.get("kind") == "execution_outcome"
+        ][:window]
+        if len(outcomes) < 5:
+            return None
+        successes = sum(1 for e in outcomes if e.get("succeeded"))
+        rate = successes / len(outcomes)
+        return rate if rate < warn_threshold else None
+
+    # ---------------------------------------------------------------------------
+    # S6-5: Execution duration baseline
+    # ---------------------------------------------------------------------------
+
+    def record_execution_duration(
+        self,
+        *,
+        task_id: str,
+        role: str,
+        duration_seconds: float,
+        now: datetime,
+    ) -> None:
+        """Record the wall-clock duration of a kodo execution pass.
+
+        Used to build a baseline that can detect abnormally long runs (e.g. kodo
+        stuck in a loop) before the stale-running TTL fires.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_duration",
+                    "task_id": task_id,
+                    "role": role,
+                    "duration_seconds": round(duration_seconds, 1),
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def median_execution_duration(
+        self,
+        role: str,
+        *,
+        window: int = 20,
+        now: datetime | None = None,
+    ) -> float | None:
+        """Return the median execution duration in seconds for *role*.
+
+        Returns ``None`` if fewer than 3 samples exist.
+        """
+        from datetime import timezone as _tz
+        _now = now or datetime.now(_tz.utc)
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=_now)
+        durations = [
+            float(e["duration_seconds"])
+            for e in reversed(events)
+            if e.get("kind") == "execution_duration"
+            and e.get("role") == role
+            and isinstance(e.get("duration_seconds"), (int, float))
+        ][:window]
+        if len(durations) < 3:
+            return None
+        sorted_d = sorted(durations)
+        mid = len(sorted_d) // 2
+        if len(sorted_d) % 2 == 1:
+            return sorted_d[mid]
+        return (sorted_d[mid - 1] + sorted_d[mid]) / 2
+
+    # ---------------------------------------------------------------------------
+    # S6-9: Structured audit log export
+    # ---------------------------------------------------------------------------
+
+    def audit_export(
+        self,
+        *,
+        window_days: int = 7,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return a structured activity log for the last *window_days* days.
+
+        Each entry contains the fields most useful for human or machine audit:
+        task_id, role, outcome (succeeded/failed/quota/quality/scope), repo_key,
+        duration_seconds, and timestamp.  Events are sorted oldest-first.
+
+        Consumers can filter by role, repo_key, or outcome to answer questions
+        like "what did the system do to repo X this week?" without reading raw
+        JSON events.
+        """
+        _now = now or datetime.now()
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=_now)
+        cutoff = _now - timedelta(days=window_days)
+
+        # Build a map of task_id → duration from execution_duration events
+        durations: dict[str, float] = {}
+        for e in events:
+            if e.get("kind") == "execution_duration" and e.get("task_id"):
+                durations[str(e["task_id"])] = float(e.get("duration_seconds", 0))
+
+        # Collect and flatten meaningful event kinds
+        audit_rows: list[dict[str, Any]] = []
+        for e in events:
+            kind = e.get("kind", "")
+            try:
+                ts = datetime.fromisoformat(str(e["timestamp"]))
+            except (ValueError, KeyError):
+                continue
+            if ts < cutoff:
+                continue
+
+            if kind == "execution_outcome":
+                audit_rows.append({
+                    "kind": "execution",
+                    "task_id": e.get("task_id", ""),
+                    "role": e.get("role", ""),
+                    "outcome": "succeeded" if e.get("succeeded") else "failed",
+                    "repo_key": e.get("repo_key", ""),
+                    "duration_seconds": durations.get(str(e.get("task_id", "")), None),
+                    "kodo_version": e.get("kodo_version", None),
+                    "timestamp": e["timestamp"],
+                })
+            elif kind == "kodo_quota_event":
+                audit_rows.append({
+                    "kind": "execution",
+                    "task_id": e.get("task_id", ""),
+                    "role": e.get("role", ""),
+                    "outcome": "quota_exhausted",
+                    "repo_key": "",
+                    "duration_seconds": None,
+                    "timestamp": e["timestamp"],
+                })
+            elif kind == "kodo_quality_warning":
+                audit_rows.append({
+                    "kind": "quality_warning",
+                    "task_id": e.get("task_id", ""),
+                    "role": "",
+                    "outcome": "quality_warning",
+                    "repo_key": e.get("repo_key", ""),
+                    "suppression_counts": e.get("suppression_counts", {}),
+                    "timestamp": e["timestamp"],
+                })
+            elif kind == "scope_violation":
+                audit_rows.append({
+                    "kind": "scope_violation",
+                    "task_id": e.get("task_id", ""),
+                    "role": "",
+                    "outcome": "scope_violation",
+                    "repo_key": e.get("repo_key", ""),
+                    "violated_files": e.get("violated_files", []),
+                    "timestamp": e["timestamp"],
+                })
+            elif kind == "escalation_sent":
+                audit_rows.append({
+                    "kind": "escalation",
+                    "task_id": "",
+                    "role": "",
+                    "outcome": "escalated",
+                    "repo_key": "",
+                    "classification": e.get("classification", ""),
+                    "task_ids": e.get("task_ids", []),
+                    "timestamp": e["timestamp"],
+                })
+
+        audit_rows.sort(key=lambda r: r["timestamp"])
+        return audit_rows
 
     def record_skip(
         self,

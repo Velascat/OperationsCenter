@@ -258,6 +258,23 @@ def main() -> None:
     os.environ.setdefault("CONTROL_PLANE_CONFIG", args.config)
     settings = load_settings(args.config)
 
+    # S6-1: Maintenance window gate — skip proposal creation when in window.
+    _now_mw = datetime.now(UTC)
+    for _w in getattr(settings, "maintenance_windows", []) or []:
+        _days = list(getattr(_w, "days", []) or [])
+        if _days and _now_mw.weekday() not in _days:
+            continue
+        _start = int(getattr(_w, "start_hour", 0))
+        _end = int(getattr(_w, "end_hour", 0))
+        _h = _now_mw.hour
+        _in_window = (_start <= _h < _end) if _start < _end else (_h >= _start or _h < _end)
+        if _in_window:
+            print(
+                f"[skip] Maintenance window active (hour={_h}, start={_start}, end={_end}). "
+                "Proposal cycle suppressed."
+            )
+            return
+
     # --- Stage 1: Observe ---
     repo_path, repo_name = resolve_repo_path(args.repo, settings)
     ensure_git_repo(repo_path)

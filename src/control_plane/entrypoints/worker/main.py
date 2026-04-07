@@ -24,6 +24,47 @@ from control_plane.config import load_settings
 from control_plane.domain import ExecutionResult
 from control_plane.execution.usage_store import UsageStore
 from control_plane.proposer.rejection_store import ProposalRejectionStore
+# ---------------------------------------------------------------------------
+# S6-8: Module-level kodo version cache (refreshed per watcher startup).
+# ---------------------------------------------------------------------------
+_kodo_version_cache: dict[str, str | None] = {}
+
+
+def _get_kodo_version(binary: str) -> str | None:
+    """Return the cached kodo binary version string, fetching it on first call."""
+    if binary not in _kodo_version_cache:
+        from control_plane.adapters.kodo.adapter import KodoAdapter
+        _kodo_version_cache[binary] = KodoAdapter.get_version(binary)
+    return _kodo_version_cache[binary]
+
+
+# ---------------------------------------------------------------------------
+# S6-1: Maintenance window helpers.
+# ---------------------------------------------------------------------------
+
+def _in_maintenance_window(settings: "Any", now: "datetime") -> bool:
+    """Return True if *now* falls within any configured maintenance window.
+
+    Windows use UTC hours.  Wrap-midnight windows (start_hour > end_hour) are
+    supported.  An empty ``days`` list means the window applies every day.
+    """
+    windows = getattr(settings, "maintenance_windows", None) or []
+    for w in windows:
+        days = list(getattr(w, "days", []) or [])
+        if days and now.weekday() not in days:
+            continue
+        start = int(getattr(w, "start_hour", 0))
+        end = int(getattr(w, "end_hour", 0))
+        hour = now.hour
+        if start < end:
+            if start <= hour < end:
+                return True
+        else:  # wraps midnight
+            if hour >= start or hour < end:
+                return True
+    return False
+
+
 TRIAGE_COMMENT_MARKER = "[Improve] Blocked triage"
 UNBLOCK_COMMENT_MARKER = "[Improve] Resolution complete"
 IMPROVE_COMMENT_MARKER = "[Improve] Improvement pass"
@@ -542,6 +583,32 @@ def execution_gate_decision(
             "current": budget.current,
         }
 
+    # S6-2: Per-repo daily execution cap.
+    try:
+        _rk = _extract_repo_key(issue, service)
+        _repo_cfg_gate = service.settings.repos.get(_rk)
+        _max_daily = getattr(_repo_cfg_gate, "max_daily_executions", None) if _repo_cfg_gate else None
+        if _max_daily is not None:
+            repo_budget = store.budget_decision_for_repo(_rk, _max_daily, now=now)
+            if not repo_budget.allowed:
+                store.record_skip(
+                    role=role,
+                    task_id=task_id,
+                    signature=signature,
+                    reason=repo_budget.reason or "repo_budget_exceeded",
+                    detail=_rk,
+                    now=now,
+                    evidence={"repo_key": _rk, "limit": repo_budget.limit, "current": repo_budget.current},
+                )
+                return "skip_repo_budget", {
+                    "reason": repo_budget.reason,
+                    "repo_key": _rk,
+                    "limit": repo_budget.limit,
+                    "current": repo_budget.current,
+                }
+    except Exception:
+        pass
+
     store.record_execution(role=role, task_id=task_id, signature=signature, now=now)
     return None
 
@@ -1011,26 +1078,46 @@ def detect_post_merge_regressions(
             pr = gh.get_pr(owner, repo_name, pr_number)
             if not (pr.get("merged") or pr.get("merged_at")):
                 continue
-            merged_sha = (pr.get("head") or {}).get("sha", "")
+            merged_sha = (pr.get("merge_commit_sha") or (pr.get("head") or {}).get("sha", ""))
             failed_checks = gh.get_failed_checks(owner, repo_name, pr_number, pr_data=pr)
             if not failed_checks:
                 continue  # CI clean — nothing to do
             task_title = str(issue.get("name", "unknown task"))
             repo_key = _repo_key_from_pr_url(pr_url, service)
+            # S6-7: Check whether this is a safe revert candidate (merge commit is
+            # still HEAD of the base branch — no subsequent commits on top of it).
+            base_branch = str((pr.get("base") or {}).get("ref", ""))
+            _base_head = gh.get_branch_head(owner, repo_name, base_branch) if base_branch else None
+            _is_safe_revert = bool(
+                merged_sha and _base_head and merged_sha == _base_head
+            )
+            if _is_safe_revert:
+                regression_goal = (
+                    f"Revert the PR from task '{task_title}' to restore CI stability. "
+                    "The merge commit is still the HEAD of the base branch, so a clean revert is safe. "
+                    "Create a revert PR and merge it."
+                )
+                regression_action = "revert"
+            else:
+                regression_goal = (
+                    f"CI failed after merging the PR from task '{task_title}'. "
+                    "Investigate the failing checks and either fix the regression or "
+                    "revert the change if the fix is not straightforward."
+                )
+                regression_action = "fix_or_revert"
             regression_task = client.create_issue(
                 name=f"Regression from: {task_title}",
                 description=(
                     f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
-                    "## Goal\n"
-                    f"CI failed after merging the PR from task '{task_title}'. "
-                    "Investigate the failing checks and either fix the regression or "
-                    "revert the change if the fix is not straightforward.\n\n"
+                    f"## Goal\n{regression_goal}\n\n"
                     "## Context\n"
                     f"- source_task_id: {task_id}\n"
                     f"- pull_request_url: {pr_url}\n"
                     + (f"- merged_sha: {merged_sha}\n" if merged_sha else "")
+                    + (f"- base_branch: {base_branch}\n" if base_branch else "")
                     + f"- failed_checks: {'; '.join(failed_checks[:3])}\n"
-                    "- recommended_action: fix_or_revert\n"
+                    f"- recommended_action: {regression_action}\n"
+                    f"- safe_revert: {'true' if _is_safe_revert else 'false'}\n"
                     "- priority: high\n"
                 ),
                 state="Ready for AI",
@@ -1680,6 +1767,78 @@ def handle_stale_autonomy_task_scan(
             pass
 
     return cancelled_ids
+
+
+# ---------------------------------------------------------------------------
+# S6-10: Board health snapshot
+# ---------------------------------------------------------------------------
+
+def board_health_check(
+    issues: list[dict[str, Any]],
+    service: "ExecutionService",
+) -> list[dict[str, Any]]:
+    """Return a list of board anomaly descriptors.
+
+    Checks for:
+    - Tasks stuck in "Running" state (no watcher should leave tasks running).
+    - Clustered blocked reasons (same classification on >=5 blocked tasks).
+    - Quiet propose lane (no Backlog/Ready tasks for >1 repo at once).
+
+    Returns an empty list when the board looks healthy.
+    """
+    anomalies: list[dict[str, Any]] = []
+
+    running_ids = [
+        str(iss.get("id", ""))
+        for iss in issues
+        if issue_status_name(iss) == "Running"
+    ]
+    if len(running_ids) >= 3:
+        anomalies.append({
+            "kind": "stuck_running",
+            "count": len(running_ids),
+            "task_ids": running_ids[:10],
+            "detail": "multiple tasks in Running state — a watcher may have crashed",
+        })
+
+    # Blocked reason clustering
+    blocked_reasons: dict[str, list[str]] = {}
+    for iss in issues:
+        if issue_status_name(iss) != "Blocked":
+            continue
+        tid = str(iss.get("id", ""))
+        for lbl in issue_label_names(iss):
+            if lbl.startswith("blocked:") or lbl.startswith("classification:"):
+                blocked_reasons.setdefault(lbl, []).append(tid)
+    for reason, ids in blocked_reasons.items():
+        if len(ids) >= 5:
+            anomalies.append({
+                "kind": "clustered_blocked_reason",
+                "reason": reason,
+                "count": len(ids),
+                "task_ids": ids[:10],
+                "detail": f">=5 blocked tasks share the same reason — systemic issue suspected",
+            })
+
+    # Quiet propose lane: count active (non-Done, non-Cancelled) tasks per repo
+    repo_active: dict[str, int] = {}
+    for iss in issues:
+        status = issue_status_name(iss)
+        if status in ("Done", "Cancelled"):
+            continue
+        for lbl in issue_label_names(iss):
+            if lbl.startswith("repo:"):
+                rk = lbl[5:].strip()
+                repo_active[rk] = repo_active.get(rk, 0) + 1
+    for rk in service.settings.repos:
+        if repo_active.get(rk, 0) == 0:
+            anomalies.append({
+                "kind": "quiet_repo_lane",
+                "repo_key": rk,
+                "detail": f"no active tasks for repo '{rk}' — propose lane may be stalled",
+            })
+
+    return anomalies
 
 
 def build_multi_step_plan(
@@ -4367,7 +4526,23 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
 
     selected_evidence = selected_evidence_from_issue(issue)
     target_area_hint = target_area_hint_from_issue(issue)
+    _goal_t0 = time.monotonic()
     result = run_service_task(service, client, task_id, worker_role="goal")
+    _goal_duration = time.monotonic() - _goal_t0
+    # S6-5: Record execution duration and flag anomalies.
+    try:
+        service.usage_store.record_execution_duration(task_id=task_id, role="goal", duration_seconds=_goal_duration, now=datetime.now(UTC))
+        _median_goal = service.usage_store.median_execution_duration("goal")
+        if _median_goal is not None and _goal_duration > _median_goal * 2:
+            logging.getLogger(__name__).warning(json.dumps({
+                "event": "duration_anomaly",
+                "role": "goal",
+                "task_id": task_id,
+                "duration_seconds": round(_goal_duration, 1),
+                "median_seconds": round(_median_goal, 1),
+            }))
+    except Exception:
+        pass
     created_ids: list[str] = []
     if result.outcome_status == "no_op":
         client.comment_issue(
@@ -4531,6 +4706,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                 role="goal",
                 succeeded=result.success,
                 now=datetime.now(UTC),
+                kodo_version=_get_kodo_version(service.settings.kodo.binary),
             )
     except Exception:
         pass
@@ -4590,7 +4766,23 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
     issue = client.fetch_issue(task_id)
     selected_evidence = selected_evidence_from_issue(issue)
     target_area_hint = target_area_hint_from_issue(issue)
+    _test_t0 = time.monotonic()
     result = run_service_task(service, client, task_id, worker_role="test")
+    _test_duration = time.monotonic() - _test_t0
+    # S6-5: Record execution duration and flag anomalies.
+    try:
+        service.usage_store.record_execution_duration(task_id=task_id, role="test", duration_seconds=_test_duration, now=datetime.now(UTC))
+        _median_test = service.usage_store.median_execution_duration("test")
+        if _median_test is not None and _test_duration > _median_test * 2:
+            logging.getLogger(__name__).warning(json.dumps({
+                "event": "duration_anomaly",
+                "role": "test",
+                "task_id": task_id,
+                "duration_seconds": round(_test_duration, 1),
+                "median_seconds": round(_median_test, 1),
+            }))
+    except Exception:
+        pass
     if result.outcome_status == "no_op":
         result.final_status = "Blocked"
         client.comment_issue(
@@ -4697,6 +4889,7 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
                 role="test",
                 succeeded=result.success,
                 now=datetime.now(UTC),
+                kodo_version=_get_kodo_version(service.settings.kodo.binary),
             )
     except Exception:
         pass
@@ -4955,6 +5148,21 @@ def run_watch_loop(
         )
         if status_dir is not None and _is_primary_slot:
             write_heartbeat(status_dir, role, now=datetime.now(UTC))
+        # S6-1: Maintenance window gate — skip execution during configured windows.
+        _now_mw = datetime.now(UTC)
+        if _in_maintenance_window(service.settings, _now_mw):
+            logger.info(json.dumps({
+                "event": "watch_maintenance_window",
+                "role": role,
+                "cycle": cycle,
+                "hour": _now_mw.hour,
+                "weekday": _now_mw.weekday(),
+            }))
+            if max_cycles is not None and cycle >= max_cycles:
+                logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
+                return
+            time.sleep(poll_interval_seconds)
+            continue
         try:
             if cycle == 1 and _is_primary_slot:
                 if not validate_credentials(
@@ -5034,6 +5242,34 @@ def run_watch_loop(
                     stale_auto_ids = handle_stale_autonomy_task_scan(client, service, now=datetime.now(UTC))
                     if stale_auto_ids:
                         logger.info(json.dumps({"event": "watch_stale_autonomy_cancelled", "role": role, "cycle": cycle, "task_ids": stale_auto_ids}))
+                # S6-4: Failure-rate degradation check — every 5 cycles on primary slot.
+                if cycle % 5 == 0:
+                    try:
+                        _degraded_rate = service.usage_store.check_failure_rate_degradation(now=datetime.now(UTC))
+                        if _degraded_rate is not None:
+                            logger.warning(json.dumps({
+                                "event": "failure_rate_degradation",
+                                "role": role,
+                                "cycle": cycle,
+                                "success_rate": round(_degraded_rate, 3),
+                                "action": "review recent executions before circuit breaker opens",
+                            }))
+                    except Exception:
+                        pass
+                # S6-10: Board health snapshot — every 40 improve cycles.
+                if role == "improve" and cycle % 40 == 0:
+                    try:
+                        _bh_issues = client.list_issues()
+                        _bh_anomalies = board_health_check(_bh_issues, service)
+                        if _bh_anomalies:
+                            logger.warning(json.dumps({
+                                "event": "board_health_anomalies",
+                                "role": role,
+                                "cycle": cycle,
+                                "anomalies": _bh_anomalies,
+                            }))
+                    except Exception:
+                        pass
             task_id, action = select_watch_candidate(
                 client,
                 ready_state=ready_state,
@@ -5131,6 +5367,21 @@ def run_watch_loop(
                 # Pre-execution validation for goal tasks
                 if role == "goal" and action == "execute":
                     if not validate_task_pre_execution(client, service, task_id, issue):
+                        # S6-6: Feed rejection back into the proposal learning loop.
+                        try:
+                            _pre_exec_category = str(
+                                next(
+                                    (lbl for lbl in issue_label_names(issue) if lbl.startswith("task-kind")),
+                                    "goal",
+                                )
+                            )
+                            service.usage_store.record_proposal_outcome(
+                                category=_pre_exec_category,
+                                succeeded=False,
+                                now=datetime.now(UTC),
+                            )
+                        except Exception:
+                            pass
                         write_watch_status(
                             status_dir=status_dir,
                             role=role,
@@ -5484,6 +5735,39 @@ def main() -> None:
         store = UsageStore(Path(sr_args.usage_path) if sr_args.usage_path else None)
         report = store.get_spend_report(window_days=sr_args.window_days, now=datetime.now(UTC))
         print(json.dumps(report, indent=2))
+        sys.exit(0)
+
+    # S6-9: Structured audit log export
+    if len(sys.argv) >= 2 and sys.argv[1] == "audit-export":
+        ae_parser = argparse.ArgumentParser(description="Export structured audit log")
+        ae_parser.add_argument("--window-days", type=int, default=7)
+        ae_parser.add_argument("--usage-path", default=None)
+        ae_args = ae_parser.parse_args(sys.argv[2:])
+        from control_plane.execution.usage_store import UsageStore
+        store = UsageStore(Path(ae_args.usage_path) if ae_args.usage_path else None)
+        events = store.audit_export(window_days=ae_args.window_days, now=datetime.now(UTC))
+        print(json.dumps(events, indent=2))
+        sys.exit(0)
+
+    # S6-10: Board health snapshot
+    if len(sys.argv) >= 2 and sys.argv[1] == "board-health":
+        bh_parser = argparse.ArgumentParser(description="Check board health")
+        bh_parser.add_argument("--config", required=True)
+        bh_args = bh_parser.parse_args(sys.argv[2:])
+        _bh_settings = load_settings(bh_args.config)
+        _bh_client = PlaneClient(
+            base_url=_bh_settings.plane.base_url,
+            api_token=_bh_settings.plane_token(),
+            workspace_slug=_bh_settings.plane.workspace_slug,
+            project_id=_bh_settings.plane.project_id,
+        )
+        try:
+            _bh_service = ExecutionService(_bh_settings)
+            _bh_issues_all = _bh_client.list_issues()
+            _bh_result = board_health_check(_bh_issues_all, _bh_service)
+            print(json.dumps({"anomalies": _bh_result, "total_issues": len(_bh_issues_all)}, indent=2))
+        finally:
+            _bh_client.close()
         sys.exit(0)
 
     parser = argparse.ArgumentParser(description="Run Plane task(s) through Kodo wrapper")

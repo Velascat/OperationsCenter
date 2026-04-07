@@ -17,8 +17,10 @@ from control_plane.entrypoints.worker.main import (
     _STALE_AUTONOMY_CANCEL_MARKER,
     _check_task_pr_merged,
     _extract_filename_tokens,
+    _get_kodo_version,
     _has_conflict_with_active_task,
     _heartbeat_path,
+    _in_maintenance_window,
     _is_multi_step_task,
     _is_self_repo,
     _pr_number_from_url,
@@ -28,12 +30,14 @@ from control_plane.entrypoints.worker.main import (
     _self_modify_approved,
     _split_oversized_finding,
     blocked_resolution_is_complete,
+    board_health_check,
     build_improve_triage_result,
     build_multi_step_plan,
     check_heartbeats,
     classify_blocked_issue,
     classify_execution_result,
     detect_post_merge_regressions,
+    execution_gate_decision,
     extract_triage_follow_up_ids,
     handle_feedback_loop_scan,
     handle_goal_task,
@@ -3863,3 +3867,333 @@ def test_quality_warning_event_recorded_in_usage_store(tmp_path) -> None:
     events = [e for e in data["events"] if e["kind"] == "kodo_quality_warning"]
     assert len(events) == 1
     assert events[0]["suppression_counts"]["noqa"] == 4
+
+
+# ---------------------------------------------------------------------------
+# S6 tests
+# ---------------------------------------------------------------------------
+
+# S6-1: Maintenance window helper
+def test_in_maintenance_window_returns_true_when_in_window() -> None:
+    from control_plane.entrypoints.worker.main import _in_maintenance_window
+
+    class FakeWindow:
+        start_hour = 2
+        end_hour = 4
+        days: list[int] = []
+
+    class FakeSettings:
+        maintenance_windows = [FakeWindow()]
+
+    now = datetime(2026, 1, 5, 3, 0, 0, tzinfo=UTC)  # 03:00 UTC, Monday
+    assert _in_maintenance_window(FakeSettings(), now) is True
+
+
+def test_in_maintenance_window_returns_false_outside_window() -> None:
+    from control_plane.entrypoints.worker.main import _in_maintenance_window
+
+    class FakeWindow:
+        start_hour = 2
+        end_hour = 4
+        days: list[int] = []
+
+    class FakeSettings:
+        maintenance_windows = [FakeWindow()]
+
+    now = datetime(2026, 1, 5, 10, 0, 0, tzinfo=UTC)  # 10:00 UTC
+    assert _in_maintenance_window(FakeSettings(), now) is False
+
+
+def test_in_maintenance_window_wraps_midnight() -> None:
+    from control_plane.entrypoints.worker.main import _in_maintenance_window
+
+    class FakeWindow:
+        start_hour = 22
+        end_hour = 2   # wraps: 22–24, 0–2
+        days: list[int] = []
+
+    class FakeSettings:
+        maintenance_windows = [FakeWindow()]
+
+    in_window = datetime(2026, 1, 5, 23, 30, 0, tzinfo=UTC)
+    out_of_window = datetime(2026, 1, 5, 10, 0, 0, tzinfo=UTC)
+    assert _in_maintenance_window(FakeSettings(), in_window) is True
+    assert _in_maintenance_window(FakeSettings(), out_of_window) is False
+
+
+def test_in_maintenance_window_day_filter_skips_wrong_day() -> None:
+    from control_plane.entrypoints.worker.main import _in_maintenance_window
+
+    class FakeWindow:
+        start_hour = 2
+        end_hour = 4
+        days = [0, 1, 2, 3, 4]  # weekdays only
+
+    class FakeSettings:
+        maintenance_windows = [FakeWindow()]
+
+    # Saturday (weekday 5) should not be in window
+    saturday = datetime(2026, 1, 10, 3, 0, 0, tzinfo=UTC)
+    assert _in_maintenance_window(FakeSettings(), saturday) is False
+
+
+# S6-2: Per-repo budget check
+def test_budget_decision_for_repo_blocks_when_limit_reached(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+
+    # Simulate 3 executions for this repo in the last 24h
+    for i in range(3):
+        store.record_execution(
+            role="goal",
+            task_id=f"t{i}",
+            signature=f"sig{i}",
+            repo_key="myrepo",
+            now=now,
+        )
+
+    decision = store.budget_decision_for_repo("myrepo", max_daily=3, now=now)
+    assert decision.allowed is False
+    assert decision.reason == "repo_budget_exceeded"
+    assert decision.current == 3
+
+
+def test_budget_decision_for_repo_allows_when_under_limit(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+
+    for i in range(2):
+        store.record_execution(
+            role="goal",
+            task_id=f"t{i}",
+            signature=f"sig{i}",
+            repo_key="myrepo",
+            now=now,
+        )
+
+    decision = store.budget_decision_for_repo("myrepo", max_daily=3, now=now)
+    assert decision.allowed is True
+
+
+# S6-4: Failure rate degradation check
+def test_check_failure_rate_degradation_returns_rate_when_degraded(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+
+    # 7 failures, 3 successes → 30% success rate (below default 60% warn threshold)
+    for i in range(7):
+        store.record_execution_outcome(task_id=f"fail{i}", role="goal", succeeded=False, now=now)
+    for i in range(3):
+        store.record_execution_outcome(task_id=f"ok{i}", role="goal", succeeded=True, now=now)
+
+    rate = store.check_failure_rate_degradation(now=now)
+    assert rate is not None
+    assert rate == pytest.approx(0.3)
+
+
+def test_check_failure_rate_degradation_returns_none_when_healthy(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+
+    for i in range(8):
+        store.record_execution_outcome(task_id=f"ok{i}", role="goal", succeeded=True, now=now)
+    for i in range(2):
+        store.record_execution_outcome(task_id=f"fail{i}", role="goal", succeeded=False, now=now)
+
+    rate = store.check_failure_rate_degradation(now=now)
+    assert rate is None  # 80% success rate is healthy
+
+
+def test_check_failure_rate_degradation_returns_none_below_minimum_samples(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+
+    for i in range(3):
+        store.record_execution_outcome(task_id=f"fail{i}", role="goal", succeeded=False, now=now)
+
+    rate = store.check_failure_rate_degradation(now=now)
+    assert rate is None  # < 5 samples
+
+
+# S6-5: Execution duration baseline
+def test_record_execution_duration_persists_event(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_execution_duration(task_id="t1", role="goal", duration_seconds=120.5, now=now)
+
+    data = store.load()
+    events = [e for e in data["events"] if e["kind"] == "execution_duration"]
+    assert len(events) == 1
+    assert events[0]["duration_seconds"] == pytest.approx(120.5)
+    assert events[0]["role"] == "goal"
+
+
+def test_median_execution_duration_returns_none_below_minimum(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    for i in range(2):
+        store.record_execution_duration(task_id=f"t{i}", role="goal", duration_seconds=float(100 + i * 10), now=now)
+    assert store.median_execution_duration("goal") is None
+
+
+def test_median_execution_duration_returns_correct_value(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    durations = [60.0, 90.0, 120.0, 150.0, 180.0]
+    for i, d in enumerate(durations):
+        store.record_execution_duration(task_id=f"t{i}", role="goal", duration_seconds=d, now=now)
+    median = store.median_execution_duration("goal")
+    assert median == pytest.approx(120.0)
+
+
+# S6-8: Kodo version stored in execution outcomes
+def test_record_execution_outcome_stores_kodo_version(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_execution_outcome(
+        task_id="t1",
+        role="goal",
+        succeeded=True,
+        now=now,
+        kodo_version="kodo 1.2.3",
+    )
+
+    data = store.load()
+    events = [e for e in data["events"] if e["kind"] == "execution_outcome"]
+    assert len(events) == 1
+    assert events[0]["kodo_version"] == "kodo 1.2.3"
+
+
+def test_circuit_breaker_skips_on_mixed_kodo_versions(tmp_path) -> None:
+    """Circuit breaker should NOT fire when failures span multiple kodo versions."""
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+
+    # 5 failures but across 2 different kodo versions
+    for i in range(3):
+        store.record_execution_outcome(
+            task_id=f"t{i}", role="goal", succeeded=False, now=now, kodo_version="kodo 1.0.0"
+        )
+    for i in range(3, 6):
+        store.record_execution_outcome(
+            task_id=f"t{i}", role="goal", succeeded=False, now=now, kodo_version="kodo 2.0.0"
+        )
+
+    decision = store.budget_decision(now=now)
+    # Mixed versions → circuit breaker should NOT block
+    assert decision.allowed is True
+
+
+# S6-9: Audit export
+def test_audit_export_returns_execution_outcomes(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    store.record_execution_outcome(task_id="t1", role="goal", succeeded=True, now=now)
+    store.record_execution_outcome(task_id="t2", role="goal", succeeded=False, now=now)
+
+    events = store.audit_export(window_days=1, now=now)
+    assert len(events) == 2
+    # audit_export maps execution_outcome → kind "execution"
+    assert all(e["kind"] == "execution" for e in events)
+    outcomes = {e["task_id"]: e["outcome"] for e in events}
+    assert outcomes["t1"] == "succeeded"
+    assert outcomes["t2"] == "failed"
+
+
+def test_audit_export_excludes_old_events(tmp_path) -> None:
+    store = UsageStore(tmp_path / "usage.json")
+    now = datetime.now(UTC)
+    old = now - timedelta(days=10)
+    store.record_execution_outcome(task_id="t1", role="goal", succeeded=True, now=old)
+    store.record_execution_outcome(task_id="t2", role="goal", succeeded=True, now=now)
+
+    events = store.audit_export(window_days=1, now=now)
+    assert len(events) == 1
+    assert events[0]["task_id"] == "t2"
+
+
+# S6-10: Board health check
+def test_board_health_check_detects_stuck_running(tmp_path) -> None:
+    from control_plane.entrypoints.worker.main import board_health_check
+
+    issues = [
+        {"id": str(i), "state": {"name": "Running"}, "labels": []}
+        for i in range(4)
+    ]
+
+    class FakeSettings:
+        repos: dict = {}
+
+    class FakeService:
+        settings = FakeSettings()
+
+    anomalies = board_health_check(issues, FakeService())
+    stuck = [a for a in anomalies if a["kind"] == "stuck_running"]
+    assert len(stuck) == 1
+    assert stuck[0]["count"] == 4
+
+
+def test_board_health_check_detects_clustered_blocked_reasons(tmp_path) -> None:
+    from control_plane.entrypoints.worker.main import board_health_check
+
+    issues = [
+        {"id": str(i), "state": {"name": "Blocked"}, "labels": [{"name": "blocked: scope_violation"}]}
+        for i in range(6)
+    ]
+
+    class FakeSettings:
+        repos: dict = {}
+
+    class FakeService:
+        settings = FakeSettings()
+
+    anomalies = board_health_check(issues, FakeService())
+    clustered = [a for a in anomalies if a["kind"] == "clustered_blocked_reason"]
+    assert len(clustered) == 1
+    assert clustered[0]["count"] == 6
+
+
+def test_board_health_check_detects_quiet_repo(tmp_path) -> None:
+    from control_plane.entrypoints.worker.main import board_health_check
+
+    issues: list[dict] = []  # no active tasks
+
+    class FakeRepos:
+        def __iter__(self):
+            return iter(["myrepo"])
+
+    class FakeSettings:
+        repos = FakeRepos()
+
+    class FakeService:
+        settings = FakeSettings()
+
+    anomalies = board_health_check(issues, FakeService())
+    quiet = [a for a in anomalies if a["kind"] == "quiet_repo_lane"]
+    assert len(quiet) == 1
+    assert quiet[0]["repo_key"] == "myrepo"
+
+
+def test_board_health_check_returns_empty_for_healthy_board() -> None:
+    from control_plane.entrypoints.worker.main import board_health_check
+
+    issues = [
+        {"id": "1", "state": {"name": "Ready for AI"}, "labels": [{"name": "repo: myrepo"}]},
+        {"id": "2", "state": {"name": "Done"}, "labels": [{"name": "repo: myrepo"}]},
+    ]
+
+    class FakeRepos:
+        def __iter__(self):
+            return iter(["myrepo"])
+
+    class FakeSettings:
+        repos = FakeRepos()
+
+    class FakeService:
+        settings = FakeSettings()
+
+    anomalies = board_health_check(issues, FakeService())
+    # Should have no stuck_running, no clustered, and no quiet_repo (myrepo has 1 active task)
+    assert all(a["kind"] != "stuck_running" for a in anomalies)
+    assert all(a["kind"] != "clustered_blocked_reason" for a in anomalies)
+    assert all(a["kind"] != "quiet_repo_lane" for a in anomalies)
