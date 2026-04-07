@@ -788,3 +788,285 @@ kodo_profiles:
 **Fix:** `ProposalRejectionStore` (new `proposer/rejection_store.py`) maintains a persistent JSON file at `state/proposal_rejections.json`. Records are keyed by `candidate_dedup_key` and store reason, task_id, task_title, and recorded_at. Records are indefinite (never pruned). `ProposerGuardrailAdapter.evaluate()` checks the rejection store first — before budget, cooldown, or open-task checks — and returns `reason="permanently_rejected_by_human"` for any rejected key. Rejection records are written by the human rejection capture (S4-7) when a Cancelled autonomy task is detected.
 
 **Files:** `proposer/rejection_store.py` (new), `proposer/guardrail_adapter.py` (`_rejection_store` field, check in `evaluate`)
+
+---
+
+## Session 6 — 10 Autonomous Operation Controls
+
+### S6-1. Maintenance Window Gate
+
+**Problem:** The system had no way to pause autonomous execution during planned maintenance periods, deploy windows, or overnight freezes without stopping the entire watcher process.
+
+**Fix:** `maintenance_windows:` in config accepts a list of `{start_hour, end_hour, days}` entries (UTC hours, weekday numbers). At the start of every watcher poll cycle, `_in_maintenance_window(settings, now)` is called. While a window is active, the cycle logs a `watch_maintenance_window` event and sleeps without polling or executing tasks. Wrap-midnight windows (e.g. 22:00–04:00) are supported. The autonomy-cycle entrypoint also checks the window before Stage 1.
+
+**Config:**
+```yaml
+maintenance_windows:
+  - start_hour: 2
+    end_hour: 4
+    days: [0, 1, 2, 3, 4]   # Mon–Fri 02:00–04:00 UTC
+```
+
+**Files:** `settings.py` (`MaintenanceWindow`), `entrypoints/worker/main.py` (`_in_maintenance_window`, gate in `run_watch_loop`), `entrypoints/autonomy_cycle/main.py` (gate in `main()`)
+
+---
+
+### S6-2. Per-Repo Daily Execution Cap
+
+**Problem:** The global daily execution cap prevented the whole system from over-running, but one noisy repo could consume the entire quota, leaving other repos with nothing for the rest of the day.
+
+**Fix:** `RepoSettings.max_daily_executions: int | None` (default: None = no per-repo limit). In `execution_gate_decision`, after the global budget passes, `UsageStore.budget_decision_for_repo(repo_key, max_daily, now)` counts that repo's `execution` events in the last 24 hours and returns `BudgetDecision(allowed=False)` if the cap is reached. Returns `skip_repo_budget` with the current count and limit.
+
+**Config:**
+```yaml
+repos:
+  high_volume_repo:
+    max_daily_executions: 5
+```
+
+**Files:** `settings.py` (`RepoSettings.max_daily_executions`), `execution/usage_store.py` (`budget_decision_for_repo`), `entrypoints/worker/main.py` (`execution_gate_decision`)
+
+---
+
+### S6-3. Auto-Merge on CI Green for Autonomy PRs
+
+**Problem:** Autonomy-sourced PRs required a human 👍 even when CI was fully green. For routine lint/type fixes with 100% acceptance history, the review gate was pure friction.
+
+**Fix:** When `auto_merge_on_ci_green: true` is set on a repo and `reviewer.auto_merge_success_rate_threshold` (default 0.9) is satisfied, the review watcher merges autonomy PRs automatically once all CI checks pass. The merge only fires when: the task is labelled `source: autonomy`; the PR is open and not already merged; all CI checks passed; the system-wide success rate is above the threshold.
+
+**Config:**
+```yaml
+repos:
+  my_repo:
+    auto_merge_on_ci_green: true
+reviewer:
+  auto_merge_success_rate_threshold: 0.9
+```
+
+**Files:** `settings.py` (`RepoSettings.auto_merge_on_ci_green`, `ReviewerSettings.auto_merge_success_rate_threshold`), `entrypoints/reviewer/main.py` (`_process_human_review`)
+
+---
+
+### S6-4. Failure Rate Degradation Detection
+
+**Problem:** The circuit breaker (S4-3) only fires at 80% failure. A system degrading from 95% to 65% success — a meaningful signal — produced no warning until it crossed the hard threshold.
+
+**Fix:** `UsageStore.check_failure_rate_degradation(window=30, warn_threshold=0.6, now)` computes the success rate over the last N execution outcomes. When the rate falls below `warn_threshold` (default 60%) it returns the rate (not None), otherwise None. Called every 5 primary-slot cycles in `run_watch_loop`. A `failure_rate_degradation` warning is logged with the current rate and a call to action before the circuit breaker opens.
+
+**Files:** `execution/usage_store.py` (`check_failure_rate_degradation`), `entrypoints/worker/main.py` (check in `run_watch_loop`)
+
+---
+
+### S6-5. Execution Duration Baseline
+
+**Problem:** A task running for 4 hours while the normal runtime was 20 minutes was invisible until the stale-running TTL fired and re-queued it. By then, Kodo may have been stuck in a loop for hours consuming API quota.
+
+**Fix:** `UsageStore.record_execution_duration(task_id, role, duration_seconds, now)` is called after each goal/test execution with the wall-clock time. `median_execution_duration(role)` computes the median over the last 20 runs. When the current run takes >2× the median, a `duration_anomaly` warning is logged. Both methods are used in `handle_goal_task` and `handle_test_task`.
+
+**Files:** `execution/usage_store.py` (`record_execution_duration`, `median_execution_duration`), `entrypoints/worker/main.py` (`handle_goal_task`, `handle_test_task`)
+
+---
+
+### S6-6. Pre-Execution Rejection Feedback
+
+**Problem:** When `validate_task_pre_execution` rejected a task, the rejection was not reflected in the proposal success-rate store. Future cycles could keep proposing the same category of un-actionable tasks.
+
+**Fix:** When pre-execution validation rejects a task, `UsageStore.record_proposal_outcome(category, succeeded=False, now)` is called before the task is moved to Backlog. The category is derived from the task's `task-kind:` label. This feeds the per-category success rate the same way a full execution failure would.
+
+**Files:** `entrypoints/worker/main.py` (`run_watch_loop`, after validation rejection)
+
+---
+
+### S6-7. Safe Revert Detection for Post-Merge Regressions
+
+**Problem:** `detect_post_merge_regressions` could flag a regression but had no way to know whether a revert was safe — the merged commit may have been built on by subsequent commits, making a naive revert destructive.
+
+**Fix:** After detecting a failing CI check on a merged PR, `detect_post_merge_regressions` calls `get_branch_head(owner, repo, base_branch)` to check whether the merge commit SHA is still the latest commit on the base branch. If yes, the regression task's `recommended_action` is set to `revert`; if not (subsequent commits exist), it is set to `investigate`. The task description reflects the recommendation.
+
+**Files:** `entrypoints/worker/main.py` (`detect_post_merge_regressions`)
+
+---
+
+### S6-8. Kodo Version Attribution in Execution Outcomes
+
+**Problem:** When a kodo version upgrade caused widespread failures, it was impossible to distinguish "kodo bug" from "task quality issue" in the usage store. The circuit breaker would open, but the root cause remained opaque.
+
+**Fix:** `_get_kodo_version(binary)` is cached per watcher startup (module-level dict). The result is passed as `kodo_version=` to `UsageStore.record_execution_outcome()`. When the kodo version transitions mid-window (old version → new version or vice versa), the circuit-breaker check skips outcomes from the old version in its sliding window to prevent a version upgrade from triggering a false positive.
+
+**Files:** `entrypoints/worker/main.py` (`_get_kodo_version`, `_kodo_version_cache`, called from `handle_goal_task`/`handle_test_task`), `execution/usage_store.py` (`record_execution_outcome`, version-transition check in `budget_decision`)
+
+---
+
+### S6-9. Structured Audit Log Export
+
+**Problem:** Operators had no structured way to answer "what did the system do this week?" without manually parsing JSON event files or reading Plane comment threads.
+
+**Fix:** `UsageStore.audit_export(window_days, now)` maps `execution_outcome` events to human-friendly `{kind: "execution", task_id, outcome, succeeded, role, kodo_version, timestamp}` dicts. The `audit-export` CLI subcommand prints the full list as JSON.
+
+```bash
+python -m control_plane.entrypoints.worker.main audit-export --window-days 7
+python -m control_plane.entrypoints.worker.main audit-export --window-days 30 > audit.json
+```
+
+**Files:** `execution/usage_store.py` (`audit_export`), `entrypoints/worker/main.py` (`audit-export` subcommand in `main()`)
+
+---
+
+### S6-10. Board Health Snapshot
+
+**Problem:** Detecting board anomalies (tasks stuck in Running, a classification appearing on 10+ blocked tasks, an entire repo lane going quiet) required manual board inspection. No automated signal existed for systemic board health problems.
+
+**Fix:** `board_health_check(issues, service)` detects three anomaly patterns:
+1. **stuck_running** — ≥3 tasks in `Running` state simultaneously (watchers should never leave tasks Running).
+2. **clustered_blocked_reason** — ≥5 blocked tasks with the same `blocked_classification` label (systemic failure pattern).
+3. **quiet_repo_lane** — a configured repo has zero active tasks (Ready for AI or Running) while other repos do (may indicate a per-repo budget cap or config issue).
+
+Called every 40 improve cycles in `run_watch_loop`. Also available as the `board-health` CLI subcommand.
+
+```bash
+python -m control_plane.entrypoints.worker.main board-health --config config/control_plane.local.yaml
+```
+
+**Files:** `entrypoints/worker/main.py` (`board_health_check`, `board-health` subcommand)
+
+---
+
+## Session 7 — 7 Full-Autonomy Infrastructure Gaps
+
+### S7-1. Process Supervisor
+
+**Problem:** The `watch-all` bash restart loop (S4-1) restarted crashed watchers, but had no independent watchdog that could survive if the shell session died, no structured restart-count tracking, and no manifest-driven process management.
+
+**Fix:** New entrypoint `entrypoints/supervisor/main.py` reads a YAML manifest listing processes to manage. It spawns each as a subprocess, then every `check_interval` seconds (default 30):
+1. Checks whether each process is still alive (`poll()` is not None).
+2. Checks whether each process's heartbeat file is stale (> 5 minutes old).
+3. On either condition: kills the existing process (if any) and restarts after `restart_backoff_seconds`.
+
+Per-process `restart_max` limits the number of automatic restart attempts (default: unlimited). Writes `logs/local/supervisor.status.json` on every check iteration for external observability.
+
+**Manifest format:**
+```yaml
+processes:
+  - role: goal
+    command: ["python", "-m", "control_plane.entrypoints.worker.main",
+              "--config", "/path/to/config.yaml", "--watch", "--role", "goal",
+              "--status-dir", "logs/local"]
+    restart_backoff_seconds: 10
+  - role: improve
+    command: [...]
+```
+
+**Files:** `entrypoints/supervisor/__init__.py`, `entrypoints/supervisor/main.py` (new)
+
+---
+
+### S7-2. Credential Rotation Detection
+
+**Problem:** `validate_credentials` (S2-7) detected invalid tokens (401/403) but had no awareness of upcoming expiry. A GitHub fine-grained PAT expiring at midnight would not be caught until it actually expired, halting all execution.
+
+**Fix:** After a successful GitHub `/user` check, the response's `x-token-expiration` header is read (present on fine-grained PATs). When expiry is within `escalation.credential_expiry_warn_days` days (default 7), a `credential_expiry_soon` warning is logged. When ≤1 day remains, an error is logged and a `credential_github_expiring` escalation event is recorded, which can trigger the escalation webhook on the next threshold check.
+
+**Config:**
+```yaml
+escalation:
+  credential_expiry_warn_days: 7  # 0 = disabled
+```
+
+**Files:** `settings.py` (`EscalationSettings.credential_expiry_warn_days`), `entrypoints/worker/main.py` (`validate_credentials`)
+
+---
+
+### S7-3. Transcript Failure Classification
+
+**Problem:** `classify_execution_result` had a coarse `infra_tooling` catch-all for anything that wasn't a context limit, missing dependency, or validation failure. This meant process timeouts, model API errors, and OOM kills all produced the same classification and the same (wrong) follow-up recommendation.
+
+**Fix:** Three new classifications added before `infra_tooling`, checked in priority order:
+
+| Classification | Trigger patterns |
+|---------------|-----------------|
+| `oom` | "out of memory", "cannot allocate memory", "killed", "oom" |
+| `timeout` | "timed out", "timeout", "operation timed out", "deadline exceeded" |
+| `model_error` | "internal server error", "service unavailable", "overloaded", "bad gateway", "rate_limit_error" |
+
+A fourth classification, `tool_failure`, covers bash/git/file tool errors distinct from auth failures. The `infra_tooling` bucket no longer captures timeouts.
+
+**Files:** `entrypoints/worker/main.py` (`classify_execution_result`)
+
+---
+
+### S7-4. Self-Healing for Repeatedly Blocked Tasks
+
+**Problem:** A task could cycle through `Blocked → triage → new follow-up → Blocked` indefinitely. Each cycle created another follow-up task without ever detecting the loop pattern. The board would accumulate chains of blocked tasks with no systemic intervention.
+
+**Fix:** `UsageStore.consecutive_blocks_for_task(task_id, now)` counts backwards through events for that task_id: increments for each `blocked_triage` event, stops and resets when a successful `execution_outcome` is found. In `handle_blocked_triage`, after recording the triage event, if the consecutive count reaches `CONSECUTIVE_BLOCK_COOLDOWN_THRESHOLD = 3`, a self-healing comment is posted on the task and a `self_healing_repeated_block` warning is logged. The comment recommends human review and notes that autonomous retries are paused.
+
+**Files:** `execution/usage_store.py` (`consecutive_blocks_for_task`), `entrypoints/worker/main.py` (`CONSECUTIVE_BLOCK_COOLDOWN_THRESHOLD`, `handle_blocked_triage`)
+
+---
+
+### S7-5. Dependency Update Loop
+
+**Problem:** Outdated package dependencies were only detected via the manual `dependency-check` CLI or when a task failed with a missing API. There was no autonomous path to create bounded update tasks for major-version bumps.
+
+**Fix:** `handle_dependency_update_scan()` runs every 50 improve cycles (new `_DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL`). For each repo with `local_path` configured:
+1. Runs `pip list --outdated --format=json` inside the repo's venv (falls back to system Python if no venv found).
+2. For each package with a **major-version bump** (current major < latest major), creates a bounded Plane task in Backlog.
+3. Tasks are deduplicated against existing board tasks by title.
+4. At most `_MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN = 2` tasks are created per scan to avoid board floods.
+
+**Files:** `entrypoints/worker/main.py` (`handle_dependency_update_scan`, `_DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL`, `_MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN`, wired into `run_watch_loop`)
+
+---
+
+### S7-6. Cross-Repo Impact Analysis
+
+**Problem:** When a task modified a shared interface (a public API module, a protocol definition, a shared utility), the system had no awareness that sibling repos might depend on it. Breaking changes could be merged without any indication that other repos needed updating.
+
+**Fix:** New `RepoSettings.impact_report_paths: list[str]` field declares paths in a repo that are shared interfaces. After each successful goal execution, `_check_cross_repo_impact(changed_files, service)` checks whether any changed file starts with a declared `impact_report_paths` prefix from any repo in settings. When a match is found, a `[Goal] Cross-repo impact detected` comment is posted on the task listing the affected repo and path, and a `cross_repo_impact_detected` warning is logged.
+
+**Config:**
+```yaml
+repos:
+  shared_lib:
+    impact_report_paths:
+      - src/api/
+      - proto/
+```
+
+**Files:** `settings.py` (`RepoSettings.impact_report_paths`), `entrypoints/worker/main.py` (`_check_cross_repo_impact`, called from `handle_goal_task`)
+
+---
+
+### S7-7. Human Escalation Wiring
+
+**Problem:** Escalation (S2-1) fired only when the same blocked-task classification crossed a threshold. Two other critical failure modes had no escalation path: (1) the circuit breaker tripping on a systemic failure, (2) the autonomy proposer going silent for many consecutive cycles.
+
+**Fix (circuit breaker):** In `run_watch_loop`, every 5 cycles on the primary slot, after the failure-rate degradation check, `budget_decision()` is checked for `reason="circuit_breaker_open"`. When the circuit breaker has tripped and an escalation webhook is configured, `should_escalate(classification="circuit_breaker_tripped", threshold=1, ...)` fires and sends a POST. A `circuit_breaker_escalation_sent` error event is logged.
+
+**Fix (quiet proposer):** In `_write_quiet_diagnosis()`, after writing `quiet_diagnosis.json`, when a webhook is configured and `should_escalate(classification="proposer_quiet", threshold=1, ...)` fires, `post_escalation` sends a POST with `count=N` (number of quiet cycles). The escalation is cooldown-guarded to avoid repeated POSTs on consecutive quiet cycles.
+
+**Files:** `entrypoints/worker/main.py` (circuit-breaker escalation in `run_watch_loop`), `entrypoints/autonomy_cycle/main.py` (`_write_quiet_diagnosis`, `_write_cycle_report` — escalation kwargs propagated)
+
+---
+
+## Summary Table (continued)
+
+| # | Name | Trigger | Where |
+|---|------|---------|-------|
+| S6-1 | Maintenance window gate | every poll cycle | `_in_maintenance_window`, `run_watch_loop` |
+| S6-2 | Per-repo daily execution cap | before execution | `budget_decision_for_repo`, `execution_gate_decision` |
+| S6-3 | Auto-merge on CI green | review watcher | `_process_human_review` |
+| S6-4 | Failure rate degradation | every 5 cycles | `check_failure_rate_degradation`, `run_watch_loop` |
+| S6-5 | Execution duration baseline | after each execution | `record_execution_duration`, `handle_goal_task` |
+| S6-6 | Pre-exec rejection feedback | pre-execution validation | `run_watch_loop`, `record_proposal_outcome` |
+| S6-7 | Safe revert detection | every 10 improve cycles | `detect_post_merge_regressions` |
+| S6-8 | Kodo version attribution | after each execution | `_get_kodo_version`, `record_execution_outcome` |
+| S6-9 | Structured audit log export | CLI subcommand | `audit_export`, `audit-export` |
+| S6-10 | Board health snapshot | every 40 improve cycles + CLI | `board_health_check`, `board-health` |
+| S7-1 | Process supervisor | continuous | `entrypoints/supervisor/main.py` |
+| S7-2 | Credential rotation detection | cycle 1 startup | `validate_credentials` |
+| S7-3 | Transcript failure classification | classify after execution | `classify_execution_result` |
+| S7-4 | Self-healing repeated blocks | after blocked triage | `consecutive_blocks_for_task`, `handle_blocked_triage` |
+| S7-5 | Dependency update loop | every 50 improve cycles | `handle_dependency_update_scan` |
+| S7-6 | Cross-repo impact analysis | after successful goal | `_check_cross_repo_impact`, `handle_goal_task` |
+| S7-7 | Human escalation wiring | every 5 cycles + quiet diagnosis | `run_watch_loop`, `_write_quiet_diagnosis` |

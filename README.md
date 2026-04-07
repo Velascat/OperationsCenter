@@ -100,8 +100,8 @@ The naming is intentionally close because the second is the board adapter for th
 
 ### Repo-Aware Autonomy
 
-- Read-only repo observer snapshots with eleven signal collectors: git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health, lint violations (`ruff`), type errors (`ty`/`mypy`), CI check history (GitHub API), and per-task validation failure patterns.
-- Read-only normalized insight generation from retained observer snapshots across thirteen derivers.
+- Read-only repo observer snapshots with fourteen signal collectors: git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health, lint violations (`ruff`), type errors (`ty`/`mypy`), CI check history (GitHub API), per-task validation failure patterns, static architecture coupling (AST), benchmark regression (reads retained benchmark output), and security advisories (reads pip-audit/npm audit/trivy JSON).
+- Read-only normalized insight generation from retained observer snapshots across seventeen derivers (including architecture drift, benchmark regression, and security vuln derivers added in Phase 5).
 - Cross-signal correlation: lint and type violations are checked for overlap with git hotspot files; overlap boosts candidate confidence with a second corroborating signal.
 - Guarded proposal-candidate generation from retained insights across twelve candidate families (seven active by default, five gated).
 - Chain-aware candidate sequencing: `type_fix` is suppressed when `lint_fix` is active in the same cycle or was recently emitted; `execution_health_followup` is suppressed when `test_visibility` is active. Both suppression reasons are artifact-visible.
@@ -153,7 +153,7 @@ The naming is intentionally close because the second is the board adapter for th
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
 - Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
-### Autonomy Hardening (26 improvements across three implementation rounds)
+### Autonomy Hardening (53 improvements across seven implementation rounds)
 
 The following capabilities were added to close gaps toward full autonomous operation:
 
@@ -191,6 +191,33 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Cost/spend telemetry** — `cost_per_execution_usd` in config enables per-task cost recording; `spend-report` CLI subcommand shows total executions and estimated USD per repo per day/week.
 - **Parallel execution within lanes** — `parallel_slots: N` in config (or `--parallel-slots N` CLI flag) launches N task-execution threads; slot 0 owns all periodic scans; throughput scales linearly for independent tasks.
 - **Multi-step dependency planning** — tasks with titles containing `refactor`, `migrate`, `redesign`, etc. (or labeled `plan: multi-step`) are automatically decomposed into Analyze → Implement → Verify subtasks with `depends_on` links before any execution begins.
+
+**Session 4 — 10 reliability and learning improvements:** watcher auto-restart bash loop, stale autonomy task invalidation, success-rate circuit breaker, parallel slot write safety (per-path RLock + atomic writes), observer snapshot staleness detection, connection error exponential backoff, human rejection capture, per-task-kind execution profiles, dry-run quiet diagnosis, long-lived deduplication store.
+
+**Session 5 — 10 reliability and observability improvements:** Plane write retry, Kodo process-tree cleanup on timeout, per-task-kind Running TTL, disk space guardrail, quota exhaustion detection, task urgency scoring, board saturation backpressure, scope violation recording, improve→propose systemic feedback channel, Kodo quality erosion detection.
+
+**Session 6 — 10 autonomous operation controls:**
+
+- **Maintenance window gate** — `maintenance_windows:` in config pauses execution and proposals during planned windows (UTC hours, weekday filters, wrap-midnight support).
+- **Per-repo daily execution cap** — `max_daily_executions: N` on a repo prevents one noisy repo from consuming the full global budget.
+- **Auto-merge on CI green** — `auto_merge_on_ci_green: true` per-repo merges autonomy PRs automatically once all CI checks pass (requires success rate threshold).
+- **Failure rate degradation detection** — warns at 60% success rate before the 80% circuit-breaker threshold; fires every 5 watcher cycles.
+- **Execution duration baseline** — records wall-clock time per task; logs `duration_anomaly` when a run takes >2× the median.
+- **Pre-execution rejection feedback** — when `validate_task_pre_execution` rejects a task, records a failure in the proposal success-rate store so the category learns.
+- **Safe revert detection** — post-merge regression tasks now carry `recommended_action: revert` when the merge commit is still at HEAD, `investigate` when subsequent commits exist.
+- **Kodo version attribution** — `kodo_version` is recorded in every execution outcome; the circuit breaker skips outcomes from the previous version during a kodo upgrade.
+- **Structured audit log export** — `audit-export` CLI prints the full execution event log as JSON; filterable by `--window-days`.
+- **Board health snapshot** — `board-health` CLI and automatic 40-cycle scan detect stuck_running tasks, clustered blocked reasons, and quiet repo lanes.
+
+**Session 7 — 7 full-autonomy infrastructure gaps:**
+
+- **Process supervisor** — `entrypoints/supervisor/main.py` manages watcher processes from a YAML manifest; restarts on crash or stale heartbeat; writes `supervisor.status.json`.
+- **Credential rotation detection** — checks GitHub PAT expiry header at startup; warns ≤7 days before expiry; escalates ≤1 day before expiry.
+- **Transcript failure classification** — `oom`, `timeout`, `model_error`, and `tool_failure` added as distinct classifications before the `infra_tooling` catch-all.
+- **Self-healing for repeated blocks** — after 3 consecutive blocks on the same task, a self-healing comment is posted and a warning logged; resets on next success.
+- **Dependency update loop** — every 50 improve cycles, `pip list --outdated` is run for repos with `local_path`; major-version bumps create bounded Plane tasks.
+- **Cross-repo impact analysis** — `impact_report_paths:` per-repo declares shared interface paths; touching them after a successful goal execution posts a cross-repo warning comment.
+- **Human escalation wiring** — circuit-breaker trips and proposer quiet-cycles now fire the escalation webhook with cooldown guard, in addition to the existing blocked-task threshold escalation.
 
 ### Repo and Branch Selection
 

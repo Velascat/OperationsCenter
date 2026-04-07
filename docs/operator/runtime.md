@@ -343,6 +343,113 @@ Default retention is 1 day and can be changed with:
 CONTROL_PLANE_RETENTION_DAYS=<days>
 ```
 
+## Process Supervisor
+
+For unattended operation, use the process supervisor instead of (or on top of) the bash restart loops in `watch-all`. The supervisor is manifest-driven, tracks restart counts, and monitors heartbeat files independently of the shell session:
+
+```bash
+python -m control_plane.entrypoints.supervisor.main \
+    --manifest config/supervisor_manifest.yaml \
+    --log-dir logs/local \
+    --check-interval 30
+```
+
+Example manifest (`config/supervisor_manifest.yaml`):
+```yaml
+processes:
+  - role: goal
+    command: ["python", "-m", "control_plane.entrypoints.worker.main",
+              "--config", "config/control_plane.local.yaml",
+              "--watch", "--role", "goal", "--status-dir", "logs/local"]
+    restart_backoff_seconds: 10
+  - role: improve
+    command: [...]
+    restart_max: 20        # stop trying after 20 crashes
+  - role: reviewer
+    command: [...]
+```
+
+The supervisor writes `logs/local/supervisor.status.json` on every check — readable by `watch-all-status` or any external monitor. It restarts a process when: (a) the process exits, or (b) its heartbeat file is >5 minutes old (the process is alive but frozen).
+
+## Dependency Update Loop
+
+The improve watcher automatically scans for outdated pip packages every 50 cycles for repos with a `local_path` configured. Major-version bumps trigger bounded Plane tasks in Backlog (at most 2 per scan). No operator action is needed.
+
+To surface dependency updates immediately without waiting for a cycle:
+
+```bash
+# Run the improve watcher manually for one scan cycle
+python -m control_plane.entrypoints.worker.main \
+    --config config/control_plane.local.yaml --first-ready --role improve
+```
+
+## Maintenance Windows
+
+To pause all autonomous execution during planned maintenance (deploy windows, overnight freezes):
+
+```yaml
+maintenance_windows:
+  - start_hour: 2        # UTC
+    end_hour: 4
+    days: [0, 1, 2, 3, 4]   # Mon–Fri only; empty = every day
+```
+
+While a window is active, watchers log `watch_maintenance_window` and sleep the full poll interval without polling. The autonomy-cycle pipeline also skips proposal creation during windows.
+
+## Cross-Repo Impact Paths
+
+When a task modifies shared interface paths, a warning comment is posted on the task automatically. Declare shared paths per-repo:
+
+```yaml
+repos:
+  shared_lib:
+    impact_report_paths:
+      - src/api/         # any change under src/api/ triggers a warning
+      - proto/
+```
+
+Look for `[Goal] Cross-repo impact detected` comments on tasks. This does not block the task — it is an advisory that downstream repos may need to be checked.
+
+## Audit Log Export
+
+Export a structured execution audit trail for the last N days:
+
+```bash
+# Last 7 days (default)
+python -m control_plane.entrypoints.worker.main audit-export
+
+# Last 30 days, save to file
+python -m control_plane.entrypoints.worker.main audit-export --window-days 30 > audit.json
+```
+
+Each entry has `kind: "execution"`, `task_id`, `outcome`, `succeeded`, `role`, `kodo_version`, and `timestamp`. Use for compliance review or debugging failure patterns.
+
+## Board Health Snapshot
+
+```bash
+python -m control_plane.entrypoints.worker.main board-health \
+    --config config/control_plane.local.yaml
+```
+
+Returns a JSON list of board anomalies:
+- `stuck_running` — ≥3 tasks in Running state simultaneously
+- `clustered_blocked_reason` — ≥5 blocked tasks with the same classification
+- `quiet_repo_lane` — a configured repo has zero active tasks
+
+Also runs automatically every 40 improve cycles with anomalies logged as `board_health_anomalies` warnings.
+
+## Per-Repo Daily Execution Cap
+
+Prevent one high-volume repo from consuming the full daily execution budget:
+
+```yaml
+repos:
+  high_volume_repo:
+    max_daily_executions: 5   # default: no per-repo limit
+```
+
+When the cap is reached, the watcher logs `skip_repo_budget` and moves to the next task. The global budget still applies independently.
+
 ## Runtime Boundaries
 
 Current runtime is:
@@ -350,7 +457,7 @@ Current runtime is:
 - local-first
 - polling-based
 - single-machine
-- one watcher process per role
+- one watcher process per role (plus optional supervisor)
 
 It is not:
 

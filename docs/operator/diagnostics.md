@@ -79,13 +79,18 @@ python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/l
 
 Returns exit code 0 if all watchers wrote a heartbeat within the last 5 minutes. Returns exit code 1 with a message listing stale roles. Run from cron to get paged when a watcher dies silently.
 
-## Credential Validation
+## Credential Validation and Expiry Detection
 
-On the first cycle of each watcher run, Control Plane calls the GitHub and Plane APIs to validate tokens. If either returns 401/403, the watcher logs a clear error and exits rather than running with invalid credentials. An escalation event is also written to the usage store so the pattern shows up in the dashboard.
+On the first cycle of each watcher run, Control Plane validates GitHub and Plane tokens.
 
-If a watcher fails to start with `watch_credential_failure`, check:
-- `GITHUB_TOKEN` is set and valid
-- `PLANE_API_TOKEN` is set and valid for the configured workspace
+**Invalid tokens (401/403):** The watcher logs `credential_invalid`, records an escalation event, and exits. If a watcher fails to start with `watch_credential_failure`, check that `GITHUB_TOKEN` and `PLANE_API_TOKEN` are set and valid for the configured workspace.
+
+**Upcoming expiry (fine-grained PATs):** If the GitHub `/user` response includes an `x-token-expiration` header, Control Plane checks whether expiry is within `escalation.credential_expiry_warn_days` days (default 7). When approaching expiry:
+
+- `≤ warn_days` remaining: logs `credential_expiry_soon` warning with days remaining and expiry date
+- `≤ 1 day` remaining: logs error and records a `credential_github_expiring` escalation event
+
+Set `escalation.credential_expiry_warn_days: 0` to disable expiry monitoring. Only fine-grained GitHub PATs expose this header; classic tokens do not.
 
 ## Config Schema Drift Check
 
@@ -233,6 +238,64 @@ Filter for `"kind": "kodo_quota_event"` to track frequency. Unlike transient rat
 
 See the [Disk Space Guardrail](../operator/runtime.md#disk-space-guardrail) section in the Runtime Guide. If writes to the usage store are failing with `OSError`, disk space is the first thing to check.
 
+## Failure Classification Reference
+
+`classify_execution_result` maps execution failures to one of these classifications (checked in priority order):
+
+| Classification | Trigger | Follow-up action |
+|---------------|---------|-----------------|
+| `scope_policy` | `allowed_paths` violation | policy-retry fired |
+| `oom` | Out of memory / killed | investigate memory pressure |
+| `timeout` | Process timed out | increase `kodo.timeout_seconds` or split task |
+| `model_error` | API 5xx / overloaded | transient; retry usually succeeds |
+| `context_limit` | Token limit exceeded | split task with `prior_progress` handoff |
+| `dependency_missing` | ModuleNotFoundError / command not found | fix bootstrap |
+| `flaky_test` | Known-flaky command | stabilise the test |
+| `validation_failure` | Tests / lint fail | investigate test output |
+| `tool_failure` | Bash/git tool error | investigate tool configuration |
+| `infra_tooling` | Auth / missing file | fix credentials or environment |
+| `unknown` | None of the above | investigate stderr |
+
+## Self-Healing Log Events
+
+When a task is blocked for the third consecutive time without a successful execution in between, the system posts a `[Improve] Repeated-block self-healing triggered` comment and logs:
+
+```json
+{"event": "self_healing_repeated_block", "task_id": "...", "consecutive_blocks": 3, "classification": "..."}
+```
+
+This means the task needs human review — autonomous retries for it are paused. The consecutive block counter resets after a successful execution.
+
+## Cross-Repo Impact Warnings
+
+When a goal task touches paths declared in another repo's `impact_report_paths`, a warning is logged:
+
+```json
+{"event": "cross_repo_impact_detected", "task_id": "...", "warnings": ["repo=shared_lib shared_path=src/api/ changed_file=src/api/client.py"]}
+```
+
+And a comment is posted on the task: `[Goal] Cross-repo impact detected`. This is advisory — verify dependent repos still build and pass tests.
+
+## Supervisor Status
+
+When using the process supervisor, check its status:
+
+```bash
+cat logs/local/supervisor.status.json
+```
+
+Fields per process: `role`, `alive`, `pid`, `restart_count`, `last_restart_at`. A high `restart_count` on a role indicates a crash loop — investigate the watcher log for that role.
+
+## Circuit Breaker Escalation
+
+When the circuit breaker trips (≥80% failure over last 5 executions) AND an escalation webhook is configured, a webhook POST is sent automatically (cooldown-guarded). Look for:
+
+```json
+{"event": "circuit_breaker_escalation_sent", "role": "...", "reason": "circuit_breaker_open"}
+```
+
+in the watcher log. The escalation fires once per cooldown period (`escalation.cooldown_seconds`, default 3600). The circuit breaker still resets when the failure rate improves — the escalation is informational.
+
 ## Suggested Debugging Order
 
 1. `watch-all-status`
@@ -241,14 +304,19 @@ See the [Disk Space Guardrail](../operator/runtime.md#disk-space-guardrail) sect
 4. retained artifact directory in `tools/report/kodo_plane/`
 5. `plane-doctor` if the board/API contract looks wrong
 6. heartbeat check: `python -m control_plane.entrypoints.worker.main heartbeat-check`
-7. config drift: look for `config_drift_detected` in watcher log at cycle 1
-8. workspace health: look for `workspace_health_*` events in improve watcher log
-9. circuit breaker: look for `reason: circuit_breaker_open` in watcher log
-10. connection backoff: look for `watch_error` with `consecutive_errors > 1` in watcher log
-11. quota exhaustion: look for `"kind": "kodo_quota_event"` in usage store
-12. quality erosion: look for `"kind": "kodo_quality_warning"` in usage store
-13. scope violations: look for `"kind": "scope_violation"` in usage store
-14. board saturation: look for `"event": "propose_skipped_board_saturated"` in propose watcher log
+7. supervisor status: `cat logs/local/supervisor.status.json` (if using supervisor)
+8. config drift: look for `config_drift_detected` in watcher log at cycle 1
+9. workspace health: look for `workspace_health_*` events in improve watcher log
+10. circuit breaker: look for `reason: circuit_breaker_open` in watcher log; check for `circuit_breaker_escalation_sent`
+11. connection backoff: look for `watch_error` with `consecutive_errors > 1` in watcher log
+12. quota exhaustion: look for `"kind": "kodo_quota_event"` in usage store
+13. quality erosion: look for `"kind": "kodo_quality_warning"` in usage store
+14. scope violations: look for `"kind": "scope_violation"` in usage store
+15. board saturation: look for `"event": "propose_skipped_board_saturated"` in propose watcher log
+16. self-healing: look for `self_healing_repeated_block` events in improve watcher log
+17. credential expiry: look for `credential_expiry_soon` in watcher log at cycle 1
+18. cross-repo impact: look for `cross_repo_impact_detected` in goal watcher log
+19. dependency updates: look for `dependency_update_task_created` in improve watcher log
 
 For autonomy-layer inputs:
 

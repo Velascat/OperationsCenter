@@ -12,7 +12,7 @@ This document tracks what is deferred, what is partially done, and what must be 
 | 2 | Proposal generation (dry-run) | ✓ complete |
 | 3 | Bounded automatic proposal creation | ✓ complete |
 | 4 | Validation profiles + execution feedback depth | partial — see below |
-| 5 | Richer signal depth (architecture, benchmark, security) | deferred |
+| 5 | Richer signal depth (architecture, benchmark, security) | ✓ complete |
 | 6 | Cross-run confidence calibration | deferred |
 | 7 | Bounded experiment mode | deferred — guarded |
 
@@ -53,59 +53,36 @@ The `decide` section of the cycle report shows `emitted_families` but not the `v
 
 ---
 
-## Phase 5 — Richer signal depth
+## Phase 5 — Richer signal depth ✓ Complete
 
-**Why deferred:** The current signal set (lint, type, CI, execution health, test continuity, dependency drift, hotspots, todos, validation history) is not yet stabilized in terms of acceptance rate. Adding more signals before the feedback loop has data on the existing ones generates noise before value.
+All three Phase 5 collectors and derivers are implemented and wired into the pipeline. The observer now collects 14 signals; the insight engine runs 17 derivers.
 
-**Unlock condition:** lint_fix and type_fix have ≥10 feedback records each; arch_promotion has been reviewed at least once by a human.
+### ✓ ArchitectureSignalCollector
 
-### ArchitectureSignalCollector
+Static coupling analysis via AST: module size, import depth, circular dependencies. Runs in the observer stage; never modifies the repo. Emits `ArchitectureSignal`.
 
-**What it does:** Static coupling analysis of the source tree — module size, import depth, circular dependencies. Runs in the observer stage; never modifies the repo.
+- Collector: `src/control_plane/observer/collectors/architecture_signal.py`
+- Deriver: `src/control_plane/insights/derivers/architecture_drift.py` — emits `arch_drift/coupling_high`, `arch_drift/module_bloat`
+- Registered in `build_observer_service()` and `build_insight_service()` in `autonomy_cycle/main.py`
+- Consumed by: `arch_promotion` family in the decision engine
 
-**Where it plugs in:**
-- New collector: `src/control_plane/observer/collectors/architecture_signal.py`
-- New signal model: `ArchitectureSignal` in `src/control_plane/observer/models.py`
-- Register in: `src/control_plane/entrypoints/autonomy_cycle/main.py` → `build_observer_service()` (TODO comment already present)
-- New deriver: `src/control_plane/insights/derivers/architecture_drift.py` — emits `arch_drift/coupling_high`, `arch_drift/module_bloat`
-- Register deriver in: `build_insight_service()` (TODO comment already present)
-- Consumed by: existing `arch_promotion` rule in `src/control_plane/decision/rules/arch_promotion.py`
+### ✓ BenchmarkSignalCollector
 
-**Validation gate:** ArchitectureSignal appearing in snapshot artifacts on at least 3 consecutive runs; at least one arch_promotion proposal reviewed and accepted by a human.
+Reads pre-existing benchmark output files (pytest-benchmark JSON, hyperfine JSON, custom `report.json`). Never runs benchmarks itself. Detects regressions against prior retained outputs. Emits `BenchmarkSignal`.
 
----
+- Collector: `src/control_plane/observer/collectors/benchmark_signal.py`
+- Deriver: `src/control_plane/insights/derivers/benchmark_regression.py` — emits `benchmark_regression/present`
+- Registered in both factory functions
 
-### BenchmarkSignalCollector
+### ✓ SecuritySignalCollector
 
-**What it does:** Reads pre-existing benchmark output files from retained artifacts — pytest-benchmark JSON, hyperfine JSON, custom `report.json`. Never runs benchmarks itself. Detects regressions by comparing current output to prior retained outputs.
+Reads pip-audit, npm audit, or trivy JSON output from retained artifacts. Never runs audit tools itself. Emits `SecuritySignal` when advisories are present.
 
-**Where it plugs in:**
-- New collector: `src/control_plane/observer/collectors/benchmark_signal.py`
-- New signal model: `BenchmarkSignal` in `src/control_plane/observer/models.py`
-- Register in: `build_observer_service()` (TODO comment already present)
-- New deriver: `src/control_plane/insights/derivers/benchmark_regression.py` — emits `benchmark_regression/present`
-- Register deriver in: `build_insight_service()` (TODO comment already present)
-- New rule: `src/control_plane/decision/rules/performance_regression.py` — new `performance_regression` family
-- New validation profile: `BENCHMARK_CLEAN = "benchmark_clean"` in `src/control_plane/decision/validation_profiles.py`
+- Collector: `src/control_plane/observer/collectors/security_signal.py`
+- Deriver: `src/control_plane/insights/derivers/security_vuln.py` — emits `security_vuln/present`
+- Registered in both factory functions
 
-**Validation gate:** At least one benchmark output format present in the repo with ≥5 retained outputs; BenchmarkSignal appearing in snapshot artifacts; at least one performance_regression proposal reviewed by a human.
-
----
-
-### SecuritySignalCollector
-
-**What it does:** Reads pip-audit, npm audit, or trivy JSON output from retained artifacts. Never runs audit tools itself. Emits a SecuritySignal when known vulnerabilities are present.
-
-**Where it plugs in:**
-- New collector: `src/control_plane/observer/collectors/security_signal.py`
-- New signal model: `SecuritySignal` in `src/control_plane/observer/models.py`
-- Register in: `build_observer_service()` (TODO comment already present)
-- New deriver: `src/control_plane/insights/derivers/security_vuln.py` — emits `security_vuln/present`
-- Register deriver in: `build_insight_service()` (TODO comment already present)
-- New rule: `src/control_plane/decision/rules/security_followup.py` — new `security_followup` family
-- New validation profile: `AUDIT_CLEAN = "audit_clean"` in `src/control_plane/decision/validation_profiles.py`
-
-**Validation gate:** At least one audit tool running in CI with output retained; SecuritySignal appearing in snapshots; at least one security_followup proposal reviewed by a human.
+All three signals default to `status="unavailable"` when the tool output files are absent, making them safe no-ops on repos that do not use them.
 
 ---
 
