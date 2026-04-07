@@ -1497,7 +1497,6 @@ class ExecutionService:
             verdict_file = repo_path / ".review" / "verdict.txt"
             verdict_file.parent.mkdir(exist_ok=True)
             goal_text = (
-                f"## Goal\n"
                 f"Self-review: evaluate whether the changes on branch `{branch}` fully satisfy the original goal.\n\n"
                 f"## Original Goal\n"
                 f"{original_goal}\n\n"

@@ -540,6 +540,54 @@ repos:
 
 When the cap is reached, the watcher logs `skip_repo_budget` and moves to the next task. The global budget still applies independently.
 
+## Session 10 Features (S10)
+
+### Campaign Status CLI
+
+Track multi-step execution plan progress across related tasks:
+
+```bash
+python -m control_plane.entrypoints.campaign_status.main
+python -m control_plane.entrypoints.campaign_status.main --status in_progress
+python -m control_plane.entrypoints.campaign_status.main --json
+```
+
+Campaigns are registered automatically when `build_multi_step_plan()` decomposes a complex task. Records are stored in `state/campaigns.json`.
+
+### CI Webhook Receiver
+
+Receive real-time GitHub `check_run` events instead of polling:
+
+```bash
+python -m control_plane.entrypoints.ci_webhook.main --host 127.0.0.1 --port 8765
+```
+
+Environment variables:
+- `CONTROL_PLANE_WEBHOOK_SECRET` — HMAC secret from GitHub webhook settings (required for signature validation)
+- `CONTROL_PLANE_WEBHOOK_PORT` — port (default: 8765)
+- `CONTROL_PLANE_WEBHOOK_HOST` — host (default: 127.0.0.1)
+- `CONTROL_PLANE_WEBHOOK_TRIGGER` — optional command to run on CI event (default: write trigger file to `state/ci_webhook_triggers/`)
+
+Configure GitHub to send `check_run` events to `http://your-host:8765/webhook`.
+
+### Awaiting Input — Mid-Execution Questions
+
+Kodo can signal it needs clarification by including `<!-- cp:question: <text> -->` in its output. The improve watcher detects this, marks the task Blocked with `awaiting_input` classification, and posts the question for the operator.
+
+After the operator replies in the task comments, `handle_awaiting_input_scan()` (every 8 improve cycles) detects the answer, injects it into the task description, and re-queues the task to `Ready for AI`.
+
+### Calibration Cleanup
+
+Remove stale calibration events manually:
+
+```python
+from control_plane.tuning.calibration import ConfidenceCalibrationStore
+removed = ConfidenceCalibrationStore().cleanup_old_events(window_days=90)
+print(f"Removed {removed} old events")
+```
+
+This is also safe to call periodically in automation; `calibration_for()` and `report()` already apply a 90-day window by default.
+
 ## Runtime Boundaries
 
 Current runtime is:

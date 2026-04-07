@@ -102,6 +102,22 @@ The parent task receives a comment with created child task ids, and the child ta
 
 These are board-facing workflow states, not a queue implementation.
 
+## Awaiting-Input Flow
+
+When Kodo embeds `<!-- cp:question: ... -->` in its output, the task enters a human-in-the-loop sub-flow inside the `Blocked` state:
+
+```text
+goal [Running] -> Blocked (awaiting_input)
+                      ↓
+         improve extracts question, posts Plane comment
+                      ↓  (every 8 cycles)
+         human replies on Plane task
+                      ↓
+         improve injects answer, re-queues -> Ready for AI
+```
+
+This flow is distinct from `validation_failure` or `infra_tooling` blocks — it is not retried automatically. It waits for a human answer. Once detected and re-queued, the task re-enters the normal goal execution cycle with the answer injected into its description.
+
 ## Boundaries
 
 This lifecycle contract does not imply:

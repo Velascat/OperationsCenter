@@ -282,6 +282,49 @@ MAX_PROPOSALS_PER_DAY = 30
 | `velocity_cap_exceeded` | ≥10 proposals created in the last 24 hours | Wait for the window to pass; or raise `max_proposals_per_24h` |
 | `proposal_stale_open` | Prior unresolved proposal exceeded `expires_after_runs` without feedback | Close or record feedback for the old task; or increase `expires_after_runs` |
 
+## Calibration Time Decay
+
+The `ConfidenceCalibrationStore` filters events by recency when computing acceptance rates. The default window is 90 days.
+
+```bash
+# View calibration with the default 90-day window
+./scripts/control-plane.sh tune-autonomy
+
+# Widen the window to see all historical data
+./scripts/control-plane.sh tune-autonomy --window 180
+```
+
+The `window_days` parameter is passed to `calibration_for()` and `report()` internally. Events older than the window are excluded from acceptance-rate calculations.
+
+**Cleaning up stale events:**
+
+```python
+from control_plane.tuning.calibration import ConfidenceCalibrationStore
+store = ConfidenceCalibrationStore()
+store.cleanup_old_events(window_days=90)  # removes events older than 90 days
+```
+
+This is safe to run periodically. It does not affect the recommendation output — recommendations already exclude old events via the window — but it keeps `state/calibration_store.json` compact.
+
+**Why time decay matters:** Early feedback records may reflect a different codebase state or an earlier version of Kodo. Excluding stale events prevents historical over-confidence from blocking proposals that are now reliably accepted.
+
+## Proposal Utility Scoring
+
+Before the per-cycle proposal cap is applied, proposals are ranked by a utility score:
+
+```
+score = confidence_weight + calibration_bonus + state_bonus - scope_penalty
+```
+
+- `confidence_weight`: 1.0 for high, 0.6 for medium, 0.2 for low
+- `calibration_bonus`: up to +0.3 based on the family's recent acceptance rate (0.0 when no calibration data)
+- `state_bonus`: +0.1 if the proposal targets a task already in Backlog
+- `scope_penalty`: -0.2 for medium complexity (3–7 files), -0.5 for high complexity (≥8 files)
+
+High-complexity proposals (≥8 files affected) are automatically placed in Backlog regardless of score. This prevents unachievable-scope proposals from consuming the execution budget.
+
+To inspect current proposal scores for a cycle, add `--dry-run` and check the retained `proposal_candidates.json` artifact — the `utility_score` field is written alongside each candidate.
+
 ## Documenting Threshold Changes
 
 When you change a threshold, add a comment inline or update this file with the before/after:

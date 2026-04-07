@@ -13,6 +13,7 @@ This document tracks what is deferred, what is partially done, and what must be 
 | 3 | Bounded automatic proposal creation | ✓ complete |
 | 4 | Validation profiles + execution feedback depth | ✓ complete (S8) |
 | 5 | Richer signal depth (architecture, benchmark, security) | ✓ complete |
+| 5.1 | Learning and feedback loop hardening (S10) | ✓ complete |
 | 6 | Cross-run confidence calibration | deferred |
 | 7 | Bounded experiment mode | deferred — guarded |
 

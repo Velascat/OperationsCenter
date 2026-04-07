@@ -153,7 +153,7 @@ The naming is intentionally close because the second is the board adapter for th
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
 - Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
-### Autonomy Hardening (73 improvements across nine implementation rounds)
+### Autonomy Hardening (83 improvements across ten implementation rounds)
 
 The following capabilities were added to close gaps toward full autonomous operation:
 
@@ -244,6 +244,19 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **PR description quality check** — `_check_pr_description_quality()` detects empty or thin PR descriptions (<80 chars) before self-review and patches them with task context via `GitHubPRClient.update_pr_description()`.
 - **Evidence-enriched conflict avoidance** — the proposal loop now checks file paths extracted from `evidence_lines` (not just title tokens) against in-flight task artifacts, giving higher-fidelity conflict suppression.
 - **Theme aggregation** — `ThemeAggregationDeriver` groups files appearing persistently in top lint/type violations across ≥3 snapshots into `theme/lint_cluster` and `theme/type_cluster` insights; `LintClusterRule` proposes a single `[Refactor]` task instead of N individual fix proposals.
+
+**Session 10 — 10 learning, feedback, and intelligence improvements:**
+
+- **Rejection pattern injection** — `_load_rejection_patterns_for_proposal()` reads `state/rejection_patterns.json` and injects a `## Prior Rejection Patterns` section into every Kodo task description so known reviewer objections are addressed before submission.
+- **`awaiting_input` classification** — Kodo can embed `<!-- cp:question: ... -->` in its output to signal a clarifying question; the improve watcher classifies the task as `awaiting_input`, extracts the question, posts it as a Plane comment, and re-queues the task every 8 cycles once a human reply appears.
+- **Reviewer → goal requeue** — after `REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD` (default 2) zero-change revision passes in human review, the PR is closed and a fresh `goal` task is created so the problem is re-analysed from scratch instead of looping indefinitely.
+- **CampaignStore** — multi-step plan progress is tracked in `state/campaigns.json`; `CampaignStore.create()` is called when a multi-step plan is decomposed; `campaign-status` CLI shows active campaigns with step-level progress bars.
+- **Calibration time decay** — `ConfidenceCalibrationStore.calibration_for()` and `report()` now accept `window_days=90`; events older than the window are excluded from acceptance-rate calculations; `cleanup_old_events(window_days)` removes stale events from disk.
+- **Complexity gate** — `_estimate_task_complexity()` counts affected files; proposals touching ≥8 files are automatically placed in Backlog instead of Ready for AI, preventing Kodo from receiving an unachievable scope in one context window.
+- **Utility scoring** — `_score_proposal_utility()` combines confidence weight, calibration acceptance bonus, state bonus, and scope penalty into a float; proposals are sorted by score before the cycle cap is applied, ensuring the highest-value proposals are created first.
+- **CI webhook** — `entrypoints/ci_webhook/main.py` accepts GitHub check-run events over HTTP with HMAC-SHA256 signature validation; writes trigger files to `state/ci_webhook_triggers/` or runs a configurable command, enabling event-driven autonomy-cycle invocation on CI completion.
+- **Cross-repo synthesis** — `CrossRepoSynthesisDeriver` reads the latest `repo_insights.json` artifact for every repo in `tools/report/control_plane/insights/` and emits `cross_repo/pattern_detected` when the same insight kind appears in ≥2 repos, surfacing org-wide patterns that warrant a single shared fix task.
+- **Priority rescore scan** — every 45 improve cycles, `handle_priority_rescore_scan()` re-evaluates backlog autonomy tasks: demotes those whose signal family's calibration acceptance rate has dropped below 40% (adds `signal_stale` label), and promotes those above 75% to `priority: high`.
 
 ### Repo and Branch Selection
 

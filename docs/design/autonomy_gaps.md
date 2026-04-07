@@ -1,6 +1,6 @@
-# Autonomy Hardening — 36 Full-Autonomy Gap Improvements
+# Autonomy Hardening — 46 Full-Autonomy Gap Improvements
 
-This document describes the 36 improvements implemented across four sessions to close the
+This document describes the 46 improvements implemented across five sessions to close the
 gaps toward fully autonomous operation. They are grouped by session, then by theme.
 
 ---
@@ -1416,3 +1416,150 @@ New `LintClusterRule` in `decision/rules/lint_cluster.py` turns these into `[Ref
 | S9-8 | PR description quality check | before self-review | `_check_pr_description_quality`, `update_pr_description` |
 | S9-9 | Evidence-enriched conflict avoidance | before task creation | `_extract_evidence_file_tokens`, proposal loop |
 | S9-10 | Theme aggregation | autonomy-cycle insights + decision | `theme_aggregation.py`, `LintClusterRule` |
+
+---
+
+## Session 10 — 10 Learning, Feedback, and Intelligence Improvements
+
+### S10-1: Rejection Patterns Injected into Kodo Prompts
+
+**Problem:** The proposer generated task descriptions without knowledge of what human reviewers had previously flagged. When a reviewer rejected a PR for "missing tests", the next proposal for the same family would not mention this concern, leading to repeat rejections.
+
+**Fix:** `build_proposal_description()` in `worker/main.py` now calls `_load_rejection_patterns_for_proposal(family, repo_key)` which reads `state/rejection_patterns.json` (maintained by the reviewer watcher). When top-3 patterns exist, a **## Prior Rejection Patterns** section is appended to the task description, instructing Kodo to proactively address them.
+
+**Files:** `entrypoints/worker/main.py` (`_load_rejection_patterns_for_proposal`, `_REJECTION_PATTERNS_PATH`, `build_proposal_description`)
+
+---
+
+### S10-2: Question-Asking Mid-Execution (`awaiting_input`)
+
+**Problem:** Kodo would silently block or produce low-quality output when it lacked critical information (e.g., which database schema version to target). There was no mechanism to ask the operator a question and resume with the answer.
+
+**Fix:**
+- New `<!-- cp:question: ... -->` marker in Kodo stdout/summary: `extract_cp_question()` detects it; `classify_execution_result()` returns `"awaiting_input"`.
+- `classify_blocked_issue()` also detects the marker in existing comments.
+- `build_improve_triage_result()` handles `awaiting_input`: surfaces the question text in the human-attention comment.
+- New `handle_awaiting_input_scan()` (every 8 improve cycles): finds Blocked tasks with this classification, detects human replies posted after the triage comment, injects the answer into the task description, and transitions back to Ready for AI.
+
+**Files:** `entrypoints/worker/main.py` (`extract_cp_question`, `_CP_QUESTION_RE`, `classify_execution_result`, `classify_blocked_issue`, `build_improve_triage_result`, `handle_awaiting_input_scan`, `_AWAITING_INPUT_SCAN_CYCLE_INTERVAL`, watch loop)
+
+---
+
+### S10-3: Reviewer → Goal Re-Run Escalation
+
+**Problem:** When a human reviewer left a comment that Kodo could not address (zero changed files), the system would post "made no changes" indefinitely, burning loop count without progress.
+
+**Fix:** New `_requeue_as_goal()` in `reviewer/main.py`. When zero-change revision attempts reach `REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD` (2), the function:
+1. Closes the PR with an explanatory comment.
+2. Creates a fresh goal task with the review feedback injected into the goal description.
+3. Marks the original task Done and removes the PR review state file.
+
+A warning is shown to the reviewer after each zero-change attempt indicating how many are left before requeue.
+
+**Files:** `entrypoints/reviewer/main.py` (`_requeue_as_goal`, `REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD`, `_process_human_review`)
+
+---
+
+### S10-4: Campaign/Project Tracking
+
+**Problem:** Multi-step plans created by `build_multi_step_plan()` had no aggregate progress view. Operators had to cross-reference three individual Plane tasks to understand where a campaign stood.
+
+**Fix:** New `CampaignStore` in `execution/campaign_store.py`. When `build_multi_step_plan()` creates step tasks, it registers a campaign record with the source task ID, title, and step task IDs. The store tracks `done_step_ids`, `cancelled_step_ids`, `status` (in_progress / partial / completed / cancelled), and progress_pct.
+
+New `entrypoints/campaign_status/main.py` CLI:
+```
+python -m control_plane.entrypoints.campaign_status.main [--status ...] [--json]
+```
+
+**Files:** `execution/campaign_store.py` (NEW), `entrypoints/campaign_status/main.py` (NEW), `entrypoints/worker/main.py` (campaign registration in `build_multi_step_plan`)
+
+---
+
+### S10-5: Calibration Time Decay
+
+**Problem:** `ConfidenceCalibrationStore` accumulated events indefinitely. Old data from a period when a family performed poorly would dilute recent signal, making calibration data stale and misleading.
+
+**Fix:**
+- `calibration_for()` and `report()` now accept `window_days=90` (default). Events older than the window are excluded from acceptance-rate calculations.
+- New `cleanup_old_events(window_days=90)`: removes events older than the window from disk; returns count removed.
+- `_cutoff(window_days)` helper computes the ISO timestamp cutoff.
+
+**Files:** `tuning/calibration.py` (`calibration_for`, `report`, `cleanup_old_events`, `_cutoff`)
+
+---
+
+### S10-6: Task Complexity Estimate at Proposal Time
+
+**Problem:** The proposer would create high-priority proposals involving 10+ files that kodo could not complete in a single run, wasting execution budget.
+
+**Fix:** New `_estimate_task_complexity(proposal)` function in `worker/main.py`. Returns `"low"` / `"medium"` / `"high"` based on the count of distinct file paths in `evidence_lines` + goal text. `build_proposal_candidates()` applies a **complexity gate**: proposals estimated as `"high"` are moved to Backlog with confidence reduced from high → medium. This prevents flooding the board with unexecutable tasks.
+
+Thresholds: ≥8 files → high; 3–7 → medium; <3 → low.
+
+**Files:** `entrypoints/worker/main.py` (`_estimate_task_complexity`, `_COMPLEXITY_FILE_THRESHOLD_HIGH/MEDIUM`, `build_proposal_candidates` complexity gate)
+
+---
+
+### S10-7: Utility Function for Proposal Ranking
+
+**Problem:** Within a cycle, proposals were created in arbitrary iteration order. The highest-value proposal might miss the cycle cap while lower-value ones were created first.
+
+**Fix:** New `_score_proposal_utility(proposal)` function. Score = confidence weight + calibration bonus (0–0.4) + state bonus (0.2 for Ready for AI) − scope penalty (0.05 per file beyond 2, capped at 0.3). `handle_propose_cycle()` sorts proposals by descending utility score before the cycle-cap loop, ensuring the best proposals are always created first.
+
+**Files:** `entrypoints/worker/main.py` (`_score_proposal_utility`, `handle_propose_cycle` sort)
+
+---
+
+### S10-8: Real-Time CI Webhook
+
+**Problem:** ControlPlane polled for CI status every N seconds. Between CI completing and the next poll, the reviewer watcher was idle even though action could have been taken immediately.
+
+**Fix:** New `entrypoints/ci_webhook/main.py` HTTP server for GitHub `check_run` webhook events:
+- Listens on `127.0.0.1:8765` (configurable via env vars).
+- Validates `X-Hub-Signature-256` HMAC using `CONTROL_PLANE_WEBHOOK_SECRET`.
+- On `check_run.completed` with a relevant conclusion: writes a JSON trigger file to `state/ci_webhook_triggers/` (or runs a custom command via `CONTROL_PLANE_WEBHOOK_TRIGGER`).
+- Trigger files are picked up by the reviewer watcher on the next cycle.
+
+**Files:** `entrypoints/ci_webhook/main.py` (NEW), `entrypoints/ci_webhook/__init__.py` (NEW)
+
+---
+
+### S10-9: Cross-Repo Synthesis Deriver
+
+**Problem:** When lint errors, security vulnerabilities, or architecture drift appeared simultaneously in multiple repos, the system proposed per-repo fix tasks with no visibility into the systemic pattern.
+
+**Fix:** New `CrossRepoSynthesisDeriver` in `insights/derivers/cross_repo_synthesis.py`. On each autonomy-cycle insights run, it reads the latest `repo_insights.json` artifact from every repo in `tools/report/control_plane/insights/`, computes insight-kind overlap, and emits `cross_repo/pattern_detected` for any kind shared by ≥2 repos. The evidence includes `shared_insight_kind`, `repo_count`, and `repos`.
+
+Registered last in `build_insight_service()` so all per-repo derivers have already fired.
+
+**Files:** `insights/derivers/cross_repo_synthesis.py` (NEW), `entrypoints/autonomy_cycle/main.py` (registration)
+
+---
+
+### S10-10: Task Priority Re-Evaluation Scan
+
+**Problem:** Autonomy backlog tasks accumulated indefinitely. A task proposed when lint errors were high would stay in Backlog even after a manual cleanup removed all violations. Conversely, a task for a high-acceptance family would sit at the same priority as one for a low-acceptance family.
+
+**Fix:** New `handle_priority_rescore_scan()` (every 45 improve cycles). For each Backlog task with `source: autonomy` label:
+- **Demote** (add `signal_stale` label): when `calibration_for` or `proposal_success_rate` < 0.2 (signal has become unreliable).
+- **Promote** (add `priority: high` label): when acceptance rate ≥ 0.7 and the task isn't already high priority.
+Each change adds a `[Improve] Priority rescore` comment explaining the reasoning.
+
+**Files:** `entrypoints/worker/main.py` (`handle_priority_rescore_scan`, `_PRIORITY_RESCORE_CYCLE_INTERVAL`, watch loop)
+
+---
+
+## Summary Table — Session 10
+
+| # | Name | Trigger | Where |
+|---|------|---------|-------|
+| S10-1 | Rejection patterns in prompts | at proposal creation | `build_proposal_description`, `_load_rejection_patterns_for_proposal` |
+| S10-2 | awaiting_input question-asking | during execution / improve scan | `classify_execution_result`, `handle_awaiting_input_scan` |
+| S10-3 | Reviewer → goal requeue | after repeated zero-change revisions | `_requeue_as_goal`, `_process_human_review` |
+| S10-4 | Campaign tracking | on multi-step plan creation | `CampaignStore`, `campaign-status` CLI |
+| S10-5 | Calibration time decay | on calibration query + cleanup | `calibration_for(window_days)`, `cleanup_old_events` |
+| S10-6 | Complexity gate at proposal time | `build_proposal_candidates` | `_estimate_task_complexity` |
+| S10-7 | Utility-ranked proposals | before cycle-cap loop | `_score_proposal_utility`, `handle_propose_cycle` |
+| S10-8 | CI webhook receiver | on GitHub check_run event | `entrypoints/ci_webhook/main.py` |
+| S10-9 | Cross-repo synthesis | autonomy-cycle insights stage | `CrossRepoSynthesisDeriver` |
+| S10-10 | Priority rescore scan | every 45 improve cycles | `handle_priority_rescore_scan` |

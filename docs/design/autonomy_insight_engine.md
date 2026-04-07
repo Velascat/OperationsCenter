@@ -40,6 +40,7 @@ The insight engine also reads a bounded recent snapshot history for the same rep
 | `CIPatternDeriver` | `ci_pattern/failing`, `ci_pattern/flaky` |
 | `ValidationPatternDeriver` | `validation_pattern/repeated_failures` |
 | `ProposalOutcomeDeriver` | `proposal_outcome/acceptance_rate_low`, `proposal_outcome/acceptance_rate_high` |
+| `CrossRepoSynthesisDeriver` | `cross_repo/pattern_detected` |
 
 ## Deriver Details
 
@@ -99,6 +100,16 @@ Reads retained feedback records from `state/proposal_feedback/` and derives:
 | `proposal_outcome/acceptance_rate_high` | acceptance rate ≥ 80% with ≥5 feedback records |
 
 These insights feed the self-tuning regulator's acceptance rate rules.
+
+### CrossRepoSynthesisDeriver
+
+Reads the latest `repo_insights.json` artifact for every repo found under `tools/report/control_plane/insights/`. Groups insight kinds across repos and derives:
+
+| Insight | Condition |
+|---------|-----------|
+| `cross_repo/pattern_detected` | the same insight kind appears in ≥2 repos |
+
+Evidence includes `shared_insight_kind`, `repo_count`, `repos` (list), and a description suggesting an org-wide fix. Falls back silently to zero insights when fewer than 2 repos have artifact data. The deriver is intentionally read-only and never modifies the repo.
 
 ## Output
 

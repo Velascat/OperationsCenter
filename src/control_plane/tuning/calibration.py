@@ -89,19 +89,24 @@ class ConfidenceCalibrationStore:
         confidence: str,
         *,
         repo_key: str | None = None,
+        window_days: int | None = 90,
     ) -> float | None:
         """Return the observed acceptance rate for (family, confidence[, repo_key]).
 
         When repo_key is given, only events matching that repo are counted.
         Falls back to global aggregate when repo_key is None.
+        When window_days is given (default 90), only events within that many days
+        are counted so stale data does not dilute recent signal.
         Returns None when fewer than _MIN_SAMPLE_SIZE records exist.
         """
         with self._lock:
             data = self._load()
+        cutoff = self._cutoff(window_days)
         events = [
             e for e in data.get("events", [])
             if e.get("family") == family and e.get("confidence") == confidence
             and (repo_key is None or e.get("repo_key") == repo_key)
+            and (cutoff is None or e.get("recorded_at", "") >= cutoff)
         ]
         if len(events) < _MIN_SAMPLE_SIZE:
             return None
@@ -109,15 +114,45 @@ class ConfidenceCalibrationStore:
         total = len(events)
         return merged / total
 
-    def report(self, *, per_repo: bool = False) -> list[CalibrationRecord]:
+    def cleanup_old_events(self, *, window_days: int = 90) -> int:
+        """Remove events older than *window_days*. Returns number of events removed."""
+        cutoff = self._cutoff(window_days)
+        if cutoff is None:
+            return 0
+        with self._lock:
+            data = self._load()
+            events = data.get("events", [])
+            kept = [e for e in events if e.get("recorded_at", "") >= cutoff]
+            removed = len(events) - len(kept)
+            if removed > 0:
+                data["events"] = kept
+                self._save(data)
+        return removed
+
+    @staticmethod
+    def _cutoff(window_days: int | None) -> str | None:
+        """Return ISO timestamp cutoff string or None when no window is configured."""
+        if window_days is None:
+            return None
+        from datetime import timedelta
+        cutoff_dt = datetime.now(UTC) - timedelta(days=window_days)
+        return cutoff_dt.isoformat()
+
+    def report(self, *, per_repo: bool = False, window_days: int | None = 90) -> list[CalibrationRecord]:
         """Return calibration records for all (family, confidence[, repo_key]) pairs with enough data.
 
         When per_repo=True, groups by (repo_key, family, confidence).
         When per_repo=False (default), groups by (family, confidence) across all repos.
+        When window_days is given (default 90), only events within that window are used.
         """
         with self._lock:
             data = self._load()
-        events = data.get("events", [])
+        cutoff = self._cutoff(window_days)
+        all_events = data.get("events", [])
+        events = (
+            [e for e in all_events if e.get("recorded_at", "") >= cutoff]
+            if cutoff is not None else all_events
+        )
 
         if per_repo:
             # Group by (repo_key, family, confidence)

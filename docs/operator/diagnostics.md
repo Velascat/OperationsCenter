@@ -252,6 +252,7 @@ See the [Disk Space Guardrail](../operator/runtime.md#disk-space-guardrail) sect
 | `dependency_missing` | ModuleNotFoundError / command not found | fix bootstrap |
 | `flaky_test` | Known-flaky command | stabilise the test |
 | `validation_failure` | Tests / lint fail | investigate test output |
+| `awaiting_input` | Kodo embedded `<!-- cp:question: ... -->` | human must reply; improve watcher re-queues automatically |
 | `tool_failure` | Bash/git tool error | investigate tool configuration |
 | `infra_tooling` | Auth / missing file | fix credentials or environment |
 | `unknown` | None of the above | investigate stderr |
@@ -296,6 +297,58 @@ When the circuit breaker trips (≥80% failure over last 5 executions) AND an es
 
 in the watcher log. The escalation fires once per cooldown period (`escalation.cooldown_seconds`, default 3600). The circuit breaker still resets when the failure rate improves — the escalation is informational.
 
+## Campaign Status
+
+Track multi-step plan progress from the board:
+
+```bash
+# Show all active campaigns
+python -m control_plane.entrypoints.campaign_status.main
+
+# Show only in-progress campaigns
+python -m control_plane.entrypoints.campaign_status.main --status in_progress
+
+# JSON output for scripting
+python -m control_plane.entrypoints.campaign_status.main --json
+```
+
+Campaigns are created automatically when the improve watcher decomposes a multi-step plan (tasks with titles containing `refactor`, `migrate`, `redesign`, etc. or labeled `plan: multi-step`). Each campaign tracks step completion and overall progress.
+
+Campaign records are stored in `state/campaigns.json`. Each record contains `campaign_id`, `title`, `step_ids`, `done_step_ids`, `cancelled_step_ids`, `total_steps`, `completed_steps`, `progress_pct`, and `status` (`pending`, `in_progress`, `complete`, `partially_cancelled`).
+
+## Awaiting-Input Tasks
+
+When Kodo embeds `<!-- cp:question: ... -->` in its output, the task is classified as `awaiting_input` and blocked. The improve watcher:
+
+1. Extracts the question text from the HTML comment.
+2. Posts it as a Plane comment asking for human input.
+3. Scans every 8 improve cycles for a human reply.
+4. When a reply is detected, injects the answer into the task description and re-queues it to `Ready for AI`.
+
+To find pending awaiting-input tasks:
+
+```bash
+grep "awaiting_input" logs/local/watch-all/improve.log | tail -20
+```
+
+Or check the Plane board for tasks with `blocked_classification: awaiting_input` in their latest comment.
+
+## CI Webhook
+
+The CI webhook server receives GitHub check-run events and triggers autonomy cycles reactively:
+
+```bash
+# Start the webhook server
+python -m control_plane.entrypoints.ci_webhook.main --port 8765 --secret "$WEBHOOK_SECRET"
+
+# Trigger files land in state/ci_webhook_triggers/
+ls state/ci_webhook_triggers/
+```
+
+Each trigger file is named `<timestamp>_<check_suite_id>.json` and contains the repository, branch, check name, status, and conclusion. The pipeline trigger watcher watches this directory and fires `autonomy-cycle` when a new trigger appears.
+
+HMAC-SHA256 signature validation (`X-Hub-Signature-256` header) is enforced when `--secret` is provided. Requests without a valid signature return HTTP 401.
+
 ## Suggested Debugging Order
 
 1. `watch-all-status`
@@ -323,6 +376,11 @@ in the watcher log. The escalation fires once per cooldown period (`escalation.c
 23. no-op loop: look for `noop_loop/family_cycling` in the latest insights artifact; family is cycling without acceptance
 24. coverage gap: look for `coverage_gap/low_overall` or `coverage_gap/uncovered_files` insights; check `coverage.xml` is being generated
 25. execution env: look for `execution_env_warning` in the goal watcher log; check that required tools are installed in venv
+26. awaiting-input tasks: look for `blocked_classification: awaiting_input` in improve watcher log; check Plane task for extracted question
+27. priority rescore: look for `priority_rescore_demoted` and `priority_rescore_promoted` events in improve watcher log every 45 cycles
+28. cross-repo patterns: look for `cross_repo/pattern_detected` in the latest insights artifact; consider org-wide fix tasks
+29. campaign status: run `campaign-status` CLI; check `state/campaigns.json` for stalled campaigns
+30. ci webhook triggers: check `state/ci_webhook_triggers/` for unprocessed trigger files
 
 For autonomy-layer inputs:
 
