@@ -388,6 +388,16 @@ def _process_self_review(
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="self_review_lgtm")
         return 1
 
+    # Self-review machinery failed (kodo didn't produce verdict.txt) — retry next cycle.
+    if verdict.verdict == "error":
+        logger.warning(json.dumps({
+            "event": "self_review_error_retry",
+            "task_id": task_id,
+            "concerns": verdict.concerns,
+            "loop": self_review_loops,
+        }))
+        return 1
+
     # CONCERNS — check for merge conflicts first (Option A).
     if _concerns_indicate_merge_conflict(verdict.concerns) and not state.get("auto_rebase_attempted"):
         logger.info(json.dumps({"event": "auto_rebase_start", "task_id": task_id}))
