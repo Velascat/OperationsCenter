@@ -835,7 +835,6 @@ def _requeue_as_goal(
     # 3. Create the fresh goal task
     fresh_title = f"[Requeue] {str(state.get('task_title', original_goal[:60]))}"
     try:
-        repo_cfg = service.settings.repos.get(repo_key)
         new_task = plane_client.create_issue(
             name=fresh_title,
             description=fresh_description,
@@ -864,8 +863,8 @@ def _requeue_as_goal(
         ]
         plane_client.comment_issue(
             task_id,
-            f"[Review] Closed and re-queued as fresh goal.\n"
-            + "\n".join(f"- {l}" for l in comment_lines),
+            "[Review] Closed and re-queued as fresh goal.\n"
+            + "\n".join(f"- {line}" for line in comment_lines),
         )
     except Exception:
         pass

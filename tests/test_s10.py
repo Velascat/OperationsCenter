@@ -14,7 +14,6 @@ S10-10 Task priority re-evaluation scan
 from __future__ import annotations
 
 import json
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -61,7 +60,7 @@ def test_load_rejection_patterns_missing_file_returns_empty(tmp_path: Path) -> N
 
 def test_build_proposal_description_injects_rejection_patterns() -> None:
     from control_plane.entrypoints.worker.main import (
-        ProposalSpec, build_proposal_description, _load_rejection_patterns_for_proposal
+        ProposalSpec, build_proposal_description
     )
 
     service = MagicMock()
@@ -475,7 +474,7 @@ def test_estimate_task_complexity_high() -> None:
 
 def test_build_proposal_candidates_complexity_gate_caps_high_complexity(tmp_path: Path) -> None:
     from control_plane.entrypoints.worker.main import (
-        build_proposal_candidates, ProposalSpec, _estimate_task_complexity
+        build_proposal_candidates, _estimate_task_complexity
     )
 
     service = MagicMock()

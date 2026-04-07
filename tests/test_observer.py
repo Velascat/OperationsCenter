@@ -279,7 +279,7 @@ def test_repo_signals_snapshot_new_fields_default_to_unavailable() -> None:
     assert snapshot.security_signal.status == "unavailable"
 
 
-def _make_service(tmp_path: Path, **extra_collectors) -> tuple[RepoObserverService, "ObserverContext"]:  # type: ignore[name-defined]
+def _make_service(tmp_path: Path, **extra_collectors) -> tuple[RepoObserverService, "ObserverContext"]:  # type: ignore[name-defined]  # noqa: F821
     """Helper: build a minimal service + context for unit-level service tests."""
     repo = tmp_path / "repo"
     repo.mkdir()

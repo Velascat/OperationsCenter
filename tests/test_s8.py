@@ -17,9 +17,6 @@ Coverage:
 from __future__ import annotations
 
 import json
-import threading
-import time
-import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,7 +29,6 @@ import pytest
 # ---------------------------------------------------------------------------
 
 from control_plane.entrypoints.worker.main import handle_feedback_loop_scan
-import control_plane.entrypoints.worker.main as _wmain_module
 
 
 def _make_issue(task_id: str, status: str, labels: list[str] | None = None) -> dict:
@@ -47,7 +43,6 @@ def _make_issue(task_id: str, status: str, labels: list[str] | None = None) -> d
 
 def test_feedback_auto_records_merged_pr(tmp_path: Path) -> None:
     """handle_feedback_loop_scan writes 'merged' feedback for a Done task with a merged PR."""
-    import importlib
     import control_plane.entrypoints.worker.main as wmain
     orig_feedback_dir = wmain._FEEDBACK_DIR
     wmain._FEEDBACK_DIR = tmp_path / "feedback"
@@ -150,9 +145,9 @@ def test_feedback_records_human_rejection_with_dedup_key(tmp_path: Path) -> None
 # S8-2: ExecutionOutcomeDeriver (Phase 4)
 # ---------------------------------------------------------------------------
 
-from control_plane.insights.derivers.execution_outcome import ExecutionOutcomeDeriver
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.observer.models import (
+from control_plane.insights.derivers.execution_outcome import ExecutionOutcomeDeriver  # noqa: E402
+from control_plane.insights.normalizer import InsightNormalizer  # noqa: E402
+from control_plane.observer.models import (  # noqa: E402
     RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
     TestSignal, DependencyDriftSignal, TodoSignal,
 )
@@ -270,7 +265,7 @@ def test_stale_autonomy_respects_config_days() -> None:
 # S8-3b: Semantic deduplication
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.worker.main import _semantic_title_similarity, _SEMANTIC_DEDUP_THRESHOLD
+from control_plane.entrypoints.worker.main import _semantic_title_similarity, _SEMANTIC_DEDUP_THRESHOLD  # noqa: E402
 
 
 def test_semantic_similarity_identical_titles() -> None:
@@ -336,7 +331,7 @@ def test_semantic_dedup_suppresses_near_duplicate_proposal() -> None:
 # S8-4: Goal decomposition (build_multi_step_plan)
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.worker.main import build_multi_step_plan
+from control_plane.entrypoints.worker.main import build_multi_step_plan  # noqa: E402
 
 
 def test_build_multi_step_plan_creates_subtasks() -> None:
@@ -402,7 +397,7 @@ def test_build_multi_step_plan_skips_non_complex_task() -> None:
 # S8-5: Rollback on post-merge regression
 # ---------------------------------------------------------------------------
 
-from control_plane.adapters.git.client import GitClient
+from control_plane.adapters.git.client import GitClient  # noqa: E402
 
 
 def test_git_revert_commit_creates_branch(tmp_path: Path) -> None:
@@ -562,8 +557,8 @@ def test_reviewer_triggers_rebase_on_behind_branch() -> None:
 # S8-7: Quality trend tracking
 # ---------------------------------------------------------------------------
 
-from control_plane.insights.derivers.quality_trend import QualityTrendDeriver
-from control_plane.observer.models import LintSignal, TypeSignal
+from control_plane.insights.derivers.quality_trend import QualityTrendDeriver  # noqa: E402
+from control_plane.observer.models import LintSignal, TypeSignal  # noqa: E402
 
 
 def _make_snapshot_with_metrics(
@@ -648,7 +643,7 @@ def test_quality_trend_stagnant() -> None:
 # S8-8: Runtime error ingestion
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.error_ingest.main import _is_duplicate, _mark_created, _dedup_key
+from control_plane.entrypoints.error_ingest.main import _is_duplicate, _mark_created, _dedup_key  # noqa: E402
 
 
 def test_error_ingest_dedup_key_is_stable() -> None:
@@ -793,7 +788,7 @@ def test_require_explicit_approval_skips_timeout_merge() -> None:
 # S8-10: Confidence calibration infrastructure
 # ---------------------------------------------------------------------------
 
-from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
+from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE  # noqa: E402
 
 
 def test_calibration_record_and_retrieve(tmp_path: Path) -> None:

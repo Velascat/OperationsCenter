@@ -2069,7 +2069,6 @@ def handle_awaiting_input_scan(
         reviewer_cfg = service.settings.reviewer
         bot_logins: set[str] = set(reviewer_cfg.bot_logins)
         marker = _bot_marker_from_settings(service.settings) if hasattr(service.settings, "reviewer") else ""
-        bot_comment_ids: set[int] = set()
 
         human_answers = [
             c for c in comments[triage_comment_idx + 1:]

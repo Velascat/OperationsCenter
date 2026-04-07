@@ -56,9 +56,6 @@ class CrossRepoSynthesisDeriver:
         if not snapshots:
             return []
 
-        # Collect insight kinds from the current run's snapshots
-        current_repo_name = str((getattr(snapshots[0], "repo", None) and getattr(snapshots[0].repo, "name", "")) or "")
-        current_kinds: set[str] = set()
         # We don't have direct access to derived insights here — the current
         # snapshot will be represented through the stored artifact once the
         # insight service writes it.  For now we synthesise from stored artifacts only.
