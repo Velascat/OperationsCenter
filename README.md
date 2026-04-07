@@ -100,8 +100,8 @@ The naming is intentionally close because the second is the board adapter for th
 
 ### Repo-Aware Autonomy
 
-- Read-only repo observer snapshots with fourteen signal collectors: git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health, lint violations (`ruff`), type errors (`ty`/`mypy`), CI check history (GitHub API), per-task validation failure patterns, static architecture coupling (AST), benchmark regression (reads retained benchmark output), and security advisories (reads pip-audit/npm audit/trivy JSON).
-- Read-only normalized insight generation from retained observer snapshots across nineteen derivers (including architecture drift, benchmark regression, security vuln, execution outcome, and quality trend derivers).
+- Read-only repo observer snapshots with fifteen signal collectors: git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health, lint violations (`ruff`), type errors (`ty`/`mypy`), CI check history (GitHub API), per-task validation failure patterns, static architecture coupling (AST), benchmark regression (reads retained benchmark output), security advisories (reads pip-audit/npm audit/trivy JSON), and test coverage gaps (reads coverage.xml/HTML/text reports).
+- Read-only normalized insight generation from retained observer snapshots across twenty-two derivers (including architecture drift, benchmark regression, security vuln, execution outcome, quality trend, no-op loop, coverage gap, and theme aggregation derivers).
 - Cross-signal correlation: lint and type violations are checked for overlap with git hotspot files; overlap boosts candidate confidence with a second corroborating signal.
 - Guarded proposal-candidate generation from retained insights across twelve candidate families (seven active by default, five gated).
 - Chain-aware candidate sequencing: `type_fix` is suppressed when `lint_fix` is active in the same cycle or was recently emitted; `execution_health_followup` is suppressed when `test_visibility` is active. Both suppression reasons are artifact-visible.
@@ -153,7 +153,7 @@ The naming is intentionally close because the second is the board adapter for th
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
 - Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
-### Autonomy Hardening (63 improvements across eight implementation rounds)
+### Autonomy Hardening (73 improvements across nine implementation rounds)
 
 The following capabilities were added to close gaps toward full autonomous operation:
 
@@ -231,6 +231,19 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Explicit approval control** — `require_explicit_approval: true` per-repo prevents the reviewer watcher from timeout-merging; posts a daily reminder comment instead.
 - **Feedback loop config wiring** — `stale_autonomy_backlog_days` is now read from settings and passed into the stale scan on every cycle.
 - **Feedback calibration CLI** — `feedback record` accepts optional `--family` and `--confidence` args; records to the calibration store when provided.
+
+**Session 9 — 10 structural and observability improvements:**
+
+- **Event-driven pipeline trigger** — `entrypoints/pipeline_trigger/main.py` watches `.git/FETCH_HEAD`, error ingest state, and CI artifact dirs; fires `autonomy-cycle` reactively within a configurable debounce window instead of relying on schedule alone.
+- **Execution environment pre-flight** — before claiming a task, `_check_execution_environment()` verifies required tools (`ruff` for lint_fix, `ty`/`mypy` for type_fix, `pytest` for test_fix) are present in PATH or the repo venv; warns without blocking.
+- **No-op loop detection** — `NoOpLoopDeriver` reads proposer artifacts and feedback to detect families proposed ≥3 times in 30 days with zero merged outcomes; emits `noop_loop/family_cycling` so operators can adjust thresholds.
+- **Per-repo × family calibration** — `ConfidenceCalibrationStore` now accepts an optional `repo_key` dimension; `report(per_repo=True)` surfaces repo-specific miscalibration distinct from the global aggregate.
+- **Rejection reason extraction** — when a PR is escalated to human review, `_extract_rejection_patterns()` scans comments for 8 known patterns (missing tests, naming convention, docstrings, coverage, style, scope, type annotations, breaking changes) and persists them to `state/rejection_patterns.json`.
+- **Budget allocation by acceptance rate** — `execution_gate_decision()` reads calibration; when a family's `calibration_ratio < 0.5`, it records an extra execution credit to throttle under-performing families without fully blocking them.
+- **Test coverage gap detection** — new `CoverageSignalCollector` reads `coverage.xml`, text reports, and HTML reports; `CoverageGapDeriver` emits `coverage_gap/low_overall` and `coverage_gap/uncovered_files`; `CoverageGapRule` proposes improvement tasks.
+- **PR description quality check** — `_check_pr_description_quality()` detects empty or thin PR descriptions (<80 chars) before self-review and patches them with task context via `GitHubPRClient.update_pr_description()`.
+- **Evidence-enriched conflict avoidance** — the proposal loop now checks file paths extracted from `evidence_lines` (not just title tokens) against in-flight task artifacts, giving higher-fidelity conflict suppression.
+- **Theme aggregation** — `ThemeAggregationDeriver` groups files appearing persistently in top lint/type violations across ≥3 snapshots into `theme/lint_cluster` and `theme/type_cluster` insights; `LintClusterRule` proposes a single `[Refactor]` task instead of N individual fix proposals.
 
 ### Repo and Branch Selection
 

@@ -425,6 +425,27 @@ processes:
 
 The supervisor writes `logs/local/supervisor.status.json` on every check — readable by `watch-all-status` or any external monitor. It restarts a process when: (a) the process exits, or (b) its heartbeat file is >5 minutes old (the process is alive but frozen).
 
+## Pipeline Trigger (Event-Driven)
+
+For reactive operation instead of scheduled-only runs, use the pipeline trigger daemon:
+
+```bash
+python -m control_plane.entrypoints.pipeline_trigger.main \
+    --config config/control_plane.local.yaml \
+    --execute \
+    --min-interval 300    # minimum seconds between runs (default 300)
+    --poll-interval 30    # how often to check trigger files (default 30)
+```
+
+The trigger watches three sources:
+- `.git/FETCH_HEAD` in each repo's `local_path` — fires when a new fetch/push arrives
+- `state/error_ingest_dedup.json` — fires when a runtime error is ingested
+- `tools/report/kodo_plane/` child count — fires when new execution artifacts appear
+
+Trigger state is persisted in `state/pipeline_trigger_state.json`. The debounce (`--min-interval`) prevents re-running on every small change; 5 minutes is a reasonable default for most repos.
+
+**When to use:** Pair with the watcher processes (`watch-all`) for fully reactive operation. The trigger handles pipeline refresh; the watchers handle task execution.
+
 ## Dependency Update Loop
 
 The improve watcher automatically scans for outdated pip packages every 50 cycles for repos with a `local_path` configured. Major-version bumps trigger bounded Plane tasks in Backlog (at most 2 per scan). No operator action is needed.
@@ -449,6 +470,21 @@ maintenance_windows:
 ```
 
 While a window is active, watchers log `watch_maintenance_window` and sleep the full poll interval without polling. The autonomy-cycle pipeline also skips proposal creation during windows.
+
+## Coverage Signal Collection
+
+The observer collects test coverage data automatically when coverage reports are present in the repo or logs directory. No configuration is needed — coverage collection is a safe no-op when reports are absent.
+
+Supported report formats (checked in priority order):
+1. `coverage.xml` — Cobertura XML produced by `coverage xml` or `pytest --cov`
+2. `pytest-coverage.txt` / `coverage.txt` — text totals only
+3. `htmlcov/index.html` — HTML report from `coverage html`
+
+To enable coverage proposals, generate coverage reports as part of your normal test run and keep the output files in the repo root or your logs directory. ControlPlane never runs coverage tools itself.
+
+When coverage data is available, the autonomy pipeline can propose:
+- `[Improve] Improve test coverage (currently N%)` — when total coverage falls below 60%
+- `[Improve] Add tests for N under-covered file(s)` — when ≥3 files are below 80%
 
 ## Cross-Repo Impact Paths
 

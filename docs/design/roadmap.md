@@ -41,7 +41,7 @@ Per-task validation profile tracking and cycle report profile fields remain as o
 
 ## Phase 5 — Richer signal depth ✓ Complete
 
-All three Phase 5 collectors and derivers are implemented and wired into the pipeline. The observer now collects 14 signals; the insight engine runs 17 derivers.
+All three Phase 5 collectors and derivers are implemented and wired into the pipeline. The observer now collects 15 signals; the insight engine runs 22 derivers (including additions from S8 and S9).
 
 ### ✓ ArchitectureSignalCollector
 

@@ -1230,3 +1230,189 @@ Wired into `feedback record` CLI (optional `--family` / `--confidence` args) and
 | S8-8 | Runtime error ingestion | continuous webhook + log tail | `entrypoints/error_ingest/main.py` |
 | S8-9 | Explicit approval control | reviewer timeout-merge path | `RepoSettings.require_explicit_approval`, `_process_human_review` |
 | S8-10 | Confidence calibration store | tune-autonomy + feedback record | `tuning/calibration.py`, `tune-autonomy` output |
+
+---
+
+## Session 9 — 10 structural and observability improvements
+
+### S9-1. Event-Driven Pipeline Trigger
+
+**Problem:** The full pipeline (`observe → insights → decide → propose`) runs on a schedule or manually. When something important happens — a CI failure, a runtime error ingested, a new git push — the system cannot react immediately.
+
+**Fix:** New `entrypoints/pipeline_trigger/main.py`. Watches three trigger sources:
+1. `.git/FETCH_HEAD` mtime in each configured repo's `local_path` (new push/fetch)
+2. `state/error_ingest_dedup.json` mtime (new errors ingested)
+3. `tools/report/kodo_plane/` child count (new execution artifacts)
+
+When any source changes, fires `autonomy-cycle --config <config> [--execute]` as a subprocess. Debounce: minimum 5 minutes between triggered runs (configurable). State persisted in `state/pipeline_trigger_state.json`.
+
+**Usage:**
+```bash
+python -m control_plane.entrypoints.pipeline_trigger.main \
+    --config config/control_plane.local.yaml \
+    --execute \
+    --min-interval 300
+```
+
+**Files:** `entrypoints/pipeline_trigger/main.py` (NEW)
+
+---
+
+### S9-2. Execution Environment Pre-Flight Probe
+
+**Problem:** Before claiming a task, the system validates scope and goal quality, but not whether the tools needed to execute actually exist. A `type_fix` task can be claimed and fail immediately with `dependency_missing` because `ty` isn't installed.
+
+**Fix:** New `_check_execution_environment(service, family) -> list[str]` using `shutil.which()` for PATH lookup, falling back to checking the first configured repo's `.venv/bin/`. Per-family tool requirements:
+
+| Family | Required tools (any one in group) |
+|--------|-----------------------------------|
+| `lint_fix` | `ruff` |
+| `type_fix` | `ty` or `mypy` |
+| `test_fix` | `pytest` |
+| `coverage_gap` | `pytest` or `coverage` |
+
+Warnings are logged but execution is not blocked — soft signal only, since tool availability can't always be determined (e.g. tools installed in CI, not locally).
+
+**Files:** `entrypoints/worker/main.py` (`_check_execution_environment`, `_KIND_REQUIRED_TOOLS`, wired into `validate_task_pre_execution`)
+
+---
+
+### S9-3. No-Op Loop Detection
+
+**Problem:** When the same signal keeps firing and the same family keeps creating tasks that either get abandoned or re-create the same problem, the system has no way to recognize it's cycling without net progress.
+
+**Fix:** New `NoOpLoopDeriver` in `insights/derivers/noop_loop.py`. Reads proposer result artifacts and proposal feedback files from the last 30 days. For each family: if proposed ≥3 times (`min_proposals=3`) with zero merged outcomes in that window, emits `noop_loop/family_cycling` with evidence including proposal count and merge count.
+
+**Files:** `insights/derivers/noop_loop.py` (NEW), `entrypoints/autonomy_cycle/main.py` (registered in `build_insight_service()`)
+
+---
+
+### S9-4. Per-Repo × Family Calibration
+
+**Problem:** The calibration store tracks global acceptance rates per family. A `type_fix` task in a strictly-typed repo is a very different proposition than the same family in a legacy codebase — global calibration masks repo-specific patterns.
+
+**Fix:** `ConfidenceCalibrationStore.record()`, `calibration_for()`, and `report()` all accept an optional `repo_key` parameter. Events now carry a `repo_key` field. `calibration_for(family, confidence, repo_key="myrepo")` returns the repo-specific acceptance rate. `report(per_repo=True)` groups by (repo_key, family, confidence) and returns `CalibrationRecord` with `repo_key` field set.
+
+**Files:** `tuning/calibration.py` (extended `record`, `calibration_for`, `report`; `CalibrationRecord.repo_key` field added)
+
+---
+
+### S9-5. Rejection Reason Extraction
+
+**Problem:** When a human rejects a PR, the outcome is recorded as `abandoned` but the comment explaining *why* is discarded. If the same rejection pattern recurs, the system never learns to add that constraint to future proposals.
+
+**Fix:** New `_extract_rejection_patterns(comments, *, family, repo_key) -> list[str]` scans PR review comments against 8 pattern categories:
+
+| Pattern | Keywords detected |
+|---------|-------------------|
+| `missing_tests` | missing test, needs test, add test |
+| `naming_convention` | naming convention, variable name, rename |
+| `missing_docstrings` | missing docstring, needs docstring |
+| `coverage_gap` | coverage, uncovered, untested branch |
+| `code_style` | style, formatting, whitespace |
+| `scope_too_large` | too large, too many files, split |
+| `missing_type_annotations` | type annotation, type hint |
+| `breaking_change` | breaking change, backwards compat |
+
+`_record_rejection_patterns()` persists counts to `state/rejection_patterns.json` keyed by `{repo_key}:{family}`. `load_rejection_patterns()` returns the top-3 by frequency. Wired into `_escalate_to_human()` so every escalation automatically extracts patterns.
+
+**Files:** `entrypoints/reviewer/main.py` (`_extract_rejection_patterns`, `_record_rejection_patterns`, `load_rejection_patterns`, `_REJECTION_PATTERNS_PATH`, wired in `_escalate_to_human`)
+
+---
+
+### S9-6. Budget Allocation by Acceptance Rate
+
+**Problem:** The daily execution budget is distributed first-come-first-served. High-acceptance-rate families compete for the same budget slots as low-acceptance-rate families. There's no proportional weighting.
+
+**Fix:** In `execution_gate_decision()`, after the standard budget check, calibration is read for the task's source_family and confidence. When `calibration_ratio < 0.5` (over-confident family performing at less than half its expected acceptance rate), `record_execution()` is called twice — once for the task, once for a `calibration_penalty` marker. This consumes double the daily budget credit, effectively halving the execution rate for that family without fully blocking it.
+
+**Files:** `entrypoints/worker/main.py` (budget penalty block in `execution_gate_decision`)
+
+---
+
+### S9-7. Test Coverage Gap Detection
+
+**Problem:** The system detects test regressions and test signal failures, but has no visibility into which code paths have *no tests at all*. Coverage gaps can't be proposed as tasks because the signal doesn't exist.
+
+**Fix:** Three new components:
+
+**`CoverageSignalCollector`** (`observer/collectors/coverage_signal.py`) — reads (in priority order):
+1. `coverage.xml` (Cobertura XML): file-level coverage percentages
+2. `pytest-coverage.txt` / `coverage.txt`: total line only
+3. `htmlcov/index.html`: total from HTML header
+
+Returns `CoverageSignal(status="measured", total_coverage_pct=..., uncovered_file_count=..., top_uncovered=[...])` or `status="unavailable"` when no report is found. Never runs coverage tools.
+
+**`CoverageGapDeriver`** (`insights/derivers/coverage_gap.py`) — emits:
+- `coverage_gap/low_overall` when `total_coverage_pct < 60%`
+- `coverage_gap/uncovered_files` when ≥3 files are below 80% threshold
+
+**`CoverageGapRule`** (`decision/rules/coverage_gap.py`) — proposes `[Improve] Add tests for N under-covered file(s)` tasks.
+
+**Model:** `CoverageSignal` and `UncoveredFile` added to `observer/models.py`; `coverage_signal` field added to `RepoSignalsSnapshot`.
+
+**Files:** `observer/models.py`, `observer/collectors/coverage_signal.py` (NEW), `observer/service.py`, `insights/derivers/coverage_gap.py` (NEW), `decision/rules/coverage_gap.py` (NEW), `entrypoints/autonomy_cycle/main.py`
+
+---
+
+### S9-8. PR Description Quality Check
+
+**Problem:** Kodo writes PR descriptions, but the reviewer watcher doesn't verify they contain useful information. Empty or one-line descriptions lead to human reviewers ignoring PRs.
+
+**Fix:** New `_check_pr_description_quality(gh, owner, repo, pr_number, *, task_description, marker, logger)`. Runs once per PR (guarded by `state["description_checked"]`) before `_process_self_review` calls `run_self_review_pass()`. When the PR description body is fewer than 80 characters, fetches the Plane task description and patches the PR body via `gh.update_pr_description()` with an auto-generated description noting the source.
+
+New `GitHubPRClient.update_pr_description()` uses `PATCH /repos/{owner}/{repo}/pulls/{number}`.
+
+**Files:** `adapters/github_pr.py` (`update_pr_description`), `entrypoints/reviewer/main.py` (`_check_pr_description_quality`, wired into `_process_self_review`)
+
+---
+
+### S9-9. Evidence-Enriched Conflict Avoidance
+
+**Problem:** The three-tier conflict detection uses filename tokens from the proposal title (low fidelity). Proposal evidence_lines often contain actual file paths, giving a more accurate picture of what a task would touch.
+
+**Fix:** New `_extract_evidence_file_tokens(evidence_lines) -> set[str]` extracts file path basenames from evidence_lines using regex. In the proposal loop, both the title-based conflict check AND an evidence-based conflict check are run before creating a task:
+
+```python
+_conflict_title_check = _has_conflict_with_active_task(proposal.title, ...)
+_conflict_evidence_check = _has_conflict_with_active_task(" ".join(evidence_files), ...)
+if _conflict_title_check or _conflict_evidence_check:
+    suppress
+```
+
+The log event `propose_conflict_skipped` now includes `evidence_files_checked` count.
+
+**Files:** `entrypoints/worker/main.py` (`_extract_evidence_file_tokens`, extended conflict check in proposal loop)
+
+---
+
+### S9-10. Theme Aggregation Deriver
+
+**Problem:** The system emits individual lint candidates per insight. If the same file appears in top lint violations across 5 consecutive snapshots, the system proposes 5 individual `lint_fix` tasks for it rather than recognizing the structural pattern.
+
+**Fix:** New `ThemeAggregationDeriver` in `insights/derivers/theme_aggregation.py`. Requires ≥3 snapshots (`_MIN_SNAPSHOTS`). Counts how many snapshots each file appears in top lint violations / top type errors. Files appearing in ≥3 snapshots (`_MIN_SNAPSHOT_APPEARANCES`) emit:
+- `theme/lint_cluster` — with `file`, `snapshot_appearances`, `snapshots_analyzed` evidence
+- `theme/type_cluster` — same structure
+
+New `LintClusterRule` in `decision/rules/lint_cluster.py` turns these into `[Refactor] Systematic lint cleanup: <file>` proposals with `family="lint_cluster"`, confidence="high". At most `_MAX_CLUSTER_FILES = 3` insights per run.
+
+`lint_cluster` and `coverage_gap` added to `ALL_FAMILIES` in decision service.
+
+**Files:** `insights/derivers/theme_aggregation.py` (NEW), `decision/rules/lint_cluster.py` (NEW), `decision/service.py` (`ALL_FAMILIES`, `_build_rules`), `entrypoints/autonomy_cycle/main.py`
+
+---
+
+## Summary Table (continued)
+
+| # | Name | Trigger | Where |
+|---|------|---------|-------|
+| S9-1 | Event-driven pipeline trigger | on repo/ingest/CI change | `entrypoints/pipeline_trigger/main.py` |
+| S9-2 | Execution env pre-flight probe | before task claim | `_check_execution_environment`, `validate_task_pre_execution` |
+| S9-3 | No-op loop detection | autonomy-cycle insights stage | `noop_loop.py`, `build_insight_service` |
+| S9-4 | Per-repo × family calibration | feedback record + tune-autonomy | `ConfidenceCalibrationStore.record/report` |
+| S9-5 | Rejection reason extraction | on PR escalation to human | `_extract_rejection_patterns`, `_escalate_to_human` |
+| S9-6 | Budget allocation by acceptance rate | before execution | `execution_gate_decision` calibration penalty |
+| S9-7 | Test coverage gap detection | autonomy-cycle observe + insights | `coverage_signal.py`, `coverage_gap.py`, `CoverageGapRule` |
+| S9-8 | PR description quality check | before self-review | `_check_pr_description_quality`, `update_pr_description` |
+| S9-9 | Evidence-enriched conflict avoidance | before task creation | `_extract_evidence_file_tokens`, proposal loop |
+| S9-10 | Theme aggregation | autonomy-cycle insights + decision | `theme_aggregation.py`, `LintClusterRule` |

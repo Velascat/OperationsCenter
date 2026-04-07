@@ -320,6 +320,9 @@ in the watcher log. The escalation fires once per cooldown period (`escalation.c
 20. quality trends: look for `quality_trend/lint_degrading` or `type_degrading` insights in `tools/report/control_plane/insights/`
 21. confidence calibration: run `tune-autonomy` and check the calibration table for ⚠ families
 22. error ingest: look for `error_ingest_task_created` events; check `state/error_ingest_dedup.json` for dedup state
+23. no-op loop: look for `noop_loop/family_cycling` in the latest insights artifact; family is cycling without acceptance
+24. coverage gap: look for `coverage_gap/low_overall` or `coverage_gap/uncovered_files` insights; check `coverage.xml` is being generated
+25. execution env: look for `execution_env_warning` in the goal watcher log; check that required tools are installed in venv
 
 For autonomy-layer inputs:
 
@@ -338,6 +341,67 @@ When the board is quiet, also check the proposer lane:
 - proposer log in `logs/local/watch-all/`
 - new tasks labeled `source: proposer`
 - `logs/autonomy_cycle/quiet_diagnosis.json` for aggregated suppression reasons
+
+## No-Op Loop Warnings
+
+When the `NoOpLoopDeriver` detects a family cycling without acceptance, a `noop_loop/family_cycling` insight is written. Check:
+
+```bash
+cat tools/report/control_plane/insights/$(ls -t tools/report/control_plane/insights/ | head -1) | python3 -m json.tool | grep -A5 noop_loop
+```
+
+Evidence fields: `family`, `proposals_in_window`, `merges_in_window`, `look_back_days`.
+
+**Common causes:**
+- The family's threshold is too low — it fires too easily on signals that don't warrant a fix
+- The generated proposals are consistently rejected without a clear path to acceptance (check `state/rejection_patterns.json`)
+- The execution environment is missing the required tool (check `execution_env_warning` in the goal watcher log)
+
+**Remediation:** Consider raising the family's signal threshold in `config/autonomy_tuning.json`, or demoting the family's tier via `autonomy-tiers set --family <family> --tier 0`.
+
+## Coverage Gap Detection
+
+When `coverage.xml`, a text coverage report, or `htmlcov/index.html` is present in a repo, the observer collects coverage data automatically. Check whether coverage reports exist:
+
+```bash
+ls <repo_path>/coverage.xml <repo_path>/htmlcov/index.html 2>/dev/null
+```
+
+If coverage data is available but no `coverage_gap` proposals are appearing, the total may be above the 60% threshold or the uncovered file count may be below 3. Check the latest observer artifact:
+
+```bash
+python3 -c "import json; d=json.load(open('$(ls -t tools/report/control_plane/observer/*.json | head -1)')); print(d['signals'].get('coverage_signal', {}))"
+```
+
+Coverage collection requires pre-existing report files. ControlPlane never runs coverage tools itself. Generate coverage reports as part of your CI or test script, then retain the output files.
+
+## Theme Aggregation
+
+When the same source file appears in top lint or type violations across 3+ consecutive observer snapshots, `ThemeAggregationDeriver` emits `theme/lint_cluster` or `theme/type_cluster` insights. The `LintClusterRule` proposes a single `[Refactor]` task for that file rather than repeated `lint_fix` proposals.
+
+If you see `[Refactor] Systematic lint cleanup: <file>` tasks being proposed, it means the file has persistent violations that individual lint fixes are not resolving. The refactor task asks Kodo to address the root pattern rather than individual violations.
+
+## Rejection Patterns Store
+
+When a PR is escalated to human review and the human reviewer leaves comments, rejection patterns are automatically extracted and stored:
+
+```bash
+cat state/rejection_patterns.json
+```
+
+Each key is `{repo_key}:{family}`. Each entry has `patterns` (pattern name → count) and `last_seen` (pattern name → ISO timestamp). The most frequently seen patterns are the main recurring feedback from human reviewers for that family in that repo.
+
+These patterns are currently persisted for observability. Future work can wire them into proposal descriptions to pre-empt known objections.
+
+## Execution Environment Warnings
+
+When a goal task is claimed for a family that requires specific tools, the watcher checks tool availability:
+
+```bash
+grep "execution_env_warning" logs/local/watch-all/goal.log
+```
+
+Warning fields: `task_id`, `family`, `warning` (describes which tool group is missing). The task is not blocked — it proceeds to execution — but repeated warnings for the same family indicate the tool should be installed in the repo's venv or system PATH.
 
 ## Quality Trend Warnings
 
