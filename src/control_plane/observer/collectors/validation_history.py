@@ -104,13 +104,19 @@ class ValidationHistoryCollector:
         for task_id, stats in task_stats.items():
             runs = stats["total_runs"]
             failures = stats["validation_failures"]
-            if runs >= _MIN_RUNS_FOR_PATTERN and failures >= _MIN_FAILURES_FOR_PATTERN:
+            failure_rate = failures / runs if runs > 0 else 0.0
+            if (
+                runs >= _MIN_RUNS_FOR_PATTERN
+                and failures >= _MIN_FAILURES_FOR_PATTERN
+                and failure_rate >= 0.5
+            ):
                 repeated_failures.append(
                     ValidationFailureRecord(
                         task_id=task_id,
                         worker_role=stats["worker_role"],
                         total_runs=runs,
                         validation_failure_count=failures,
+                        failure_rate=round(failure_rate, 3),
                     )
                 )
 
