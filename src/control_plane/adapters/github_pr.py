@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+from typing import Any
 
 import httpx
 
@@ -26,7 +27,7 @@ class GitHubPRClient:
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
-    def _request(self, method: str, url: str, **kwargs: object) -> httpx.Response:
+    def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """HTTP request with rate-limit retry and low-quota warning.
 
         On 429 responses, reads the ``Retry-After`` header (defaulting to
@@ -39,7 +40,7 @@ class GitHubPRClient:
         kwargs.setdefault("timeout", 30)
         resp: httpx.Response | None = None
         for attempt in range(_GH_RATE_LIMIT_MAX_RETRIES + 1):
-            resp = httpx.request(method, url, headers=self._headers, **kwargs)  # type: ignore[arg-type]
+            resp = httpx.request(method, url, headers=self._headers, **kwargs)
             remaining_raw = resp.headers.get("X-RateLimit-Remaining")
             if remaining_raw is not None:
                 try:
@@ -65,7 +66,8 @@ class GitHubPRClient:
                 "url": url,
             }))
             time.sleep(retry_after)
-        return resp  # type: ignore[return-value]
+        assert resp is not None
+        return resp
 
     @staticmethod
     def owner_repo_from_clone_url(clone_url: str) -> tuple[str, str]:
