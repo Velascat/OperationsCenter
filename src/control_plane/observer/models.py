@@ -120,6 +120,7 @@ class ValidationFailureRecord(BaseModel):
     worker_role: str
     total_runs: int
     validation_failure_count: int
+    failure_rate: float = 0.0
 
 
 class ValidationHistorySignal(BaseModel):
