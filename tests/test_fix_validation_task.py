@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from control_plane.application.service import ExecutionService
+from control_plane.application.service import ExecutionService, _BaselineResult
 from control_plane.domain.models import ValidationResult
 
 
@@ -439,6 +439,74 @@ class TestMaybeCreateFixValidationTask:
 
         tid = svc._maybe_create_fix_validation_task(pc, task, "err", "run-1")
         assert tid is None
+
+    def test_none_validation_results_uses_fallback_description(self) -> None:
+        """Bug 2: None validation_results must not crash; should use fallback path."""
+        svc = _make_service()
+        pc = _make_plane_client()
+        task = _make_task()
+
+        tid = svc._maybe_create_fix_validation_task(
+            pc, task, "baseline error", "run-1",
+            validation_results=None,
+            repo_target=None,
+        )
+
+        assert tid == "new-task-123"
+        call_kwargs = pc.create_issue.call_args[1]
+        desc = call_kwargs["description"]
+        # Should use the fallback (simple) description, not the enriched one
+        assert "## Validation Error" in desc
+        assert "baseline error" in desc
+        assert "## Failing Commands" not in desc
+
+
+# ---------------------------------------------------------------------------
+# Tests for _BaselineResult None-safety
+# ---------------------------------------------------------------------------
+
+
+class TestBaselineResultNoneSafety:
+    def test_failed_true_without_validation_results_gets_empty_list(self) -> None:
+        """Bug 1: _BaselineResult(failed=True) with no validation_results should get [] not None."""
+        result = _BaselineResult(failed=True, error_text="x")
+        assert result.validation_results is not None
+        assert result.validation_results == []
+
+    def test_failed_false_without_validation_results_stays_none(self) -> None:
+        result = _BaselineResult(failed=False, error_text=None)
+        assert result.validation_results is None
+
+    def test_failed_true_with_explicit_results_keeps_them(self) -> None:
+        vr = [_make_validation_result("cmd", 1, stderr="err")]
+        result = _BaselineResult(failed=True, error_text="x", validation_results=vr)
+        assert result.validation_results is vr
+
+
+# ---------------------------------------------------------------------------
+# Tests for _validation_excerpt returning '' instead of None
+# ---------------------------------------------------------------------------
+
+
+class TestValidationExcerptReturnsEmptyString:
+    def test_returns_empty_string_when_all_pass(self) -> None:
+        """Bug 3: should return '' not None when no commands failed."""
+        results = [_make_validation_result("cmd", 0, stdout="ok")]
+        excerpt = ExecutionService._validation_excerpt(results)
+        assert excerpt == ""
+        assert excerpt is not None
+
+    def test_returns_empty_string_when_no_output(self) -> None:
+        """Bug 3: should return '' not None when failed commands have no output."""
+        results = [_make_validation_result("cmd", 1, stderr="", stdout="")]
+        excerpt = ExecutionService._validation_excerpt(results)
+        assert excerpt is not None
+
+    def test_returns_text_when_failed_with_output(self) -> None:
+        results = [_make_validation_result("cmd", 1, stderr="error text")]
+        excerpt = ExecutionService._validation_excerpt(results)
+        assert "error text" in excerpt
+        assert "[cmd]" in excerpt
 
 
 # ---------------------------------------------------------------------------
