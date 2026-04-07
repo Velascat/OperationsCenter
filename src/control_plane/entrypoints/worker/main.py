@@ -5429,6 +5429,24 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     except Exception:
         pass
     created_ids: list[str] = []
+    if result.outcome_status == "skipped":
+        # Circuit-breaker skip: service returned early without transitioning the task.
+        # Move it back to Ready for AI so it will be retried once the blocker clears.
+        client.comment_issue(
+            task_id,
+            render_worker_comment(
+                "[Goal] Execution skipped; re-queued",
+                [
+                    f"run_id: {result.run_id}",
+                    f"task_id: {task_id}",
+                    "task_kind: goal",
+                    f"outcome_reason: {result.outcome_reason or 'skipped'}",
+                    "next_action: task re-queued to Ready for AI; retry will happen once the blocker is resolved",
+                ],
+            ),
+        )
+        client.transition_issue(task_id, "Ready for AI")
+        return created_ids
     if result.outcome_status == "no_op":
         client.comment_issue(
             task_id,
