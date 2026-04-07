@@ -1448,11 +1448,14 @@ def validate_credentials(
                 "error": str(exc),
             }))
 
-    # Plane
+    # Plane — use the project work-items endpoint for the credential check.
+    # The workspace-level endpoint (/api/v1/workspaces/{slug}/) does not accept
+    # API key auth in some Plane versions and returns 401 even with a valid token.
+    # The work-items endpoint uses the same token and is a reliable reachability probe.
     try:
         plane_token = settings.plane_token()
         resp = httpx.get(
-            f"{settings.plane.base_url}/api/v1/workspaces/{settings.plane.workspace_slug}/",
+            f"{settings.plane.base_url}/api/v1/workspaces/{settings.plane.workspace_slug}/projects/{settings.plane.project_id}/work-items/",
             headers={"X-API-Key": plane_token},
             timeout=10,
         )
