@@ -12,6 +12,7 @@ from control_plane.observer.models import (
     BacklogSignal,
     BenchmarkSignal,
     CIHistorySignal,
+    CoverageSignal,
     DependencyDriftSignal,
     ExecutionHealthSignal,
     LintSignal,
@@ -66,6 +67,7 @@ class RepoObserverService:
         architecture_signal_collector: RepoSignalCollector | None = None,
         benchmark_signal_collector: RepoSignalCollector | None = None,
         security_signal_collector: RepoSignalCollector | None = None,
+        coverage_signal_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -84,6 +86,7 @@ class RepoObserverService:
         self.architecture_signal_collector = architecture_signal_collector
         self.benchmark_signal_collector = benchmark_signal_collector
         self.security_signal_collector = security_signal_collector
+        self.coverage_signal_collector = coverage_signal_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -212,6 +215,17 @@ class RepoObserverService:
             if self.security_signal_collector is not None
             else SecuritySignal(status="unavailable")
         )
+        coverage_signal = (
+            self._collect_optional(
+                self.coverage_signal_collector,
+                context,
+                "coverage_signal",
+                collector_errors,
+                default=CoverageSignal(status="unavailable"),
+            )
+            if self.coverage_signal_collector is not None
+            else CoverageSignal(status="unavailable")
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -228,6 +242,7 @@ class RepoObserverService:
             architecture_signal=architecture_signal,
             benchmark_signal=benchmark_signal,
             security_signal=security_signal,
+            coverage_signal=coverage_signal,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

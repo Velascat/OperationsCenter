@@ -225,6 +225,22 @@ def _extract_filename_tokens(title: str) -> set[str]:
     return {m.group(0).lower() for m in re.finditer(r"\b\w[\w.]*\.py\b", title)}
 
 
+def _extract_evidence_file_tokens(evidence_lines: list[str]) -> set[str]:
+    """Extract file path basenames from proposal evidence lines.
+
+    Evidence lines often contain patterns like:
+      - file: src/control_plane/foo.py
+      - Top uncovered files: foo.py, bar.py
+    This gives higher-fidelity conflict data than title tokens alone.
+    """
+    tokens: set[str] = set()
+    for line in evidence_lines:
+        # Match any file-like path (any extension, or no extension but looks like a module path)
+        for m in re.finditer(r"[\w/.-]+\.\w{1,6}", line):
+            tokens.add(Path(m.group(0)).name.lower())
+    return tokens
+
+
 def _collect_open_pr_files(service: "ExecutionService") -> set[str]:
     """Return basenames of all files changed in open PRs across all configured repos.
 
@@ -686,7 +702,53 @@ def execution_gate_decision(
     except Exception:
         pass
 
+    # S9-6: Budget allocation by acceptance rate.
+    # When a family has low calibration ratio (< 0.5), it consumes double the execution
+    # credit to slow down low-confidence families without fully blocking them.
+    _extra_credit = False
+    try:
+        from control_plane.tuning.calibration import ConfidenceCalibrationStore, _EXPECTED_RATES
+        _issue_labels = [
+            str(lbl.get("name", lbl) if isinstance(lbl, dict) else lbl)
+            for lbl in (issue.get("labels") or [])
+        ]
+        _family_for_cal = ""
+        _confidence_for_cal = ""
+        for _lbl in _issue_labels:
+            if _lbl.startswith("source_family:"):
+                _family_for_cal = _lbl.split(":", 1)[1].strip()
+            elif _lbl in ("confidence:high", "confidence:medium", "confidence:low"):
+                _confidence_for_cal = _lbl.split(":", 1)[1].strip()
+        # Also check description text for source_family
+        if not _family_for_cal:
+            _desc = str(issue.get("description") or "")
+            for _line in _desc.splitlines():
+                if _line.strip().startswith("- source_family:"):
+                    _family_for_cal = _line.split(":", 1)[1].strip()
+                    break
+        if _family_for_cal and _confidence_for_cal:
+            _cal_store = ConfidenceCalibrationStore()
+            _cal_rate = _cal_store.calibration_for(_family_for_cal, _confidence_for_cal)
+            if _cal_rate is not None:
+                _expected = _EXPECTED_RATES.get(_confidence_for_cal, 0.5)
+                _ratio = _cal_rate / _expected if _expected > 0 else 1.0
+                if _ratio < 0.5:
+                    _extra_credit = True
+                    _logger.info(json.dumps({
+                        "event": "calibration_budget_penalty",
+                        "task_id": task_id,
+                        "family": _family_for_cal,
+                        "confidence": _confidence_for_cal,
+                        "calibration_ratio": round(_ratio, 3),
+                        "reason": "low calibration ratio — recording extra execution credit",
+                    }))
+    except Exception:
+        pass
+
     store.record_execution(role=role, task_id=task_id, signature=signature, now=now)
+    if _extra_credit:
+        # Record a second execution credit to slow down under-performing families
+        store.record_execution(role=role, task_id=f"{task_id}_calibration_penalty", signature=signature, now=now)
     return None
 
 
@@ -1377,6 +1439,61 @@ def validate_credentials(
 
 _MIN_GOAL_LENGTH = 30
 _MAX_GOAL_LENGTH = 8000
+
+# S9-2: Per-task-kind tool requirements for execution environment pre-flight.
+# Keys are task families (extracted from source_family label).
+# Values are lists of tool names; at least one in each sub-list must be present.
+_KIND_REQUIRED_TOOLS: dict[str, list[list[str]]] = {
+    "lint_fix": [["ruff"]],
+    "type_fix": [["ty", "mypy"]],   # either ty OR mypy satisfies this requirement
+    "test_fix": [["pytest"]],
+    "coverage_gap": [["pytest", "coverage"]],
+}
+
+
+def _check_execution_environment(
+    service: "ExecutionService",
+    family: str,
+) -> list[str]:
+    """Return a list of missing tool warnings for the given proposal family.
+
+    Uses shutil.which() for PATH lookup, then falls back to checking the first
+    configured repo's venv if a local_path is available.  Returns [] when all
+    required tools are present or the family has no requirements.
+    """
+    import shutil
+
+    requirements = _KIND_REQUIRED_TOOLS.get(family, [])
+    if not requirements:
+        return []
+
+    # Build venv bin paths from configured local_paths
+    venv_paths: list[Path] = []
+    for repo_cfg in service.settings.repos.values():
+        lp = getattr(repo_cfg, "local_path", None)
+        if lp:
+            venv_bin = Path(str(lp)) / ".venv" / "bin"
+            if venv_bin.is_dir():
+                venv_paths.append(venv_bin)
+
+    missing: list[str] = []
+    for tool_group in requirements:
+        # Each group is OR — at least one tool in the group must exist
+        found_any = False
+        for tool in tool_group:
+            if shutil.which(tool):
+                found_any = True
+                break
+            # Check venv paths
+            for venv_bin in venv_paths:
+                if (venv_bin / tool).exists():
+                    found_any = True
+                    break
+            if found_any:
+                break
+        if not found_any:
+            missing.append(f"required tool not found: {' or '.join(tool_group)}")
+    return missing
 _INVALID_GOAL_MARKERS = ("fix everything", "fix all", "improve everything", "do everything")
 
 _PRE_EXEC_VALIDATION_MARKER = "[Goal] Task rejected by pre-execution validation"
@@ -1444,6 +1561,37 @@ def validate_task_pre_execution(
                     reasons.append(
                         f"mentioned files not found in any configured local_path: {', '.join(mentioned_files[:3])}"
                     )
+
+    # S9-2: Execution environment pre-flight — check required tools for this family.
+    # This is a WARN-only check: missing tools are logged but do not block execution.
+    # This allows tasks to proceed even when tool availability can't be determined.
+    try:
+        labels = [
+            str(lbl.get("name", lbl) if isinstance(lbl, dict) else lbl)
+            for lbl in (issue.get("labels") or [])
+        ]
+        _family = ""
+        for lbl in labels:
+            if lbl.startswith("source_family:"):
+                _family = lbl.split(":", 1)[1].strip()
+                break
+        if not _family:
+            # Try extracting from description
+            for line in goal_text.splitlines():
+                if line.strip().startswith("source_family:"):
+                    _family = line.split(":", 1)[1].strip()
+                    break
+        if _family:
+            env_warnings = _check_execution_environment(service, _family)
+            for warn in env_warnings:
+                _logger.warning(json.dumps({
+                    "event": "execution_env_warning",
+                    "task_id": task_id,
+                    "family": _family,
+                    "warning": warn,
+                }))
+    except Exception:
+        pass
 
     if not reasons:
         return True
@@ -4742,9 +4890,20 @@ def handle_propose_cycle(
     for proposal in proposals:
         if len(created_ids) >= MAX_PROPOSALS_PER_CYCLE:
             break
-        # Skip proposals that conflict with an in-flight task touching the same file.
-        if _has_conflict_with_active_task(proposal.title, issues, service.usage_store, open_pr_files):
-            _logger.info(json.dumps({"event": "propose_conflict_skipped", "title": proposal.title, "open_pr_files_count": len(open_pr_files)}))
+        # S9-9: Skip proposals that conflict with an in-flight task.
+        # Uses evidence_lines for higher-fidelity file detection than title tokens alone.
+        evidence_files = _extract_evidence_file_tokens(getattr(proposal, "evidence_lines", []))
+        _conflict_title_check = _has_conflict_with_active_task(proposal.title, issues, service.usage_store, open_pr_files)
+        _conflict_evidence_check = bool(evidence_files) and _has_conflict_with_active_task(
+            " ".join(evidence_files), issues, service.usage_store, open_pr_files
+        )
+        if _conflict_title_check or _conflict_evidence_check:
+            _logger.info(json.dumps({
+                "event": "propose_conflict_skipped",
+                "title": proposal.title,
+                "open_pr_files_count": len(open_pr_files),
+                "evidence_files_checked": len(evidence_files),
+            }))
             skipped_conflict += 1
             continue
         created = create_proposed_task_if_missing(

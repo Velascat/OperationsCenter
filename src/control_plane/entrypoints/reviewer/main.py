@@ -46,6 +46,107 @@ def _write_proposal_feedback(state: dict, outcome: str, merge_reason: str | None
         pass  # feedback is best-effort; never block the merge path
 
 
+_REJECTION_PATTERNS_PATH = Path("state/rejection_patterns.json")
+
+# Common rejection reason keywords → normalized pattern labels
+_REJECTION_PATTERN_MAP = [
+    (re.compile(r"missing test|no test|needs test|add test", re.IGNORECASE), "missing_tests"),
+    (re.compile(r"naming convention|variable name|rename|name should", re.IGNORECASE), "naming_convention"),
+    (re.compile(r"missing docstring|needs docstring|add docstring|no docstring", re.IGNORECASE), "missing_docstrings"),
+    (re.compile(r"coverage|uncovered|untested branch", re.IGNORECASE), "coverage_gap"),
+    (re.compile(r"style|formatting|format|whitespace|blank line", re.IGNORECASE), "code_style"),
+    (re.compile(r"too large|too big|scope|too many files|split", re.IGNORECASE), "scope_too_large"),
+    (re.compile(r"type annotation|type hint|missing type|typed", re.IGNORECASE), "missing_type_annotations"),
+    (re.compile(r"breaking change|backwards compat|api change", re.IGNORECASE), "breaking_change"),
+]
+
+
+def _extract_rejection_patterns(comments: list[dict], *, family: str = "", repo_key: str = "") -> list[str]:
+    """Scan PR review comments for known rejection patterns.  Returns pattern labels found."""
+    found: set[str] = set()
+    for comment in comments:
+        body = str(comment.get("body") or "")
+        for pattern_re, label in _REJECTION_PATTERN_MAP:
+            if pattern_re.search(body):
+                found.add(label)
+    return sorted(found)
+
+
+def _record_rejection_patterns(patterns: list[str], *, family: str, repo_key: str) -> None:
+    """Append detected rejection patterns to the persistent rejection patterns store."""
+    if not patterns:
+        return
+    try:
+        _REJECTION_PATTERNS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            existing = json.loads(_REJECTION_PATTERNS_PATH.read_text())
+        except Exception:
+            existing = {}
+        key = f"{repo_key}:{family}" if (repo_key and family) else (family or repo_key or "unknown")
+        entry = existing.setdefault(key, {"patterns": {}, "last_seen": {}})
+        now_str = datetime.now(UTC).isoformat()
+        for p in patterns:
+            entry["patterns"][p] = entry["patterns"].get(p, 0) + 1
+            entry["last_seen"][p] = now_str
+        _REJECTION_PATTERNS_PATH.write_text(json.dumps(existing, indent=2))
+    except Exception:
+        pass  # best-effort
+
+
+def load_rejection_patterns(*, family: str, repo_key: str) -> list[str]:
+    """Return the most common rejection patterns for (repo_key, family), sorted by frequency."""
+    try:
+        data = json.loads(_REJECTION_PATTERNS_PATH.read_text())
+        key = f"{repo_key}:{family}" if (repo_key and family) else (family or repo_key or "unknown")
+        entry = data.get(key, {})
+        by_count = sorted(entry.get("patterns", {}).items(), key=lambda kv: kv[1], reverse=True)
+        return [p for p, _ in by_count[:3]]
+    except Exception:
+        return []
+
+
+def _check_pr_description_quality(
+    gh: GitHubPRClient,
+    owner: str,
+    repo: str,
+    pr_number: int,
+    *,
+    task_description: str,
+    marker: str,
+    logger: logging.Logger,
+) -> None:
+    """Post a description enhancement comment when the PR description is too thin.
+
+    This runs before self-review so reviewers see a useful description.
+    A thin description is one that is empty, very short (< 80 chars), or consists
+    only of the branch name / task ID.
+    """
+    try:
+        pr_data = gh.get_pr(owner, repo, pr_number)
+        body = str(pr_data.get("body") or "").strip()
+        if len(body) >= 80:
+            return  # Description is adequate
+
+        # Build an enhanced description from the Plane task description if available
+        task_excerpt = (task_description or "").strip()[:300]
+        if not task_excerpt:
+            return  # Nothing to add
+
+        enhanced = (
+            "**Description (auto-generated from task context):**\n\n"
+            f"{task_excerpt}\n\n"
+            "_This description was added automatically because the PR description was empty or too short._"
+        )
+        gh.update_pr_description(owner, repo, pr_number, enhanced)
+        logger.info(json.dumps({
+            "event": "pr_description_enhanced",
+            "pr_number": pr_number,
+            "original_length": len(body),
+        }))
+    except Exception:
+        pass  # best-effort; never block self-review
+
+
 def _bot_marker(settings) -> str:
     return settings.reviewer.bot_comment_marker
 
@@ -202,6 +303,26 @@ def _process_self_review(
     pr_number = state["pr_number"]
     task_id = state["task_id"]
     marker = _bot_marker(service.settings)
+
+    # S9-8: Ensure PR description is adequate before self-review runs.
+    if not state.get("description_checked"):
+        try:
+            _task_desc = ""
+            try:
+                _issue = plane_client.fetch_issue(task_id)
+                _task_desc = str(_issue.get("description") or _issue.get("description_stripped") or "")
+            except Exception:
+                pass
+            _check_pr_description_quality(
+                gh, owner, repo, pr_number,
+                task_description=_task_desc,
+                marker=marker,
+                logger=logger,
+            )
+        except Exception:
+            pass
+        state["description_checked"] = True
+        state_file.write_text(json.dumps(state, indent=2))
 
     # Timeout: escalate to human rather than merge blindly from self-review
     created_at = datetime.fromisoformat(state["created_at"])
@@ -362,6 +483,22 @@ def _escalate_to_human(
     state_file.write_text(json.dumps(state, indent=2))
     logger.info(json.dumps({"event": "escalated_to_human_review", "task_id": task_id}))
     _write_proposal_feedback(state, outcome="escalated", merge_reason=None)
+
+    # S9-5: Extract rejection patterns from current review comments
+    try:
+        _family = state.get("source_family", "")
+        _repo_key = state.get("repo_key", "")
+        _comments = gh.list_pr_comments(owner, repo, pr_number)
+        _patterns = _extract_rejection_patterns(_comments, family=_family, repo_key=_repo_key)
+        if _patterns:
+            _record_rejection_patterns(_patterns, family=_family, repo_key=_repo_key)
+            logger.info(json.dumps({
+                "event": "rejection_patterns_recorded",
+                "task_id": task_id,
+                "patterns": _patterns,
+            }))
+    except Exception:
+        pass
 
 
 def _process_human_review(

@@ -156,6 +156,16 @@ class GitHubPRClient:
         resp.raise_for_status()
         return resp.json()
 
+    def update_pr_description(self, owner: str, repo: str, pr_number: int, body: str) -> dict:
+        """Update the PR description body via PATCH /pulls/:number."""
+        resp = self._request(
+            "PATCH",
+            f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
+            json={"body": body},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def post_comment(self, owner: str, repo: str, pr_number: int, body: str) -> dict:
         resp = self._request(
             "POST",

@@ -175,6 +175,22 @@ class SecuritySignal(BaseModel):
     summary: str | None = None
 
 
+class UncoveredFile(BaseModel):
+    path: str
+    coverage_pct: float
+
+
+class CoverageSignal(BaseModel):
+    status: str  # "measured", "partial", "unavailable"
+    total_coverage_pct: float | None = None
+    uncovered_file_count: int = 0
+    uncovered_threshold_pct: float = 80.0
+    top_uncovered: list[UncoveredFile] = Field(default_factory=list)
+    source: str | None = None
+    observed_at: datetime | None = None
+    summary: str | None = None
+
+
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
@@ -190,6 +206,7 @@ class RepoSignalsSnapshot(BaseModel):
     architecture_signal: ArchitectureSignal = Field(default_factory=lambda: ArchitectureSignal(status="unavailable"))
     benchmark_signal: BenchmarkSignal = Field(default_factory=lambda: BenchmarkSignal(status="unavailable"))
     security_signal: SecuritySignal = Field(default_factory=lambda: SecuritySignal(status="unavailable"))
+    coverage_signal: CoverageSignal = Field(default_factory=lambda: CoverageSignal(status="unavailable"))
 
 
 class RepoStateSnapshot(BaseModel):

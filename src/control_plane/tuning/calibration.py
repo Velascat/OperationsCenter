@@ -43,6 +43,7 @@ class CalibrationRecord:
     # expected rates: high=0.8, medium=0.5, low=0.3 (conservative baselines)
     expected_rate: float
     calibration_ratio: float  # > 1.0 = well-calibrated or over-performing; < 1.0 = over-confident
+    repo_key: str | None = None  # None = global aggregate across all repos
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -58,34 +59,49 @@ class ConfidenceCalibrationStore:
         self._path = path
         self._lock = threading.RLock()
 
-    def record(self, family: str, confidence: str, outcome: str) -> None:
+    def record(self, family: str, confidence: str, outcome: str, *, repo_key: str | None = None) -> None:
         """Append a calibration event.
 
         outcome must be one of: merged, escalated, abandoned.
         Silently ignored for unknown confidence labels (not in high/medium/low).
+        repo_key (optional) enables per-repo × family calibration.
         """
         if confidence not in _EXPECTED_RATES:
             return
         if outcome not in ("merged", "escalated", "abandoned"):
             return
-        entry = {
+        entry: dict = {
             "recorded_at": datetime.now(UTC).isoformat(),
             "family": family,
             "confidence": confidence,
             "outcome": outcome,
         }
+        if repo_key:
+            entry["repo_key"] = repo_key
         with self._lock:
             data = self._load()
             data.setdefault("events", []).append(entry)
             self._save(data)
 
-    def calibration_for(self, family: str, confidence: str) -> float | None:
-        """Return the observed acceptance rate for (family, confidence), or None if too few samples."""
+    def calibration_for(
+        self,
+        family: str,
+        confidence: str,
+        *,
+        repo_key: str | None = None,
+    ) -> float | None:
+        """Return the observed acceptance rate for (family, confidence[, repo_key]).
+
+        When repo_key is given, only events matching that repo are counted.
+        Falls back to global aggregate when repo_key is None.
+        Returns None when fewer than _MIN_SAMPLE_SIZE records exist.
+        """
         with self._lock:
             data = self._load()
         events = [
             e for e in data.get("events", [])
             if e.get("family") == family and e.get("confidence") == confidence
+            and (repo_key is None or e.get("repo_key") == repo_key)
         ]
         if len(events) < _MIN_SAMPLE_SIZE:
             return None
@@ -93,23 +109,39 @@ class ConfidenceCalibrationStore:
         total = len(events)
         return merged / total
 
-    def report(self) -> list[CalibrationRecord]:
-        """Return calibration records for all (family, confidence) pairs with enough data."""
+    def report(self, *, per_repo: bool = False) -> list[CalibrationRecord]:
+        """Return calibration records for all (family, confidence[, repo_key]) pairs with enough data.
+
+        When per_repo=True, groups by (repo_key, family, confidence).
+        When per_repo=False (default), groups by (family, confidence) across all repos.
+        """
         with self._lock:
             data = self._load()
         events = data.get("events", [])
 
-        # Group by (family, confidence)
-        groups: dict[tuple[str, str], list[str]] = {}
-        for e in events:
-            key = (str(e.get("family", "")), str(e.get("confidence", "")))
-            if key[0] and key[1] in _EXPECTED_RATES:
-                groups.setdefault(key, []).append(str(e.get("outcome", "")))
+        if per_repo:
+            # Group by (repo_key, family, confidence)
+            groups: dict[tuple, list[str]] = {}
+            for e in events:
+                rk = str(e.get("repo_key") or "")
+                key = (rk, str(e.get("family", "")), str(e.get("confidence", "")))
+                if key[1] and key[2] in _EXPECTED_RATES:
+                    groups.setdefault(key, []).append(str(e.get("outcome", "")))
+        else:
+            # Group by (family, confidence) — global aggregate
+            _groups: dict[tuple[str, str], list[str]] = {}
+            for e in events:
+                key2 = (str(e.get("family", "")), str(e.get("confidence", "")))
+                if key2[0] and key2[1] in _EXPECTED_RATES:
+                    _groups.setdefault(key2, []).append(str(e.get("outcome", "")))
+            # Unify format
+            groups = {("", k[0], k[1]): v for k, v in _groups.items()}
 
         records: list[CalibrationRecord] = []
-        for (family, confidence), outcomes in sorted(groups.items()):
+        for group_key, outcomes in sorted(groups.items()):
             if len(outcomes) < _MIN_SAMPLE_SIZE:
                 continue
+            rk_val, family, confidence = group_key
             merged = outcomes.count("merged")
             escalated = outcomes.count("escalated")
             abandoned = outcomes.count("abandoned")
@@ -127,6 +159,7 @@ class ConfidenceCalibrationStore:
                 acceptance_rate=round(acceptance_rate, 3),
                 expected_rate=expected_rate,
                 calibration_ratio=round(calibration_ratio, 3),
+                repo_key=rk_val or None,
             ))
         return records
 

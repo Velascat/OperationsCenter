@@ -15,8 +15,11 @@ from control_plane.decision.service import ALL_FAMILIES, DecisionEngineService, 
 from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.derivers.architecture_drift import ArchitectureDriftDeriver
 from control_plane.insights.derivers.benchmark_regression import BenchmarkRegressionDeriver
+from control_plane.insights.derivers.coverage_gap import CoverageGapDeriver
 from control_plane.insights.derivers.execution_outcome import ExecutionOutcomeDeriver
+from control_plane.insights.derivers.noop_loop import NoOpLoopDeriver
 from control_plane.insights.derivers.quality_trend import QualityTrendDeriver
+from control_plane.insights.derivers.theme_aggregation import ThemeAggregationDeriver
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
 from control_plane.insights.derivers.cross_signal import CrossSignalDeriver
 from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
@@ -38,6 +41,7 @@ from control_plane.insights.service import InsightEngineService, new_generation_
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.collectors.architecture_signal import ArchitectureSignalCollector
 from control_plane.observer.collectors.benchmark_signal import BenchmarkSignalCollector
+from control_plane.observer.collectors.coverage_signal import CoverageSignalCollector
 from control_plane.observer.collectors.dependency_drift import DependencyDriftCollector
 from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
@@ -75,6 +79,7 @@ def build_observer_service() -> RepoObserverService:
         architecture_signal_collector=ArchitectureSignalCollector(),
         benchmark_signal_collector=BenchmarkSignalCollector(),
         security_signal_collector=SecuritySignalCollector(),
+        coverage_signal_collector=CoverageSignalCollector(),
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )
@@ -117,6 +122,12 @@ def build_insight_service() -> InsightEngineService:
             ExecutionOutcomeDeriver(normalizer),
             # S8-7 — QualityTrendDeriver: tracks lint/type error deltas across snapshots
             QualityTrendDeriver(normalizer),
+            # S9-3 — NoOpLoopDeriver: detects families cycling without acceptance
+            NoOpLoopDeriver(normalizer),
+            # S9-7 — CoverageGapDeriver: surfaces test coverage gaps
+            CoverageGapDeriver(normalizer),
+            # S9-10 — ThemeAggregationDeriver: groups persistent per-file violations
+            ThemeAggregationDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )
