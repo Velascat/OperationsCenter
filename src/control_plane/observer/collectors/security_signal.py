@@ -107,7 +107,7 @@ class SecuritySignalCollector:
         critical = 0
         high = 0
         for entry in data:
-            vulns = entry.get("vulns", []) if isinstance(entry, dict) else []
+            vulns = entry.get("vulns", []) if isinstance(entry, dict) else []  # type: ignore
             advisory_count += len(vulns)
             for vuln in vulns:
                 severity = (vuln.get("fix_versions") and "high") or "unknown"
@@ -122,7 +122,7 @@ class SecuritySignalCollector:
         if not isinstance(data, dict):
             return 0, 0, 0
 
-        vulns = data.get("vulnerabilities", {})
+        vulns = data.get("vulnerabilities", {})  # type: ignore
         if not isinstance(vulns, dict):
             return 0, 0, 0
 
@@ -147,7 +147,7 @@ class SecuritySignalCollector:
         if not isinstance(data, dict):
             return 0, 0, 0
 
-        results = data.get("Results", [])
+        results = data.get("Results", [])  # type: ignore
         if not isinstance(results, list):
             return 0, 0, 0
 
