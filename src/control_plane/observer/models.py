@@ -146,6 +146,35 @@ class CIHistorySignal(BaseModel):
     source: str | None = None
 
 
+class ArchitectureSignal(BaseModel):
+    status: str  # "healthy", "warnings", "unavailable"
+    source: str | None = None
+    observed_at: datetime | None = None
+    max_import_depth: int | None = None
+    circular_dependencies: list[str] = Field(default_factory=list)
+    coupling_score: float | None = None
+    summary: str | None = None
+
+
+class BenchmarkSignal(BaseModel):
+    status: str  # "nominal", "regression", "unavailable"
+    source: str | None = None
+    observed_at: datetime | None = None
+    benchmark_count: int = 0
+    regressions: list[str] = Field(default_factory=list)
+    summary: str | None = None
+
+
+class SecuritySignal(BaseModel):
+    status: str  # "clean", "advisories", "unavailable"
+    source: str | None = None
+    observed_at: datetime | None = None
+    advisory_count: int = 0
+    critical_count: int = 0
+    high_count: int = 0
+    summary: str | None = None
+
+
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
@@ -158,6 +187,9 @@ class RepoSignalsSnapshot(BaseModel):
     type_signal: TypeSignal = Field(default_factory=lambda: TypeSignal(status="unavailable"))
     ci_history: CIHistorySignal = Field(default_factory=lambda: CIHistorySignal(status="unavailable"))
     validation_history: ValidationHistorySignal = Field(default_factory=lambda: ValidationHistorySignal(status="unavailable"))
+    architecture_signal: ArchitectureSignal = Field(default_factory=lambda: ArchitectureSignal(status="unavailable"))
+    benchmark_signal: BenchmarkSignal = Field(default_factory=lambda: BenchmarkSignal(status="unavailable"))
+    security_signal: SecuritySignal = Field(default_factory=lambda: SecuritySignal(status="unavailable"))
 
 
 class RepoStateSnapshot(BaseModel):

@@ -13,6 +13,8 @@ from control_plane.decision.artifact_writer import DecisionArtifactWriter
 from control_plane.decision.loader import DecisionLoader
 from control_plane.decision.service import ALL_FAMILIES, DecisionEngineService, _DEFAULT_ALLOWED_FAMILIES, new_decision_context
 from control_plane.insights.artifact_writer import InsightArtifactWriter
+from control_plane.insights.derivers.architecture_drift import ArchitectureDriftDeriver
+from control_plane.insights.derivers.benchmark_regression import BenchmarkRegressionDeriver
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
 from control_plane.insights.derivers.cross_signal import CrossSignalDeriver
 from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
@@ -21,6 +23,7 @@ from control_plane.insights.derivers.execution_health import ExecutionHealthDeri
 from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
 from control_plane.insights.derivers.ci_pattern import CIPatternDeriver
 from control_plane.insights.derivers.lint_drift import LintDriftDeriver
+from control_plane.insights.derivers.security_vuln import SecurityVulnDeriver
 from control_plane.insights.derivers.validation_pattern import ValidationPatternDeriver
 from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
 from control_plane.insights.derivers.proposal_outcome import ProposalOutcomeDeriver
@@ -31,12 +34,15 @@ from control_plane.insights.loader import SnapshotLoader
 from control_plane.insights.normalizer import InsightNormalizer
 from control_plane.insights.service import InsightEngineService, new_generation_context
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
+from control_plane.observer.collectors.architecture_signal import ArchitectureSignalCollector
+from control_plane.observer.collectors.benchmark_signal import BenchmarkSignalCollector
 from control_plane.observer.collectors.dependency_drift import DependencyDriftCollector
 from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector
 from control_plane.observer.collectors.ci_history import CIHistoryCollector
 from control_plane.observer.collectors.lint_signal import LintSignalCollector
+from control_plane.observer.collectors.security_signal import SecuritySignalCollector
 from control_plane.observer.collectors.validation_history import ValidationHistoryCollector
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
 from control_plane.observer.collectors.type_check import TypeSignalCollector
@@ -64,11 +70,9 @@ def build_observer_service() -> RepoObserverService:
         type_signal_collector=TypeSignalCollector(),
         ci_history_collector=CIHistoryCollector(),
         validation_history_collector=ValidationHistoryCollector(),
-        # Deferred: Phase 5 — ArchitectureSignalCollector (see docs/design/roadmap.md §Phase 5)
-        #
-        # Deferred: Phase 5 — BenchmarkSignalCollector (see docs/design/roadmap.md §Phase 5)
-        #
-        # Deferred: Phase 5 — SecuritySignalCollector (see docs/design/roadmap.md §Phase 5)
+        architecture_signal_collector=ArchitectureSignalCollector(),
+        benchmark_signal_collector=BenchmarkSignalCollector(),
+        security_signal_collector=SecuritySignalCollector(),
         snapshot_builder=SnapshotBuilder(),
         artifact_writer=ObserverArtifactWriter(),
     )
@@ -100,15 +104,13 @@ def build_insight_service() -> InsightEngineService:
             CIPatternDeriver(normalizer),
             ValidationPatternDeriver(normalizer),
             ProposalOutcomeDeriver(normalizer),
+            ArchitectureDriftDeriver(normalizer),
+            BenchmarkRegressionDeriver(normalizer),
+            SecurityVulnDeriver(normalizer),
             # CrossSignalDeriver runs last so all single-signal derivers have already fired.
             # Its insights are consumed by lint_fix and type_fix rules for confidence boosting.
             CrossSignalDeriver(normalizer),
             # Deferred: Phase 4 — ExecutionOutcomeDeriver (see docs/design/roadmap.md §Phase 4)
-            # Deferred: Phase 5 — ArchitectureDriftDeriver (see docs/design/roadmap.md §Phase 5)
-            #
-            # Deferred: Phase 5 — BenchmarkRegressionDeriver (see docs/design/roadmap.md §Phase 5)
-            #
-            # Deferred: Phase 5 — SecurityVulnDeriver (see docs/design/roadmap.md §Phase 5)
         ],
         artifact_writer=InsightArtifactWriter(),
     )

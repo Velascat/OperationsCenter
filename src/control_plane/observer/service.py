@@ -8,7 +8,9 @@ from typing import Any, Protocol
 from control_plane.config import Settings
 from control_plane.observer.artifact_writer import ObserverArtifactWriter
 from control_plane.observer.models import (
+    ArchitectureSignal,
     BacklogSignal,
+    BenchmarkSignal,
     CIHistorySignal,
     DependencyDriftSignal,
     ExecutionHealthSignal,
@@ -16,6 +18,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
+    SecuritySignal,
     TestSignal,
     TodoSignal,
     TypeSignal,
@@ -60,6 +63,9 @@ class RepoObserverService:
         type_signal_collector: RepoSignalCollector | None = None,
         ci_history_collector: RepoSignalCollector | None = None,
         validation_history_collector: RepoSignalCollector | None = None,
+        architecture_signal_collector: RepoSignalCollector | None = None,
+        benchmark_signal_collector: RepoSignalCollector | None = None,
+        security_signal_collector: RepoSignalCollector | None = None,
         snapshot_builder: SnapshotBuilder | None = None,
         artifact_writer: ObserverArtifactWriter | None = None,
     ) -> None:
@@ -75,6 +81,9 @@ class RepoObserverService:
         self.type_signal_collector = type_signal_collector
         self.ci_history_collector = ci_history_collector
         self.validation_history_collector = validation_history_collector
+        self.architecture_signal_collector = architecture_signal_collector
+        self.benchmark_signal_collector = benchmark_signal_collector
+        self.security_signal_collector = security_signal_collector
         self.snapshot_builder = snapshot_builder or SnapshotBuilder()
         self.artifact_writer = artifact_writer or ObserverArtifactWriter()
 
@@ -170,6 +179,39 @@ class RepoObserverService:
             if self.validation_history_collector is not None
             else ValidationHistorySignal(status="unavailable")
         )
+        architecture_signal = (
+            self._collect_optional(
+                self.architecture_signal_collector,
+                context,
+                "architecture_signal",
+                collector_errors,
+                default=ArchitectureSignal(status="unavailable"),
+            )
+            if self.architecture_signal_collector is not None
+            else ArchitectureSignal(status="unavailable")
+        )
+        benchmark_signal = (
+            self._collect_optional(
+                self.benchmark_signal_collector,
+                context,
+                "benchmark_signal",
+                collector_errors,
+                default=BenchmarkSignal(status="unavailable"),
+            )
+            if self.benchmark_signal_collector is not None
+            else BenchmarkSignal(status="unavailable")
+        )
+        security_signal = (
+            self._collect_optional(
+                self.security_signal_collector,
+                context,
+                "security_signal",
+                collector_errors,
+                default=SecuritySignal(status="unavailable"),
+            )
+            if self.security_signal_collector is not None
+            else SecuritySignal(status="unavailable")
+        )
 
         signals = RepoSignalsSnapshot(
             recent_commits=recent_commits,
@@ -183,6 +225,9 @@ class RepoObserverService:
             type_signal=type_signal,
             ci_history=ci_history,
             validation_history=validation_history,
+            architecture_signal=architecture_signal,
+            benchmark_signal=benchmark_signal,
+            security_signal=security_signal,
         )
         snapshot = self.snapshot_builder.build(
             run_id=context.run_id,

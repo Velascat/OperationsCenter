@@ -14,10 +14,13 @@ from control_plane.observer.collectors.recent_commits import RecentCommitsCollec
 from control_plane.observer.collectors.test_signal import TestSignalCollector
 from control_plane.observer.collectors.todo_signal import TodoSignalCollector
 from control_plane.observer.models import (
+    ArchitectureSignal,
+    BenchmarkSignal,
     DependencyDriftSignal,
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
+    SecuritySignal,
     TestSignal as ObserverTestSignal,
     TodoSignal,
 )
@@ -235,3 +238,177 @@ def test_observer_service_writes_snapshot_artifacts(tmp_path: Path) -> None:
     assert len(artifacts) == 2
     assert Path(artifacts[0]).exists()
     assert Path(artifacts[1]).exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 – new signal models and service extension
+# ---------------------------------------------------------------------------
+
+
+def test_new_signal_models_can_be_imported() -> None:
+    """ArchitectureSignal, BenchmarkSignal, SecuritySignal are importable."""
+    arch = ArchitectureSignal(status="healthy")
+    bench = BenchmarkSignal(status="nominal")
+    sec = SecuritySignal(status="clean")
+
+    assert arch.status == "healthy"
+    assert arch.circular_dependencies == []
+    assert arch.max_import_depth is None
+    assert arch.coupling_score is None
+
+    assert bench.status == "nominal"
+    assert bench.benchmark_count == 0
+    assert bench.regressions == []
+
+    assert sec.status == "clean"
+    assert sec.advisory_count == 0
+    assert sec.critical_count == 0
+    assert sec.high_count == 0
+
+
+def test_repo_signals_snapshot_new_fields_default_to_unavailable() -> None:
+    """RepoSignalsSnapshot can be built with minimal required args; new fields default to unavailable."""
+    snapshot = RepoSignalsSnapshot(
+        test_signal=ObserverTestSignal(status="unknown"),
+        dependency_drift=DependencyDriftSignal(status="not_available"),
+        todo_signal=TodoSignal(),
+    )
+
+    assert snapshot.architecture_signal.status == "unavailable"
+    assert snapshot.benchmark_signal.status == "unavailable"
+    assert snapshot.security_signal.status == "unavailable"
+
+
+def _make_service(tmp_path: Path, **extra_collectors) -> tuple[RepoObserverService, "ObserverContext"]:  # type: ignore[name-defined]
+    """Helper: build a minimal service + context for unit-level service tests."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    init_git_repo(repo)
+    commit_file(repo, "src/a.py", "print('a')\n", "Add a")
+
+    logs_root = tmp_path / "logs" / "local"
+    logs_root.mkdir(parents=True)
+    settings = load_settings(write_config(tmp_path))
+
+    service = RepoObserverService(
+        repo_collector=GitContextCollector(),
+        recent_commits_collector=RecentCommitsCollector(),
+        file_hotspots_collector=FileHotspotsCollector(),
+        test_signal_collector=TestSignalCollector(),
+        dependency_drift_collector=DependencyDriftCollector(),
+        todo_signal_collector=TodoSignalCollector(),
+        snapshot_builder=SnapshotBuilder(),
+        artifact_writer=ObserverArtifactWriter(tmp_path / "observer"),
+        **extra_collectors,
+    )
+    context = new_observer_context(
+        repo_path=repo,
+        repo_name="control-plane",
+        base_branch="main",
+        settings=settings,
+        source_command="control-plane observe-repo",
+        commit_limit=5,
+        hotspot_window=5,
+        todo_limit=5,
+        logs_root=logs_root,
+    )
+    return service, context
+
+
+class _FixedCollector:
+    """Collector that always returns a pre-set value."""
+
+    def __init__(self, value):
+        self._value = value
+
+    def collect(self, context):
+        return self._value
+
+
+class _FailingCollector:
+    """Collector that always raises."""
+
+    def __init__(self, message: str = "boom"):
+        self._message = message
+
+    def collect(self, context):
+        raise RuntimeError(self._message)
+
+
+def test_observer_service_backward_compatible_without_new_collectors(tmp_path: Path) -> None:
+    """Service instantiates and runs correctly with no new Phase 5 collectors."""
+    service, context = _make_service(tmp_path)
+
+    snapshot, _ = service.observe(context)
+
+    assert snapshot.signals.architecture_signal.status == "unavailable"
+    assert snapshot.signals.benchmark_signal.status == "unavailable"
+    assert snapshot.signals.security_signal.status == "unavailable"
+
+
+def test_observer_service_with_new_collectors_provided(tmp_path: Path) -> None:
+    """When new collectors are provided, their return values appear in the snapshot."""
+    arch = ArchitectureSignal(status="warnings", max_import_depth=10, coupling_score=0.42)
+    bench = BenchmarkSignal(status="regression", benchmark_count=5, regressions=["bench_foo"])
+    sec = SecuritySignal(status="advisories", advisory_count=3, critical_count=1, high_count=2)
+
+    service, context = _make_service(
+        tmp_path,
+        architecture_signal_collector=_FixedCollector(arch),
+        benchmark_signal_collector=_FixedCollector(bench),
+        security_signal_collector=_FixedCollector(sec),
+    )
+
+    snapshot, _ = service.observe(context)
+
+    assert snapshot.signals.architecture_signal.status == "warnings"
+    assert snapshot.signals.architecture_signal.max_import_depth == 10
+    assert snapshot.signals.architecture_signal.coupling_score == 0.42
+
+    assert snapshot.signals.benchmark_signal.status == "regression"
+    assert snapshot.signals.benchmark_signal.benchmark_count == 5
+    assert snapshot.signals.benchmark_signal.regressions == ["bench_foo"]
+
+    assert snapshot.signals.security_signal.status == "advisories"
+    assert snapshot.signals.security_signal.advisory_count == 3
+    assert snapshot.signals.security_signal.critical_count == 1
+    assert snapshot.signals.security_signal.high_count == 2
+
+
+def test_observer_service_failing_collector_records_error_and_returns_unavailable(tmp_path: Path) -> None:
+    """When a new collector raises, the signal is 'unavailable' and the error is recorded."""
+    service, context = _make_service(
+        tmp_path,
+        architecture_signal_collector=_FailingCollector("arch exploded"),
+        benchmark_signal_collector=_FailingCollector("bench exploded"),
+        security_signal_collector=_FailingCollector("sec exploded"),
+    )
+
+    snapshot, _ = service.observe(context)
+
+    assert snapshot.signals.architecture_signal.status == "unavailable"
+    assert snapshot.signals.benchmark_signal.status == "unavailable"
+    assert snapshot.signals.security_signal.status == "unavailable"
+
+    assert snapshot.collector_errors.get("architecture_signal") == "arch exploded"
+    assert snapshot.collector_errors.get("benchmark_signal") == "bench exploded"
+    assert snapshot.collector_errors.get("security_signal") == "sec exploded"
+
+
+def test_observer_service_partial_new_collectors(tmp_path: Path) -> None:
+    """Only some new collectors provided; others default to unavailable without error."""
+    arch = ArchitectureSignal(status="healthy")
+    service, context = _make_service(
+        tmp_path,
+        architecture_signal_collector=_FixedCollector(arch),
+        # benchmark and security collectors deliberately omitted
+    )
+
+    snapshot, _ = service.observe(context)
+
+    assert snapshot.signals.architecture_signal.status == "healthy"
+    assert snapshot.signals.benchmark_signal.status == "unavailable"
+    assert snapshot.signals.security_signal.status == "unavailable"
+    # No errors for absent collectors
+    assert "benchmark_signal" not in snapshot.collector_errors
+    assert "security_signal" not in snapshot.collector_errors
