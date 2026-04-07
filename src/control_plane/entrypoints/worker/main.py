@@ -1817,7 +1817,7 @@ def board_health_check(
                 "reason": reason,
                 "count": len(ids),
                 "task_ids": ids[:10],
-                "detail": f">=5 blocked tasks share the same reason — systemic issue suspected",
+                "detail": ">=5 blocked tasks share the same reason — systemic issue suspected",
             })
 
     # Quiet propose lane: count active (non-Done, non-Cancelled) tasks per repo
