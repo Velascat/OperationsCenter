@@ -39,9 +39,12 @@ Blocked tasks are classified into a small fixed set:
 - `verification_failure`
 - `context_limit`
 - `dependency_missing`
+- `awaiting_input`
 - `unknown`
 
 Additionally, `pre_exec_rejected` is used by the goal watcher when a task fails pre-execution validation before any Kodo run begins.
+
+`awaiting_input` is set when Kodo embeds a `<!-- cp:question: ... -->` HTML comment in its output, indicating it stopped to ask a clarifying question rather than proceeding with an assumption. The improve watcher scans for human replies every 8 cycles and re-queues the task automatically once a reply is detected.
 
 This vocabulary is shared across board comments, watcher logs, and retained summaries.
 
@@ -83,6 +86,8 @@ All scans run on the primary slot only when `parallel_slots > 1`.
 | Stale PR TTL | every 20 cycles | Closes PRs older than `stale_pr_days` (default 7); requeues to Backlog |
 | Workspace health | every 25 cycles | Verifies venv python per repo; attempts bootstrap repair on failure; creates `[Workspace]` task if repair fails |
 | Stale autonomy scan | every 30 cycles | Cancels autonomy-proposed Backlog tasks older than 21 days whose signal is stale |
+| Awaiting-input scan | every 8 cycles | Finds blocked `awaiting_input` tasks, checks for human reply, injects answer and re-queues |
+| Priority rescore scan | every 45 cycles | Demotes backlog autonomy tasks with calibration acceptance <40% (adds `signal_stale` label); promotes those >75% to `priority: high` |
 
 ## Stale Autonomy Task Invalidation
 

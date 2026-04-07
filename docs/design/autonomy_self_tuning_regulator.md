@@ -186,6 +186,14 @@ Auto-apply writes to `config/autonomy_tuning.json`:
 
 This file is gitignored (or should be treated as runtime state). To revert a tuning change, edit or delete the file. The `DecisionEngineService` falls back to hardcoded defaults if the file is absent.
 
+## Calibration Time Decay
+
+`ConfidenceCalibrationStore` applies a time-decay window when computing acceptance rates. The default window is 90 days. Events older than the window are excluded from calculations, ensuring stale feedback from an earlier codebase state does not skew confidence labels.
+
+The `window_days` parameter is accepted by both `calibration_for(family, confidence, window_days=90)` and `report(window_days=90)`. The `cleanup_old_events(window_days=90)` method removes events outside the window from disk to keep the store compact.
+
+This is a passive filter — it does not change stored records, it only excludes old ones from the returned rate. Running `cleanup_old_events` is optional and safe.
+
 ## Cadence
 
 The regulator is not wired into the hot-path autonomy cycle. Run it as a periodic maintenance step:

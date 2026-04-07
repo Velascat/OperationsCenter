@@ -163,6 +163,21 @@ This is safe. The review watcher checks merge status before every action. If it 
 2. Confirm the human commented on the PR itself, not on a commit or on the Plane task.
 3. Check that the comment does not carry the `<!-- controlplane:bot -->` marker — if it does, the watcher will skip it.
 
+## Requeue-as-Goal on Stalled Revision Loops
+
+When a PR in Phase 2 (human review) receives repeated human comments but Kodo produces zero-change revision passes each time, the reviewer watcher will eventually close the PR and create a fresh `goal` task rather than looping indefinitely.
+
+**Trigger condition:** `REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD` consecutive zero-change revision passes (default: 2). A "zero-change pass" is detected when the revision diff between the old and new head commits is empty — Kodo acknowledged the comment but produced no code changes.
+
+**What happens:**
+1. The PR is closed with a `<!-- controlplane:bot -->` comment explaining the requeue.
+2. A fresh `task-kind: goal` task is created in `Backlog` with the original goal text and a note that the previous PR stalled.
+3. The original Plane task is marked Done.
+
+The fresh goal task allows a human to review the scope and promote it when ready, rather than letting the PR loop consume review cycles with no progress.
+
+**State tracked in:** `state/pr_reviews/<owner>/<repo>/<pr-number>.json` — the `zero_change_count` field increments on each zero-change pass and resets if a non-empty revision is detected.
+
 ## Test Scenarios
 
 Run these scenarios against a controlled test repo to validate the loop before enabling it in production:
