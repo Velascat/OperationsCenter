@@ -155,6 +155,24 @@ class GitClient:
         """Check out an existing local or remote-tracking branch."""
         self._run(["git", "checkout", branch], cwd=repo_path)
 
+    def revert_commit(self, repo_path: Path, commit_sha: str, *, new_branch: str) -> bool:
+        """Create *new_branch* at HEAD and apply a `git revert` of *commit_sha*.
+
+        Returns True on success. On any conflict or error, leaves the repo on
+        the new branch without committing so the caller can decide what to do.
+        Does NOT push the branch — callers must call push_branch() themselves.
+        """
+        try:
+            self._run(["git", "checkout", "-b", new_branch], cwd=repo_path)
+            self._run(["git", "revert", "--no-edit", commit_sha], cwd=repo_path)
+            return True
+        except RuntimeError:
+            try:
+                self._run(["git", "revert", "--abort"], cwd=repo_path)
+            except RuntimeError:
+                pass
+            return False
+
     def rebase_onto_origin(self, repo_path: Path, base_branch: str) -> bool:
         """Rebase HEAD onto origin/<base_branch>.  Aborts cleanly on conflict.
 

@@ -95,6 +95,24 @@ def main() -> None:
     else:
         print("\n  No artifacts written (empty result).")
 
+    # S8-10: Confidence calibration report
+    try:
+        from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
+        cal_records = ConfidenceCalibrationStore().report()
+        if cal_records:
+            print("\n  Confidence calibration:")
+            print(f"  {'family':<28} {'conf':<8} {'n':>5} {'accept%':>9} {'expected':>9} {'ratio':>7}")
+            for r in cal_records:
+                flag = "⚠" if r.calibration_ratio < 0.6 else (" ✓" if r.calibration_ratio >= 0.9 else "  ")
+                print(
+                    f"  {r.family:<28} {r.confidence:<8} {r.total:>5} "
+                    f"{r.acceptance_rate:>8.0%} {r.expected_rate:>8.0%} {r.calibration_ratio:>6.2f}{flag}"
+                )
+        else:
+            print(f"\n  Confidence calibration: no data yet (need ≥{_MIN_SAMPLE_SIZE} records per family/confidence).")
+    except Exception:
+        pass
+
 
 if __name__ == "__main__":
     main()

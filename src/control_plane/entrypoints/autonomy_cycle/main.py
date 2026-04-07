@@ -15,6 +15,8 @@ from control_plane.decision.service import ALL_FAMILIES, DecisionEngineService, 
 from control_plane.insights.artifact_writer import InsightArtifactWriter
 from control_plane.insights.derivers.architecture_drift import ArchitectureDriftDeriver
 from control_plane.insights.derivers.benchmark_regression import BenchmarkRegressionDeriver
+from control_plane.insights.derivers.execution_outcome import ExecutionOutcomeDeriver
+from control_plane.insights.derivers.quality_trend import QualityTrendDeriver
 from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
 from control_plane.insights.derivers.cross_signal import CrossSignalDeriver
 from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
@@ -110,7 +112,11 @@ def build_insight_service() -> InsightEngineService:
             # CrossSignalDeriver runs last so all single-signal derivers have already fired.
             # Its insights are consumed by lint_fix and type_fix rules for confidence boosting.
             CrossSignalDeriver(normalizer),
-            # Deferred: Phase 4 — ExecutionOutcomeDeriver (see docs/design/roadmap.md §Phase 4)
+            # Phase 4 — ExecutionOutcomeDeriver: reads retained execution transcripts
+            # to classify failure modes (timeout_pattern, test_regression, validation_loop)
+            ExecutionOutcomeDeriver(normalizer),
+            # S8-7 — QualityTrendDeriver: tracks lint/type error deltas across snapshots
+            QualityTrendDeriver(normalizer),
         ],
         artifact_writer=InsightArtifactWriter(),
     )

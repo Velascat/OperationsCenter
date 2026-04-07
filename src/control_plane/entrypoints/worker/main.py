@@ -194,6 +194,32 @@ def _record_execution_artifact(service: ExecutionService, task_id: str, result: 
         pass
 
 
+def _semantic_title_similarity(a: str, b: str) -> float:
+    """Jaccard similarity on word tokens between two title strings.
+
+    Returns a value in [0, 1].  Values ≥ 0.5 indicate titles that are likely
+    about the same problem and should be treated as near-duplicates for the
+    purpose of proposal deduplication.
+
+    This catches cases where exact title dedup misses because the wording
+    changed slightly (e.g. "Fix lint errors in api.py" vs "Lint fix: api.py").
+    """
+    # Strip common prefix markers like [Step 1/3:], [Goal], etc.
+    _STRIP_RE = re.compile(r"^\[[^\]]*\]\s*")
+    a_clean = _STRIP_RE.sub("", a.lower())
+    b_clean = _STRIP_RE.sub("", b.lower())
+    tokens_a = set(re.findall(r"\b\w{3,}\b", a_clean))  # words ≥ 3 chars
+    tokens_b = set(re.findall(r"\b\w{3,}\b", b_clean))
+    if not tokens_a or not tokens_b:
+        return 0.0
+    intersection = tokens_a & tokens_b
+    union = tokens_a | tokens_b
+    return len(intersection) / len(union)
+
+
+_SEMANTIC_DEDUP_THRESHOLD = 0.5
+
+
 def _extract_filename_tokens(title: str) -> set[str]:
     """Extract *.py filename tokens from a task title for conflict detection."""
     return {m.group(0).lower() for m in re.finditer(r"\b\w[\w.]*\.py\b", title)}
@@ -1143,10 +1169,55 @@ def detect_post_merge_regressions(
                 merged_sha and _base_head and merged_sha == _base_head
             )
             if _is_safe_revert:
+                # S8-5: Auto-create a revert branch and open a PR immediately.
+                # This acts faster than waiting for a Kodo execution cycle.
+                _revert_branch = f"revert/{merged_sha[:8]}-{task_id[:8]}"
+                _revert_pr_url: str | None = None
+                repo_key_for_revert = _repo_key_from_pr_url(pr_url, service)
+                repo_cfg_for_revert = service.settings.repos.get(repo_key_for_revert)
+                if repo_cfg_for_revert and base_branch and merged_sha:
+                    try:
+                        _reverted = service.create_revert_branch(
+                            clone_url=repo_cfg_for_revert.clone_url,
+                            base_branch=base_branch,
+                            merge_sha=merged_sha,
+                            revert_branch=_revert_branch,
+                        )
+                        if _reverted:
+                            _token = service.settings.repo_git_token(repo_key_for_revert)
+                            if _token:
+                                _rgh = GitHubPRClient(_token)
+                                _rpr = _rgh.create_pr(
+                                    owner, repo_name,
+                                    head=_revert_branch,
+                                    base=base_branch,
+                                    title=f"Revert: {task_title[:80]}",
+                                    body=(
+                                        f"Automatic revert of merge commit `{merged_sha[:8]}`.\n\n"
+                                        f"Post-merge CI failures detected on PR from task `{task_id}`:\n"
+                                        + "\n".join(f"- {c}" for c in failed_checks[:3])
+                                    ),
+                                )
+                                _revert_pr_url = _rpr.get("html_url", "")
+                                _logger.info(json.dumps({
+                                    "event": "auto_revert_pr_created",
+                                    "task_id": task_id,
+                                    "revert_pr_url": _revert_pr_url,
+                                    "revert_branch": _revert_branch,
+                                }))
+                    except Exception as _exc:
+                        _logger.warning(json.dumps({
+                            "event": "auto_revert_pr_failed",
+                            "task_id": task_id,
+                            "error": str(_exc),
+                        }))
                 regression_goal = (
                     f"Revert the PR from task '{task_title}' to restore CI stability. "
                     "The merge commit is still the HEAD of the base branch, so a clean revert is safe. "
-                    "Create a revert PR and merge it."
+                    + (f"An automatic revert PR has been opened: {_revert_pr_url} — "
+                       "review and merge it, or investigate whether CI was a transient flake."
+                       if _revert_pr_url else
+                       "Create a revert PR and merge it.")
                 )
                 regression_action = "revert"
             else:
@@ -4319,6 +4390,16 @@ def create_proposed_task_if_missing(
     normalized_key = proposal.dedup_key.strip().lower()
     if normalized_title in existing_names or normalized_key in proposal_keys:
         return None
+    # S8-3b: Semantic near-duplicate check — suppress proposals whose title is
+    # highly similar to an existing board task even if the wording differs.
+    for existing_name in existing_names:
+        if _semantic_title_similarity(normalized_title, existing_name) >= _SEMANTIC_DEDUP_THRESHOLD:
+            _logger.info(json.dumps({
+                "event": "propose_semantic_dedup_suppressed",
+                "title": proposal.title,
+                "similar_to": existing_name,
+            }))
+            return None
     if memory is not None and now is not None:
         if recently_proposed(memory, title=proposal.title, dedup_key=proposal.dedup_key, now=now):
             return None
@@ -5514,7 +5595,8 @@ def run_watch_loop(
                         logger.info(json.dumps({"event": "watch_workspace_health_tasks", "role": role, "cycle": cycle, "task_ids": ws_ids}))
                 # Stale autonomy task scan — every 30 improve cycles.
                 if role == "improve" and cycle % _STALE_AUTONOMY_SCAN_CYCLE_INTERVAL == 0:
-                    stale_auto_ids = handle_stale_autonomy_task_scan(client, service, now=datetime.now(UTC))
+                    _stale_days = int(getattr(service.settings, "stale_autonomy_backlog_days", _STALE_AUTONOMY_TASK_DAYS))
+                    stale_auto_ids = handle_stale_autonomy_task_scan(client, service, now=datetime.now(UTC), stale_days=_stale_days)
                     if stale_auto_ids:
                         logger.info(json.dumps({"event": "watch_stale_autonomy_cancelled", "role": role, "cycle": cycle, "task_ids": stale_auto_ids}))
                 # S7-5: Dependency update scan — every 50 improve cycles.

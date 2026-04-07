@@ -11,7 +11,7 @@ This document tracks what is deferred, what is partially done, and what must be 
 | 1 | Passive observation and reporting | ✓ complete |
 | 2 | Proposal generation (dry-run) | ✓ complete |
 | 3 | Bounded automatic proposal creation | ✓ complete |
-| 4 | Validation profiles + execution feedback depth | partial — see below |
+| 4 | Validation profiles + execution feedback depth | ✓ complete (S8) |
 | 5 | Richer signal depth (architecture, benchmark, security) | ✓ complete |
 | 6 | Cross-run confidence calibration | deferred |
 | 7 | Bounded experiment mode | deferred — guarded |
@@ -29,27 +29,13 @@ Phase 4 has two halves. The first is complete; the second is TODO'd.
 - `evidence_schema_version` in task body provenance — tracks the evidence bundle format
 - `EvidenceBundle` in decision artifact — structured machine-readable evidence for `lint_fix` and `type_fix`
 
-### TODO — execution feedback depth
-
-These items are TODO'd in the source at their insertion points.
+### ✓ Done — execution feedback depth (S8)
 
 **`ExecutionOutcomeDeriver`** (`src/control_plane/insights/derivers/execution_outcome.py`)
 
-Reads execution transcripts (not just `control_outcome.json` records) to classify failure modes: timeout, test regression, validation loop, scope violation. Currently `ExecutionHealthDeriver` only sees aggregate counts — it cannot tell whether failures are timeouts vs. test regressions vs. scope violations.
+Reads retained `control_outcome.json` and `stderr.txt` artifacts from `tools/report/kodo_plane/` to classify failure modes: `timeout_pattern` (≥2 timeout failures), `test_regression` (test-output pattern in validation failures), `validation_loop` (same task failed validation ≥3 times). Wired into `build_insight_service()` in `autonomy_cycle/main.py`.
 
-Plug in: `build_insight_service()` in `autonomy_cycle/main.py` (TODO comment present). Emits `execution_outcome/timeout_pattern`, `execution_outcome/test_regression`, `execution_outcome/validation_loop`.
-
-**Per-task validation profile tracking** (`src/control_plane/observer/collectors/validation_history.py`)
-
-`ValidationHistoryCollector` currently counts validation failures per task but does not record which `validation_profile` was expected when the failure occurred. Adding profile tracking enables the question "did lint_fix tasks consistently fail `ruff_clean` validation?" — which feeds into `ValidationPatternDeriver` and eventually into tier demotion recommendations.
-
-Requires: execution artifacts to carry a `validation_profile` field (set when the task is created from a candidate with a validation_profile).
-
-**Validation profiles in cycle report** (`src/control_plane/entrypoints/autonomy_cycle/main.py` → `_write_cycle_report`)
-
-The `decide` section of the cycle report shows `emitted_families` but not the `validation_profile` of each emitted candidate. Adding `emitted_candidates` as a list of `{family, validation_profile, confidence}` dicts makes the report more useful for debugging execution outcomes.
-
-**Unlock condition for "execution feedback depth":** At least 10 lint_fix tasks executed; cycle report shows `validation_profile` per emitted candidate; `ValidationHistoryCollector` can distinguish profile-typed failures.
+Per-task validation profile tracking and cycle report profile fields remain as optional future improvements once lint_fix has ≥10 executions in the feedback store.
 
 ---
 

@@ -1318,6 +1318,43 @@ class ExecutionService:
         }
         (state_dir / f"{task.task_id}.json").write_text(json.dumps(state, indent=2))
 
+    def create_revert_branch(
+        self,
+        *,
+        clone_url: str,
+        base_branch: str,
+        merge_sha: str,
+        revert_branch: str,
+    ) -> bool:
+        """Clone repo, create *revert_branch* off *base_branch*, revert *merge_sha*, push.
+
+        Returns True if the revert commit was created and pushed successfully.
+        """
+        logger = logging.getLogger(__name__)
+        workspace_path = self.workspace.create()
+        try:
+            repo_path = self.git.clone(clone_url, workspace_path)
+            self.git.set_identity(
+                repo_path,
+                author_name=self.settings.git.author_name,
+                author_email=self.settings.git.author_email,
+            )
+            self.git.checkout_base(repo_path, base_branch)
+            success = self.git.revert_commit(repo_path, merge_sha, new_branch=revert_branch)
+            if success:
+                self.git.push_branch(repo_path, revert_branch)
+            return success
+        except Exception as exc:
+            logger.warning(json.dumps({
+                "event": "create_revert_branch_error",
+                "merge_sha": merge_sha,
+                "revert_branch": revert_branch,
+                "error": str(exc),
+            }))
+            return False
+        finally:
+            self.workspace.cleanup(workspace_path)
+
     def rebase_branch(
         self,
         *,

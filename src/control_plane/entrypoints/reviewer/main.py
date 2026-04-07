@@ -417,11 +417,60 @@ def _process_human_review(
         except Exception as _exc:
             logger.warning(json.dumps({"event": "pr_auto_merge_check_failed", "task_id": task_id, "error": str(_exc)}))
 
+    # S8-6: Proactive branch divergence detection — if the branch is behind base,
+    # attempt a rebase before it becomes a conflict, not just when self-review flags it.
+    try:
+        _pr_for_divergence = gh.get_pr(owner, repo, pr_number)
+        _ms = _pr_for_divergence.get("mergeable_state", "")
+        if _ms == "behind" and not state.get("auto_rebase_attempted"):
+            logger.info(json.dumps({
+                "event": "branch_divergence_detected",
+                "task_id": task_id,
+                "pr_number": pr_number,
+                "mergeable_state": _ms,
+            }))
+            _rebased = _try_auto_rebase(state, service, logger)
+            state["auto_rebase_attempted"] = True
+            state_file.write_text(json.dumps(state, indent=2))
+            if _rebased:
+                logger.info(json.dumps({"event": "divergence_rebase_succeeded", "task_id": task_id}))
+                return 1
+            else:
+                logger.warning(json.dumps({"event": "divergence_rebase_failed", "task_id": task_id}))
+    except Exception as _exc:
+        logger.warning(json.dumps({"event": "divergence_check_error", "task_id": task_id, "error": str(_exc)}))
+
     # Timeout: merge after 1 day with no action
     created_at = datetime.fromisoformat(state["created_at"])
     elapsed = (datetime.now(UTC) - created_at).total_seconds()
     if elapsed > REVIEW_TIMEOUT_SECONDS:
         logger.info(json.dumps({"event": "pr_review_timeout", "task_id": task_id, "elapsed_hours": round(elapsed / 3600, 1)}))
+        # S8-9: Respect require_explicit_approval — never timeout-merge if set.
+        repo_cfg_for_approval = service.settings.repos.get(repo_key)
+        if repo_cfg_for_approval and getattr(repo_cfg_for_approval, "require_explicit_approval", False):
+            logger.info(json.dumps({
+                "event": "pr_timeout_merge_skipped_explicit_approval",
+                "task_id": task_id,
+                "reason": "require_explicit_approval is true for this repo",
+            }))
+            # Post a reminder comment at most once per day to avoid comment spam
+            _reminder_key = f"explicit_approval_reminder_{task_id}"
+            _last_reminder = state.get(_reminder_key, "")
+            _now_str = datetime.now(UTC).isoformat()
+            if not _last_reminder or (datetime.now(UTC) - datetime.fromisoformat(_last_reminder)).total_seconds() > 86400:
+                try:
+                    marker = _bot_marker(service.settings)
+                    _post_bot_comment(
+                        gh, owner, repo, pr_number,
+                        "This PR requires explicit approval before merging. "
+                        "React with 👍 or leave an approval comment to proceed.",
+                        marker,
+                    )
+                    state[_reminder_key] = _now_str
+                    state_file.write_text(json.dumps(state, indent=2))
+                except Exception:
+                    pass
+            return 0
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="timeout")
         return 1
 

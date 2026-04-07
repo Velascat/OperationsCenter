@@ -1,5 +1,9 @@
 """Record proposal feedback outcomes for the autonomy feedback loop.
 
+Also updates the Phase 6 confidence calibration store when the feedback record
+includes a ``confidence`` field (set when recording outcomes for autonomy proposals
+that carry a known confidence label).
+
 The reviewer watcher writes feedback records automatically when it merges or
 escalates a PR. This entrypoint handles the cases that fall outside the watcher:
 
@@ -70,6 +74,16 @@ def cmd_record(args: argparse.Namespace) -> None:
 
     feedback_path.write_text(json.dumps(record, indent=2))
     print(f"  Recorded: task={task_id}  outcome={outcome}  → {feedback_path}")
+
+    # S8-10: Update confidence calibration store if confidence label is provided.
+    if args.confidence and args.family:
+        try:
+            from control_plane.tuning.calibration import ConfidenceCalibrationStore
+            cal = ConfidenceCalibrationStore()
+            cal.record(args.family, args.confidence, outcome)
+            print(f"  Calibration updated: family={args.family}  confidence={args.confidence}  outcome={outcome}")
+        except Exception:
+            pass  # calibration is best-effort
 
 
 def cmd_list(args: argparse.Namespace) -> None:
@@ -147,6 +161,10 @@ def main() -> None:
     record_p.add_argument(
         "--force", action="store_true", help="Overwrite an existing feedback record"
     )
+    # S8-10: Optional confidence calibration fields
+    record_p.add_argument("--family", help="Proposal family (e.g. lint_fix) for calibration tracking")
+    record_p.add_argument("--confidence", choices=["high", "medium", "low"],
+                          help="Confidence label assigned at proposal time, for calibration")
 
     list_p = subparsers.add_parser("list", help="List all feedback records")
     list_p.add_argument("--limit", type=int, default=20, help="Max records to display (default: 20)")

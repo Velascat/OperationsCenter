@@ -47,6 +47,26 @@ class EscalationSettings(BaseModel):
     credential_expiry_warn_days: int = 7
 
 
+class ErrorIngestLogSource(BaseModel):
+    """A log file to tail for ERROR lines and convert to Plane tasks."""
+    path: str
+    repo_key: str
+    # Regex pattern that must match the line; default catches lines with ERROR or CRITICAL
+    pattern: str = r"(ERROR|CRITICAL)"
+    # Minimum seconds between tasks created for the same pattern match (dedup window)
+    dedup_window_seconds: int = 3600
+
+
+class ErrorIngestSettings(BaseModel):
+    """Configuration for the runtime error ingestion service (S8-8)."""
+    # Port for the HTTP webhook receiver (0 = disabled)
+    webhook_port: int = 0
+    # Log files to tail for error lines
+    log_sources: list[ErrorIngestLogSource] = Field(default_factory=list)
+    # Default repo_key for webhook events that don't specify one
+    default_repo_key: str = ""
+
+
 class ScheduledTask(BaseModel):
     cron: str  # e.g. "0 9 * * 1" (Monday 09:00 UTC)
     title: str
@@ -114,6 +134,9 @@ class RepoSettings(BaseModel):
     # When any of these paths are touched by an execution, a cross-repo impact
     # warning is added to the task comment so operators can check sibling repos.
     impact_report_paths: list[str] = Field(default_factory=list)
+    # S8-9: When True, the review watcher will never auto-merge on timeout.
+    # The PR must receive an explicit 👍 or human approval comment.
+    require_explicit_approval: bool = False
 
 
 class Settings(BaseModel):
@@ -165,6 +188,11 @@ class Settings(BaseModel):
     # are suppressed.  Use this to prevent autonomous activity during planned
     # deploy windows, maintenance periods, or overnight freezes.
     maintenance_windows: list[MaintenanceWindow] = Field(default_factory=list)
+    # S8-3: Days before a source:autonomy Backlog task is considered stale and
+    # eligible for cancellation.  0 = disabled.
+    stale_autonomy_backlog_days: int = 30
+    # S8-8: Runtime error ingestion configuration.  None = disabled.
+    error_ingest: ErrorIngestSettings | None = None
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]
