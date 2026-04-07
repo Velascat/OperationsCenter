@@ -129,7 +129,13 @@ def build_decision_service() -> DecisionEngineService:
 # Deferred: Phase 7 — experiment mode entrypoint (see docs/design/roadmap.md §Phase 7)
 
 
-def _write_quiet_diagnosis(report_dir: Path, *, quiet_window: int = 5) -> None:
+def _write_quiet_diagnosis(
+    report_dir: Path,
+    *,
+    quiet_window: int = 5,
+    escalation_webhook: str = "",
+    escalation_cooldown_seconds: int = 3600,
+) -> None:
     """If the last *quiet_window* cycle reports all had 0 candidates emitted,
     write ``quiet_diagnosis.json`` aggregating suppression reasons.
 
@@ -189,6 +195,34 @@ def _write_quiet_diagnosis(report_dir: Path, *, quiet_window: int = 5) -> None:
     diag_path = report_dir / "quiet_diagnosis.json"
     diag_path.write_text(json.dumps(diag, indent=2))
     print(f"\n  [warn] Proposer quiet for {quiet_window} cycles — diagnosis → {diag_path}")
+    # S7-7: Fire escalation webhook when proposer goes silent.
+    if escalation_webhook:
+        try:
+            from control_plane.adapters.escalation import post_escalation
+            from control_plane.execution.usage_store import UsageStore
+            _now = datetime.now(UTC)
+            _store = UsageStore()
+            _should, _ids = _store.should_escalate(
+                classification="proposer_quiet",
+                threshold=1,
+                cooldown_seconds=escalation_cooldown_seconds,
+                now=_now,
+            )
+            if _should:
+                post_escalation(
+                    escalation_webhook,
+                    classification="proposer_quiet",
+                    count=quiet_window,
+                    task_ids=[],
+                    now=_now,
+                )
+                _store.record_escalation(
+                    classification="proposer_quiet",
+                    task_ids=[],
+                    now=_now,
+                )
+        except Exception:
+            pass
 
 
 def main() -> None:
@@ -309,6 +343,9 @@ def main() -> None:
     else:
         print("\n  No candidates emitted.")
 
+    _esc_webhook = str(getattr(getattr(settings, "escalation", None), "webhook_url", "") or "")
+    _esc_cooldown = int(getattr(getattr(settings, "escalation", None), "cooldown_seconds", 3600))
+
     if dry_run:
         print("\n  Dry-run mode: proposer stage skipped. Use --execute to create Plane tasks.")
         _write_cycle_report(
@@ -318,6 +355,8 @@ def main() -> None:
             emitted=emitted,
             prop_artifact=None,
             dry_run=True,
+            escalation_webhook=_esc_webhook,
+            escalation_cooldown_seconds=_esc_cooldown,
         )
         return
 
@@ -331,6 +370,8 @@ def main() -> None:
             emitted=emitted,
             prop_artifact=None,
             dry_run=False,
+            escalation_webhook=_esc_webhook,
+            escalation_cooldown_seconds=_esc_cooldown,
         )
         return
 
@@ -367,6 +408,8 @@ def main() -> None:
                     emitted=emitted,
                     prop_artifact=None,
                     dry_run=False,
+                    escalation_webhook=_esc_webhook,
+                    escalation_cooldown_seconds=_esc_cooldown,
                 )
                 return
         except Exception:
@@ -396,6 +439,8 @@ def main() -> None:
             emitted=emitted,
             prop_artifact=prop_artifact,
             dry_run=False,
+            escalation_webhook=_esc_webhook,
+            escalation_cooldown_seconds=_esc_cooldown,
         )
     finally:
         client.close()
@@ -409,6 +454,8 @@ def _write_cycle_report(
     emitted: list,
     prop_artifact,
     dry_run: bool,
+    escalation_webhook: str = "",
+    escalation_cooldown_seconds: int = 3600,
 ) -> None:
     from collections import Counter
     from control_plane.execution import UsageStore
@@ -555,7 +602,12 @@ def _write_cycle_report(
     # candidates emitted, aggregate suppression reasons and write a diagnosis
     # file so the operator knows why the proposer went silent.
     _QUIET_WINDOW = 5
-    _write_quiet_diagnosis(report_dir, quiet_window=_QUIET_WINDOW)
+    _write_quiet_diagnosis(
+        report_dir,
+        quiet_window=_QUIET_WINDOW,
+        escalation_webhook=escalation_webhook,
+        escalation_cooldown_seconds=escalation_cooldown_seconds,
+    )
 
 
 if __name__ == "__main__":

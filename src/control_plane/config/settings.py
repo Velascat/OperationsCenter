@@ -43,6 +43,8 @@ class EscalationSettings(BaseModel):
     block_threshold: int = 5
     # Minimum seconds between two escalation POSTs for the same classification
     cooldown_seconds: int = 3600
+    # S7-2: Warn when a GitHub token expires within this many days (0 = disabled)
+    credential_expiry_warn_days: int = 7
 
 
 class ScheduledTask(BaseModel):
@@ -108,6 +110,10 @@ class RepoSettings(BaseModel):
     # When True and the task is source: autonomy, the review watcher merges the PR
     # automatically once CI is green without waiting for a human 👍.
     auto_merge_on_ci_green: bool = False
+    # S7-6: Paths in this repo that are shared interfaces across repos.
+    # When any of these paths are touched by an execution, a cross-repo impact
+    # warning is added to the task comment so operators can check sibling repos.
+    impact_report_paths: list[str] = Field(default_factory=list)
 
 
 class Settings(BaseModel):

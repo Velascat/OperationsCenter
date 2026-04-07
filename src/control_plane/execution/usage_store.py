@@ -866,6 +866,26 @@ class UsageStore:
             return True, matching_ids
         return False, []
 
+    def consecutive_blocks_for_task(self, task_id: str, *, now: datetime) -> int:
+        """Return how many consecutive blocked_triage events exist for *task_id*.
+
+        Counts backwards from the most recent event until a non-blocked event
+        (execution_outcome with succeeded=True) is found or all events are scanned.
+        Used by S7-4 self-healing to detect tasks stuck in a block loop.
+        """
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        count = 0
+        for ev in reversed(events):
+            if ev.get("task_id") != task_id:
+                continue
+            kind = ev.get("kind")
+            if kind == "blocked_triage":
+                count += 1
+            elif kind == "execution_outcome" and ev.get("succeeded"):
+                break
+        return count
+
     def record_blocked_triage(self, *, task_id: str, classification: str, now: datetime) -> None:
         """Record a single blocked-triage event for escalation tracking."""
         with self._exclusive():

@@ -95,6 +95,8 @@ MAX_BACKLOG_PROMOTIONS_PER_CYCLE = 2
 STALE_BLOCKED_ESCALATION_DAYS = 7
 EXECUTION_ACTIONS = {"execute", "improve_task"}
 MAX_CLASSIFICATION_ISSUES = 20
+# S7-4: Number of consecutive blocks on the same task before self-healing fires.
+CONSECUTIVE_BLOCK_COOLDOWN_THRESHOLD = 3
 _logger = logging.getLogger(__name__)
 
 
@@ -355,6 +357,45 @@ def classify_execution_result(
     if result.policy_violations:
         return "scope_policy"
     excerpt = (result.execution_stderr_excerpt or "").lower()
+    # S7-3: Out-of-memory — check early, before infra_tooling catches "killed"
+    if any(
+        token in excerpt
+        for token in [
+            "out of memory",
+            "cannot allocate memory",
+            "killed",
+            "oom",
+            "memory allocation failed",
+        ]
+    ):
+        return "oom"
+    # S7-3: Hard timeout — kodo process killed by timeout wrapper (exit 124) or
+    # subprocess timed out.  Separate from infra auth failures.
+    if any(
+        token in excerpt
+        for token in [
+            "timed out",
+            "timeout",
+            "operation timed out",
+            "deadline exceeded",
+        ]
+    ):
+        return "timeout"
+    # S7-3: Model API / provider errors (5xx, overloaded, etc.)
+    if any(
+        token in excerpt
+        for token in [
+            "internal server error",
+            "service unavailable",
+            "bad gateway",
+            "overloaded",
+            "too many requests",
+            "rate_limit_error",
+            "anthropic api error",
+            "openai error",
+        ]
+    ):
+        return "model_error"
     # Context-window exhaustion — kodo ran out of tokens mid-task (check before validation_failure)
     if any(
         token in excerpt
@@ -391,6 +432,18 @@ def classify_execution_result(
                 ):
                     return "flaky_test"
         return "validation_failure"
+    # S7-3: Tool-level failures (bash/file/git tool errors distinct from auth)
+    if any(
+        token in excerpt
+        for token in [
+            "tool_error",
+            "bash tool failed",
+            "git tool failed",
+            "permission denied",
+            "read-only file system",
+        ]
+    ):
+        return "tool_failure"
     # Infrastructure / auth / tooling failures
     if any(
         token in excerpt
@@ -400,8 +453,6 @@ def classify_execution_result(
             "auth",
             "login required",
             "no such file or directory",
-            "timed out",
-            "timeout",
         ]
     ):
         return "infra_tooling"
@@ -1184,6 +1235,34 @@ def validate_credentials(
                     now=now,
                 )
                 valid = False
+            else:
+                # S7-2: Check token expiry from response header (fine-grained PATs).
+                _expiry_header = resp.headers.get("x-token-expiration") or resp.headers.get("github-authentication-token-expiration")
+                if _expiry_header:
+                    try:
+                        from datetime import timezone as _tz
+                        _expiry_dt = datetime.fromisoformat(_expiry_header.replace("Z", "+00:00"))
+                        if _expiry_dt.tzinfo is None:
+                            _expiry_dt = _expiry_dt.replace(tzinfo=_tz.utc)
+                        _days_left = (_expiry_dt - now).days
+                        _esc = getattr(settings, "escalation", None)
+                        _warn_days = int(getattr(_esc, "credential_expiry_warn_days", 7)) if _esc else 7
+                        if _warn_days > 0 and _days_left <= _warn_days:
+                            _level = "error" if _days_left <= 1 else "warning"
+                            getattr(_logger, _level)(json.dumps({
+                                "event": "credential_expiry_soon",
+                                "provider": "github",
+                                "days_left": _days_left,
+                                "expires_at": _expiry_header,
+                            }))
+                            if _days_left <= 1:
+                                usage_store.record_escalation(
+                                    classification="credential_github_expiring",
+                                    task_ids=[],
+                                    now=now,
+                                )
+                    except Exception:
+                        pass
         except Exception as exc:
             _logger.warning(json.dumps({
                 "event": "credential_check_failed",
@@ -1339,6 +1418,9 @@ _FEEDBACK_LOOP_SCAN_MARKER = "[Improve] Feedback auto-recorded"
 _STALE_AUTONOMY_CANCEL_MARKER = "<!-- cp:stale-autonomy-scan -->"
 _STALE_AUTONOMY_TASK_DAYS = 21
 _STALE_AUTONOMY_SCAN_CYCLE_INTERVAL = 30
+# S7-5: Dependency update scan runs every N improve cycles.
+_DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL = 50
+_MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN = 2
 
 
 def handle_feedback_loop_scan(
@@ -1767,6 +1849,121 @@ def handle_stale_autonomy_task_scan(
             pass
 
     return cancelled_ids
+
+
+# ---------------------------------------------------------------------------
+# S7-5: Dependency update loop
+# ---------------------------------------------------------------------------
+
+def handle_dependency_update_scan(
+    client: PlaneClient,
+    service: "ExecutionService",
+) -> list[str]:
+    """Create Plane tasks for outdated pip/npm dependencies in local repos.
+
+    For each repo configured with a ``local_path``, this scan:
+    1. Runs ``pip list --outdated --format=json`` inside the repo's venv
+       (or the active Python environment if no venv is found).
+    2. Identifies packages with a major-version bump.
+    3. Creates one bounded update task per package, up to
+       ``_MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN`` per call.
+
+    Only repos with a ``local_path`` setting are checked — repos without a
+    locally checked-out copy are skipped silently.  All subprocess calls are
+    best-effort; a failure on one repo does not prevent the others.
+
+    Returns a list of created task IDs.
+    """
+    existing_names = existing_issue_names(client)
+    created_ids: list[str] = []
+
+    for repo_key, repo_cfg in service.settings.repos.items():
+        if len(created_ids) >= _MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN:
+            break
+        local_path = getattr(repo_cfg, "local_path", None)
+        if not local_path:
+            continue
+        repo_path = Path(local_path)
+        if not repo_path.exists():
+            continue
+
+        # Prefer the repo's own venv python; fall back to system python3.
+        venv_python = repo_path / ".venv" / "bin" / "python"
+        python_bin = str(venv_python) if venv_python.exists() else "python3"
+
+        try:
+            proc = subprocess.run(
+                [python_bin, "-m", "pip", "list", "--outdated", "--format=json"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(repo_path),
+            )
+            if proc.returncode != 0 or not proc.stdout.strip():
+                continue
+            outdated = json.loads(proc.stdout)
+        except Exception:
+            continue
+
+        for pkg in outdated:
+            if len(created_ids) >= _MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN:
+                break
+            try:
+                name = str(pkg.get("name", ""))
+                current = str(pkg.get("version", ""))
+                latest = str(pkg.get("latest_version", ""))
+                if not name or not current or not latest:
+                    continue
+                # Only propose updates for major-version bumps to avoid noise.
+                cur_major = int(current.split(".")[0])
+                lat_major = int(latest.split(".")[0])
+                if lat_major <= cur_major:
+                    continue
+                task_title = f"Update {name} from {current} to {latest} in {repo_key}"
+                if task_title.lower() in existing_names:
+                    continue
+                base_branch = getattr(repo_cfg, "default_branch", "main")
+                new_issue = client.create_issue(
+                    name=task_title,
+                    description=(
+                        f"## Execution\n"
+                        f"repo: {repo_key}\n"
+                        f"base_branch: {base_branch}\n"
+                        f"mode: goal\n\n"
+                        f"## Goal\n"
+                        f"Update the `{name}` dependency from `{current}` to `{latest}` "
+                        f"(major version bump). Verify the upgrade does not break existing "
+                        f"tests or imports. Update any API callsites that have changed.\n\n"
+                        f"## Constraints\n"
+                        f"- source: dependency_update_scan\n"
+                        f"- package: {name}\n"
+                        f"- current_version: {current}\n"
+                        f"- target_version: {latest}\n"
+                        f"- Run validation commands after upgrading to confirm no regressions.\n"
+                    ),
+                    state="Backlog",
+                    label_names=[
+                        "task-kind: goal",
+                        f"repo: {repo_key}",
+                        "source: autonomy",
+                        "source_family: dependency_update",
+                    ],
+                )
+                if new_issue:
+                    created_ids.append(str(new_issue.get("id")))
+                    existing_names.add(task_title)
+                    _logger.info(json.dumps({
+                        "event": "dependency_update_task_created",
+                        "repo_key": repo_key,
+                        "package": name,
+                        "current": current,
+                        "latest": latest,
+                        "task_id": str(new_issue.get("id")),
+                    }))
+            except Exception:
+                continue
+
+    return created_ids
 
 
 # ---------------------------------------------------------------------------
@@ -4723,8 +4920,58 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
             )
     except Exception:
         pass
+    # S7-6: Cross-repo impact analysis.
+    # When changed files overlap with shared interface paths declared in any other
+    # repo's impact_report_paths, annotate the task with a cross-repo warning.
+    if result.success and result.changed_files:
+        try:
+            _cross_repo_warnings = _check_cross_repo_impact(result.changed_files, service)
+            if _cross_repo_warnings:
+                client.comment_issue(
+                    task_id,
+                    render_worker_comment(
+                        "[Goal] Cross-repo impact detected",
+                        [
+                            f"task_id: {task_id}",
+                            "action: changed files overlap with shared interface paths",
+                            *[f"impact: {w}" for w in _cross_repo_warnings],
+                            "recommendation: verify dependent repos still build and pass tests",
+                        ],
+                    ),
+                )
+                _logger.warning(json.dumps({
+                    "event": "cross_repo_impact_detected",
+                    "task_id": task_id,
+                    "warnings": _cross_repo_warnings,
+                }))
+        except Exception:
+            pass
     rewrite_worker_summary(result, service, task_id)
     return created_ids
+
+
+def _check_cross_repo_impact(
+    changed_files: list[str],
+    service: "ExecutionService",
+) -> list[str]:
+    """Return warning strings when *changed_files* touch shared interface paths.
+
+    Checks ``impact_report_paths`` declared on every repo in settings.  Each
+    entry is treated as a path prefix; a match is reported as a warning string
+    describing which repo and which shared path was touched.
+    """
+    warnings: list[str] = []
+    for repo_key, repo_cfg in service.settings.repos.items():
+        impact_paths = list(getattr(repo_cfg, "impact_report_paths", []) or [])
+        if not impact_paths:
+            continue
+        for changed in changed_files:
+            for shared_path in impact_paths:
+                if changed.startswith(shared_path.rstrip("/")):
+                    warnings.append(
+                        f"repo={repo_key} shared_path={shared_path} changed_file={changed}"
+                    )
+    return warnings
 
 
 def goal_failure_needs_manual_env_fix(result: ExecutionResult) -> bool:
@@ -5101,6 +5348,34 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
                         )
                     except Exception:
                         pass  # Systemic task creation is best-effort
+    # S7-4: Self-healing for repeatedly blocked tasks.
+    # When the same task has been blocked N consecutive times without a successful
+    # execution in between, add a self-healing comment and flag it for human review.
+    try:
+        _consec = service.usage_store.consecutive_blocks_for_task(task_id, now=datetime.now(UTC))
+        if _consec >= CONSECUTIVE_BLOCK_COOLDOWN_THRESHOLD:
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Improve] Repeated-block self-healing triggered",
+                    [
+                        f"task_id: {task_id}",
+                        f"consecutive_blocks: {_consec}",
+                        f"threshold: {CONSECUTIVE_BLOCK_COOLDOWN_THRESHOLD}",
+                        f"last_classification: {triage.classification}",
+                        "action: task flagged for human review — autonomous retries paused",
+                        "recommendation: review classification pattern and unblock manually or close the task",
+                    ],
+                ),
+            )
+            _logger.warning(json.dumps({
+                "event": "self_healing_repeated_block",
+                "task_id": task_id,
+                "consecutive_blocks": _consec,
+                "classification": triage.classification,
+            }))
+    except Exception:
+        pass
     return triage.classification, created_ids
 
 
@@ -5242,6 +5517,15 @@ def run_watch_loop(
                     stale_auto_ids = handle_stale_autonomy_task_scan(client, service, now=datetime.now(UTC))
                     if stale_auto_ids:
                         logger.info(json.dumps({"event": "watch_stale_autonomy_cancelled", "role": role, "cycle": cycle, "task_ids": stale_auto_ids}))
+                # S7-5: Dependency update scan — every 50 improve cycles.
+                if role == "improve" and cycle % _DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL == 0:
+                    try:
+                        dep_ids = handle_dependency_update_scan(client, service)
+                        if dep_ids:
+                            counters["follow_up_tasks_created"] += len(dep_ids)
+                            logger.info(json.dumps({"event": "watch_dependency_update_tasks", "role": role, "cycle": cycle, "task_ids": dep_ids}))
+                    except Exception:
+                        pass
                 # S6-4: Failure-rate degradation check — every 5 cycles on primary slot.
                 if cycle % 5 == 0:
                     try:
@@ -5254,6 +5538,40 @@ def run_watch_loop(
                                 "success_rate": round(_degraded_rate, 3),
                                 "action": "review recent executions before circuit breaker opens",
                             }))
+                    except Exception:
+                        pass
+                    # S7-7: Escalate when the circuit breaker has tripped.
+                    try:
+                        _cb_budget = service.usage_store.budget_decision(now=datetime.now(UTC))
+                        if not _cb_budget.allowed and "circuit_breaker" in (_cb_budget.reason or ""):
+                            _esc7 = getattr(service.settings, "escalation", None)
+                            if _esc7 and getattr(_esc7, "webhook_url", ""):
+                                _now7 = datetime.now(UTC)
+                                _cb_should, _cb_ids = service.usage_store.should_escalate(
+                                    classification="circuit_breaker_tripped",
+                                    threshold=1,
+                                    cooldown_seconds=int(getattr(_esc7, "cooldown_seconds", 3600)),
+                                    now=_now7,
+                                )
+                                if _cb_should:
+                                    post_escalation(
+                                        _esc7.webhook_url,
+                                        classification="circuit_breaker_tripped",
+                                        count=1,
+                                        task_ids=[],
+                                        now=_now7,
+                                    )
+                                    service.usage_store.record_escalation(
+                                        classification="circuit_breaker_tripped",
+                                        task_ids=[],
+                                        now=_now7,
+                                    )
+                                    logger.error(json.dumps({
+                                        "event": "circuit_breaker_escalation_sent",
+                                        "role": role,
+                                        "cycle": cycle,
+                                        "reason": _cb_budget.reason,
+                                    }))
                     except Exception:
                         pass
                 # S6-10: Board health snapshot — every 40 improve cycles.
