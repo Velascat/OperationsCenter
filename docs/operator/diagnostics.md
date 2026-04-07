@@ -317,6 +317,9 @@ in the watcher log. The escalation fires once per cooldown period (`escalation.c
 17. credential expiry: look for `credential_expiry_soon` in watcher log at cycle 1
 18. cross-repo impact: look for `cross_repo_impact_detected` in goal watcher log
 19. dependency updates: look for `dependency_update_task_created` in improve watcher log
+20. quality trends: look for `quality_trend/lint_degrading` or `type_degrading` insights in `tools/report/control_plane/insights/`
+21. confidence calibration: run `tune-autonomy` and check the calibration table for ⚠ families
+22. error ingest: look for `error_ingest_task_created` events; check `state/error_ingest_dedup.json` for dedup state
 
 For autonomy-layer inputs:
 
@@ -335,6 +338,54 @@ When the board is quiet, also check the proposer lane:
 - proposer log in `logs/local/watch-all/`
 - new tasks labeled `source: proposer`
 - `logs/autonomy_cycle/quiet_diagnosis.json` for aggregated suppression reasons
+
+## Quality Trend Warnings
+
+The `QualityTrendDeriver` emits insights when lint or type error counts are trending in a direction across ≥3 observer snapshots. Check the latest insights artifact for these signals:
+
+```bash
+cat tools/report/control_plane/insights/$(ls -t tools/report/control_plane/insights/ | head -1)
+```
+
+Look for entries with `kind` starting with `quality_trend/`:
+
+| Insight | Meaning |
+|---------|---------|
+| `quality_trend/lint_degrading` | Lint errors increased >10% from oldest to newest snapshot |
+| `quality_trend/type_degrading` | Type errors increased >10% |
+| `quality_trend/lint_improving` | Lint errors decreased >10% |
+| `quality_trend/type_improving` | Type errors decreased >10% |
+| `quality_trend/stagnant` | Metrics present but <10% change in either direction |
+
+`stagnant` on a repo with many outstanding lint/type tasks may indicate the autonomy loop is proposing tasks that are not reaching execution, or that tasks complete but introduce equivalent new violations.
+
+## Confidence Calibration
+
+After enough feedback records accumulate (≥5 per family/confidence combination), `tune-autonomy` prints a calibration table:
+
+```
+  Confidence calibration:
+  family                       conf     n  accept%  expected    ratio
+  lint_fix                     high     8    62.5%     80.0%   0.78
+  type_fix                     high     6    33.3%     80.0%   0.42⚠
+```
+
+The `ratio` column is `acceptance_rate / expected_rate`. Interpretation:
+- `ratio ≥ 0.9` (✓) — well-calibrated; the confidence label matches observed outcomes
+- `0.6 ≤ ratio < 0.9` — mildly over-confident; monitor but no immediate action needed
+- `ratio < 0.6` (⚠) — over-confident; the system is creating `high`-confidence proposals that are frequently rejected
+
+When a family shows ⚠, consider lowering its `min_confidence` threshold in config or demoting its tier until the acceptance rate recovers.
+
+To record calibration data manually:
+
+```bash
+python -m control_plane.entrypoints.feedback.main record \
+    --task-id <uuid> --outcome merged \
+    --family lint_fix --confidence high
+```
+
+Calibration data is stored in `state/calibration_store.json`.
 
 ## Maintenance Boundary
 

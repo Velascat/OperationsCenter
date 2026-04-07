@@ -101,7 +101,7 @@ The naming is intentionally close because the second is the board adapter for th
 ### Repo-Aware Autonomy
 
 - Read-only repo observer snapshots with fourteen signal collectors: git context, recent commits, file hotspots, test signal, dependency drift, TODOs, execution health, lint violations (`ruff`), type errors (`ty`/`mypy`), CI check history (GitHub API), per-task validation failure patterns, static architecture coupling (AST), benchmark regression (reads retained benchmark output), and security advisories (reads pip-audit/npm audit/trivy JSON).
-- Read-only normalized insight generation from retained observer snapshots across seventeen derivers (including architecture drift, benchmark regression, and security vuln derivers added in Phase 5).
+- Read-only normalized insight generation from retained observer snapshots across nineteen derivers (including architecture drift, benchmark regression, security vuln, execution outcome, and quality trend derivers).
 - Cross-signal correlation: lint and type violations are checked for overlap with git hotspot files; overlap boosts candidate confidence with a second corroborating signal.
 - Guarded proposal-candidate generation from retained insights across twelve candidate families (seven active by default, five gated).
 - Chain-aware candidate sequencing: `type_fix` is suppressed when `lint_fix` is active in the same cycle or was recently emitted; `execution_health_followup` is suppressed when `test_visibility` is active. Both suppression reasons are artifact-visible.
@@ -153,7 +153,7 @@ The naming is intentionally close because the second is the board adapter for th
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
 - Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
-### Autonomy Hardening (53 improvements across seven implementation rounds)
+### Autonomy Hardening (63 improvements across eight implementation rounds)
 
 The following capabilities were added to close gaps toward full autonomous operation:
 
@@ -218,6 +218,19 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Dependency update loop** — every 50 improve cycles, `pip list --outdated` is run for repos with `local_path`; major-version bumps create bounded Plane tasks.
 - **Cross-repo impact analysis** — `impact_report_paths:` per-repo declares shared interface paths; touching them after a successful goal execution posts a cross-repo warning comment.
 - **Human escalation wiring** — circuit-breaker trips and proposer quiet-cycles now fire the escalation webhook with cooldown guard, in addition to the existing blocked-task threshold escalation.
+
+**Session 8 — 10 execution depth and calibration improvements:**
+
+- **ExecutionOutcomeDeriver (Phase 4)** — reads retained `control_outcome.json` and `stderr.txt` from kodo artifacts; classifies `timeout_pattern` (≥2 timeout failures), `test_regression` (test output in stderr of validation failure), `validation_loop` (same task fails validation ≥3 times).
+- **Quality trend tracking** — `QualityTrendDeriver` computes lint/type error deltas across ≥3 observer snapshots; emits `lint_improving`, `lint_degrading`, `type_improving`, `type_degrading`, `stagnant` insights with a 10% change threshold.
+- **Confidence calibration store** — `ConfidenceCalibrationStore` in `tuning/calibration.py` tracks whether `high/medium/low` confidence labels are accurate; `tune-autonomy` output now includes a calibration table with ⚠ flags for over-confident families.
+- **Semantic deduplication** — near-duplicate proposals with different wording are suppressed via Jaccard similarity on title word tokens (threshold 0.5); `[...]` prefix markers are stripped before comparison.
+- **Auto revert branch on regression** — when `detect_post_merge_regressions()` finds a safe-revert case (merge commit still at HEAD), a revert branch is automatically created and a `[Revert]` PR opened for human review.
+- **Proactive branch divergence check** — the reviewer watcher proactively checks `mergeable_state == "behind"` and calls `_try_auto_rebase()` before waiting for human comments.
+- **Runtime error ingestion** — new `entrypoints/error_ingest/main.py` accepts production errors via HTTP webhook (`POST /ingest`) or log file tailing; deduplicates via `state/error_ingest_dedup.json` and creates Plane tasks automatically.
+- **Explicit approval control** — `require_explicit_approval: true` per-repo prevents the reviewer watcher from timeout-merging; posts a daily reminder comment instead.
+- **Feedback loop config wiring** — `stale_autonomy_backlog_days` is now read from settings and passed into the stale scan on every cycle.
+- **Feedback calibration CLI** — `feedback record` accepts optional `--family` and `--confidence` args; records to the calibration store when provided.
 
 ### Repo and Branch Selection
 

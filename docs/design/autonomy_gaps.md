@@ -1070,3 +1070,163 @@ repos:
 | S7-5 | Dependency update loop | every 50 improve cycles | `handle_dependency_update_scan` |
 | S7-6 | Cross-repo impact analysis | after successful goal | `_check_cross_repo_impact`, `handle_goal_task` |
 | S7-7 | Human escalation wiring | every 5 cycles + quiet diagnosis | `run_watch_loop`, `_write_quiet_diagnosis` |
+
+---
+
+## Session 8 — 10 execution depth and calibration improvements
+
+These improvements completed Phase 4 (execution feedback depth), added confidence calibration, quality trend tracking, runtime error ingestion, and several robustness fixes.
+
+### S8-1. Feedback Loop Config Wiring
+
+**Problem:** The feedback loop scan used a hardcoded `stale_autonomy_backlog_days` value and ignored the config field, so operator tuning had no effect.
+
+**Fix:** `handle_stale_autonomy_task_scan()` now reads `stale_autonomy_backlog_days` from `service.settings` (falling back to the internal default) on every call. The `run_watch_loop` passes the config-derived value down.
+
+**Files:** `config/settings.py` (`stale_autonomy_backlog_days: int = 30`), `entrypoints/worker/main.py` (wiring in `run_watch_loop`)
+
+---
+
+### S8-2. ExecutionOutcomeDeriver (Phase 4 Complete)
+
+**Problem:** The Phase 4 execution feedback depth feature was deferred — a `# Deferred: Phase 4 — ExecutionOutcomeDeriver` comment existed in `autonomy_cycle/main.py` but no deriver was implemented.
+
+**Fix:** New `ExecutionOutcomeDeriver` in `insights/derivers/execution_outcome.py`. Reads retained `control_outcome.json` and `stderr.txt` artifacts from `tools/report/kodo_plane/`. Classifies three failure modes:
+- `timeout_pattern` — ≥2 timeout failures across retained runs
+- `test_regression` — test-output pattern found in stderr of a validation failure
+- `validation_loop` — same `task_id` fails validation ≥3 times
+
+Each classification emits a corresponding insight under the `execution_outcome/` namespace.
+
+**Files:** `insights/derivers/execution_outcome.py` (NEW), `entrypoints/autonomy_cycle/main.py` (registered in `build_insight_service()`)
+
+---
+
+### S8-3. Stale Pruning + Semantic Deduplication
+
+**Problem (a):** Stale autonomy backlog pruning ignored the config field (see S8-1).
+
+**Problem (b):** The existing exact-title deduplication missed near-duplicate proposals whose titles differed by small wording changes (e.g. `Fix lint errors in auth.py` vs. `Resolve linting in auth.py`).
+
+**Fix (b):** New `_semantic_title_similarity(a, b) -> float` using Jaccard similarity on word tokens (≥3 characters). `[...]` prefix markers are stripped before comparison. Threshold `_SEMANTIC_DEDUP_THRESHOLD = 0.5`. Applied in `create_proposed_task_if_missing()` after the exact-title check but before any Plane API call.
+
+**Files:** `entrypoints/worker/main.py` (`_semantic_title_similarity`, `_SEMANTIC_DEDUP_THRESHOLD`, applied in `create_proposed_task_if_missing`)
+
+---
+
+### S8-4. Goal Decomposition (Multi-Step Planning)
+
+**Problem:** `build_multi_step_plan()` was already implemented but not covered by tests and the wiring was not verified end-to-end.
+
+**Status:** Confirmed working. Decomposes tasks with titles containing `migrate`, `refactor`, `redesign`, etc. into Analyze → Implement → Verify subtasks with `depends_on:` chains.
+
+**Files:** `entrypoints/worker/main.py` (`build_multi_step_plan`)
+
+---
+
+### S8-5. Automatic Revert Branch on Post-Merge Regression
+
+**Problem:** `detect_post_merge_regressions()` detected `recommended_action: revert` cases but only logged the finding — no automated revert branch or PR was created.
+
+**Fix:** New `GitClient.revert_commit(repo_path, commit_sha, *, new_branch) -> bool` and `ExecutionService.create_revert_branch(*, clone_url, base_branch, merge_sha, revert_branch) -> bool`. When `detect_post_merge_regressions()` finds a safe-revert case (merge commit still at HEAD), it calls `service.create_revert_branch()` and then `gh.create_pr()` to open an auto-revert PR. The PR is flagged `[Revert]` for human review.
+
+**Files:** `adapters/git/client.py` (`revert_commit`), `application/service.py` (`create_revert_branch`), `entrypoints/worker/main.py` (`detect_post_merge_regressions` — revert branch + PR creation)
+
+---
+
+### S8-6. Branch Divergence Detection in Review Loop
+
+**Problem:** The reviewer watcher only attempted a rebase reactively (when it received a `CHANGES_REQUESTED` review). A PR that fell behind `main` due to other merges would sit stuck until a human noticed.
+
+**Fix:** In `_process_human_review()`, before the normal review pass, the PR's `mergeable_state` is fetched. When it is `"behind"` and no rebase has been attempted in this state file, `_try_auto_rebase()` is called proactively. The `auto_rebase_attempted` flag prevents repeated attempts on the same PR.
+
+**Files:** `entrypoints/reviewer/main.py` (`_process_human_review` — proactive divergence check)
+
+---
+
+### S8-7. Quality Trend Tracking
+
+**Problem:** The system could tell that lint errors exist today, but had no objective function to know whether quality was improving or degrading over time. Without this, the system could loop on tasks that make no net progress.
+
+**Fix:** New `QualityTrendDeriver` in `insights/derivers/quality_trend.py`. Requires ≥3 observer snapshots. Computes lint and type error deltas (oldest → newest). Emits insights with a 10% change threshold:
+- `quality_trend/lint_improving`, `quality_trend/lint_degrading`
+- `quality_trend/type_improving`, `quality_trend/type_degrading`
+- `quality_trend/stagnant` when metrics exist but show <10% change in either direction
+
+**Files:** `insights/derivers/quality_trend.py` (NEW), `entrypoints/autonomy_cycle/main.py` (registered in `build_insight_service()`)
+
+---
+
+### S8-8. Runtime Error Ingestion
+
+**Problem:** The system had no way to learn about runtime errors. Production errors that triggered alerting pipelines were invisible; Kodo would fix what it could see in static analysis but never what manifested at runtime.
+
+**Fix:** New `entrypoints/error_ingest/main.py`:
+- **Webhook receiver:** `run_webhook_server(plane_client, *, port, default_repo_key)` starts a `ThreadingHTTPServer` on `POST /ingest`; accepts JSON `{text, repo_key?}`; creates Plane tasks.
+- **Log tail watcher:** `_tail_log_file(...)` follows a file for lines matching a regex; deduplicates via `state/error_ingest_dedup.json` with a configurable time window.
+- Dedup key is a stable hash of `(repo_key, text[:200])`.
+
+**Config:**
+```yaml
+error_ingest:
+  webhook_port: 9000
+  default_repo_key: myrepo
+  log_sources:
+    - path: /var/log/myapp/app.log
+      repo_key: myrepo
+      pattern: "(ERROR|CRITICAL)"
+      dedup_window_seconds: 3600
+```
+
+**Files:** `config/settings.py` (`ErrorIngestSettings`, `ErrorIngestLogSource`), `entrypoints/error_ingest/main.py` (NEW)
+
+---
+
+### S8-9. Explicit Approval Control
+
+**Problem:** Repos that require human sign-off before any merge had no mechanism to prevent the reviewer watcher from timing out and auto-merging. The `auto_merge_on_ci_green` flag controlled automatic CI-green merges but not the 1-day timeout-merge path.
+
+**Fix:** New `RepoSettings.require_explicit_approval: bool = False`. When `True`, the reviewer watcher never executes timeout-based merges. Instead, it posts a reminder comment on the PR (at most once per day) asking for explicit human approval. The comment carries `<!-- controlplane:bot -->` so it is not re-processed.
+
+**Config:**
+```yaml
+repos:
+  production_repo:
+    require_explicit_approval: true
+```
+
+**Files:** `config/settings.py` (`RepoSettings.require_explicit_approval`), `entrypoints/reviewer/main.py` (`_process_human_review` — timeout-merge blocked, reminder posted)
+
+---
+
+### S8-10. Confidence Calibration Store
+
+**Problem:** The system assigned `confidence: high/medium/low` labels to proposals, but never tracked whether those labels were accurate. A family systematically over-confident would be hard to detect without a calibration record.
+
+**Fix:** New `ConfidenceCalibrationStore` in `tuning/calibration.py`. Backed by `state/calibration_store.json`. API:
+- `record(family, confidence, outcome)` — records one feedback event
+- `calibration_for(family, confidence) -> float | None` — returns acceptance rate (requires `_MIN_SAMPLE_SIZE = 5`)
+- `report() -> list[CalibrationRecord]` — all calibrated family/confidence pairs
+
+Expected acceptance rates: `high=0.8`, `medium=0.5`, `low=0.3`. `calibration_ratio = acceptance_rate / expected_rate`. Ratio < 0.6 flagged as over-confident (⚠); ≥ 0.9 is well-calibrated (✓).
+
+Wired into `feedback record` CLI (optional `--family` / `--confidence` args) and `tune-autonomy` output (calibration table printed after the standard tuning report).
+
+**Files:** `tuning/calibration.py` (NEW), `entrypoints/feedback/main.py` (`--family`, `--confidence` args + `record()` call), `entrypoints/tuning/main.py` (calibration table output)
+
+---
+
+## Summary Table (continued)
+
+| # | Name | Trigger | Where |
+|---|------|---------|-------|
+| S8-1 | Feedback loop config wiring | every 15 improve cycles | `handle_feedback_loop_scan`, `run_watch_loop` |
+| S8-2 | ExecutionOutcomeDeriver | autonomy-cycle insights stage | `execution_outcome.py`, `build_insight_service` |
+| S8-3 | Semantic deduplication | before task creation | `_semantic_title_similarity`, `create_proposed_task_if_missing` |
+| S8-4 | Goal decomposition (multi-step) | on complex task detection | `build_multi_step_plan` |
+| S8-5 | Auto revert branch on regression | every 10 improve cycles | `detect_post_merge_regressions`, `create_revert_branch` |
+| S8-6 | Proactive branch divergence check | reviewer loop per PR | `_process_human_review` |
+| S8-7 | Quality trend tracking | autonomy-cycle insights stage | `quality_trend.py`, `build_insight_service` |
+| S8-8 | Runtime error ingestion | continuous webhook + log tail | `entrypoints/error_ingest/main.py` |
+| S8-9 | Explicit approval control | reviewer timeout-merge path | `RepoSettings.require_explicit_approval`, `_process_human_review` |
+| S8-10 | Confidence calibration store | tune-autonomy + feedback record | `tuning/calibration.py`, `tune-autonomy` output |

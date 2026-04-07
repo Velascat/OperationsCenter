@@ -155,6 +155,12 @@ CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS=20 ./scripts/control-plane.sh watch --ro
 
 When saturated, look for `"event": "propose_skipped_board_saturated"` in the propose watcher log. This is not an error — it means the board already has more work than the workers are consuming.
 
+## Semantic Deduplication
+
+In addition to exact-title matching, proposals are checked for near-duplicate titles using Jaccard similarity on word tokens (minimum 3 characters). Titles with similarity ≥ 0.5 are considered duplicates and suppressed. `[...]` prefix markers (e.g. `[Regression]`, `[Lint]`) are stripped before comparison so prefixed variants of the same underlying proposal are caught.
+
+If a legitimate proposal is being suppressed as a near-duplicate, check the board for existing tasks with similar titles. The threshold is not configurable at runtime.
+
 ## Task Urgency Scoring
 
 When the watcher selects which task to pick up next, candidates are ranked by a composite urgency score rather than priority label alone:
@@ -260,6 +266,50 @@ Promotion criteria (all must be true):
 
 Tasks created at tier 0 are never promoted. Tasks without a `source: autonomy` label are not touched.
 
+## Error Ingestion Service
+
+The error ingest service bridges production runtime errors into Plane tasks automatically. It supports two input modes:
+
+**Webhook receiver** — listens for HTTP `POST /ingest` with JSON body `{text, repo_key?}`:
+
+```bash
+python -m control_plane.entrypoints.error_ingest.main \
+    --config config/control_plane.local.yaml
+```
+
+Configure in `config/control_plane.local.yaml`:
+```yaml
+error_ingest:
+  webhook_port: 9000
+  default_repo_key: myrepo
+  log_sources:
+    - path: /var/log/myapp/app.log
+      repo_key: myrepo
+      pattern: "(ERROR|CRITICAL)"
+      dedup_window_seconds: 3600
+```
+
+**Log file tailing** — follows one or more log files for lines matching a regex; each match creates a Plane task.
+
+Duplicate suppression is handled via `state/error_ingest_dedup.json`. The dedup key is a stable hash of `(repo_key, text[:200])`; within `dedup_window_seconds`, the same error text will not create a second task. Delete the file to reset dedup state.
+
+## Explicit Approval Control
+
+By default, the reviewer watcher merges autonomy PRs after a 1-day timeout with no unresolved comments. For repos that must not auto-merge without a human sign-off, set:
+
+```yaml
+repos:
+  production_repo:
+    require_explicit_approval: true
+```
+
+When enabled:
+- Timeout-based merges are blocked for that repo.
+- A reminder comment is posted on the PR asking for explicit approval (at most once per day).
+- The PR stays open until a human approves via 👍 or an explicit `LGTM` comment.
+
+This does not affect the `auto_merge_on_ci_green` path, which is controlled separately. Both flags can coexist; `require_explicit_approval` blocks only the timeout path.
+
 ## Feedback
 
 Records proposal outcomes manually for tasks that were merged, escalated, or abandoned outside the reviewer loop:
@@ -276,6 +326,10 @@ python -m control_plane.entrypoints.feedback.main record \
 # Record abandonment
 python -m control_plane.entrypoints.feedback.main record \
     --task-id <uuid> --outcome abandoned
+
+# Record with confidence calibration data (optional)
+python -m control_plane.entrypoints.feedback.main record \
+    --task-id <uuid> --outcome merged --family lint_fix --confidence high
 
 # List all feedback records
 python -m control_plane.entrypoints.feedback.main list
