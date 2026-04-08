@@ -262,6 +262,20 @@ class TestBuildFixValidationDescription:
         assert "## Configured Validation Commands" not in desc
         assert "## Failing Commands" in desc
 
+    def test_no_configured_commands_section_when_both_lists_empty(self) -> None:
+        """Empty validation_results=[] and repo_target with empty validation_commands=[] —
+        no 'Configured Validation Commands' section should appear."""
+        rt = MagicMock()
+        rt.validation_commands = []
+        desc = ExecutionService._build_fix_validation_description(
+            repo_key="org/repo",
+            baseline_error_text="err",
+            occurrence_count=1,
+            validation_results=[],
+            repo_target=rt,
+        )
+        assert "## Configured Validation Commands" not in desc
+
 
 # ---------------------------------------------------------------------------
 # Tests for _maybe_create_fix_validation_task (integration-ish with mocks)
@@ -482,6 +496,20 @@ class TestBaselineResultNoneSafety:
         result = _BaselineResult(failed=True, error_text="x", validation_results=vr)
         assert result.validation_results is vr
 
+    def test_failed_true_with_explicit_empty_list_keeps_empty_list(self) -> None:
+        """Explicit validation_results=[] on failed=True must stay [] (not replaced or None)."""
+        result = _BaselineResult(failed=True, error_text="x", validation_results=[])
+        assert result.validation_results is not None
+        assert result.validation_results == []
+        assert isinstance(result.validation_results, list)
+
+    def test_failed_false_with_explicit_empty_list_keeps_empty_list(self) -> None:
+        """Explicit validation_results=[] on failed=False must stay [] (not coerced to None)."""
+        result = _BaselineResult(failed=False, error_text=None, validation_results=[])
+        assert result.validation_results is not None
+        assert result.validation_results == []
+        assert isinstance(result.validation_results, list)
+
 
 # ---------------------------------------------------------------------------
 # Tests for _validation_excerpt returning '' instead of None
@@ -507,6 +535,34 @@ class TestValidationExcerptReturnsEmptyString:
         excerpt = ExecutionService._validation_excerpt(results)
         assert "error text" in excerpt
         assert "[cmd]" in excerpt
+
+    def test_stdout_fallback_when_no_stderr(self) -> None:
+        """Commands with only stdout (no stderr) should return the stdout content."""
+        results = [_make_validation_result("build", 1, stderr="", stdout="build failed at line 42")]
+        excerpt = ExecutionService._validation_excerpt(results)
+        assert "build failed at line 42" in excerpt
+        assert isinstance(excerpt, str)
+
+    def test_empty_list_returns_empty_string(self) -> None:
+        """Empty list [] must return '' (not None)."""
+        excerpt = ExecutionService._validation_excerpt([])
+        assert excerpt == ""
+        assert excerpt is not None
+
+    def test_multiple_failed_mixed_stderr_and_stdout(self) -> None:
+        """Multiple failed commands: some with stderr, some with only stdout — both included."""
+        results = [
+            _make_validation_result("lint", 1, stderr="lint error", stdout=""),
+            _make_validation_result("build", 2, stderr="", stdout="build output"),
+            _make_validation_result("test", 0, stdout="all pass"),
+        ]
+        excerpt = ExecutionService._validation_excerpt(results)
+        assert "[lint]" in excerpt
+        assert "lint error" in excerpt
+        assert "[build]" in excerpt
+        assert "build output" in excerpt
+        # passing command should not appear
+        assert "[test]" not in excerpt
 
 
 # ---------------------------------------------------------------------------

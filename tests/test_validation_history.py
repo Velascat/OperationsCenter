@@ -130,6 +130,42 @@ class TestValidationHistoryPatternDetection:
         assert rec.validation_failure_count == 2
         assert rec.failure_rate == 0.5
 
+    def test_49_percent_failure_rate_not_flagged(self, tmp_path: Path) -> None:
+        """100 runs, 49 failures (49%) — just below threshold, should NOT be flagged."""
+        for i in range(100):
+            passed = i >= 49  # first 49 fail, last 51 pass
+            _make_run_dir(
+                tmp_path, f"run-{i:03d}", "task-e", "myrepo",
+                validation_passed=passed,
+            )
+
+        ctx = _MinimalContext(settings=_MinimalSettings(report_root=tmp_path), repo_name="myrepo")
+        signal = ValidationHistoryCollector().collect(ctx)
+
+        assert signal.status == "nominal"
+        assert signal.tasks_with_repeated_failures == []
+
+    def test_1_run_1_failure_not_flagged(self, tmp_path: Path) -> None:
+        """1 run, 1 failure — below _MIN_RUNS_FOR_PATTERN=2, should NOT be flagged."""
+        _make_run_dir(tmp_path, "run-0", "task-f", "myrepo", validation_passed=False)
+
+        ctx = _MinimalContext(settings=_MinimalSettings(report_root=tmp_path), repo_name="myrepo")
+        signal = ValidationHistoryCollector().collect(ctx)
+
+        assert signal.status == "nominal"
+        assert signal.tasks_with_repeated_failures == []
+
+    def test_2_runs_1_failure_not_flagged(self, tmp_path: Path) -> None:
+        """2 runs, 1 failure (50% rate but only 1 failure) — below _MIN_FAILURES_FOR_PATTERN=2."""
+        _make_run_dir(tmp_path, "run-0", "task-g", "myrepo", validation_passed=False)
+        _make_run_dir(tmp_path, "run-1", "task-g", "myrepo", validation_passed=True)
+
+        ctx = _MinimalContext(settings=_MinimalSettings(report_root=tmp_path), repo_name="myrepo")
+        signal = ValidationHistoryCollector().collect(ctx)
+
+        assert signal.status == "nominal"
+        assert signal.tasks_with_repeated_failures == []
+
 
 class TestValidationFailureRecordModel:
     def test_failure_rate_default(self) -> None:
@@ -144,3 +180,11 @@ class TestValidationFailureRecordModel:
             validation_failure_count=2, failure_rate=0.667,
         )
         assert rec.failure_rate == 0.667
+
+    def test_failure_rate_boundary_0_499_round_trip(self) -> None:
+        """Verify failure_rate=0.499 round-trips correctly (just below 0.5 threshold)."""
+        rec = ValidationFailureRecord(
+            task_id="t", worker_role="w", total_runs=1000,
+            validation_failure_count=499, failure_rate=0.499,
+        )
+        assert rec.failure_rate == 0.499
