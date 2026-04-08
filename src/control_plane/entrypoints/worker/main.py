@@ -3834,11 +3834,14 @@ def create_follow_up_task(
         handoff_reason=handoff_reason,
         constraints_text=constraints_text,
     )
+    _fu_labels = [f"task-kind: {task_kind}", f"source: {source_role}-worker"]
+    if _self_modify_approved(original_issue):
+        _fu_labels.append("self-modify: approved")
     created = client.create_issue(
         name=title,
         description=description,
         state=state,
-        label_names=[f"task-kind: {task_kind}", f"source: {source_role}-worker"],
+        label_names=_fu_labels,
     )
     client.comment_issue(
         str(created.get("id")),
@@ -6549,10 +6552,14 @@ def run_watch_loop(
                             # Create a re-triage goal task and mark this one as escalated.
                             issue_for_escalation = client.fetch_issue(task_id)
                             issue_title = str(issue_for_escalation.get("name", "blocked task"))
+                            _esc_repo_key = _extract_repo_key(issue_for_escalation, service)
+                            _esc_labels = ["task-kind: goal", "source: improve-worker"]
+                            if _is_self_repo(_esc_repo_key, service) or _self_modify_approved(issue_for_escalation):
+                                _esc_labels.append("self-modify: approved")
                             escalation_task = client.create_issue(
                                 name=f"Re-triage: {issue_title}",
                                 description=(
-                                    f"## Execution\nrepo: {_extract_repo_key(issue_for_escalation, service)}\nmode: goal\n\n"
+                                    f"## Execution\nrepo: {_esc_repo_key}\nmode: goal\n\n"
                                     f"## Goal\n"
                                     f"This task was blocked with human attention required for over {STALE_BLOCKED_ESCALATION_DAYS} days "
                                     f"without resolution. Re-examine the original blocked task '{issue_title}' ({task_id}) and either:\n"
@@ -6564,7 +6571,7 @@ def run_watch_loop(
                                     "- escalation_reason: stale_blocked_human_attention\n"
                                 ),
                                 state="Ready for AI",
-                                label_names=["task-kind: goal", "source: improve-worker"],
+                                label_names=_esc_labels,
                             )
                             escalation_id = str(escalation_task.get("id", ""))
                             client.transition_issue(task_id, "Blocked")
