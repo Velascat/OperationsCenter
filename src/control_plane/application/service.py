@@ -90,7 +90,10 @@ class _BaselineResult:
     ) -> None:
         self.failed = failed
         self.error_text = error_text
-        self.validation_results = validation_results
+        if failed and validation_results is None:
+            self.validation_results: list["ValidationResult"] | None = []
+        else:
+            self.validation_results = validation_results
 
 
 class ExecutionService:
@@ -662,7 +665,7 @@ class ExecutionService:
 
             # Quality-erosion analysis: count new inline suppressions added by
             # this kodo run.  Lines starting with '+' in the unified diff that
-            # contain # noqa, # type: ignore, or bare `pass` in test bodies
+            # contain noqa suppression, type-ignore, or bare ``pass`` in test bodies
             # are quality-eroding patterns that pass validation but degrade code
             # quality over time.  Emit a kodo_quality_warning event and annotate
             # the PR comment when the total exceeds the threshold.
@@ -946,7 +949,7 @@ class ExecutionService:
             lines.append(f"- blocked_classification: {result.blocked_classification}")
         if result.validation_passed is False and result.validation_results is not None:
             excerpt = ExecutionService._validation_excerpt(result.validation_results)
-            if excerpt is not None:
+            if excerpt:
                 lines.append(f"- validation_errors:\n```\n{excerpt}\n```")
         if result.policy_violations:
             lines.append(f"- policy_violations: {', '.join(result.policy_violations)}")
@@ -960,10 +963,10 @@ class ExecutionService:
         return "\n".join(lines)
 
     @staticmethod
-    def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 20) -> str | None:
+    def _validation_excerpt(validation_results: list[ValidationResult], max_lines: int = 20) -> str:
         failed = [r for r in validation_results if r.exit_code != 0]
         if not failed:
-            return None
+            return ""
         output_lines: list[str] = []
         for r in failed:
             output_lines.append(f"[{r.command}]")
@@ -972,7 +975,7 @@ class ExecutionService:
                 output_lines.extend(text.splitlines())
         if len(output_lines) > max_lines:
             output_lines = output_lines[-max_lines:]
-        return "\n".join(output_lines) or None
+        return "\n".join(output_lines) or ""
 
     @staticmethod
     def _stderr_excerpt(stderr: str) -> str | None:
@@ -1084,12 +1087,16 @@ class ExecutionService:
             # Include the issue we are about to create in the count.
             occurrence_count += 1
 
+            # Defensive: ensure non-list validation_results uses the
+            # fallback description path rather than risking iteration.
+            safe_results = validation_results if isinstance(validation_results, list) else None
+
             description = self._build_fix_validation_description(
                 repo_key=task.repo_key,
                 base_branch=task.base_branch,
                 baseline_error_text=baseline_error_text,
                 occurrence_count=occurrence_count,
-                validation_results=validation_results,
+                validation_results=safe_results,
                 repo_target=repo_target,
             )
 
