@@ -6347,7 +6347,7 @@ def run_watch_loop(
                 eligible = status_name == ready_state and task_kind == role
             elif action == "improve_task":
                 eligible = status_name == ready_state and task_kind == "improve"
-            elif action in ("blocked_triage", "blocked_resolution_complete", "blocked_pr_merged"):
+            elif action in ("blocked_triage", "blocked_resolution_complete", "blocked_pr_merged", "blocked_stale_escalation"):
                 eligible = status_name == "Blocked"
 
             if not eligible:
