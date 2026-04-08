@@ -76,10 +76,13 @@ class ProposalCandidateMapper:
                 f"validation_profile: {candidate.validation_profile}",
                 f"requires_human_approval: {'true' if requires_human_approval else 'false'}",
                 f"evidence_schema_version: {evidence_schema_version}",
-                # TODO (Phase 4): add proposal_generation_run once autonomy_cycle assigns a
-                # stable cycle-level run_id distinct from the decision run_id. This field
-                # will link the task back to the specific cycle_<ts>.json report that
+                # TODO (Phase 4 — proposal_generation_run_id) [deferred, reviewed 2026-04-07]
+                # Add proposal_generation_run_id once autonomy_cycle assigns a stable
+                # cycle-level run_id distinct from the decision run_id. This field will
+                # link the task back to the specific cycle_<ts>.json report that
                 # originated it. For now, decision_run_id serves as the closest proxy.
+                # Unlock condition: autonomy_cycle refactored to thread a cycle-level run_id.
+                # See docs/design/roadmap.md §Phase 4.
                 f"expires_at: {expires_at}",
                 "observer_run_ids:",
             ]
