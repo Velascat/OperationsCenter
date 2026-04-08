@@ -9,6 +9,7 @@ import pytest
 
 from control_plane.decision.rules.execution_health import ExecutionHealthRule
 from control_plane.insights.derivers.execution_health import ExecutionHealthDeriver
+from control_plane.insights.models import DerivedInsight
 from control_plane.insights.normalizer import InsightNormalizer
 from control_plane.observer.collectors.execution_health import ExecutionArtifactCollector
 from control_plane.observer.models import (
@@ -402,6 +403,95 @@ def test_rule_produces_candidates_for_both_patterns() -> None:
     assert families == {"execution_health_followup"}
     patterns = {s.pattern_key for s in specs}
     assert patterns == {"high_no_op_rate", "persistent_validation_failures"}
+
+
+def _make_unknown_failures_insight(
+    repo: str = "ControlPlane",
+    unknown_count: int = 3,
+    error_count: int = 2,
+    total_runs: int = 10,
+) -> DerivedInsight:
+    ts = datetime(2026, 4, 4, 12, tzinfo=UTC)
+    unknown_error_total = unknown_count + error_count
+    return DerivedInsight(
+        insight_id=f"execution_health:{repo}:repeated_unknown_failures",
+        dedup_key=f"execution_health|{repo}|repeated_unknown_failures",
+        kind="execution_health",
+        subject=repo,
+        status="present",
+        evidence={
+            "repo": repo,
+            "pattern": "repeated_unknown_failures",
+            "total_runs": total_runs,
+            "unknown_count": unknown_count,
+            "error_count": error_count,
+            "unknown_error_total": unknown_error_total,
+        },
+        first_seen_at=ts,
+        last_seen_at=ts,
+    )
+
+
+def test_rule_produces_candidate_for_repeated_unknown_failures() -> None:
+    insight = _make_unknown_failures_insight(unknown_count=3, error_count=2, total_runs=10)
+    specs = ExecutionHealthRule().evaluate([insight])
+
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.family == "execution_health_followup"
+    assert spec.pattern_key == "repeated_unknown_failures"
+    assert spec.confidence == "high"
+    assert spec.expires_after_runs == 5
+    assert spec.matched_rules == ["execution_health_repeated_unknown_failures"]
+    assert spec.risk_class == "logic"
+    assert spec.subject == "ControlPlane"
+
+
+def test_rule_repeated_unknown_failures_proposal_outline() -> None:
+    insight = _make_unknown_failures_insight(unknown_count=3, error_count=2, total_runs=10)
+    specs = ExecutionHealthRule().evaluate([insight])
+
+    spec = specs[0]
+    assert "unknown" in spec.proposal_outline.title_hint.lower()
+    assert "5 recent failures" in spec.proposal_outline.title_hint
+    assert "ControlPlane" in spec.proposal_outline.title_hint
+    assert "kodo_plane" in spec.proposal_outline.summary_hint
+    assert "circuit-breaker" in spec.proposal_outline.summary_hint
+    assert spec.proposal_outline.labels_hint == ["task-kind: improve", "source: proposer"]
+    assert spec.proposal_outline.source_family == "execution_health_followup"
+
+
+def test_rule_repeated_unknown_failures_evidence_lines() -> None:
+    insight = _make_unknown_failures_insight(unknown_count=1, error_count=1, total_runs=5)
+    specs = ExecutionHealthRule().evaluate([insight])
+
+    spec = specs[0]
+    assert len(spec.evidence_lines) == 1
+    line = spec.evidence_lines[0]
+    assert "2 of the last 5 runs" in line
+    assert "1 unknown" in line
+    assert "1 errors" in line
+
+
+def test_rule_repeated_unknown_failures_priority() -> None:
+    insight = _make_unknown_failures_insight(repo="MyRepo")
+    specs = ExecutionHealthRule().evaluate([insight])
+
+    spec = specs[0]
+    assert spec.priority == (0, 0, "execution_health|MyRepo|repeated_unknown_failures")
+
+
+def test_rule_produces_candidates_for_all_three_patterns() -> None:
+    insights = [
+        _make_insight("high_no_op_rate"),
+        _make_insight("persistent_validation_failures"),
+        _make_unknown_failures_insight(),
+    ]
+    specs = ExecutionHealthRule().evaluate(insights)  # type: ignore[arg-type]
+
+    assert len(specs) == 3
+    patterns = {s.pattern_key for s in specs}
+    assert patterns == {"high_no_op_rate", "persistent_validation_failures", "repeated_unknown_failures"}
 
 
 # ---------------------------------------------------------------------------

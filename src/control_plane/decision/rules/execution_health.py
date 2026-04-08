@@ -10,11 +10,13 @@ from control_plane.insights.models import DerivedInsight
 class ExecutionHealthRule:
     """Turns execution-health insights into proposal candidates.
 
-    Fires on two patterns:
+    Fires on three patterns:
     - high_no_op_rate: suggests reviewing what tasks are being generated and
       whether task descriptions are clear enough for the execution engine.
     - persistent_validation_failures: suggests fixing a systemic quality issue
       (broken test suite, lint errors, or tasks scoped beyond one pass).
+    - repeated_unknown_failures: suggests investigating recent executions that
+      ended with unknown or error outcomes to identify the root cause.
     """
 
     def evaluate(self, insights: Sequence[DerivedInsight]) -> list[CandidateSpec]:
@@ -98,6 +100,51 @@ class ExecutionHealthRule:
                             source_family="execution_health_followup",
                         ),
                         priority=(0, 0, f"execution_health|{repo}|persistent_validation_failures"),
+                    )
+                )
+
+            elif pattern == "repeated_unknown_failures":
+                unknown_count = insight.evidence.get("unknown_count", 0)
+                error_count = insight.evidence.get("error_count", 0)
+                unknown_error_total = insight.evidence.get(
+                    "unknown_error_total", unknown_count + error_count
+                )
+                total = insight.evidence.get("total_runs", 0)
+                candidates.append(
+                    CandidateSpec(
+                        family="execution_health_followup",
+                        subject=repo,
+                        pattern_key="repeated_unknown_failures",
+                        evidence=dict(insight.evidence),
+                        matched_rules=["execution_health_repeated_unknown_failures"],
+                        confidence="high",
+                        evidence_lines=[
+                            f"{unknown_error_total} of the last {total} runs for '{repo}' "
+                            f"ended with unknown or error outcomes "
+                            f"({unknown_count} unknown, {error_count} errors).",
+                        ],
+                        risk_class="logic",
+                        expires_after_runs=5,
+                        proposal_outline=ProposalOutline(
+                            title_hint=(
+                                f"Investigate repeated unknown/error failures in {repo} "
+                                f"({unknown_error_total} recent failures)"
+                            ),
+                            summary_hint=(
+                                f"Execution artifacts show {unknown_error_total} of the last {total} "
+                                f"runs for {repo} ended with unknown or error outcomes "
+                                f"({unknown_count} unknown, {error_count} errors). "
+                                "This suggests the execution engine is encountering repeated unexplained "
+                                "failures. Investigate recent kodo_plane artifacts and execution logs "
+                                "to identify whether the cause is environmental (e.g. tooling misconfiguration, "
+                                "missing dependencies) or task-related (e.g. impossible scope, malformed input). "
+                                "While this fix-task remains unresolved, the circuit-breaker will skip "
+                                "further task execution against this repo to avoid wasting budget."
+                            ),
+                            labels_hint=["task-kind: improve", "source: proposer"],
+                            source_family="execution_health_followup",
+                        ),
+                        priority=(0, 0, f"execution_health|{repo}|repeated_unknown_failures"),
                     )
                 )
 
