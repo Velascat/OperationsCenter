@@ -3114,6 +3114,14 @@ def select_watch_candidate(
                 return task_id, "blocked_triage"
             if blocked_resolution_is_complete(client, task_id):
                 return task_id, "blocked_resolution_complete"
+            # Re-blocked: the task was previously unblocked but the goal worker blocked it
+            # again (e.g. retry cap hit after resolution). Escalate to create a re-triage
+            # goal task, unless already escalated.
+            if (
+                blocked_issue_already_unblocked(client, task_id)
+                and not blocked_issue_already_escalated(client, task_id)
+            ):
+                return task_id, "blocked_stale_escalation"
             # Stale dead-end: human_attention with no follow-ups, sitting for >7 days.
             # Create a fresh re-triage task rather than leaving it frozen forever.
             if (
@@ -3191,6 +3199,18 @@ STALE_ESCALATION_MARKER = "[Improve] Stale blocked escalation"
 def blocked_issue_already_triaged(client: PlaneClient, task_id: str) -> bool:
     for comment in client.list_comments(task_id):
         if TRIAGE_COMMENT_MARKER.lower() in extract_comment_text(comment).lower():
+            return True
+    return False
+
+
+def blocked_issue_already_unblocked(client: PlaneClient, task_id: str) -> bool:
+    """Return True if this task was previously unblocked (unblock comment present).
+
+    A task with an unblock comment that is still in Blocked state was re-blocked by
+    the goal worker after a failed resolution attempt — it needs a new triage pass.
+    """
+    for comment in client.list_comments(task_id):
+        if UNBLOCK_COMMENT_MARKER.lower() in extract_comment_text(comment).lower():
             return True
     return False
 
