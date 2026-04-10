@@ -11,21 +11,17 @@ _ARTIFACT_SCAN_LIMIT = 60
 _MIN_RUNS_FOR_PATTERN = 2   # task must have at least this many runs to be flagged
 _MIN_FAILURES_FOR_PATTERN = 2  # task must have at least this many validation failures to appear
 
-# TODO (Phase 4 — execution feedback depth): extend this collector to track which
-# validation_profile was expected when each failure occurred. Currently failures are counted
-# per task but are not classified by profile type, so "did lint_fix tasks consistently fail
-# ruff_clean validation?" is not answerable from this signal alone.
-#
+# TODO (Phase 4 — per-profile failure tracking) [deferred, reviewed 2026-04-07]
+# Extend this collector to track which validation_profile was expected when
+# each failure occurred. Currently failures are counted per task but not
+# classified by profile type.
 # Implementation sketch:
-#   1. Read the validation_profile from the task body in the Plane task record, or from the
-#      proposal_candidates artifact that originated the task (match via candidate_dedup_key).
+#   1. Read validation_profile from task body or proposal_candidates artifact.
 #   2. Extend ValidationFailureRecord with: validation_profile: str = ""
-#   3. Group failures by (task_id, validation_profile) in task_stats
-#   4. ValidationPatternDeriver can then emit profile-specific failure insights
-#      (e.g. validation_pattern/ruff_clean_repeated_failures vs tests_pass_repeated_failures).
-#
-# Requires: execution artifacts to carry a validation_profile field, OR a lookup from the
-# decision artifacts by task dedup_key. See docs/design/roadmap.md §Phase 4.
+#   3. Group failures by (task_id, validation_profile) in task_stats.
+#   4. Emit profile-specific failure insights from ValidationPatternDeriver.
+# Unlock condition: ≥10 lint_fix executions with validation artifacts retained.
+# See docs/design/roadmap.md §Phase 4.
 
 
 class ValidationHistoryCollector:

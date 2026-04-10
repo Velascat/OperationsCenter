@@ -7,19 +7,12 @@ from pathlib import Path
 
 from control_plane.tuning.models import FamilyMetrics
 
-# TODO (Phase 6 — confidence calibration): add a ConfidenceCalibrationStore alongside this
-# module once the feedback store has enough signal (target: ≥3 months of data, ≥20 feedback
-# records per family). It tracks "when the system said confidence=high for family X, what was
-# the actual acceptance rate?" and surfaces families where the confidence label is
-# systematically miscalibrated. Implementation sketch:
-#
-#   class ConfidenceCalibrationStore:
-#       def record(self, family: str, confidence: str, outcome: str) -> None: ...
-#       def calibration_for(self, family: str, confidence: str) -> float | None: ...
-#       def report(self) -> list[CalibrationRecord]: ...
-#
-# The calibration report is added to tune-autonomy output. min_confidence threshold in
-# DecisionContext becomes per-family once calibration data is available.
+# TODO (Phase 6 — per-family confidence threshold) [deferred, reviewed 2026-04-07]
+# ConfidenceCalibrationStore exists in control_plane.tuning.calibration with
+# record/calibration_for/report, wired into feedback/tuning/worker entrypoints.
+# Remaining: make DecisionPolicyConfig.min_confidence per-family — derive from
+# calibration_for() instead of the global scalar default once sufficient data exists.
+# Unlock condition: ≥3 months of data and ≥20 feedback records per family.
 # See docs/design/roadmap.md §Phase 6.
 
 _MIN_SAMPLE_RUNS = 1  # only exclude runs, not families; callers apply their own floor
