@@ -6395,7 +6395,24 @@ def run_watch_loop(
                             }
                         )
                     )
-                    if gate_action == "retry_cap_block":
+                    if gate_action == "skip_noop":
+                        # kodo already ran on this exact task state and made no changes.
+                        # The goal is already satisfied — close it as Done.
+                        client.transition_issue(task_id, "Done")
+                        client.comment_issue(
+                            task_id,
+                            render_worker_comment(
+                                f"[{worker_title(role)}] No-op: task auto-closed",
+                                [
+                                    f"task_id: {task_id}",
+                                    f"task_kind: {task_kind}",
+                                    "result_status: done",
+                                    f"reason: {evidence.get('reason', 'no_op')}",
+                                    f"detail: {evidence.get('detail', 'no_state_change')}",
+                                ],
+                            ),
+                        )
+                    elif gate_action == "retry_cap_block":
                         client.transition_issue(task_id, "Blocked")
                         client.comment_issue(
                             task_id,
