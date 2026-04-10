@@ -149,7 +149,7 @@ class ArchitectureSignalCollector:
             path: list[str] = []
             # Stack holds (node, neighbors_iterator) pairs.
             # A None iterator means "start processing this node" (pre-visit).
-            # Termination: each node transitions WHITE→GRAY→BLACK monotonically;
+            # Termination: each node transitions WHITE->GRAY->BLACK monotonically;
             # only WHITE nodes are pushed, so the stack is bounded by |V|.
             stack: list[tuple[str, Iterator[str] | None]] = [(start, None)]
             while stack:
