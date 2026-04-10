@@ -142,27 +142,41 @@ class ArchitectureSignalCollector:
         cycles: list[str] = []
         seen_cycles: set[frozenset[str]] = set()
 
-        def dfs(node: str, path: list[str]) -> None:
-            color[node] = GRAY
-            path.append(node)
-            for neighbor in graph.get(node, set()):
-                if neighbor not in graph:
+        for start in list(graph.keys()):
+            if color[start] != WHITE:
+                continue
+            path: list[str] = []
+            # Stack holds (node, neighbors_iterator) pairs.
+            # A None iterator means "start processing this node" (pre-visit).
+            # Termination: each node transitions WHITE->GRAY->BLACK monotonically;
+            # only WHITE nodes are pushed, so the stack is bounded by |V|.
+            stack: list[tuple[str, object]] = [(start, None)]
+            while stack:
+                node, neighbors = stack[-1]
+                if neighbors is None:
+                    # Pre-visit: color GRAY, add to path, create iterator
+                    color[node] = GRAY
+                    path.append(node)
+                    stack[-1] = (node, iter(graph.get(node, set())))
                     continue
-                if color[neighbor] == GRAY:
-                    # Found a cycle
-                    idx = path.index(neighbor)
-                    cycle_members = path[idx:]
-                    key = frozenset(cycle_members)
-                    if key not in seen_cycles:
-                        seen_cycles.add(key)
-                        cycles.append(" -> ".join(cycle_members + [neighbor]))
-                elif color[neighbor] == WHITE:
-                    dfs(neighbor, path)
-            path.pop()
-            color[node] = BLACK
-
-        for node in list(graph.keys()):
-            if color[node] == WHITE:
-                dfs(node, [])
+                # Try to advance to the next neighbor
+                neighbor = next(neighbors, None)
+                if neighbor is None:
+                    # Post-visit: all neighbors processed
+                    stack.pop()
+                    path.pop()
+                    color[node] = BLACK
+                else:
+                    if neighbor not in graph:
+                        continue
+                    if color[neighbor] == GRAY:
+                        idx = path.index(neighbor)
+                        cycle_members = path[idx:]
+                        key = frozenset(cycle_members)
+                        if key not in seen_cycles:
+                            seen_cycles.add(key)
+                            cycles.append(" -> ".join(cycle_members + [neighbor]))
+                    elif color[neighbor] == WHITE:
+                        stack.append((neighbor, None))
 
         return cycles
