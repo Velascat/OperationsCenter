@@ -1028,7 +1028,11 @@ def promote_backlog_tasks(
             (lbl.split(":", 1)[1].strip().lower() for lbl in labels if lbl.lower().startswith("source:")),
             "",
         )
-        if source in {"proposer", "autonomy", "improve-worker"}:
+        has_repo_label = any(lbl.lower().startswith("repo:") for lbl in labels)
+        # Promote tasks with a known source label, OR tasks that have a repo: label
+        # but no source: label — these are proposer-created tasks that predate
+        # systematic source labeling and would otherwise sit in Backlog forever.
+        if source in {"proposer", "autonomy", "improve-worker"} or (has_repo_label and not source):
             candidates.append(issue)
     if not candidates:
         return []
@@ -5233,11 +5237,32 @@ def handle_propose_cycle(
 
     board_idle = board_is_idle_for_proposals_from_issues(issues)
 
+    # Board saturation: don't add more autonomy tasks if the queue is already
+    # large.  This prevents a burst autonomy-cycle run from flooding the board
+    # faster than the watcher lanes can drain it.
+    _autonomy_queued = sum(
+        1 for _iss in issues
+        if issue_status_name(_iss) in ("Ready for AI", "Backlog")
+        and any("source: autonomy" == lbl.strip().lower() for lbl in issue_label_names(_iss))
+    )
+    if _autonomy_queued >= MAX_QUEUED_AUTONOMY_TASKS:
+        return ProposalCycleResult(
+            created_task_ids=[],
+            decision="board_saturated",
+            board_idle=False,
+            reason_summary=(
+                f"Proposal creation suppressed: {_autonomy_queued} autonomy tasks already "
+                f"queued (limit {MAX_QUEUED_AUTONOMY_TASKS}). "
+                "Drain the queue before creating more."
+            ),
+        )
+
     # Promote existing Backlog tasks whenever nothing is actively being worked on,
     # regardless of total backlog size. The board_idle check also requires
     # open_count <= LOW_BACKLOG_THRESHOLD, which creates a deadlock when many Backlog
     # tasks exist but nothing is in RFA/Running — nothing runs because nothing is
     # promoted, and nothing is promoted because the board looks "not idle".
+    # We only reach here when autonomy saturation hasn't fired, so it's safe to promote.
     active_count = active_task_count_from_issues(issues)
     if active_count == 0:
         promoted_ids = promote_backlog_tasks(client, issues)
@@ -5261,26 +5286,6 @@ def handle_propose_cycle(
             reason_summary=(
                 f"Proposal creation throttled: {active_count} tasks already active "
                 f"(limit {MAX_ACTIVE_TASKS_FOR_PROPOSALS})."
-            ),
-        )
-
-    # Board saturation: don't add more autonomy tasks if the queue is already
-    # large.  This prevents a burst autonomy-cycle run from flooding the board
-    # faster than the watcher lanes can drain it.
-    _autonomy_queued = sum(
-        1 for _iss in issues
-        if issue_status_name(_iss) in ("Ready for AI", "Backlog")
-        and any("source: autonomy" == lbl.strip().lower() for lbl in issue_label_names(_iss))
-    )
-    if _autonomy_queued >= MAX_QUEUED_AUTONOMY_TASKS:
-        return ProposalCycleResult(
-            created_task_ids=[],
-            decision="board_saturated",
-            board_idle=False,
-            reason_summary=(
-                f"Proposal creation suppressed: {_autonomy_queued} autonomy tasks already "
-                f"queued (limit {MAX_QUEUED_AUTONOMY_TASKS}). "
-                "Drain the queue before creating more."
             ),
         )
 
@@ -5668,12 +5673,16 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     # Quota exhaustion is an infrastructure failure — do NOT drain the circuit
     # breaker window (it would block all tasks until the operator investigates,
     # without the circuit-breaker being the right signal).
+    # Fix-validation tasks are created to fix pre-existing failures and are
+    # expected to fail or timeout occasionally — their outcomes should not count
+    # against the circuit breaker, which tracks regular task quality.
+    _is_fix_validation = str(issue.get("name", "")).startswith("Fix pre-existing validation failure in")
     try:
         if _is_quota_exhausted_result(result):
             service.usage_store.record_kodo_quota_event(
                 task_id=task_id, role="goal", now=datetime.now(UTC)
             )
-        else:
+        elif not _is_fix_validation:
             service.usage_store.record_execution_outcome(
                 task_id=task_id,
                 role="goal",

@@ -34,6 +34,10 @@ def _get_lock(path: Path) -> threading.RLock:
 # ---------------------------------------------------------------------------
 _CB_THRESHOLD = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
 _CB_WINDOW = max(3, int(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW", "5")))
+# If ALL outcomes in the window are older than this many hours, auto-recover.
+# Prevents indefinite deadlock from historical failures after the underlying
+# issue has been resolved and the operator hasn't manually cleared usage.json.
+_CB_STALENESS_HOURS = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_STALENESS_HOURS", "4"))
 
 # ---------------------------------------------------------------------------
 # Disk-space guardrail constants.
@@ -154,6 +158,19 @@ class UsageStore:
             if len(versions_in_window) <= 1:  # only block if all outcomes same version
                 failures = sum(1 for e in outcomes if not e.get("succeeded"))
                 if failures / len(outcomes) >= _CB_THRESHOLD:
+                    # Staleness bypass: if every failure is older than _CB_STALENESS_HOURS,
+                    # the underlying issue has likely been resolved (or operator cleared it).
+                    # Auto-recover rather than blocking indefinitely.
+                    try:
+                        newest_ts = max(
+                            datetime.fromisoformat(e["timestamp"])
+                            for e in outcomes
+                            if e.get("timestamp")
+                        )
+                        if (now - newest_ts) > timedelta(hours=_CB_STALENESS_HOURS):
+                            return BudgetDecision(allowed=True)
+                    except Exception:
+                        pass
                     return BudgetDecision(
                         allowed=False,
                         reason="circuit_breaker_open",
