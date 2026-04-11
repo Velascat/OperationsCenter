@@ -1350,7 +1350,8 @@ def detect_post_merge_regressions(
                     "- priority: high\n"
                 ),
                 state="Ready for AI",
-                label_names=["task-kind: goal", "priority: high", "source: post-merge-ci"],
+                label_names=["task-kind: goal", "priority: high", "source: post-merge-ci"]
+                + (["self-modify: approved"] if _is_self_repo(repo_key, service) else []),
             )
             reg_id = str(regression_task.get("id", ""))
             created_ids.append(reg_id)
@@ -1997,7 +1998,8 @@ def handle_workspace_health_check(
                     "- priority: high\n"
                 ),
                 state="Ready for AI",
-                label_names=["task-kind: goal", "priority: high", f"repo: {repo_key}", "source: improve-worker"],
+                label_names=["task-kind: goal", "priority: high", f"repo: {repo_key}", "source: improve-worker"]
+                + (["self-modify: approved"] if _is_self_repo(repo_key, service) else []),
             )
             new_id = str(new_task.get("id", ""))
             if new_id:
@@ -2577,6 +2579,8 @@ def build_multi_step_plan(
     original_title = str(issue.get("name") or "task")
     repo_key = _extract_repo_key(issue, service)
     base_labels = ["task-kind: goal", f"repo: {repo_key}", "source: multi-step-plan"]
+    if _self_modify_approved(issue):
+        base_labels.append("self-modify: approved")
 
     existing_names = existing_issue_names(client)
 
@@ -2799,7 +2803,8 @@ def handle_review_revision_scan(
                 "- source: review_revision_scan\n"
             ),
             state="Ready for AI",
-            label_names=["task-kind: goal", f"repo: {repo_key}", "source: improve-worker"],
+            label_names=["task-kind: goal", f"repo: {repo_key}", "source: improve-worker"]
+            + (["self-modify: approved"] if _is_self_repo(repo_key, service) else []),
         )
         created_ids.append(str(new_task.get("id", "")))
         _logger.info(json.dumps({
@@ -2919,7 +2924,8 @@ def handle_merge_conflict_scan(
                     "- source: merge_conflict_scan\n"
                 ),
                 state="Ready for AI",
-                label_names=["task-kind: goal", f"repo: {repo_key}", "source: improve-worker"],
+                label_names=["task-kind: goal", f"repo: {repo_key}", "source: improve-worker"]
+                + (["self-modify: approved"] if _is_self_repo(repo_key, service) else []),
             )
             created_ids.append(str(new_task.get("id", "")))
             _logger.info(json.dumps({
