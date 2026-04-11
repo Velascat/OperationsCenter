@@ -26,7 +26,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
-    TestSignal,
+    CheckSignal,
     TodoSignal,
 )
 
@@ -117,7 +117,7 @@ def _snapshot_with_validation_failures(
             is_dirty=False,
         ),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
             execution_health=ExecutionHealthSignal(

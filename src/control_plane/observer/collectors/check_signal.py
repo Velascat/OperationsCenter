@@ -4,7 +4,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.observer.models import TestSignal
+from control_plane.observer.models import CheckSignal
 from control_plane.observer.service import ObserverContext
 
 
@@ -13,20 +13,20 @@ def latest_matching_file(root: Path, pattern: str) -> Path | None:
     return files[0] if files else None
 
 
-class TestSignalCollector:
-    def collect(self, context: ObserverContext) -> TestSignal:
+class CheckSignalCollector:
+    def collect(self, context: ObserverContext) -> CheckSignal:
         log_path = latest_matching_file(context.logs_root, "*_test.log")
         if log_path is not None:
             text = log_path.read_text(encoding="utf-8", errors="replace")
             summary = self._extract_summary_line(text)
             status = self._classify_text(text)
-            return TestSignal(
+            return CheckSignal(
                 status=status,
                 source=str(log_path),
                 observed_at=datetime.fromtimestamp(log_path.stat().st_mtime, tz=UTC),
                 summary=summary,
             )
-        return TestSignal(status="unknown")
+        return CheckSignal(status="unknown")
 
     def _extract_summary_line(self, text: str) -> str | None:
         for line in reversed(text.splitlines()):

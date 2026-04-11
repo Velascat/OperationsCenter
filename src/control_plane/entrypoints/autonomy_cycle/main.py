@@ -53,7 +53,7 @@ from control_plane.observer.collectors.security_signal import SecuritySignalColl
 from control_plane.observer.collectors.validation_history import ValidationHistoryCollector
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
 from control_plane.observer.collectors.type_check import TypeSignalCollector
-from control_plane.observer.collectors.test_signal import TestSignalCollector
+from control_plane.observer.collectors.check_signal import CheckSignalCollector
 from control_plane.observer.collectors.todo_signal import TodoSignalCollector
 from control_plane.observer.service import RepoObserverService, new_observer_context
 from control_plane.observer.snapshot_builder import SnapshotBuilder
@@ -69,7 +69,7 @@ def build_observer_service() -> RepoObserverService:
         repo_collector=GitContextCollector(),
         recent_commits_collector=RecentCommitsCollector(),
         file_hotspots_collector=FileHotspotsCollector(),
-        test_signal_collector=TestSignalCollector(),
+        test_signal_collector=CheckSignalCollector(),
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
         execution_health_collector=ExecutionArtifactCollector(),

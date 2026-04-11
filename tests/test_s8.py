@@ -149,7 +149,7 @@ from control_plane.insights.derivers.execution_outcome import ExecutionOutcomeDe
 from control_plane.insights.normalizer import InsightNormalizer  # noqa: E402
 from control_plane.observer.models import (  # noqa: E402
     RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
-    TestSignal, DependencyDriftSignal, TodoSignal,
+    CheckSignal, DependencyDriftSignal, TodoSignal,
 )
 
 
@@ -160,7 +160,7 @@ def _make_snapshot(repo_name: str = "testrepo") -> RepoStateSnapshot:
         source_command="test",
         repo=RepoContextSnapshot(name=repo_name, path=Path("/tmp"), current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unavailable"),
+            test_signal=CheckSignal(status="unavailable"),
             dependency_drift=DependencyDriftSignal(status="unavailable"),
             todo_signal=TodoSignal(),
         ),
@@ -566,7 +566,7 @@ def _make_snapshot_with_metrics(
 ) -> RepoStateSnapshot:
     from control_plane.observer.models import RepoSignalsSnapshot
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unavailable"),
+        test_signal=CheckSignal(status="unavailable"),
         dependency_drift=DependencyDriftSignal(status="unavailable"),
         todo_signal=TodoSignal(),
         lint_signal=LintSignal(

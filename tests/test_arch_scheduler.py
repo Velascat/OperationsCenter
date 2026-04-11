@@ -19,7 +19,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
-    TestSignal,
+    CheckSignal,
     TodoSignal,
 )
 from control_plane.tuning.models import TuningRecommendation, TuningRunArtifact
@@ -38,7 +38,7 @@ def _make_snapshot(
     repo_name: str = "myrepo",
 ) -> RepoStateSnapshot:
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unknown"),
+        test_signal=CheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="not_available"),
         todo_signal=TodoSignal(),
         execution_health=ExecutionHealthSignal(

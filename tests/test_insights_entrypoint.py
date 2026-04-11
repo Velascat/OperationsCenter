@@ -12,7 +12,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
-    TestSignal as ObserverTestSignal,
+    CheckSignal as ObserverCheckSignal,
     TodoSignal,
 )
 
@@ -32,7 +32,7 @@ def make_snapshot(run_id: str, observed_at: datetime, *, repo_path: Path) -> Rep
         signals=RepoSignalsSnapshot(
             recent_commits=[],
             file_hotspots=[],
-            test_signal=ObserverTestSignal(status="unknown"),
+            test_signal=ObserverCheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
         ),
