@@ -4984,11 +4984,17 @@ def create_proposed_task_if_missing(
 
     description = build_proposal_description(service=service, proposal=proposal)
     reason_label = re.sub(r"[^a-z0-9_]+", "_", proposal.source_signal.lower()).strip("_")
+    _prop_labels = [f"task-kind: {proposal.task_kind}", "source: proposer", f"reason: {reason_label}"]
+    if proposal.repo_key:
+        _prop_labels.append(f"repo: {proposal.repo_key}")
+    _prop_repo_key = proposal.repo_key or default_repo_key(service)
+    if _is_self_repo(_prop_repo_key, service):
+        _prop_labels.append("self-modify: approved")
     created = client.create_issue(
         name=proposal.title,
         description=description,
         state=proposal.recommended_state,
-        label_names=[f"task-kind: {proposal.task_kind}", "source: proposer", f"reason: {reason_label}"],
+        label_names=_prop_labels,
     )
     client.comment_issue(
         str(created.get("id")),
@@ -5191,7 +5197,8 @@ def handle_propose_cycle(
                     f"- cron: {st.cron}\n"
                 ),
                 state="Ready for AI",
-                label_names=[f"task-kind: {st.kind}", f"repo: {st.repo_key}", "source: scheduler"],
+                label_names=[f"task-kind: {st.kind}", f"repo: {st.repo_key}", "source: scheduler"]
+                + (["self-modify: approved"] if _is_self_repo(st.repo_key, service) else []),
             )
             _sch_created.append(str(new_t.get("id", "")))
         if _sch_created:
