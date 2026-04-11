@@ -11,7 +11,7 @@ from control_plane.observer.collectors.execution_health import ExecutionArtifact
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector, run_git
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
-from control_plane.observer.collectors.test_signal import TestSignalCollector
+from control_plane.observer.collectors.check_signal import CheckSignalCollector
 from control_plane.observer.collectors.todo_signal import TodoSignalCollector
 from control_plane.observer.service import RepoObserverService, new_observer_context
 from control_plane.observer.snapshot_builder import SnapshotBuilder
@@ -74,7 +74,7 @@ def main() -> None:
         repo_collector=GitContextCollector(),
         recent_commits_collector=RecentCommitsCollector(),
         file_hotspots_collector=FileHotspotsCollector(),
-        test_signal_collector=TestSignalCollector(),
+        test_signal_collector=CheckSignalCollector(),
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
         execution_health_collector=ExecutionArtifactCollector(),

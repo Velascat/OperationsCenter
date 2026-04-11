@@ -20,7 +20,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
-    TestSignal as ObserverTestSignal,
+    CheckSignal as ObserverCheckSignal,
     TodoFileCount,
     TodoSignal,
 )
@@ -65,7 +65,7 @@ def make_snapshot(
         signals=RepoSignalsSnapshot(
             recent_commits=commits,
             file_hotspots=hotspots,
-            test_signal=ObserverTestSignal(status=test_status),
+            test_signal=ObserverCheckSignal(status=test_status),
             dependency_drift=DependencyDriftSignal(status=dependency_status),
             todo_signal=TodoSignal(todo_count=todo_count, fixme_count=fixme_count, top_files=top_files),
         ),

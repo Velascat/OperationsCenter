@@ -10,7 +10,7 @@ from control_plane.observer.collectors.backlog import (
     _parse_backlog,
     promotable_items,
 )
-from control_plane.observer.models import BacklogItem, BacklogSignal, RepoSignalsSnapshot, RepoStateSnapshot, RepoContextSnapshot, TestSignal, DependencyDriftSignal, TodoSignal
+from control_plane.observer.models import BacklogItem, BacklogSignal, RepoSignalsSnapshot, RepoStateSnapshot, RepoContextSnapshot, CheckSignal, DependencyDriftSignal, TodoSignal
 from control_plane.insights.derivers.backlog_promotion import BacklogPromotionDeriver
 from control_plane.insights.normalizer import InsightNormalizer
 from control_plane.decision.rules.backlog_promotion import BacklogPromotionRule
@@ -136,7 +136,7 @@ def test_collector_returns_empty_when_no_backlog(tmp_path: Path):
 
 def _make_snapshot(items: list[BacklogItem], repo_name: str = "myrepo") -> RepoStateSnapshot:
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unknown"),
+        test_signal=CheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="not_available"),
         todo_signal=TodoSignal(),
         backlog=BacklogSignal(items=items),

@@ -24,7 +24,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
-    TestSignal,
+    CheckSignal,
     DependencyDriftSignal,
     TodoSignal,
     TypeSignal,
@@ -147,7 +147,7 @@ def _make_snapshot(
         top_errors=type_errors or [],
     )
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unknown"),
+        test_signal=CheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="unknown"),
         todo_signal=TodoSignal(),
         lint_signal=lint,
@@ -223,7 +223,7 @@ def _make_snapshot_with_count(
         top_errors=type_errors or [],
     )
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unknown"),
+        test_signal=CheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="unknown"),
         todo_signal=TodoSignal(),
         lint_signal=lint,

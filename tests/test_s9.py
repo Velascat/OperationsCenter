@@ -123,7 +123,7 @@ def test_noop_loop_deriver_no_insights_when_no_proposals(tmp_path: Path) -> None
     from control_plane.insights.normalizer import InsightNormalizer
     from control_plane.observer.models import (
         RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
-        TestSignal, DependencyDriftSignal, TodoSignal,
+        CheckSignal, DependencyDriftSignal, TodoSignal,
     )
 
     normalizer = InsightNormalizer()
@@ -139,7 +139,7 @@ def test_noop_loop_deriver_no_insights_when_no_proposals(tmp_path: Path) -> None
         source_command="test",
         repo=RepoContextSnapshot(name="repo", path=tmp_path, current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
         ),
@@ -153,7 +153,7 @@ def test_noop_loop_deriver_detects_cycling_family(tmp_path: Path) -> None:
     from control_plane.insights.normalizer import InsightNormalizer
     from control_plane.observer.models import (
         RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
-        TestSignal, DependencyDriftSignal, TodoSignal,
+        CheckSignal, DependencyDriftSignal, TodoSignal,
     )
 
     proposer_root = tmp_path / "proposer"
@@ -184,7 +184,7 @@ def test_noop_loop_deriver_detects_cycling_family(tmp_path: Path) -> None:
         source_command="test",
         repo=RepoContextSnapshot(name="repo", path=tmp_path, current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
         ),
@@ -203,7 +203,7 @@ def test_noop_loop_deriver_no_insight_when_family_has_merges(tmp_path: Path) -> 
     from control_plane.insights.normalizer import InsightNormalizer
     from control_plane.observer.models import (
         RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
-        TestSignal, DependencyDriftSignal, TodoSignal,
+        CheckSignal, DependencyDriftSignal, TodoSignal,
     )
 
     proposer_root = tmp_path / "proposer"
@@ -239,7 +239,7 @@ def test_noop_loop_deriver_no_insight_when_family_has_merges(tmp_path: Path) -> 
         source_command="test",
         repo=RepoContextSnapshot(name="repo", path=tmp_path, current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
         ),
@@ -429,7 +429,7 @@ def test_coverage_gap_deriver_emits_low_overall(tmp_path: Path) -> None:
     from control_plane.insights.normalizer import InsightNormalizer
     from control_plane.observer.models import (
         CoverageSignal, RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
-        TestSignal, DependencyDriftSignal, TodoSignal,
+        CheckSignal, DependencyDriftSignal, TodoSignal,
     )
 
     normalizer = InsightNormalizer()
@@ -441,7 +441,7 @@ def test_coverage_gap_deriver_emits_low_overall(tmp_path: Path) -> None:
         source_command="test",
         repo=RepoContextSnapshot(name="repo", path=tmp_path, current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
             coverage_signal=CoverageSignal(
@@ -461,7 +461,7 @@ def test_coverage_gap_deriver_no_insight_when_unavailable(tmp_path: Path) -> Non
     from control_plane.insights.normalizer import InsightNormalizer
     from control_plane.observer.models import (
         CoverageSignal, RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
-        TestSignal, DependencyDriftSignal, TodoSignal,
+        CheckSignal, DependencyDriftSignal, TodoSignal,
     )
 
     normalizer = InsightNormalizer()
@@ -473,7 +473,7 @@ def test_coverage_gap_deriver_no_insight_when_unavailable(tmp_path: Path) -> Non
         source_command="test",
         repo=RepoContextSnapshot(name="repo", path=tmp_path, current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
             coverage_signal=CoverageSignal(status="unavailable"),
@@ -556,7 +556,7 @@ def test_extract_evidence_file_tokens_empty_for_no_paths() -> None:
 def _make_snap_with_lint_file(tmp_path: Path, fpath: str, run_id: str) -> "RepoStateSnapshot":  # noqa: F821
     from control_plane.observer.models import (
         LintSignal, LintViolation, RepoContextSnapshot, RepoSignalsSnapshot,
-        RepoStateSnapshot, TestSignal, DependencyDriftSignal, TodoSignal,
+        RepoStateSnapshot, CheckSignal, DependencyDriftSignal, TodoSignal,
     )
 
     return RepoStateSnapshot(
@@ -565,7 +565,7 @@ def _make_snap_with_lint_file(tmp_path: Path, fpath: str, run_id: str) -> "RepoS
         source_command="test",
         repo=RepoContextSnapshot(name="repo", path=tmp_path, current_branch="main", is_dirty=False),
         signals=RepoSignalsSnapshot(
-            test_signal=TestSignal(status="unknown"),
+            test_signal=CheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
             lint_signal=LintSignal(

@@ -16,7 +16,7 @@ from control_plane.observer.models import (
     RepoSignalsSnapshot,
     RepoStateSnapshot,
     SecuritySignal,
-    TestSignal,
+    CheckSignal,
     TodoSignal,
 )
 
@@ -33,7 +33,7 @@ def _make_snapshot(
 ) -> RepoStateSnapshot:
     now = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unknown"),
+        test_signal=CheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="not_available"),
         todo_signal=TodoSignal(),
         architecture_signal=architecture_signal or ArchitectureSignal(status="unavailable"),
