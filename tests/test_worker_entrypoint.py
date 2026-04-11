@@ -1196,6 +1196,7 @@ def test_handle_propose_cycle_passes_single_enabled_repo_key(monkeypatch: pytest
         {"name": "task-kind: goal"},
         {"name": "source: proposer"},
         {"name": "reason: controlplane_idle_board"},
+        {"name": "repo: ControlPlane"},
     ]
     assert "## Evidence" in str(client.created[0]["description"])
     assert any("[Propose] Autonomous task created" in comment for _, comment in client.issue_comments)

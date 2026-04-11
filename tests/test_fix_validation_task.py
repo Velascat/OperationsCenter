@@ -23,6 +23,7 @@ def _make_service() -> ExecutionService:
         svc = ExecutionService(mock_settings)
     # Set the minimal attributes the method under test needs.
     svc.logger = MagicMock()
+    svc.settings = mock_settings
     return svc
 
 
