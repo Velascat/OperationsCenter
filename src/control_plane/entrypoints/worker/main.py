@@ -5233,9 +5233,13 @@ def handle_propose_cycle(
 
     board_idle = board_is_idle_for_proposals_from_issues(issues)
 
-    # When board is idle (no active tasks), promote existing Backlog tasks before
-    # creating new ones — work through the queue before adding more.
-    if board_idle:
+    # Promote existing Backlog tasks whenever nothing is actively being worked on,
+    # regardless of total backlog size. The board_idle check also requires
+    # open_count <= LOW_BACKLOG_THRESHOLD, which creates a deadlock when many Backlog
+    # tasks exist but nothing is in RFA/Running — nothing runs because nothing is
+    # promoted, and nothing is promoted because the board looks "not idle".
+    active_count = active_task_count_from_issues(issues)
+    if active_count == 0:
         promoted_ids = promote_backlog_tasks(client, issues)
         if promoted_ids:
             logger = logging.getLogger(__name__)
@@ -5249,7 +5253,6 @@ def handle_propose_cycle(
             )
 
     # Throttle new proposals when the board already has enough active work.
-    active_count = active_task_count_from_issues(issues)
     if active_count >= MAX_ACTIVE_TASKS_FOR_PROPOSALS:
         return ProposalCycleResult(
             created_task_ids=[],
