@@ -947,16 +947,29 @@ def _process_awaiting_ci(
         "attempt": ci_fix_attempts + 1,
         "failures": failed,
     }))
-    _, changed_files = service.run_review_pass(
-        repo_key=repo_key,
-        clone_url=repo_cfg.clone_url,
-        branch=state["branch"],
-        base_branch=state["base"],
-        original_goal=state.get("original_goal", ""),
-        review_comment=ci_fix_comment,
-        task_id=task_id,
-    )
+    # Increment attempt count and persist *before* running — if bootstrap or the
+    # fix pass throws, the attempt is still counted so we converge to escalation
+    # rather than looping at attempt 1 forever.
     state["ci_fix_attempts"] = ci_fix_attempts + 1
+    state_file.write_text(json.dumps(state, indent=2))
+    try:
+        _, changed_files = service.run_review_pass(
+            repo_key=repo_key,
+            clone_url=repo_cfg.clone_url,
+            branch=state["branch"],
+            base_branch=state["base"],
+            original_goal=state.get("original_goal", ""),
+            review_comment=ci_fix_comment,
+            task_id=task_id,
+        )
+    except Exception as exc:
+        logger.warning(json.dumps({
+            "event": "ci_fix_run_error",
+            "task_id": task_id,
+            "attempt": ci_fix_attempts + 1,
+            "error": str(exc)[:300],
+        }))
+        return 1
     logger.info(json.dumps({
         "event": "ci_fix_end",
         "task_id": task_id,
