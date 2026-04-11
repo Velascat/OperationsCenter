@@ -2278,6 +2278,10 @@ _MULTI_STEP_PLAN_MARKER = "[Plan] Multi-step plan created"
 def _is_multi_step_task(issue: dict[str, Any]) -> bool:
     """Return True when the task warrants a multi-step execution plan."""
     labels = [lbl.lower() for lbl in issue_label_names(issue)]
+    # Sub-tasks created by a prior multi-step plan must never spawn another
+    # plan — that would cause unbounded recursive decomposition.
+    if "source: multi-step-plan" in labels:
+        return False
     if _MULTI_STEP_LABEL in labels:
         return True
     title = str(issue.get("name") or "").lower()
