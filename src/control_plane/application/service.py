@@ -125,6 +125,7 @@ class ExecutionService:
             env=repo_cfg.env,
             allowed_base_branches=repo_cfg.allowed_base_branches,
             validation_timeout_seconds=repo_cfg.validation_timeout_seconds,
+            skip_baseline_validation=repo_cfg.skip_baseline_validation,
         )
 
     def run_task(
@@ -465,15 +466,18 @@ class ExecutionService:
             run_env.update(repo_target.env)
 
             phase = "baseline_validation"
-            self._log_event("phase", run_id, phase=phase)
-            baseline = self._run_baseline_validation(repo_target, repo_path, run_env, run_id)
             fix_validation_task_id: str | None = None
-            if baseline.failed and baseline.error_text:
-                fix_validation_task_id = self._maybe_create_fix_validation_task(
-                    plane_client, task, baseline.error_text, run_id,
-                    validation_results=baseline.validation_results,
-                    repo_target=repo_target,
-                )
+            if repo_target.skip_baseline_validation:
+                self._log_event("phase", run_id, phase=phase, skipped=True)
+            else:
+                self._log_event("phase", run_id, phase=phase)
+                baseline = self._run_baseline_validation(repo_target, repo_path, run_env, run_id)
+                if baseline.failed and baseline.error_text:
+                    fix_validation_task_id = self._maybe_create_fix_validation_task(
+                        plane_client, task, baseline.error_text, run_id,
+                        validation_results=baseline.validation_results,
+                        repo_target=repo_target,
+                    )
 
             phase = "kodo"
             self._log_event("phase", run_id, phase=phase)

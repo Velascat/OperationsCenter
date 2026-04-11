@@ -41,6 +41,10 @@ class RepoTarget(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     allowed_base_branches: list[str] = Field(default_factory=list)
     validation_timeout_seconds: int = 300
+    # When True, baseline validation is skipped entirely.  Use for repos that
+    # have pre-existing widespread violations that are not the fault of any
+    # single task — prevents an endless fix-validation task cycle.
+    skip_baseline_validation: bool = False
 
 
 class ExecutionRequest(BaseModel):

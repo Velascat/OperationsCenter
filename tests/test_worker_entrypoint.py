@@ -897,7 +897,10 @@ def test_handle_blocked_triage_marks_human_attention_for_infra_tooling() -> None
     assert classification == "infra_tooling"
     assert created_ids == []
     assert client.created == []
-    assert any("human_attention_required: true" in comment for _, comment in client.issue_comments)
+    # infra_tooling now auto-retries: human_attention_required is false and task
+    # transitions back to Ready for AI rather than staying Blocked.
+    assert any("human_attention_required: false" in comment for _, comment in client.issue_comments)
+    assert any(state == "Ready for AI" for _, state in client.transitions)
 
 
 def test_handle_blocked_triage_avoids_duplicate_follow_up_for_same_source_reason() -> None:

@@ -137,6 +137,10 @@ class RepoSettings(BaseModel):
     # S8-9: When True, the review watcher will never auto-merge on timeout.
     # The PR must receive an explicit 👍 or human approval comment.
     require_explicit_approval: bool = False
+    # When True, baseline validation is skipped entirely.  Use for repos with
+    # pre-existing widespread violations not caused by any single task, to avoid
+    # an endless fix-validation task loop.  Post-execution validation still runs.
+    skip_baseline_validation: bool = False
 
 
 class Settings(BaseModel):
