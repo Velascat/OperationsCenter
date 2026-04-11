@@ -93,6 +93,10 @@ PROPOSE_COMMENT_MARKER = "[Propose] Autonomous task created"
 # task is blocked and requires human attention.
 _NOTIFY_WEBHOOK_ENV = "CONTROL_PLANE_NOTIFY_WEBHOOK"
 RATE_LIMIT_BACKOFF_MULTIPLIER = 4
+# Backoff applied when the kodo orchestrator reports a usage/rate-limit.
+# The watcher thread sleeps this long before returning so the next poll cycle
+# does not immediately re-run kodo while the limit is still active.
+ORCHESTRATOR_RATE_LIMIT_BACKOFF_SECONDS = 1800  # 30 minutes
 UNKNOWN_BLOCKED_CLASSIFICATION = "unknown"
 MAX_IMPROVE_FOLLOW_UPS_PER_CYCLE = 3
 MAX_PROPOSALS_PER_CYCLE = 4
@@ -3623,10 +3627,22 @@ def build_improve_triage_result(
             human_attention_required=True,
         )
 
-    if classification in {"infra_tooling", UNKNOWN_BLOCKED_CLASSIFICATION}:
+    if classification == "infra_tooling":
+        # Transient infra/tooling failures (network blip, provider restart) are
+        # auto-retried rather than requiring human attention.  The task is moved
+        # back to Ready for AI by handle_blocked_triage so it is retried on the
+        # next goal-watcher cycle.
         return ImproveTriageResult(
             classification=classification,
-            certainty="high" if classification == "infra_tooling" else "low",
+            certainty="high",
+            reason_summary=rationale,
+            recommended_action="retry",
+            human_attention_required=False,
+        )
+    if classification == UNKNOWN_BLOCKED_CLASSIFICATION:
+        return ImproveTriageResult(
+            classification=classification,
+            certainty="low",
             reason_summary=rationale,
             recommended_action="human_attention",
             human_attention_required=True,
@@ -5485,6 +5501,10 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
             ),
         )
         client.transition_issue(task_id, "Ready for AI")
+        if result.outcome_reason == "orchestrator_rate_limited":
+            # Kodo hit a Claude Code usage limit.  Sleep before returning so the
+            # watcher doesn't immediately re-pick the task and hammer the limit.
+            time.sleep(ORCHESTRATOR_RATE_LIMIT_BACKOFF_SECONDS)
         return created_ids
     if result.outcome_status == "no_op":
         client.comment_issue(
@@ -5512,7 +5532,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
         client.comment_issue(
             task_id,
             render_worker_comment(
-                "[Goal] Execution blocked by environment/auth",
+                "[Goal] Execution blocked by environment/auth — auto-retrying",
                 [
                     f"run_id: {result.run_id}",
                     f"task_id: {task_id}",
@@ -5524,11 +5544,14 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
                     "bounded_scope_reason: task remained scoped to one concrete evidence-led target but execution tooling failed first",
                     f"detail: {result.execution_stderr_excerpt or 'provider or backend configuration failed before execution'}",
                     "follow_up_task_ids: none",
-                    "next_action: fix the configured Kodo orchestrator or provider auth before retrying",
+                    "next_action: task re-queued to Ready for AI; will retry automatically once tooling is available",
                 ],
             ),
         )
         rewrite_worker_summary(result, service, task_id)
+        # Auto-requeue: transition back to RFA so a transient infra hiccup
+        # (network blip, provider restart) recovers without human intervention.
+        client.transition_issue(task_id, "Ready for AI")
         return created_ids
 
     if result.success:
@@ -6014,7 +6037,12 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
             ],
         ),
     )
-    client.transition_issue(task_id, "Blocked")
+    if triage.recommended_action == "retry":
+        # Auto-retry path (e.g. infra_tooling): move back to Ready for AI so
+        # the goal watcher picks it up again without manual operator action.
+        client.transition_issue(task_id, "Ready for AI")
+    else:
+        client.transition_issue(task_id, "Blocked")
     # Record triage event for escalation tracking
     service.usage_store.record_blocked_triage(
         task_id=task_id,
