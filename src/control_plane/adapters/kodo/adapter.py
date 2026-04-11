@@ -18,12 +18,17 @@ _CODEX_QUOTA_SIGNALS = (
 )
 
 # Strings that indicate the orchestrator (claude-code) has hit its usage limit.
+# NOTE: do NOT add generic "claude code error" here — kodo emits
+# "Claude Code error: None" as a recoverable status line that does not mean
+# the usage limit was hit.  Only match phrases that unambiguously signal a
+# rate/usage limit.
 _ORCHESTRATOR_RATE_LIMIT_SIGNALS = (
     "you've hit your limit",
     "you have hit your limit",
-    "claude code error",
     "resets 2am",
     "usage limit reached",
+    "claude code error: you've hit",
+    "claude code error: usage limit",
 )
 
 # Strings that indicate a hard quota exhaustion (account-level billing limit,
