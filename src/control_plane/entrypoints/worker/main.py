@@ -3861,6 +3861,11 @@ def create_follow_up_task(
         constraints_text=constraints_text,
     )
     _fu_labels = [f"task-kind: {task_kind}", f"source: {source_role}-worker"]
+    # Propagate repo: label so the goal/test watcher can filter by repo correctly.
+    for _lbl in issue_label_names(original_issue):
+        if _lbl.lower().startswith("repo:"):
+            _fu_labels.append(_lbl)
+            break
     if _self_modify_approved(original_issue):
         _fu_labels.append("self-modify: approved")
     created = client.create_issue(
