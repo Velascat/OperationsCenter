@@ -1100,11 +1100,14 @@ class ExecutionService:
                 repo_target=repo_target,
             )
 
+            _fix_labels = ["task-kind: goal", f"repo: {task.repo_key}"]
+            if task.repo_key == self.settings.self_repo_key:
+                _fix_labels.append("self-modify: approved")
             created = plane_client.create_issue(
                 name=dedup_prefix,
                 description=description,
-                state="Backlog",
-                label_names=["task-kind: goal"],
+                state="Ready for AI",
+                label_names=_fix_labels,
             )
             new_id = str(created.get("id", ""))
             self._log_event("fix_validation_task_created", run_id, new_id=new_id, repo_key=task.repo_key)

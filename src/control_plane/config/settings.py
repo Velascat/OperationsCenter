@@ -213,5 +213,19 @@ class Settings(BaseModel):
 
 
 def load_settings(path: str | Path) -> Settings:
-    raw = yaml.safe_load(Path(path).read_text())
-    return Settings.model_validate(raw)
+    config_path = Path(path).resolve()
+    raw = yaml.safe_load(config_path.read_text())
+    settings = Settings.model_validate(raw)
+    # Resolve relative kodo binary paths against the config file's directory so
+    # the binary can be found regardless of the process working directory.
+    config_dir = config_path.parent
+    if settings.kodo.binary and not Path(settings.kodo.binary).is_absolute():
+        resolved = (config_dir / settings.kodo.binary).resolve()
+        if resolved.exists():
+            settings.kodo.binary = str(resolved)
+    for profile in settings.kodo_profiles.values():
+        if profile.binary and not Path(profile.binary).is_absolute():
+            resolved = (config_dir / profile.binary).resolve()
+            if resolved.exists():
+                profile.binary = str(resolved)
+    return settings
