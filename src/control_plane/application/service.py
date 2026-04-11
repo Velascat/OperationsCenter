@@ -469,6 +469,7 @@ class ExecutionService:
             fix_validation_task_id: str | None = None
             if repo_target.skip_baseline_validation:
                 self._log_event("phase", run_id, phase=phase, skipped=True)
+                baseline = _BaselineResult(failed=False, error_text=None)
             else:
                 self._log_event("phase", run_id, phase=phase)
                 baseline = self._run_baseline_validation(repo_target, repo_path, run_env, run_id)
