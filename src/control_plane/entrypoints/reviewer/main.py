@@ -19,6 +19,7 @@ _BRANCH_TASK_ID_RE = re.compile(
     r"^plane/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
 )
 _MERGE_CONFLICT_RE = re.compile(r"merge conflict|unresolved .* conflict", re.IGNORECASE)
+_DEP_CONFLICT_RE = re.compile(r"ResolutionImpossible|conflicting dependencies|because these package versions have conflicting", re.IGNORECASE)
 
 PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 PROPOSAL_FEEDBACK_DIR = Path("state/proposal_feedback")
@@ -874,6 +875,108 @@ def _requeue_as_goal(
     return 1
 
 
+def _handle_dependency_conflict(
+    error_text: str,
+    gh: "GitHubPRClient",
+    state: dict,
+    state_file: Path,
+    plane_client: "PlaneClient",
+    logger: logging.Logger,
+    settings,
+) -> None:
+    """Bootstrap failed due to a pip dependency conflict.
+
+    Close the PR, create a new combined-upgrade task that names both conflicting
+    packages, and mark the original task Done.  No human needed.
+    """
+    task_id = state["task_id"]
+    repo_key = state["repo_key"]
+    owner = state["owner"]
+    repo = state["repo"]
+    pr_number = state["pr_number"]
+    original_goal = state.get("original_goal", "")
+    marker = settings.reviewer.bot_comment_marker
+
+    # Extract package names from the error, e.g.
+    # "imageio, imageio[ffmpeg]==2.34.1 and pillow==12.2.0 because these package versions..."
+    conflict_snippet = ""
+    m = re.search(r"([\w\[\].,<>=!\s]+) because these package versions have conflicting", error_text)
+    if m:
+        conflict_snippet = m.group(1).strip()
+
+    new_goal = (
+        f"The previous attempt to upgrade a dependency failed at bootstrap due to a "
+        f"pip dependency conflict.\n\n"
+        f"Conflicting packages: `{conflict_snippet or '(see error below)'}`\n\n"
+        f"Original goal: {original_goal}\n\n"
+        f"Resolve the conflict by updating all involved packages to mutually compatible "
+        f"versions.  Run the full validation suite after the upgrade to confirm nothing "
+        f"is broken.  Do not pin to older versions unless there is no compatible newer "
+        f"version available."
+    )
+    new_title = f"[Conflict] Fix dependency conflict from: {str(state.get('task_title', original_goal))[:55]}"
+
+    logger.info(json.dumps({
+        "event": "dep_conflict_detected",
+        "task_id": task_id,
+        "conflict_snippet": conflict_snippet,
+    }))
+
+    # 1. Close the PR
+    close_msg = (
+        f"Closing this PR — bootstrap failed with a pip dependency conflict.\n\n"
+        f"```\n{error_text[:600]}\n```\n\n"
+        f"A new task has been created to upgrade the conflicting packages together."
+    )
+    try:
+        _post_bot_comment(gh, owner, repo, pr_number, close_msg, marker)
+        gh.close_pr(owner, repo, pr_number)
+        logger.info(json.dumps({"event": "dep_conflict_pr_closed", "task_id": task_id, "pr_number": pr_number}))
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "dep_conflict_pr_close_failed", "task_id": task_id, "error": str(exc)}))
+
+    # 2. Create a combined-upgrade task
+    is_self = repo_key.strip().lower() in {"controlplane", "control-plane"}
+    new_labels = ["task-kind: goal", f"repo: {repo_key}", "source: reviewer-dep-conflict"]
+    if is_self:
+        new_labels.append("self-modify: approved")
+    description = (
+        f"## Execution\nrepo: {repo_key}\nmode: goal\n\n"
+        f"## Goal\n{new_goal}\n\n"
+        f"## Constraints\n"
+        f"- source_task_id: {task_id}\n"
+        f"- source: reviewer_dep_conflict\n"
+        f"- note: prior PR closed due to bootstrap dependency conflict; update all conflicting packages\n"
+    )
+    try:
+        new_task = plane_client.create_issue(
+            name=new_title,
+            description=description,
+            state="Ready for AI",
+            label_names=new_labels,
+        )
+        new_id = str(new_task.get("id", ""))
+        logger.info(json.dumps({"event": "dep_conflict_task_created", "task_id": task_id, "new_task_id": new_id}))
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "dep_conflict_task_create_failed", "task_id": task_id, "error": str(exc)}))
+        new_id = ""
+
+    # 3. Mark original task Done and clean up
+    try:
+        plane_client.transition_issue(task_id, "Done")
+        plane_client.comment_issue(
+            task_id,
+            f"[Review] Bootstrap failed — dependency conflict detected.\n\n"
+            f"PR #{pr_number} closed. New task created: {new_id or '(see log)'}.\n\n"
+            f"Conflict: `{conflict_snippet}`",
+        )
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "dep_conflict_close_task_failed", "task_id": task_id, "error": str(exc)}))
+
+    state_file.unlink(missing_ok=True)
+    _write_proposal_feedback(state, outcome="dep_conflict_requeue", merge_reason=None)
+
+
 def _process_awaiting_ci(
     state_file: Path,
     state: dict,
@@ -963,12 +1066,20 @@ def _process_awaiting_ci(
             task_id=task_id,
         )
     except Exception as exc:
+        error_text = str(exc)
         logger.warning(json.dumps({
             "event": "ci_fix_run_error",
             "task_id": task_id,
             "attempt": ci_fix_attempts + 1,
-            "error": str(exc)[:300],
+            "error": error_text[:300],
         }))
+        # If the failure is a pip dependency conflict (bootstrap can't even run),
+        # no amount of kodo fix passes will help — resolve it autonomously instead
+        # of burning remaining attempts or waiting for human review.
+        if _DEP_CONFLICT_RE.search(error_text):
+            _handle_dependency_conflict(
+                error_text, gh, state, state_file, plane_client, logger, service.settings
+            )
         return 1
     logger.info(json.dumps({
         "event": "ci_fix_end",
