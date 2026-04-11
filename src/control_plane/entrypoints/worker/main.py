@@ -5202,6 +5202,51 @@ def handle_propose_cycle(
     now = now or datetime.now(UTC)
     issues = client.list_issues()
 
+    # Label-repair pass: tasks whose description contains a "repo:" execution header
+    # but are missing the matching label are invisible to promote_backlog_tasks and the
+    # goal worker.  Detect and patch them so they re-enter the normal flow instead of
+    # silently stagnating forever.
+    _repair_logger = logging.getLogger(__name__)
+    _LIVE_STATES = {"backlog", "ready for ai", "blocked", "running", "todo", "in progress"}
+    for _iss in issues:
+        if issue_status_name(_iss).strip().lower() not in _LIVE_STATES:
+            continue
+        _existing_labels = issue_label_names(_iss)
+        if any(lbl.lower().startswith("repo:") for lbl in _existing_labels):
+            continue  # already labelled
+        # Try to infer repo from the task description metadata.
+        try:
+            _desc_repo_key, _, _ = issue_execution_target(_iss, service)
+        except Exception:
+            continue
+        if not _desc_repo_key or _desc_repo_key not in service.settings.repos:
+            continue
+        _new_labels = list(_existing_labels) + [f"repo: {_desc_repo_key}"]
+        if "task-kind: goal" not in [l.lower() for l in _new_labels] and \
+                "task-kind: test" not in [l.lower() for l in _new_labels]:
+            _new_labels.append("task-kind: goal")
+        if not any("source:" in l.lower() for l in _new_labels):
+            _new_labels.append("source: proposer")
+        if _is_self_repo(_desc_repo_key, service) and "self-modify: approved" not in _new_labels:
+            _new_labels.append("self-modify: approved")
+        try:
+            client.update_issue_labels(str(_iss["id"]), _new_labels)
+            _repair_logger.info(json.dumps({
+                "event": "propose_label_repair",
+                "task_id": str(_iss["id"]),
+                "repo_key": _desc_repo_key,
+                "labels_added": _new_labels,
+            }))
+            # Refresh the issue list so downstream logic sees the patched labels.
+            issues = client.list_issues()
+            break  # repair one per cycle to avoid thrashing; next cycle picks up more
+        except Exception as _exc:
+            _repair_logger.warning(json.dumps({
+                "event": "propose_label_repair_failed",
+                "task_id": str(_iss["id"]),
+                "error": str(_exc),
+            }))
+
     # Scheduled tasks: create any that are due and not already on the board
     scheduled = list(getattr(service.settings, "scheduled_tasks", None) or [])
     if scheduled:
