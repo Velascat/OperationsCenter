@@ -212,20 +212,28 @@ class Settings(BaseModel):
         return ExecutionControlSettings.from_env()
 
 
+def _resolve_binary(binary: str, config_dir: Path) -> str:
+    """Resolve a relative binary path to an absolute one.
+
+    Tries config-file directory first, then falls back to cwd (the project
+    root when the process starts), so paths like ``scripts/kodo-shim`` work
+    even when the config lives in a subdirectory (e.g. ``config/``).
+    """
+    if not binary or Path(binary).is_absolute():
+        return binary
+    for base in (config_dir, Path.cwd()):
+        resolved = (base / binary).resolve()
+        if resolved.exists():
+            return str(resolved)
+    return binary
+
+
 def load_settings(path: str | Path) -> Settings:
     config_path = Path(path).resolve()
     raw = yaml.safe_load(config_path.read_text())
     settings = Settings.model_validate(raw)
-    # Resolve relative kodo binary paths against the config file's directory so
-    # the binary can be found regardless of the process working directory.
     config_dir = config_path.parent
-    if settings.kodo.binary and not Path(settings.kodo.binary).is_absolute():
-        resolved = (config_dir / settings.kodo.binary).resolve()
-        if resolved.exists():
-            settings.kodo.binary = str(resolved)
+    settings.kodo.binary = _resolve_binary(settings.kodo.binary, config_dir)
     for profile in settings.kodo_profiles.values():
-        if profile.binary and not Path(profile.binary).is_absolute():
-            resolved = (config_dir / profile.binary).resolve()
-            if resolved.exists():
-                profile.binary = str(resolved)
+        profile.binary = _resolve_binary(profile.binary, config_dir)
     return settings
