@@ -287,7 +287,7 @@ class ExecutionService:
                     return result
 
             # Circuit-breaker: skip if an unresolved fix-validation task exists for the repo
-            fix_task_id = self._find_open_fix_validation_task(plane_client, task.repo_key)
+            fix_task_id = self._find_open_fix_validation_task(plane_client, task.repo_key, skip_task_id=task.task_id)
             if fix_task_id is not None:
                 self._log_event(
                     "circuit_breaker_skip",
@@ -890,8 +890,14 @@ class ExecutionService:
 
         return False
 
-    def _find_open_fix_validation_task(self, plane_client: PlaneClient, repo_key: str) -> str | None:
-        """Return the id of an unresolved fix-validation task for *repo_key*, or ``None``."""
+    def _find_open_fix_validation_task(
+        self, plane_client: PlaneClient, repo_key: str, *, skip_task_id: str = ""
+    ) -> str | None:
+        """Return the id of an unresolved fix-validation task for *repo_key*, or ``None``.
+
+        *skip_task_id* is excluded from the search so a fix-validation task does
+        not block itself from executing.
+        """
         closed_states = ("Done", "Blocked", "Cancelled")
         prefix = f"Fix pre-existing validation failure in {repo_key}"
         try:
@@ -899,8 +905,11 @@ class ExecutionService:
                 name = issue.get("name", "")
                 state = issue.get("state", {})
                 state_name = state.get("name", "") if isinstance(state, dict) else ""
+                issue_id = str(issue.get("id", ""))
+                if issue_id == skip_task_id:
+                    continue
                 if isinstance(name, str) and name.startswith(prefix) and state_name not in closed_states:
-                    return str(issue["id"])
+                    return issue_id
         except Exception:  # noqa: BLE001
             return None
         return None
