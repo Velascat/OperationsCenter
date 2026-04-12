@@ -1032,7 +1032,10 @@ def promote_backlog_tasks(
         # Promote tasks with a known source label, OR tasks that have a repo: label
         # but no source: label — these are proposer-created tasks that predate
         # systematic source labeling and would otherwise sit in Backlog forever.
-        if source in {"proposer", "autonomy", "improve-worker"} or (has_repo_label and not source):
+        # reviewer-dep-conflict and post-merge-ci are autonomy-generated and should
+        # flow freely without waiting for a human to promote them.
+        _AUTO_SOURCES = {"proposer", "autonomy", "improve-worker", "reviewer-dep-conflict", "post-merge-ci"}
+        if source in _AUTO_SOURCES or (has_repo_label and not source):
             candidates.append(issue)
     if not candidates:
         return []
@@ -6290,7 +6293,7 @@ def run_watch_loop(
                         "action": "aborting",
                     }))
                     return
-                reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state)
+                reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state, usage_store=service.usage_store)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
                 # Config drift check — log warnings for missing config keys
@@ -6442,6 +6445,25 @@ def run_watch_loop(
                                 "role": role,
                                 "cycle": cycle,
                                 "anomalies": _bh_anomalies,
+                            }))
+                    except Exception:
+                        pass
+                # Periodic orphan recovery: reconcile stale Running tasks in case a
+                # worker was killed mid-execution after the startup reconciliation ran.
+                # Runs every 20 cycles so a task whose TTL expires between restarts
+                # is recovered within one poll-interval window after the TTL passes.
+                if role in {"goal", "test", "improve"} and cycle % 20 == 0:
+                    try:
+                        _recon_ids = reconcile_stale_running_issues(
+                            client, role=role, ready_state=ready_state,
+                            usage_store=service.usage_store,
+                        )
+                        if _recon_ids:
+                            logger.info(json.dumps({
+                                "event": "watch_reconciled_stale_running",
+                                "role": role,
+                                "cycle": cycle,
+                                "task_ids": _recon_ids,
                             }))
                     except Exception:
                         pass
