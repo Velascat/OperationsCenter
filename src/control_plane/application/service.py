@@ -988,7 +988,10 @@ class ExecutionService:
             if text:
                 output_lines.extend(text.splitlines())
         if len(output_lines) > max_lines:
-            output_lines = output_lines[-max_lines:]
+            first_half = max_lines // 2
+            last_half = max_lines - first_half - 1  # -1 for the ellipsis line
+            tail = output_lines[-last_half:] if last_half else []
+            output_lines = output_lines[:first_half] + ["..."] + tail
         return "\n".join(output_lines) or ""
 
     @staticmethod
