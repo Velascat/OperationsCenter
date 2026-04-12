@@ -5318,10 +5318,10 @@ def handle_propose_cycle(
         if not _desc_repo_key or _desc_repo_key not in service.settings.repos:
             continue
         _new_labels = list(_existing_labels) + [f"repo: {_desc_repo_key}"]
-        if "task-kind: goal" not in [l.lower() for l in _new_labels] and \
-                "task-kind: test" not in [l.lower() for l in _new_labels]:
+        _new_labels_lower = [lbl.lower() for lbl in _new_labels]
+        if "task-kind: goal" not in _new_labels_lower and "task-kind: test" not in _new_labels_lower:
             _new_labels.append("task-kind: goal")
-        if not any("source:" in l.lower() for l in _new_labels):
+        if not any("source:" in lbl.lower() for lbl in _new_labels):
             _new_labels.append("source: proposer")
         if _is_self_repo(_desc_repo_key, service) and "self-modify: approved" not in _new_labels:
             _new_labels.append("self-modify: approved")
