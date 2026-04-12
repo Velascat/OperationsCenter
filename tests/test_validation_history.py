@@ -166,6 +166,52 @@ class TestValidationHistoryPatternDetection:
         assert signal.status == "nominal"
         assert signal.tasks_with_repeated_failures == []
 
+    def test_50_percent_with_minimum_runs_flagged(self, tmp_path: Path) -> None:
+        """2 runs, 1 failure = 50% rate, meets min runs (2) but only 1 failure
+        (below _MIN_FAILURES_FOR_PATTERN=2) — should NOT be flagged.
+        Tests the conjunction of all 3 conditions."""
+        _make_run_dir(tmp_path, "run-0", "task-h", "myrepo", validation_passed=False)
+        _make_run_dir(tmp_path, "run-1", "task-h", "myrepo", validation_passed=True)
+
+        ctx = _MinimalContext(settings=_MinimalSettings(report_root=tmp_path), repo_name="myrepo")
+        signal = ValidationHistoryCollector().collect(ctx)
+
+        assert signal.status == "nominal"
+        assert signal.tasks_with_repeated_failures == []
+
+    def test_exactly_3_runs_2_failures_flagged(self, tmp_path: Path) -> None:
+        """3 runs, 2 failures (66.7%) — all conditions met → flagged."""
+        _make_run_dir(tmp_path, "run-0", "task-i", "myrepo", validation_passed=False)
+        _make_run_dir(tmp_path, "run-1", "task-i", "myrepo", validation_passed=False)
+        _make_run_dir(tmp_path, "run-2", "task-i", "myrepo", validation_passed=True)
+
+        ctx = _MinimalContext(settings=_MinimalSettings(report_root=tmp_path), repo_name="myrepo")
+        signal = ValidationHistoryCollector().collect(ctx)
+
+        assert signal.status == "patterns_detected"
+        assert len(signal.tasks_with_repeated_failures) == 1
+        rec = signal.tasks_with_repeated_failures[0]
+        assert rec.task_id == "task-i"
+        assert rec.total_runs == 3
+        assert rec.validation_failure_count == 2
+        assert rec.failure_rate == 0.667
+
+    def test_failure_rate_rounding_boundary(self, tmp_path: Path) -> None:
+        """3 runs, 1 failure = 0.333... — failure_rate should be rounded to 3 decimals (0.333).
+        Not flagged because 33.3% < 50% and only 1 failure."""
+        _make_run_dir(tmp_path, "run-0", "task-j", "myrepo", validation_passed=False)
+        _make_run_dir(tmp_path, "run-1", "task-j", "myrepo", validation_passed=True)
+        _make_run_dir(tmp_path, "run-2", "task-j", "myrepo", validation_passed=True)
+
+        ctx = _MinimalContext(settings=_MinimalSettings(report_root=tmp_path), repo_name="myrepo")
+        signal = ValidationHistoryCollector().collect(ctx)
+
+        # Not flagged (below threshold), but verify rounding via overall_failure_rate
+        assert signal.status == "nominal"
+        assert signal.tasks_with_repeated_failures == []
+        # overall_failure_rate should be rounded to 3 decimals: 1/3 = 0.333
+        assert signal.overall_failure_rate == 0.333
+
 
 class TestValidationFailureRecordModel:
     def test_failure_rate_default(self) -> None:
