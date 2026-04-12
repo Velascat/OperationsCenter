@@ -3430,7 +3430,14 @@ def reconcile_stale_running_issues(
     role: str,
     ready_state: str,
     usage_store: "UsageStore | None" = None,
+    startup: bool = False,
 ) -> list[str]:
+    """Reconcile tasks stuck in Running state after a worker restart or mid-run kill.
+
+    On startup (startup=True) a short 15-minute TTL is applied so tasks claimed
+    by the previous worker session (whose kodo process is also dead) are reclaimed
+    immediately rather than sitting in Running for up to 2 hours.
+    """
     if role not in {"goal", "test", "improve"}:
         return []
     store = usage_store or UsageStore()
@@ -3460,7 +3467,7 @@ def reconcile_stale_running_issues(
                 _updated = datetime.fromisoformat(str(_updated_raw).replace("Z", "+00:00"))
                 if _updated.tzinfo is None:
                     _updated = _updated.replace(tzinfo=UTC)
-                _ttl = _RUNNING_TTL_MINUTES.get(task_kind, _RUNNING_TTL_DEFAULT_MINUTES) * 60
+                _ttl = (15 if startup else _RUNNING_TTL_MINUTES.get(task_kind, _RUNNING_TTL_DEFAULT_MINUTES)) * 60
                 if (_now - _updated).total_seconds() < _ttl:
                     continue  # Within TTL — do not touch
             except (ValueError, TypeError):
@@ -6293,7 +6300,7 @@ def run_watch_loop(
                         "action": "aborting",
                     }))
                     return
-                reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state, usage_store=service.usage_store)
+                reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state, usage_store=service.usage_store, startup=True)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
                 # Config drift check — log warnings for missing config keys
