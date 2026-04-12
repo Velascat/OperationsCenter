@@ -589,7 +589,7 @@ class TestValidationExcerptReturnsEmptyString:
         assert "test output" in excerpt
 
     def test_excerpt_max_lines_boundary(self) -> None:
-        """Exactly 20 lines returns all 20 (no truncation). 21 lines returns last 20."""
+        """Exactly 20 lines returns all 20 (no truncation). 21 lines gets middle-truncated."""
         # 20 lines: header + 19 lines of stderr = 20 total
         stderr_19 = "\n".join(f"line {i}" for i in range(19))
         results_20 = [_make_validation_result("cmd", 1, stderr=stderr_19)]
@@ -599,14 +599,14 @@ class TestValidationExcerptReturnsEmptyString:
         assert "line 0" in excerpt_20
         assert "line 18" in excerpt_20
 
-        # 21 lines: header + 20 lines of stderr = 21 total → truncated to last 20
+        # 21 lines: header + 20 lines of stderr = 21 total → middle-truncated to 20
         stderr_20 = "\n".join(f"line {i}" for i in range(20))
         results_21 = [_make_validation_result("cmd", 1, stderr=stderr_20)]
         excerpt_21 = ExecutionService._validation_excerpt(results_21, max_lines=20)
-        # Header [cmd] is line 0, gets truncated away; last 20 lines are line 0..line 19
-        assert "line 19" in excerpt_21
-        # The header should be truncated since we have 21 lines total and keep last 20
-        assert "[cmd]" not in excerpt_21
+        # Middle-truncation keeps first 10 + "..." + last 9 lines
+        assert "[cmd]" in excerpt_21  # header is in the first half
+        assert "line 19" in excerpt_21  # last line is in the tail
+        assert "..." in excerpt_21  # ellipsis marks the truncation point
 
 
 # ---------------------------------------------------------------------------
