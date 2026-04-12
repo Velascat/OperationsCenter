@@ -26,7 +26,7 @@ from control_plane.observer.models import (
     RepoContextSnapshot,
     RepoSignalsSnapshot,
     RepoStateSnapshot,
-    TestSignal,
+    CheckSignal,
     TodoSignal,
     TypeSignal,
     TypeError,
@@ -45,7 +45,7 @@ def _snapshot(
     type_errors = [TypeError(path=p, line=1, col=1, code="attr", message="y") for p in (type_paths or [])]
     hotspots = [FileHotspot(path=p, touch_count=5) for p in (hotspot_paths or [])]
     signals = RepoSignalsSnapshot(
-        test_signal=TestSignal(status="unknown"),
+        test_signal=CheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="unknown"),
         todo_signal=TodoSignal(),
         lint_signal=LintSignal(

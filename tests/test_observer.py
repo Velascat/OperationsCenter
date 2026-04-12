@@ -11,7 +11,7 @@ from control_plane.observer.collectors.dependency_drift import DependencyDriftCo
 from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
 from control_plane.observer.collectors.git_context import GitContextCollector
 from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
-from control_plane.observer.collectors.test_signal import TestSignalCollector
+from control_plane.observer.collectors.check_signal import CheckSignalCollector
 from control_plane.observer.collectors.todo_signal import TodoSignalCollector
 from control_plane.observer.models import (
     ArchitectureSignal,
@@ -21,7 +21,7 @@ from control_plane.observer.models import (
     RepoSignalsSnapshot,
     RepoStateSnapshot,
     SecuritySignal,
-    TestSignal as ObserverTestSignal,
+    CheckSignal as ObserverCheckSignal,
     TodoSignal,
 )
 from control_plane.observer.service import RepoObserverService, new_observer_context
@@ -86,7 +86,7 @@ def test_snapshot_builder_serializes_with_partial_errors() -> None:
         signals=RepoSignalsSnapshot(
             recent_commits=[],
             file_hotspots=[],
-            test_signal=ObserverTestSignal(status="unknown"),
+            test_signal=ObserverCheckSignal(status="unknown"),
             dependency_drift=DependencyDriftSignal(status="not_available"),
             todo_signal=TodoSignal(),
         ),
@@ -192,7 +192,7 @@ def test_test_signal_and_dependency_drift_collectors(tmp_path: Path) -> None:
         logs_root=logs_root,
     )
 
-    test_signal = TestSignalCollector().collect(context)
+    test_signal = CheckSignalCollector().collect(context)
     drift_signal = DependencyDriftCollector().collect(context)
 
     assert test_signal.status == "passed"
@@ -214,7 +214,7 @@ def test_observer_service_writes_snapshot_artifacts(tmp_path: Path) -> None:
         repo_collector=GitContextCollector(),
         recent_commits_collector=RecentCommitsCollector(),
         file_hotspots_collector=FileHotspotsCollector(),
-        test_signal_collector=TestSignalCollector(),
+        test_signal_collector=CheckSignalCollector(),
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
         snapshot_builder=SnapshotBuilder(),
@@ -269,7 +269,7 @@ def test_new_signal_models_can_be_imported() -> None:
 def test_repo_signals_snapshot_new_fields_default_to_unavailable() -> None:
     """RepoSignalsSnapshot can be built with minimal required args; new fields default to unavailable."""
     snapshot = RepoSignalsSnapshot(
-        test_signal=ObserverTestSignal(status="unknown"),
+        test_signal=ObserverCheckSignal(status="unknown"),
         dependency_drift=DependencyDriftSignal(status="not_available"),
         todo_signal=TodoSignal(),
     )
@@ -294,7 +294,7 @@ def _make_service(tmp_path: Path, **extra_collectors) -> tuple[RepoObserverServi
         repo_collector=GitContextCollector(),
         recent_commits_collector=RecentCommitsCollector(),
         file_hotspots_collector=FileHotspotsCollector(),
-        test_signal_collector=TestSignalCollector(),
+        test_signal_collector=CheckSignalCollector(),
         dependency_drift_collector=DependencyDriftCollector(),
         todo_signal_collector=TodoSignalCollector(),
         snapshot_builder=SnapshotBuilder(),

@@ -29,7 +29,7 @@ class FileHotspot(BaseModel):
     touch_count: int
 
 
-class TestSignal(BaseModel):
+class CheckSignal(BaseModel):
     status: str
     source: str | None = None
     observed_at: datetime | None = None
@@ -195,7 +195,7 @@ class CoverageSignal(BaseModel):
 class RepoSignalsSnapshot(BaseModel):
     recent_commits: list[CommitMetadata] = Field(default_factory=list)
     file_hotspots: list[FileHotspot] = Field(default_factory=list)
-    test_signal: TestSignal
+    test_signal: CheckSignal
     dependency_drift: DependencyDriftSignal
     todo_signal: TodoSignal
     execution_health: ExecutionHealthSignal = Field(default_factory=ExecutionHealthSignal)

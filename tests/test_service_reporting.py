@@ -654,3 +654,34 @@ def test_validation_excerpt_truncates_long_output() -> None:
     assert excerpt is not None
     lines = excerpt.splitlines()
     assert len(lines) == 10
+    # Head+tail strategy: first 5 lines (incl. command header) + '...' + last 4 lines
+    assert lines[0] == "[pytest]"
+    assert "..." in lines
+
+
+def test_validation_excerpt_head_tail_60_lines() -> None:
+    """For a 60-line error output with max_lines=20, both the first 10 and
+    last 9 lines are present with an ellipsis separator."""
+    error_lines = [f"error line {i}" for i in range(60)]
+    long_stderr = "\n".join(error_lines)
+    validation_results = [
+        ValidationResult(command="pytest", exit_code=1, stdout="", stderr=long_stderr, duration_ms=100),
+    ]
+
+    excerpt = ExecutionService._validation_excerpt(validation_results, max_lines=20)
+    assert excerpt is not None
+    lines = excerpt.splitlines()
+    assert len(lines) == 20
+
+    # First half: 10 lines (command header + first 9 error lines)
+    assert lines[0] == "[pytest]"
+    for i in range(9):
+        assert lines[i + 1] == f"error line {i}"
+
+    # Ellipsis separator
+    assert lines[10] == "..."
+
+    # Last half: 9 lines (last 9 error lines)
+    for i in range(9):
+        expected_line_num = 60 - 9 + i
+        assert lines[11 + i] == f"error line {expected_line_num}"

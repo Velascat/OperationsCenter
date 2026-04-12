@@ -20,7 +20,7 @@ from control_plane.observer.models import (
     RepoSignalsSnapshot,
     RepoStateSnapshot,
     SecuritySignal,
-    TestSignal,
+    CheckSignal,
     TodoSignal,
     TypeSignal,
     ValidationHistorySignal,
@@ -100,7 +100,7 @@ class RepoObserverService:
             context,
             "test_signal",
             collector_errors,
-            default=TestSignal(status="unknown"),
+            default=CheckSignal(status="unknown"),
         )
         dependency_drift = self._collect_optional(
             self.dependency_drift_collector,

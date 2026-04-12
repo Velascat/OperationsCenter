@@ -511,6 +511,12 @@ class TestBaselineResultNoneSafety:
         assert result.validation_results == []
         assert isinstance(result.validation_results, list)
 
+    def test_failed_false_none_results_not_coerced(self) -> None:
+        """Verify that _BaselineResult(failed=False, error_text=None, validation_results=None)
+        keeps validation_results as None (not coerced to [])."""
+        result = _BaselineResult(failed=False, error_text=None, validation_results=None)
+        assert result.validation_results is None
+
 
 # ---------------------------------------------------------------------------
 # Tests for _validation_excerpt returning '' instead of None
@@ -564,6 +570,43 @@ class TestValidationExcerptReturnsEmptyString:
         assert "build output" in excerpt
         # passing command should not appear
         assert "[test]" not in excerpt
+
+    def test_mixed_empty_and_nonempty_outputs(self) -> None:
+        """Some failed commands have stderr, some have neither stderr nor stdout.
+        Should return headers for all failed commands but output only for those that have it."""
+        results = [
+            _make_validation_result("lint", 1, stderr="lint error", stdout=""),
+            _make_validation_result("build", 2, stderr="", stdout=""),
+            _make_validation_result("test", 3, stderr="", stdout="test output"),
+        ]
+        excerpt = ExecutionService._validation_excerpt(results)
+        # All failed commands should have their headers
+        assert "[lint]" in excerpt
+        assert "[build]" in excerpt
+        assert "[test]" in excerpt
+        # Only lint and test have output
+        assert "lint error" in excerpt
+        assert "test output" in excerpt
+
+    def test_excerpt_max_lines_boundary(self) -> None:
+        """Exactly 20 lines returns all 20 (no truncation). 21 lines gets middle-truncated."""
+        # 20 lines: header + 19 lines of stderr = 20 total
+        stderr_19 = "\n".join(f"line {i}" for i in range(19))
+        results_20 = [_make_validation_result("cmd", 1, stderr=stderr_19)]
+        excerpt_20 = ExecutionService._validation_excerpt(results_20, max_lines=20)
+        # Should contain all 19 lines plus the header
+        assert "[cmd]" in excerpt_20
+        assert "line 0" in excerpt_20
+        assert "line 18" in excerpt_20
+
+        # 21 lines: header + 20 lines of stderr = 21 total → middle-truncated to 20
+        stderr_20 = "\n".join(f"line {i}" for i in range(20))
+        results_21 = [_make_validation_result("cmd", 1, stderr=stderr_20)]
+        excerpt_21 = ExecutionService._validation_excerpt(results_21, max_lines=20)
+        # Middle-truncation keeps first 10 + "..." + last 9 lines
+        assert "[cmd]" in excerpt_21  # header is in the first half
+        assert "line 19" in excerpt_21  # last line is in the tail
+        assert "..." in excerpt_21  # ellipsis marks the truncation point
 
 
 # ---------------------------------------------------------------------------
@@ -630,6 +673,48 @@ class TestBaselineValidationIntegration:
         assert "exit code: 1" in desc
         assert "lint error found" in desc
         assert "occurrence #1" in desc
+
+    def test_baseline_failure_with_empty_results_list_creates_task(self) -> None:
+        """End-to-end: baseline fails with validation_results=[] (empty list, not None).
+        The fix task should still be created using the fallback description path
+        since there are no individual results to enrich."""
+        svc = self._build_service()
+
+        # Simulate baseline that fails but returns no individual validation results
+        svc.validation.run.return_value = []
+        svc.validation.passed.return_value = False
+
+        repo_target = self._build_repo_target()
+        repo_path = Path("/tmp/fake")
+        run_env: dict[str, str] = {}
+        run_id = "run-empty"
+
+        pc = _make_plane_client()
+        task = _make_task("org/repo")
+
+        # Exercise baseline validation
+        baseline = svc._run_baseline_validation(repo_target, repo_path, run_env, run_id)
+
+        assert baseline.failed is True
+        assert baseline.validation_results is not None
+        assert baseline.validation_results == []
+
+        # Exercise fix-task creation with empty results list
+        tid = svc._maybe_create_fix_validation_task(
+            pc, task, baseline.error_text, run_id,
+            validation_results=baseline.validation_results,
+            repo_target=repo_target,
+        )
+
+        assert tid == "new-task-123"
+        pc.create_issue.assert_called_once()
+
+        call_kwargs = pc.create_issue.call_args[1]
+        desc = call_kwargs["description"]
+        # With empty results list, no "Failing Commands" section should appear
+        assert "## Failing Commands" not in desc
+        # But the baseline history section should still be present
+        assert "## Baseline Failure History" in desc
 
     def test_dedup_prevents_second_creation(self) -> None:
         # -- setup --
