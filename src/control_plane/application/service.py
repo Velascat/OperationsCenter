@@ -1551,14 +1551,15 @@ class ExecutionService:
                 f"## Instructions\n"
                 f"1. Run `git diff origin/{base_branch}..HEAD` to see what was changed\n"
                 f"2. Evaluate whether all requirements in the Original Goal section are addressed\n"
-                f"3. Write ONLY to `.review/verdict.txt` (relative to the repo root).\n"
+                f"3. Write your verdict to this exact absolute path: `{verdict_file}`\n"
+                f"   Do NOT write it anywhere else — not relative to your current directory, not in the repo root, not in home.\n"
                 f"   The file MUST start with one of exactly these two tokens on the very first line, alone, with no prefix, label, or punctuation:\n"
                 f"   - `LGTM` — if everything correctly satisfies the goal\n"
                 f"   - `CONCERNS` — if there are specific issues; follow with one issue per line starting with `- `\n"
                 f"   WRONG: 'Verdict: LGTM', 'APPROVE', '## LGTM', 'Result: CONCERNS'\n"
                 f"   RIGHT: first line is the single bare word `LGTM` or `CONCERNS`, nothing else.\n"
                 f"4. CRITICAL: Do NOT modify any source files, tests, or configuration. "
-                f"Your only permitted output is `.review/verdict.txt`.\n"
+                f"Your only permitted output is the verdict file at `{verdict_file}`.\n"
             )
             self.kodo.write_goal_file(goal_file, goal_text)
             self.kodo.run(goal_file, repo_path)

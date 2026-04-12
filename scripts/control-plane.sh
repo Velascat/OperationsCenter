@@ -186,6 +186,7 @@ start_watch_role() {
   # covers deliberate stops such as credential failures at startup.
   if [[ "${role}" == "review" ]]; then
     setsid /bin/bash -lc "
+      cd '${ROOT_DIR}'
       set -a
       source '${ENV_PATH}'
       set +a
@@ -208,6 +209,7 @@ start_watch_role() {
     " >>"${log_file}" 2>&1 < /dev/null &
   else
     setsid /bin/bash -lc "
+      cd '${ROOT_DIR}'
       set -a
       source '${ENV_PATH}'
       set +a
