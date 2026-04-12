@@ -433,13 +433,13 @@ class ExecutionService:
             )
 
             goal_file = workspace_path / "goal.md"
-            goal_text = task.goal_text
+            assembled_goal_text = task.goal_text
             scope_section = _build_scope_constraints_section(task)
             if scope_section:
-                goal_text = scope_section + goal_text
+                assembled_goal_text = scope_section + assembled_goal_text
             if merge_conflict_files:
                 conflict_list = "\n".join(f"- `{f}`" for f in merge_conflict_files)
-                goal_text = (
+                assembled_goal_text = (
                     f"## Merge Conflict Resolution Required\n\n"
                     f"This branch has conflicts with `{task.base_branch}` that must be resolved "
                     f"before the original goal can be completed. Conflict markers (`<<<<<<<`, "
@@ -448,8 +448,8 @@ class ExecutionService:
                     f"Resolve all conflict markers in those files, keeping the changes that best "
                     f"satisfy the original goal below.\n\n"
                     f"---\n\n"
-                ) + goal_text
-            self.kodo.write_goal_file(goal_file, goal_text, task.constraints_text)
+                ) + assembled_goal_text
+            self.kodo.write_goal_file(goal_file, assembled_goal_text, task.constraints_text)
 
             req = ExecutionRequest(
                 run_id=run_id,
@@ -552,9 +552,9 @@ class ExecutionService:
                             ),
                         )
                     else:
-                        # Kodo introduced the failure: keep original goal, append as feedback
-                        with open(goal_file, "a") as f:
-                            f.write(f"\n\n## Validation Feedback\n\n{error_text}\n")
+                        # Kodo introduced the failure: keep original goal, add feedback as constraint
+                        validation_constraints = (task.constraints_text or "") + f"\n\nValidation Feedback:\n{error_text}"
+                        self.kodo.write_goal_file(goal_file, assembled_goal_text, validation_constraints)
                 kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
@@ -596,13 +596,14 @@ class ExecutionService:
             # with explicit constraints so it can revert or avoid those files.
             if policy_violations and task.allowed_paths:
                 violated_files = ", ".join(f"`{f}`" for f in policy_violations)
-                with open(goal_file, "a") as gf:
-                    gf.write(
-                        f"\n\n## Scope Constraint Violation\n\n"
-                        f"You modified files outside the allowed scope: {violated_files}\n"
-                        f"Allowed paths: {', '.join(task.allowed_paths)}\n"
-                        f"Revert all changes to out-of-scope files. Keep only changes within the allowed paths.\n"
-                    )
+                scope_violation_msg = (
+                    f"\n\nScope Constraint Violation:\n"
+                    f"You modified files outside the allowed scope: {violated_files}\n"
+                    f"Allowed paths: {', '.join(task.allowed_paths)}\n"
+                    f"Revert all changes to out-of-scope files. Keep only changes within the allowed paths."
+                )
+                scope_constraints = (task.constraints_text or "") + scope_violation_msg
+                self.kodo.write_goal_file(goal_file, assembled_goal_text, scope_constraints)
                 self._log_event("policy_retry_start", run_id, violations=policy_violations)
                 kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
