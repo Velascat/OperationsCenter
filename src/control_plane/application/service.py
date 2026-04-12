@@ -488,6 +488,7 @@ class ExecutionService:
             _profiles = getattr(self.settings, "kodo_profiles", {})
             if _profiles:
                 _kodo_profile = _profiles.get(task.execution_mode) or _profiles.get("default")
+            self._assert_goal_sections_unique(goal_file)
             kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
             artifacts.extend(
                 self.reporter.write_kodo(
@@ -555,6 +556,7 @@ class ExecutionService:
                         # Kodo introduced the failure: keep original goal, add feedback as constraint
                         validation_constraints = (task.constraints_text or "") + f"\n\nValidation Feedback:\n{error_text}"
                         self.kodo.write_goal_file(goal_file, assembled_goal_text, validation_constraints)
+                self._assert_goal_sections_unique(goal_file)
                 kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
@@ -605,6 +607,7 @@ class ExecutionService:
                 scope_constraints = (task.constraints_text or "") + scope_violation_msg
                 self.kodo.write_goal_file(goal_file, assembled_goal_text, scope_constraints)
                 self._log_event("policy_retry_start", run_id, violations=policy_violations)
+                self._assert_goal_sections_unique(goal_file)
                 kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
                 artifacts.extend(
                     self.reporter.write_kodo(
@@ -919,6 +922,30 @@ class ExecutionService:
         except Exception:  # noqa: BLE001
             return None
         return None
+
+    def _assert_goal_sections_unique(self, goal_file: Path) -> bool:
+        """Check that ``## Goal`` and ``## Constraints`` appear at most once.
+
+        Returns ``True`` when the file is clean, ``False`` when duplicates are
+        detected.  Duplicates are logged as warnings but never raise.
+        """
+        try:
+            content = goal_file.read_text()
+        except OSError:
+            return True
+
+        clean = True
+        for section in ("## Goal", "## Constraints"):
+            count = len(re.findall(rf"^{re.escape(section)}$", content, re.MULTILINE))
+            if count > 1:
+                self.logger.warning(
+                    "Duplicate section %r found %d times in %s",
+                    section,
+                    count,
+                    goal_file,
+                )
+                clean = False
+        return clean
 
     def _log_event(self, event: str, run_id: str, **fields: object) -> None:
         payload = {"event": event, "run_id": run_id, **fields}
