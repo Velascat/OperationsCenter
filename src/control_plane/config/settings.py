@@ -141,6 +141,11 @@ class RepoSettings(BaseModel):
     # pre-existing widespread violations not caused by any single task, to avoid
     # an endless fix-validation task loop.  Post-execution validation still runs.
     skip_baseline_validation: bool = False
+    # CI check names to ignore when deciding whether CI is passing.  Use for
+    # pre-existing failures on the base branch that are unrelated to PR changes
+    # (e.g. a file-tag linter that was broken before the PR landed).  Checks
+    # whose names contain any of these strings are excluded from the failed list.
+    ci_ignored_checks: list[str] = Field(default_factory=list)
 
 
 class Settings(BaseModel):

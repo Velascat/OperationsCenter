@@ -186,9 +186,20 @@ class GitHubPRClient:
         return resp.json().get("check_runs", [])
 
     def get_failed_checks(
-        self, owner: str, repo: str, pr_number: int, *, pr_data: dict | None = None
+        self,
+        owner: str,
+        repo: str,
+        pr_number: int,
+        *,
+        pr_data: dict | None = None,
+        ignored_checks: list[str] | None = None,
     ) -> list[str]:
-        """Return human-readable descriptions of failing CI checks for the PR's head commit."""
+        """Return human-readable descriptions of failing CI checks for the PR's head commit.
+
+        Checks whose names contain any string in *ignored_checks* are excluded —
+        use this for known pre-existing failures on the base branch that are
+        unrelated to PR changes.
+        """
         if pr_data is None:
             pr_data = self.get_pr(owner, repo, pr_number)
         head_sha = (pr_data.get("head") or {}).get("sha", "")
@@ -198,10 +209,13 @@ class GitHubPRClient:
             check_runs = self.get_check_runs(owner, repo, head_sha)
         except Exception:
             return []
+        ignored = [s.lower() for s in (ignored_checks or [])]
         failed = []
         for cr in check_runs:
             if cr.get("conclusion") in ("failure", "timed_out", "cancelled"):
                 name = cr.get("name", "unknown")
+                if ignored and any(pat in name.lower() for pat in ignored):
+                    continue
                 summary = (cr.get("output") or {}).get("title") or cr.get("conclusion", "failed")
                 failed.append(f"{name}: {summary}")
         return failed

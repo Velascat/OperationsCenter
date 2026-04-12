@@ -216,6 +216,7 @@ def _merge_and_finalize(
     logger: logging.Logger,
     *,
     reason: str,
+    allow_unstable: bool = False,
 ) -> None:
     owner = state["owner"]
     repo = state["repo"]
@@ -246,8 +247,9 @@ def _merge_and_finalize(
             state_file.unlink(missing_ok=True)
             return
         # If CI checks are still running or failing, skip merge this cycle and retry later.
+        # allow_unstable=True means all real failures have been accounted for (e.g. ignored).
         mergeable_state = pr_data.get("mergeable_state", "")
-        if mergeable_state == "unstable":
+        if mergeable_state == "unstable" and not allow_unstable:
             logger.info(json.dumps({
                 "event": "pr_merge_skipped_ci",
                 "task_id": task_id,
@@ -552,7 +554,8 @@ def _process_human_review(
             _is_autonomy = any("source: autonomy" in lbl or lbl == "source: autonomy" for lbl in _labels)
             if _is_autonomy:
                 _pr_data = gh.get_pr(owner, repo, pr_number)
-                _failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=_pr_data)
+                _ignored_am = list(getattr(repo_cfg, "ci_ignored_checks", None) or [])
+                _failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=_pr_data, ignored_checks=_ignored_am)
                 _threshold = float(getattr(reviewer_cfg, "auto_merge_success_rate_threshold", 0.9))
                 # Only auto-merge when recent success rate is healthy (or we have no data yet).
                 _rate = service.usage_store.check_failure_rate_degradation(now=datetime.now(UTC))
@@ -1019,10 +1022,13 @@ def _process_awaiting_ci(
         _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="self_review_lgtm")
         return 1
 
+    repo_cfg = service.settings.repos.get(repo_key)
+    ignored_checks = list(getattr(repo_cfg, "ci_ignored_checks", None) or [])
+
     # CI still failing.
     ci_fix_attempts = state.get("ci_fix_attempts", 0)
     if ci_fix_attempts >= MAX_CI_FIX_ATTEMPTS:
-        failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=pr_data)
+        failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=pr_data, ignored_checks=ignored_checks)
         failures_text = "\n".join(f"- {f}" for f in (failed or ["(unknown)"]))
         reason = (
             f"CI is still failing after {ci_fix_attempts} automated fix attempt(s). "
@@ -1033,11 +1039,36 @@ def _process_awaiting_ci(
         _escalate_to_human(gh, state, state_file, plane_client, logger, service.settings, reason=reason)
         return 1
 
-    failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=pr_data)
+    failed = gh.get_failed_checks(owner, repo, pr_number, pr_data=pr_data, ignored_checks=ignored_checks)
     if not failed:
-        # Can't identify what's failing yet — wait for checks to finish.
-        logger.info(json.dumps({"event": "ci_fix_waiting_for_checks", "task_id": task_id}))
-        return 0
+        # Either checks are still in progress, or all failing checks are in the ignored list.
+        # Distinguish by checking for pending check runs.
+        head_sha = (pr_data.get("head") or {}).get("sha", "")
+        pending = True  # default: assume still pending if we can't tell
+        if head_sha:
+            try:
+                check_runs = gh.get_check_runs(owner, repo, head_sha)
+                pending = any(cr.get("status") in ("queued", "in_progress") for cr in check_runs)
+            except Exception:
+                pass
+        if pending:
+            logger.info(json.dumps({"event": "ci_fix_waiting_for_checks", "task_id": task_id}))
+            return 0
+        # All checks completed and all failures are in the ignored list — treat CI as green.
+        logger.info(json.dumps({
+            "event": "ci_all_ignored_merging",
+            "task_id": task_id,
+            "ignored_checks": ignored_checks,
+        }))
+        try:
+            _post_bot_comment(
+                gh, owner, repo, pr_number,
+                "CI checks passed (pre-existing failures ignored) — merging.", marker,
+            )
+        except Exception as exc:
+            logger.warning("Failed to post CI-cleared comment for PR %s: %s", pr_number, exc)
+        _merge_and_finalize(gh, state, state_file, plane_client, logger, reason="ci_ignored_checks_all_clear", allow_unstable=True)
+        return 1
 
     repo_cfg = service.settings.repos[repo_key]
     ci_fix_comment = (
