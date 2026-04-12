@@ -127,9 +127,12 @@ def _wire_service(
     service.git.commit_all = lambda repo_path, message: True  # type: ignore[assignment]
     service.git.push_branch = lambda repo_path, branch: None  # type: ignore[assignment]
 
-    # write_goal_file must create a real file so the policy retry can append to it
+    # write_goal_file must create a real file so the policy retry can read/rewrite it
     def write_goal_file(path: Path, goal_text: str, constraints_text: str | None = None) -> Path:
-        path.write_text(f"## Goal\n{goal_text}\n")
+        lines = [f"## Goal\n{goal_text}"]
+        if constraints_text:
+            lines.append(f"\n## Constraints\n{constraints_text}")
+        path.write_text("\n".join(lines) + "\n")
         return path
 
     service.kodo.write_goal_file = write_goal_file  # type: ignore[assignment]
