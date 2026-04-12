@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -3424,6 +3425,45 @@ _RUNNING_TTL_MINUTES: dict[str, int] = {
 _RUNNING_TTL_DEFAULT_MINUTES = 90
 
 
+def cleanup_orphaned_workspaces(prefix: str = "cp-task-") -> list[str]:
+    """Delete /tmp/<prefix>* directories that no live process references.
+
+    Reads /proc/*/cmdline to find all workspace paths currently in use, then
+    removes any workspace directory that isn't mentioned by any process.
+    Returns a list of deleted directory paths.
+    """
+    import glob as _glob
+
+    workspaces = [Path(p) for p in _glob.glob(f"/tmp/{prefix}*") if Path(p).is_dir()]
+    if not workspaces:
+        return []
+
+    # Collect every workspace tag that appears in any live process cmdline.
+    live_tags: set[str] = set()
+    try:
+        for cmdline_path in Path("/proc").glob("*/cmdline"):
+            try:
+                text = cmdline_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="replace")
+                for ws in workspaces:
+                    if ws.name in text:
+                        live_tags.add(ws.name)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+    deleted: list[str] = []
+    for ws in workspaces:
+        if ws.name in live_tags:
+            continue
+        try:
+            shutil.rmtree(ws)
+            deleted.append(str(ws))
+        except OSError:
+            pass
+    return deleted
+
+
 def reconcile_stale_running_issues(
     client: PlaneClient,
     *,
@@ -6303,6 +6343,12 @@ def run_watch_loop(
                 reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state, usage_store=service.usage_store, startup=True)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
+                try:
+                    _deleted_ws = cleanup_orphaned_workspaces()
+                    if _deleted_ws:
+                        logger.info(json.dumps({"event": "watch_cleanup_orphaned_workspaces", "role": role, "deleted": _deleted_ws, "count": len(_deleted_ws)}))
+                except Exception:
+                    pass
                 # Config drift check — log warnings for missing config keys
                 _drift_config = os.environ.get("CONTROL_PLANE_CONFIG", "")
                 _example_path = Path(_drift_config).parent / "control_plane.example.yaml" if _drift_config else None
