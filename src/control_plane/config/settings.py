@@ -202,6 +202,18 @@ class Settings(BaseModel):
     stale_autonomy_backlog_days: int = 30
     # S8-8: Runtime error ingestion configuration.  None = disabled.
     error_ingest: ErrorIngestSettings | None = None
+    # Maximum number of concurrent kodo processes across all worker roles.
+    # Workers that run kodo (goal, test) will skip their execute cycle when this
+    # many kodo-shim processes are already running, then retry next poll.
+    # 0 = unlimited (default 1).
+    max_concurrent_kodo: int = 1
+    # Minimum available system RAM in MB before a worker will launch kodo.
+    # If available memory drops below this threshold the execute cycle is
+    # skipped and a watch_skip_low_memory event is logged.  0 = disabled.
+    min_kodo_available_mb: int = 400
+    # Propose worker skips its generation cycle when the "Ready for AI" queue
+    # already has this many or more tasks.  0 = disabled (default 8).
+    propose_skip_when_ready_count: int = 8
 
     def plane_token(self) -> str:
         return os.environ[self.plane.api_token_env]

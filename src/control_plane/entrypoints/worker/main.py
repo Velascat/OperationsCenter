@@ -1560,6 +1560,48 @@ _INVALID_GOAL_MARKERS = ("fix everything", "fix all", "improve everything", "do 
 _PRE_EXEC_VALIDATION_MARKER = "[Goal] Task rejected by pre-execution validation"
 
 
+def _check_kodo_execution_gate(settings: Any) -> tuple[bool, str]:
+    """Return (allowed, reason) before launching a kodo process.
+
+    Checks two independent conditions:
+    - Concurrency: count live kodo-shim processes; block if at or above
+      settings.max_concurrent_kodo (0 = unlimited).
+    - Memory: read /proc/meminfo MemAvailable; block if below
+      settings.min_kodo_available_mb (0 = disabled).
+    """
+    # --- concurrency gate ---
+    max_kodo = getattr(settings, "max_concurrent_kodo", 1)
+    if max_kodo > 0:
+        try:
+            count = sum(
+                1
+                for p in Path("/proc").iterdir()
+                if p.name.isdigit()
+                and "kodo" in (p / "cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="replace")
+            )
+        except OSError:
+            count = 0
+        if count >= max_kodo:
+            return False, f"kodo_concurrency_cap (running={count}, max={max_kodo})"
+
+    # --- memory gate ---
+    min_mb = getattr(settings, "min_kodo_available_mb", 400)
+    if min_mb > 0:
+        try:
+            available_kb = 0
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith("MemAvailable:"):
+                    available_kb = int(line.split()[1])
+                    break
+            available_mb = available_kb // 1024
+            if available_mb < min_mb:
+                return False, f"low_memory (available={available_mb}MB, min={min_mb}MB)"
+        except OSError:
+            pass
+
+    return True, "ok"
+
+
 def validate_task_pre_execution(
     client: PlaneClient,
     service: "ExecutionService",
@@ -6666,6 +6708,36 @@ def run_watch_loop(
                         logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
                         time.sleep(poll_interval_seconds)
                         continue
+                # Resource gates: kodo concurrency cap + memory pressure.
+                # Only applies to roles that actually launch kodo (goal, test).
+                if action == "execute" and role in {"goal", "test"}:
+                    _gate_ok, _gate_reason = _check_kodo_execution_gate(service.settings)
+                    if not _gate_ok:
+                        logger.info(json.dumps({
+                            "event": "watch_skip_kodo_gate",
+                            "role": role,
+                            "cycle": cycle,
+                            "task_id": task_id,
+                            "reason": _gate_reason,
+                            "run_id": cycle_run_id,
+                        }))
+                        write_watch_status(
+                            status_dir=status_dir,
+                            role=role,
+                            cycle=cycle,
+                            state="idle",
+                            run_id=cycle_run_id,
+                            last_action="kodo_gate_blocked",
+                            task_id=task_id,
+                            task_kind=task_kind,
+                            counters=counters,
+                        )
+                        if max_cycles is not None and cycle >= max_cycles:
+                            logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
+                            return
+                        logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
+                        time.sleep(poll_interval_seconds)
+                        continue
                 claimed = False
                 try:
                     client.transition_issue(task_id, "Running")
@@ -6829,6 +6901,40 @@ def run_watch_loop(
                     raise
         except ValueError as exc:
             if role == "propose":
+                # Backlog gate: skip proposal generation when the Ready for AI
+                # queue already has enough tasks waiting.
+                _skip_threshold = getattr(service.settings, "propose_skip_when_ready_count", 8)
+                _ready_count = 0
+                if _skip_threshold > 0:
+                    try:
+                        _all_issues = client.list_issues()
+                        _ready_count = sum(1 for _i in _all_issues if issue_status_name(_i) == ready_state)
+                    except Exception:
+                        pass
+                if _skip_threshold > 0 and _ready_count >= _skip_threshold:
+                    logger.info(json.dumps({
+                        "event": "watch_propose_skipped_backlog",
+                        "role": role,
+                        "cycle": cycle,
+                        "ready_count": _ready_count,
+                        "threshold": _skip_threshold,
+                        "run_id": cycle_run_id,
+                    }))
+                    write_watch_status(
+                        status_dir=status_dir,
+                        role=role,
+                        cycle=cycle,
+                        state="idle",
+                        run_id=cycle_run_id,
+                        last_action="propose_skipped_backlog",
+                        counters=counters,
+                    )
+                    if max_cycles is not None and cycle >= max_cycles:
+                        logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
+                        return
+                    logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
+                    time.sleep(poll_interval_seconds)
+                    continue
                 proposal_result = handle_propose_cycle(client, service, status_dir=status_dir)
                 counters["follow_up_tasks_created"] += len(proposal_result.created_task_ids)
                 event_name = "watch_propose_complete" if proposal_result.created_task_ids else "watch_propose_noop"
