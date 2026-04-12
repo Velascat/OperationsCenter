@@ -17,6 +17,7 @@ This repo runs as a local polling workflow.
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
+./scripts/control-plane.sh watch-stop --role goal
 ./scripts/control-plane.sh backfill-pr-reviews
 ./scripts/control-plane.sh observe-repo
 ./scripts/control-plane.sh generate-insights
@@ -51,6 +52,7 @@ This repo runs as a local polling workflow.
 - creates Plane tasks instead of executing open-ended repo changes
 - uses cooldowns, quotas, and deduplication to avoid board spam
 - prefers `Ready for AI` only for strong, bounded tasks; otherwise uses `Backlog`
+- skips the proposal cycle when the `Ready for AI` backlog already has ≥ `propose_skip_when_ready_count` tasks (default 8) — look for `watch_propose_skipped_backlog` in the propose watcher log
 
 ### `watch --role review`
 
@@ -61,6 +63,20 @@ This repo runs as a local polling workflow.
   - **human review phase**: responds to human comments with kodo revision passes; merges on 👍 or 1-day timeout
 - ignores comments from accounts listed in `reviewer.bot_logins` and comments carrying the `<!-- controlplane:bot -->` marker
 - on startup, backfills state files for any open PRs that pre-date the watcher
+- auto-merges autonomy PRs when every failing CI check matches a `ci_ignored_checks` pattern (pre-existing failures, not caused by the PR)
+- auto-resolves pip dependency conflicts in `requirements*.txt` / `pyproject.toml` without human review
+
+### `watch-stop`
+
+Stop a single watcher role without stopping all five:
+
+```bash
+./scripts/control-plane.sh watch-stop --role goal
+./scripts/control-plane.sh watch-stop --role test
+./scripts/control-plane.sh watch-stop --role propose
+```
+
+Sends SIGTERM to the PID recorded in `logs/local/watch-all/<role>.pid`. The restart loop exits cleanly; the python worker finishes its current cycle or is interrupted by the signal. Use `watch-all-stop` to stop all roles at once.
 
 ### `backfill-pr-reviews`
 
@@ -72,7 +88,17 @@ Scans GitHub for open PRs on all `await_review`-enabled repos and creates missin
 - writes separate logs and PID files
 - not a scheduler cluster or distributed supervisor
 
-Each watcher lane runs inside a bash restart loop. If the python process exits with a non-zero code (crash, OOM, unhandled exception), the loop logs a `watcher_restart` event and relaunches after 5 seconds. An exit code of 0 (intentional stop — e.g. credential failure) breaks the loop. `watch-all-stop` sends SIGTERM, which the trap handler catches before killing the python child cleanly.
+Each watcher lane runs inside a bash restart loop. If the python process exits with a non-zero code (crash, OOM, unhandled exception), the loop logs a `watcher_restart` event and relaunches after 5 seconds. An exit code of 0 (intentional stop — e.g. credential failure) breaks the loop. `watch-all-stop` and `watch-stop` send SIGTERM, which the trap handler catches before killing the python child cleanly.
+
+### Startup Cleanup (Cycle 1)
+
+On the first cycle of each run, watchers perform two cleanup passes before polling for work:
+
+1. **Stale running task reconciliation** — tasks that have been in `Running` state for more than 15 minutes are re-queued to `Ready for AI`. This is a shorter TTL than the normal 120-minute running timeout and is intentional: if the system just restarted, tasks that were running against now-dead workers should be re-claimed quickly. The short TTL only applies on cycle 1.
+
+2. **Orphaned workspace cleanup** — `/tmp/cp-task-*` directories not referenced by any live process are deleted. These accumulate when kodo workers are killed mid-run (OOM, SIGKILL, power cycle). Deleted paths are logged as `watch_cleanup_orphaned_workspaces`.
+
+Periodic orphan cleanup also runs automatically every 20 cycles for goal, test, and improve watchers — no operator action required.
 
 ## Heartbeat And Status
 
@@ -114,6 +140,44 @@ Slot 0 is the primary slot and runs all periodic scans (heartbeat, improve sub-s
 
 **Always review board throughput before increasing slots** — parallel execution amplifies any misconfiguration in task scope or execution budget.
 
+## Resource Throttling
+
+The goal and test watchers self-throttle before launching Kodo to avoid overloading the machine.
+
+### Kodo Concurrency Gate
+
+Before each execution the watcher counts live `kodo` processes in `/proc/*/cmdline`. If the count equals or exceeds `max_concurrent_kodo`, the cycle is skipped (housekeeping still runs). The default is 1 — only one Kodo instance at a time on the machine.
+
+```yaml
+max_concurrent_kodo: 2   # allow two parallel kodo runs (e.g. 2 repos)
+```
+
+Set to 0 to disable the check.
+
+Look for `watch_skip_kodo_gate` with `"reason": "kodo_concurrency_cap"` in the watcher log when the gate fires.
+
+### Memory Gate
+
+Before each execution the watcher reads `MemAvailable` from `/proc/meminfo`. If available memory is below `min_kodo_available_mb`, the cycle is skipped. The default is 400 MB.
+
+```yaml
+min_kodo_available_mb: 600   # require at least 600 MB free before launching kodo
+```
+
+Set to 0 to disable the check.
+
+Look for `watch_skip_kodo_gate` with `"reason": "low_memory"` when the gate fires.
+
+### Propose Backlog Gate
+
+The propose watcher skips proposal generation when the `Ready for AI` queue is already full. The default threshold is 8 tasks.
+
+```yaml
+propose_skip_when_ready_count: 12   # allow up to 12 ready tasks before pausing proposals
+```
+
+Set to 0 to disable. Look for `watch_propose_skipped_backlog` in the propose watcher log.
+
 ## Spend Report
 
 To see how many tasks have been executed and their estimated cost:
@@ -142,6 +206,19 @@ cost_per_execution_usd: 0.15   # rough estimate per task run
 - insight artifacts: `tools/report/control_plane/insights/`
 - decision artifacts: `tools/report/control_plane/decision/`
 - proposer result artifacts: `tools/report/control_plane/proposer/`
+
+### Machine-Level Kodo Artifacts (`~/.kodo/`)
+
+Kodo maintains its own run history at `~/.kodo/runs/` — one JSON file per execution. This is a machine-level bookkeeping directory written by Kodo itself, not by ControlPlane. It accumulates over time (hundreds of entries, tens of MB) and is safe to leave in place.
+
+The `~/.kodo/` directory is entirely separate from any per-repo `.kodo/` runtime directory that Kodo may create inside an ephemeral workspace during a run (e.g. `.kodo/team.json` for the Claude fallback override). The per-repo `.kodo/` directory is cleaned up automatically after each task run.
+
+If disk space is a concern, prune old Kodo run history manually:
+
+```bash
+ls -lt ~/.kodo/runs/ | wc -l            # count entries
+ls -lt ~/.kodo/runs/ | tail -n +100 | awk '{print $NF}' | xargs -I{} rm ~/.kodo/runs/{}  # keep newest 100
+```
 
 ## Board Saturation Backpressure
 
@@ -389,7 +466,7 @@ Use these when you want to inspect a single stage without running the full chain
 ./scripts/control-plane.sh janitor
 ```
 
-The wrapper also runs janitor automatically before commands.
+The wrapper runs janitor automatically before write commands. Read-only and status commands (`watch-all-status`, `dev-status`, `watch-all-stop`, `watch-stop`, `plane-status`, `providers-status`, `doctor`) skip the janitor to avoid unnecessary work.
 
 Default retention is 1 day and can be changed with:
 

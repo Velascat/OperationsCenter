@@ -101,6 +101,25 @@ Advanced mode also exposes optional version pins for:
 
 Pins are for reproducible local installs. They do not automatically trigger update checks during normal runs.
 
+## Per-Repo Reviewer Settings
+
+### `ci_ignored_checks`
+
+Some repos have CI checks that were failing before the PR was opened (pre-existing failures). Listing check name substrings in `ci_ignored_checks` tells the reviewer watcher to treat those checks as non-blocking:
+
+```yaml
+repos:
+  my_repo:
+    await_review: true
+    ci_ignored_checks:
+      - "file-tag-linter"     # pre-existing linter failure unrelated to PR changes
+      - "legacy-integration"  # broken upstream check we don't own
+```
+
+When every failing check matches an entry in this list, the PR is auto-merged (with `allow_unstable=True`). This prevents orphaned PRs from being blocked indefinitely by broken CI that predates the PR. The merge is logged as `reason: ci_ignored_checks_all_clear`.
+
+Substrings are matched case-sensitively against the GitHub check run name. Use the most specific prefix or suffix that uniquely identifies the check to avoid unintentional matches.
+
 ## Notes
 
 - The setup wizard is for local operator use, not production secret management.

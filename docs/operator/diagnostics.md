@@ -349,6 +349,18 @@ Each trigger file is named `<timestamp>_<check_suite_id>.json` and contains the 
 
 HMAC-SHA256 signature validation (`X-Hub-Signature-256` header) is enforced when `--secret` is provided. Requests without a valid signature return HTTP 401.
 
+## Stray Artifact Isolation
+
+Self-review verdict files must land inside the task's ephemeral workspace (`/tmp/cp-task-<id>/`), not in `$HOME` or the repo root. The prompt uses an absolute path and the supervisor starts each watcher with `cd <ROOT_DIR>` so relative paths in the worker process resolve correctly.
+
+If you find `.review/` directories or `*_verdict.txt` files in unexpected locations (`$HOME`, bare `/home/dev/repo/`, unrelated repo clones), they are leftovers from before this fix. You can safely delete them:
+
+```bash
+find $HOME -maxdepth 2 -name '*verdict*' -o -name '.review' -type d 2>/dev/null
+```
+
+The root cause of stray verdicts is either an old kodo run that predates the absolute-path fix, or a supervisor that was not starting the worker process from `ROOT_DIR`. Both are fixed; this should not recur.
+
 ## Suggested Debugging Order
 
 1. `watch-all-status`
@@ -366,21 +378,25 @@ HMAC-SHA256 signature validation (`X-Hub-Signature-256` header) is enforced when
 13. quality erosion: look for `"kind": "kodo_quality_warning"` in usage store
 14. scope violations: look for `"kind": "scope_violation"` in usage store
 15. board saturation: look for `"event": "propose_skipped_board_saturated"` in propose watcher log
-16. self-healing: look for `self_healing_repeated_block` events in improve watcher log
-17. credential expiry: look for `credential_expiry_soon` in watcher log at cycle 1
-18. cross-repo impact: look for `cross_repo_impact_detected` in goal watcher log
-19. dependency updates: look for `dependency_update_task_created` in improve watcher log
-20. quality trends: look for `quality_trend/lint_degrading` or `type_degrading` insights in `tools/report/control_plane/insights/`
-21. confidence calibration: run `tune-autonomy` and check the calibration table for ⚠ families
-22. error ingest: look for `error_ingest_task_created` events; check `state/error_ingest_dedup.json` for dedup state
-23. no-op loop: look for `noop_loop/family_cycling` in the latest insights artifact; family is cycling without acceptance
-24. coverage gap: look for `coverage_gap/low_overall` or `coverage_gap/uncovered_files` insights; check `coverage.xml` is being generated
-25. execution env: look for `execution_env_warning` in the goal watcher log; check that required tools are installed in venv
-26. awaiting-input tasks: look for `blocked_classification: awaiting_input` in improve watcher log; check Plane task for extracted question
-27. priority rescore: look for `priority_rescore_demoted` and `priority_rescore_promoted` events in improve watcher log every 45 cycles
-28. cross-repo patterns: look for `cross_repo/pattern_detected` in the latest insights artifact; consider org-wide fix tasks
-29. campaign status: run `campaign-status` CLI; check `state/campaigns.json` for stalled campaigns
-30. ci webhook triggers: check `state/ci_webhook_triggers/` for unprocessed trigger files
+16. propose backlog gate: look for `"event": "watch_propose_skipped_backlog"` in propose watcher log — board has ≥ `propose_skip_when_ready_count` ready tasks
+17. kodo concurrency gate: look for `"event": "watch_skip_kodo_gate"` with `"reason": "kodo_concurrency_cap"` — another kodo run is active
+18. memory gate: look for `"event": "watch_skip_kodo_gate"` with `"reason": "low_memory"` — less than `min_kodo_available_mb` free
+19. self-healing: look for `self_healing_repeated_block` events in improve watcher log
+20. credential expiry: look for `credential_expiry_soon` in watcher log at cycle 1
+21. cross-repo impact: look for `cross_repo_impact_detected` in goal watcher log
+22. dependency updates: look for `dependency_update_task_created` in improve watcher log
+23. quality trends: look for `quality_trend/lint_degrading` or `type_degrading` insights in `tools/report/control_plane/insights/`
+24. confidence calibration: run `tune-autonomy` and check the calibration table for ⚠ families
+25. error ingest: look for `error_ingest_task_created` events; check `state/error_ingest_dedup.json` for dedup state
+26. no-op loop: look for `noop_loop/family_cycling` in the latest insights artifact; family is cycling without acceptance
+27. coverage gap: look for `coverage_gap/low_overall` or `coverage_gap/uncovered_files` insights; check `coverage.xml` is being generated
+28. execution env: look for `execution_env_warning` in the goal watcher log; check that required tools are installed in venv
+29. awaiting-input tasks: look for `blocked_classification: awaiting_input` in improve watcher log; check Plane task for extracted question
+30. priority rescore: look for `priority_rescore_demoted` and `priority_rescore_promoted` events in improve watcher log every 45 cycles
+31. cross-repo patterns: look for `cross_repo/pattern_detected` in the latest insights artifact; consider org-wide fix tasks
+32. campaign status: run `campaign-status` CLI; check `state/campaigns.json` for stalled campaigns
+33. ci webhook triggers: check `state/ci_webhook_triggers/` for unprocessed trigger files
+34. orphaned workspaces: look for `watch_cleanup_orphaned_workspaces` at cycle 1 or every 20 cycles; leftover `/tmp/cp-task-*` dirs indicate prior worker crashes
 
 For autonomy-layer inputs:
 

@@ -73,15 +73,21 @@ On the 4th attempt, errors are re-raised. This prevents transient Plane API blip
 
 ## Kodo Process Tree Cleanup
 
-The Kodo adapter uses `subprocess.Popen` with `start_new_session=True`. This places Kodo in its own process group, enabling full cleanup on timeout:
+The Kodo adapter uses `subprocess.Popen` with `start_new_session=True`. This places Kodo in its own process group, isolated from the worker process's session. All cleanup paths use `os.killpg` to kill the entire group (Kodo + any spawned subprocesses such as Claude worker processes):
 
 ```python
 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
 ```
 
-This kills the entire process group (Kodo + any spawned subprocesses) when the configured timeout expires. Previously, orphan Kodo processes could outlive a timed-out run and continue consuming resources.
+**Timeout path:** when the configured `kodo.timeout_seconds` expires, the process group is killed with SIGKILL. The run result carries `exit_code=-1` and a `[timeout: process group killed after Ns]` note appended to stderr.
 
-On timeout, the run result carries `exit_code=-1` and a `[timeout: process group killed after Ns]` note appended to stderr.
+**SIGTERM path:** because Kodo runs in a separate session, a SIGTERM sent to the worker Python process (supervisor stop, OOM killer) does not propagate to the Kodo group automatically. The adapter installs a SIGTERM handler for the duration of each run:
+
+1. SIGTERM arrives at the worker process.
+2. The handler calls `os.killpg` on the Kodo process group.
+3. The previous SIGTERM handler is restored and the signal is re-raised so normal Python shutdown (finally blocks, atexit hooks) can still run.
+
+This prevents Kodo subprocesses from becoming orphans that continue consuming CPU and API quota after a worker restart or system shutdown.
 
 ## Smoke verification
 
