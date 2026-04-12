@@ -45,6 +45,8 @@ def test_run_retries_with_claude_fallback_on_codex_quota(
     calls: list[list[str]] = []
 
     class FakePopen:
+        pid = 0
+
         def __init__(self, command, **kwargs):
             calls.append(command)
             self._call_index = len(calls)
@@ -80,6 +82,7 @@ def test_run_does_not_retry_on_non_quota_failure(
     calls: list[list[str]] = []
 
     class FakePopen:
+        pid = 0
         returncode = 1
 
         def __init__(self, command, **kwargs):

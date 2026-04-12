@@ -3585,6 +3585,7 @@ def test_kodo_adapter_uses_popen_with_new_session(tmp_path, monkeypatch) -> None
     popen_kwargs: list[dict] = []
 
     class FakePopen:
+        pid = 0
         returncode = 0
         def __init__(self, command, **kwargs):
             popen_kwargs.append(kwargs)

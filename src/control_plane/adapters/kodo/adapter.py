@@ -160,21 +160,49 @@ class KodoAdapter:
             env=env,
             start_new_session=True,
         )
+
+        # Capture the pgid immediately — used by both the timeout path and the
+        # SIGTERM handler below.  pid==0 means the test used a fake Popen; skip.
+        try:
+            _pgid: int | None = os.getpgid(proc.pid) if proc.pid else None
+        except OSError:
+            _pgid = None
+
+        def _kill_group() -> None:
+            if _pgid is not None:
+                try:
+                    os.killpg(_pgid, signal.SIGKILL)
+                except (ProcessLookupError, OSError):
+                    pass
+
+        # Install a SIGTERM handler so that when the worker Python process is
+        # killed (supervisor stop, OOM killer) the kodo process group — which
+        # runs in its own session and would otherwise be orphaned — is also
+        # killed before we exit.
+        _prev_sigterm = signal.getsignal(signal.SIGTERM)
+
+        def _sigterm_handler(signum: int, frame: object) -> None:
+            _kill_group()
+            # Restore the previous handler and re-raise so normal shutdown
+            # (finally blocks, atexit, etc.) can still run.
+            signal.signal(signal.SIGTERM, _prev_sigterm)
+            os.kill(os.getpid(), signum)
+
+        signal.signal(signal.SIGTERM, _sigterm_handler)
         try:
             stdout, stderr = proc.communicate(timeout=timeout)
             return KodoRunResult(proc.returncode, stdout, stderr, command)
         except subprocess.TimeoutExpired:
             # Kill the whole process group so no orphan sub-processes remain.
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except ProcessLookupError:
-                pass  # Process already exited
+            _kill_group()
             try:
                 stdout, stderr = proc.communicate(timeout=5)
             except subprocess.TimeoutExpired:
                 stdout, stderr = "", ""
             timeout_note = f"\n[timeout: process group killed after {timeout}s]"
             return KodoRunResult(-1, stdout or "", (stderr or "") + timeout_note, command)
+        finally:
+            signal.signal(signal.SIGTERM, _prev_sigterm)
 
     def run(
         self,
