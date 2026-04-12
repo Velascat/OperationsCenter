@@ -93,10 +93,10 @@ _cleanup_stale_task_branches() {
       [[ "${branch}" == "* "* ]] && continue
       [[ "${branch}" == remotes/* ]] && continue
       # Only prune branches that look like task branches.
-      if [[ "${branch}" =~ ^(task/|cp/|kodo/) ]]; then
+      if [[ "${branch}" =~ ^(task/|cp/|kodo/|plane/) ]]; then
         git -C "${repo_dir}" branch -D "${branch}" >/dev/null 2>&1 && ((deleted++)) || true
       fi
-    done < <(git -C "${repo_dir}" branch 2>/dev/null | grep -E '^\s*(task/|cp/|kodo/)' || true)
+    done < <(git -C "${repo_dir}" branch 2>/dev/null | grep -E '^\s*(task/|cp/|kodo/|plane/)' || true)
   done
   [[ "${deleted}" -gt 0 ]] && echo "Janitor: removed ${deleted} stale task branch(es)" || true
 }
@@ -113,7 +113,8 @@ Usage:
   scripts/control-plane.sh watch-all-status
   scripts/control-plane.sh dev-status
   scripts/control-plane.sh watch --role goal
-  scripts/control-plane.sh watch --role propose
+  scripts/control-plane.sh watch --role review
+  scripts/control-plane.sh watch-stop --role goal
   scripts/control-plane.sh run --task-id TASK-123
   scripts/control-plane.sh plane-doctor [--task-id TASK-123]
   scripts/control-plane.sh dependency-check [--create-plane-tasks]
@@ -304,7 +305,11 @@ fi
 shift || true
 
 cd "${ROOT_DIR}"
-run_janitor
+# Skip janitor for read-only / stop commands — they're fast and don't need it.
+case "${cmd}" in
+  watch-all-status|dev-status|watch-all-stop|watch-stop|plane-status|providers-status|doctor) ;;
+  *) run_janitor ;;
+esac
 
 case "${cmd}" in
   setup)
@@ -327,7 +332,6 @@ case "${cmd}" in
   dev-up)
     ensure_venv
     load_env_file
-    run_janitor
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
     start_watch_role goal
@@ -335,32 +339,26 @@ case "${cmd}" in
     start_watch_role improve
     start_watch_role propose
     start_watch_role review
-    run_janitor
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-down)
     load_env_file
-    run_janitor
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
     stop_watch_role review
     run_with_log plane-down "${PLANE_MANAGER}" down
-    run_janitor
     ;;
   dev-restart)
     load_env_file
-    run_janitor
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
     stop_watch_role propose
     stop_watch_role review
     run_with_log plane-down "${PLANE_MANAGER}" down
-    run_janitor
     ensure_venv
-    run_janitor
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
     start_watch_role goal
@@ -368,7 +366,6 @@ case "${cmd}" in
     start_watch_role improve
     start_watch_role propose
     start_watch_role review
-    run_janitor
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-status)
@@ -402,7 +399,39 @@ case "${cmd}" in
   watch)
     ensure_venv
     load_env_file
-    run_with_log worker "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main --config "${CONFIG_PATH}" --watch "$@"
+    # Parse --role from args so we can dispatch through start_watch_role,
+    # which handles the reviewer entrypoint, pid files, and auto-restart.
+    _watch_role=""
+    for _arg in "$@"; do
+      if [[ "${_watch_role}" == "__next__" ]]; then
+        _watch_role="${_arg}"
+        break
+      fi
+      [[ "${_arg}" == "--role" ]] && _watch_role="__next__"
+    done
+    if [[ -n "${_watch_role}" && "${_watch_role}" != "__next__" ]]; then
+      start_watch_role "${_watch_role}"
+    else
+      # No --role given: run worker inline (foreground, for debugging).
+      run_with_log worker "${VENV_DIR}/bin/python" -m control_plane.entrypoints.worker.main --config "${CONFIG_PATH}" --watch "$@"
+    fi
+    ;;
+  watch-stop)
+    # Stop a single watcher role: scripts/control-plane.sh watch-stop --role goal
+    _stop_role=""
+    for _arg in "$@"; do
+      if [[ "${_stop_role}" == "__next__" ]]; then
+        _stop_role="${_arg}"
+        break
+      fi
+      [[ "${_arg}" == "--role" ]] && _stop_role="__next__"
+    done
+    if [[ -n "${_stop_role}" && "${_stop_role}" != "__next__" ]]; then
+      stop_watch_role "${_stop_role}"
+    else
+      echo "Usage: watch-stop --role <role>" >&2
+      exit 1
+    fi
     ;;
   watch-all)
     ensure_venv
