@@ -1358,7 +1358,7 @@ def detect_post_merge_regressions(
                     "- priority: high\n"
                 ),
                 state="Ready for AI",
-                label_names=["task-kind: goal", "priority: high", "source: post-merge-ci"]
+                label_names=["task-kind: goal", "priority: high", f"repo: {repo_key}", "source: post-merge-ci"]
                 + (["self-modify: approved"] if _is_self_repo(repo_key, service) else []),
             )
             reg_id = str(regression_task.get("id", ""))
@@ -3780,7 +3780,11 @@ def issue_execution_target(issue: dict[str, Any], service: ExecutionService) -> 
             metadata = TaskParser().parse(description).execution_metadata
             repo_key = str(metadata.get("repo", "")).strip()
             base_branch = str(metadata.get("base_branch", "")).strip()
-            if repo_key in service.settings.repos and base_branch:
+            if repo_key in service.settings.repos:
+                # Fall back to repo default_branch when the header omits base_branch
+                # (e.g. regression tasks and re-triage tasks only specify repo: and mode:).
+                if not base_branch:
+                    base_branch = service.settings.repos[repo_key].default_branch
                 allowed_paths = [str(path).strip() for path in metadata.get("allowed_paths", []) if str(path).strip()]
                 return repo_key, base_branch, allowed_paths or allowed_paths_for_repo(repo_key)
         except ValueError as exc:
@@ -6677,7 +6681,7 @@ def run_watch_loop(
                             issue_for_escalation = client.fetch_issue(task_id)
                             issue_title = str(issue_for_escalation.get("name", "blocked task"))
                             _esc_repo_key = _extract_repo_key(issue_for_escalation, service)
-                            _esc_labels = ["task-kind: goal", "source: improve-worker"]
+                            _esc_labels = ["task-kind: goal", f"repo: {_esc_repo_key}", "source: improve-worker"]
                             if _is_self_repo(_esc_repo_key, service) or _self_modify_approved(issue_for_escalation):
                                 _esc_labels.append("self-modify: approved")
                             escalation_task = client.create_issue(
