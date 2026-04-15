@@ -1,8 +1,6 @@
 # tests/spec_director/test_context_bundle.py
 from __future__ import annotations
-from pathlib import Path
 import json
-import pytest
 
 
 def test_bundle_truncates_snapshot(tmp_path):
@@ -17,7 +15,7 @@ def test_bundle_truncates_snapshot(tmp_path):
 
 
 def test_bundle_includes_seed():
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder, ContextBundle
+    from control_plane.spec_director.context_bundle import ContextBundleBuilder
     builder = ContextBundleBuilder()
     bundle = builder.build(seed_text="add webhook ingestion", board_summary=[], specs_index=[], git_log="")
     assert "add webhook ingestion" in bundle.seed_text

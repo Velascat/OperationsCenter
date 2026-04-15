@@ -128,6 +128,8 @@ class FakeService:
                 )
             },
             report_root="tools/report/kodo_plane",
+            max_concurrent_kodo=0,
+            min_kodo_available_mb=0,
         )
         settings.git_token = lambda: None
         settings.execution_controls = lambda: ExecutionControlSettings(
@@ -2687,7 +2689,7 @@ def test_classify_execution_result_flaky_test() -> None:
     from control_plane.domain.models import ValidationResult
 
     service = FakeService()
-    now = datetime(2026, 4, 6, tzinfo=UTC)
+    now = datetime.now(UTC)
     # Make the command known-flaky
     for _ in range(6):
         service.usage_store.record_validation_outcome(command=".venv/bin/pytest", passed=True, now=now)

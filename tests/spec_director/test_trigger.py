@@ -2,11 +2,10 @@
 from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 
 
 def test_drop_file_trigger(tmp_path):
-    from control_plane.spec_director.trigger import TriggerDetector, TriggerResult
+    from control_plane.spec_director.trigger import TriggerDetector
     from control_plane.spec_director.models import TriggerSource
     drop = tmp_path / "spec_direction.md"
     drop.write_text("add webhook ingestion")

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from control_plane.spec_director.models import ActiveCampaigns
 from control_plane.spec_director.state import CampaignStateManager

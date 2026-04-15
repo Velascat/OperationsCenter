@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pytest
 from control_plane.spec_director.models import (
-    CampaignRecord, ActiveCampaigns, ComplianceInput, ComplianceVerdict,
+    CampaignRecord, ActiveCampaigns, ComplianceVerdict,
     SpecFrontMatter, TriggerSource,
 )
 
@@ -89,7 +89,6 @@ def test_spec_director_settings_defaults():
 
 
 def test_spec_front_matter_missing_close_delimiter():
-    import pytest
     from control_plane.spec_director.models import SpecFrontMatter
     with pytest.raises(ValueError, match="missing closing"):
         SpecFrontMatter.from_spec_text("---\ncampaign_id: abc\n# no closing delimiter")

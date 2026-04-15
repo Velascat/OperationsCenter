@@ -1,10 +1,11 @@
 # src/control_plane/entrypoints/spec_director/main.py
 from __future__ import annotations
 
+from typing import Any
+
 import argparse
 import json
 import logging
-import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +15,6 @@ from control_plane.config import load_settings
 from control_plane.execution.usage_store import _check_disk_space
 from control_plane.spec_director.brainstorm import BrainstormService
 from control_plane.spec_director.campaign_builder import CampaignBuilder
-from control_plane.spec_director.compliance import SpecComplianceService
 from control_plane.spec_director.context_bundle import ContextBundleBuilder
 from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.recovery import RecoveryService
@@ -50,7 +50,7 @@ def _collect_board_summary(client: PlaneClient) -> list[dict]:
         return []
 
 
-def run_once(settings: object, client: PlaneClient) -> None:
+def run_once(settings: Any, client: PlaneClient) -> None:
     sd = settings.spec_director
     if not sd.enabled:
         return

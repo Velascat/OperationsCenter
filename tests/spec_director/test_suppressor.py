@@ -1,6 +1,5 @@
 # tests/spec_director/test_suppressor.py
 from __future__ import annotations
-from pathlib import Path
 from control_plane.spec_director.models import ActiveCampaigns, CampaignRecord
 
 

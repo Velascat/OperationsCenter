@@ -76,7 +76,7 @@ def _run_spec_compliance(
     max_diff_kb = getattr(sd_settings, "compliance_diff_max_kb", 32) if sd_settings else 32
 
     try:
-        import anthropic
+        import anthropic  # ty: ignore[unresolved-import]
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     except Exception as exc:
         logger.warning(json.dumps({"event": "compliance_client_error", "error": str(exc)}))

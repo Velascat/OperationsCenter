@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from control_plane.spec_director.context_bundle import ContextBundle
 from control_plane.spec_director.models import SpecFrontMatter
@@ -55,7 +56,7 @@ class BrainstormResult:
 
 
 class BrainstormService:
-    def __init__(self, client: object, model: str = "claude-opus-4-6") -> None:
+    def __init__(self, client: Any, model: str = "claude-opus-4-6") -> None:
         self._client = client
         self._model = model
 
@@ -112,7 +113,7 @@ class BrainstormService:
         return "\n\n".join(parts)
 
     @staticmethod
-    def make_client(api_key_env: str = "ANTHROPIC_API_KEY") -> object:
+    def make_client(api_key_env: str = "ANTHROPIC_API_KEY") -> Any:
         import os
-        import anthropic
+        import anthropic  # ty: ignore[unresolved-import]
         return anthropic.Anthropic(api_key=os.environ[api_key_env])

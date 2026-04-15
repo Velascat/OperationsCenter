@@ -1,6 +1,5 @@
 # tests/spec_director/test_worker_routing.py
 from __future__ import annotations
-from unittest.mock import MagicMock, patch
 
 
 def _make_issue(task_kind: str, status: str = "Ready for AI") -> dict:

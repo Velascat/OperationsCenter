@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
-from control_plane.spec_director.models import CampaignRecord, ActiveCampaigns
+from control_plane.spec_director.models import CampaignRecord
 
 
 def _stalled_campaign(hours_ago: int = 30) -> CampaignRecord:

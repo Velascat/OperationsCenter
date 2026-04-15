@@ -70,5 +70,5 @@ class SpecWriter:
         if not spec_path.exists():
             return
         text = spec_path.read_text()
-        updated = text.replace(f"status: active", f"status: {status}", 1)
+        updated = text.replace("status: active", f"status: {status}", 1)
         spec_path.write_text(updated)

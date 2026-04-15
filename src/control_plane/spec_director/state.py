@@ -5,6 +5,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from control_plane.spec_director.models import ActiveCampaigns, CampaignRecord
 
@@ -69,12 +70,16 @@ class CampaignStateManager:
                 return c.spec_revision_count
         return 0
 
-    def _update_status(self, campaign_id: str, status: str) -> None:
+    def _update_status(
+        self,
+        campaign_id: str,
+        status: Literal["active", "complete", "cancelled", "partial"],
+    ) -> None:
         state = self.load()
         found = False
         for c in state.campaigns:
             if c.campaign_id == campaign_id:
-                c.status = status  # type: ignore[assignment]
+                c.status = status
                 found = True
         if found:
             self.save(state)

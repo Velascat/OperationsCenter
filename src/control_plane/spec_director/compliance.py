@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from control_plane.spec_director.models import ComplianceInput, ComplianceVerdict
 
@@ -28,7 +29,7 @@ Verdict meanings:
 class SpecComplianceService:
     def __init__(
         self,
-        client: object,
+        client: Any,
         model: str = "claude-sonnet-4-6",
         max_retries: int = 2,
         max_diff_kb: int = 32,
