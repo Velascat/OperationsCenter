@@ -12,6 +12,13 @@ class TestContinuityDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        """Derive continuity insights from consecutive test signal statuses.
+
+        Tracks all statuses including 'passed', 'failed', 'unknown',
+        'discoverable', and 'no_config'.  Emits a ``persistent`` insight
+        when the same status repeats for >= 2 snapshots and a ``transition``
+        insight whenever the status changes between adjacent snapshots.
+        """
         current_status = snapshots[0].signals.test_signal.status
         consecutive = 0
         consecutive_snapshots: list[RepoStateSnapshot] = []

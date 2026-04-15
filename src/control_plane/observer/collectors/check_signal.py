@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import configparser
+import itertools
 import re
 import subprocess
 from datetime import UTC, datetime
@@ -7,6 +9,8 @@ from pathlib import Path
 
 from control_plane.observer.models import CheckSignal
 from control_plane.observer.service import ObserverContext
+
+_TEST_FILE_GLOB_LIMIT = 5
 
 
 def latest_matching_file(root: Path, pattern: str) -> Path | None:
@@ -27,22 +31,13 @@ class CheckSignalCollector:
                 observed_at=datetime.fromtimestamp(log_path.stat().st_mtime, tz=UTC),
                 summary=summary,
             )
-        return self._fallback_discover(context)
+        return self._fallback_discovery(context)
 
-    def _fallback_discover(self, context: ObserverContext) -> CheckSignal:
-        repo = context.repo_path
-        # Check for pytest configuration
-        pyproject = repo / "pyproject.toml"
-        has_pytest_config = (repo / "pytest.ini").is_file()
-        if not has_pytest_config and pyproject.is_file():
-            try:
-                content = pyproject.read_text(encoding="utf-8", errors="replace")
-                has_pytest_config = "[tool.pytest" in content
-            except OSError:
-                pass
-
-        if not has_pytest_config:
-            return CheckSignal(status="no_config")
+    def _fallback_discovery(self, context: ObserverContext) -> CheckSignal:
+        repo_root = context.repo_path
+        has_config = self._has_pytest_config(repo_root)
+        if not has_config:
+            return CheckSignal(status="no_config", source="fallback:no_pytest_config")
 
         try:
             result = subprocess.run(
@@ -50,7 +45,7 @@ class CheckSignalCollector:
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd=repo,
+                cwd=repo_root,
             )
             if result.returncode not in (0, 5):
                 # returncode 5 means no tests collected; other non-zero is an error
@@ -58,8 +53,7 @@ class CheckSignalCollector:
 
             lines = result.stdout.strip().splitlines()
             # Count test item lines (non-empty lines before the final summary).
-            # The summary line typically looks like "X tests collected" or
-            # "no tests ran" etc.  Test items contain "::" (e.g. path::test_name).
+            # Test items contain "::" (e.g. path::test_name).
             count = sum(1 for line in lines if "::" in line and line.strip())
             if count > 0:
                 return CheckSignal(
@@ -68,9 +62,46 @@ class CheckSignalCollector:
                     source="pytest --collect-only",
                     summary=f"{count} tests discoverable",
                 )
-            return CheckSignal(status="unknown")
         except (subprocess.TimeoutExpired, OSError):
-            return CheckSignal(status="unknown")
+            pass
+
+        has_tests = self._has_test_files(repo_root)
+        if has_tests:
+            return CheckSignal(status="discoverable", source="fallback:config+tests")
+        return CheckSignal(status="discoverable", source="fallback:config_only")
+
+    def _has_pytest_config(self, repo_root: Path) -> bool:
+        pyproject = repo_root / "pyproject.toml"
+        if pyproject.is_file():
+            try:
+                text = pyproject.read_text(encoding="utf-8", errors="replace")
+                if "[tool.pytest]" in text or "[pytest]" in text:
+                    return True
+            except OSError:
+                pass
+
+        pytest_ini = repo_root / "pytest.ini"
+        if pytest_ini.is_file():
+            return True
+
+        setup_cfg = repo_root / "setup.cfg"
+        if setup_cfg.is_file():
+            try:
+                parser = configparser.ConfigParser()
+                parser.read(str(setup_cfg), encoding="utf-8")
+                if "tool:pytest" in parser.sections():
+                    return True
+            except (OSError, configparser.Error):
+                pass
+
+        return False
+
+    def _has_test_files(self, repo_root: Path) -> bool:
+        candidates = itertools.chain(
+            repo_root.rglob("test_*.py"),
+            repo_root.rglob("*_test.py"),
+        )
+        return any(itertools.islice(candidates, _TEST_FILE_GLOB_LIMIT))
 
     def _extract_summary_line(self, text: str) -> str | None:
         for line in reversed(text.splitlines()):

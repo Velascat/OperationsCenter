@@ -15,6 +15,8 @@ class ObservationCoverageDeriver:
         current = snapshots[0]
         insights: list[DerivedInsight] = []
         unavailable_signals = set(current.collector_errors.keys())
+        # 'discoverable' and 'no_config' mean bounded fallback succeeded;
+        # only true 'unknown' counts as unavailable.
         if current.signals.test_signal.status == "unknown":
             unavailable_signals.add("test_signal")
         if current.signals.dependency_drift.status == "not_available":
@@ -25,6 +27,7 @@ class ObservationCoverageDeriver:
             matching: list[RepoStateSnapshot] = []
             for snapshot in snapshots:
                 snapshot_unavailable = set(snapshot.collector_errors.keys())
+                # Mirror the same rule inside history scan.
                 if snapshot.signals.test_signal.status == "unknown":
                     snapshot_unavailable.add("test_signal")
                 if snapshot.signals.dependency_drift.status == "not_available":
