@@ -31,6 +31,7 @@ class FileHotspot(BaseModel):
 
 class CheckSignal(BaseModel):
     status: str
+    test_count: int | None = None
     source: str | None = None
     observed_at: datetime | None = None
     summary: str | None = None
