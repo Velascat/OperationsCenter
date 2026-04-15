@@ -67,6 +67,24 @@ class ErrorIngestSettings(BaseModel):
     default_repo_key: str = ""
 
 
+class SpecDirectorSettings(BaseModel):
+    enabled: bool = True
+    poll_interval_seconds: int = 120
+    spec_trigger_queue_threshold: int = 3
+    brainstorm_model: str = "claude-opus-4-6"
+    compliance_model: str = "claude-sonnet-4-6"
+    drop_file_path: str = "state/spec_direction.md"
+    plane_spec_label: str = "spec-request"
+    max_active_campaigns: int = 1
+    max_tasks_per_campaign: int = 6
+    spec_retention_days: int = 90
+    brainstorm_context_snapshot_kb: int = 8
+    compliance_diff_max_kb: int = 32
+    spec_revision_budget: int = 3
+    campaign_stall_hours: int = 24
+    campaign_abandon_hours: int = 72
+
+
 class ScheduledTask(BaseModel):
     cron: str  # e.g. "0 9 * * 1" (Monday 09:00 UTC)
     title: str
@@ -202,6 +220,7 @@ class Settings(BaseModel):
     stale_autonomy_backlog_days: int = 30
     # S8-8: Runtime error ingestion configuration.  None = disabled.
     error_ingest: ErrorIngestSettings | None = None
+    spec_director: SpecDirectorSettings = Field(default_factory=SpecDirectorSettings)
     # Maximum number of concurrent kodo processes across all worker roles.
     # Workers that run kodo (goal, test) will skip their execute cycle when this
     # many kodo-shim processes are already running, then retry next poll.
