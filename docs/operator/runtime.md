@@ -14,6 +14,7 @@ This repo runs as a local polling workflow.
 ./scripts/control-plane.sh watch --role improve
 ./scripts/control-plane.sh watch --role propose
 ./scripts/control-plane.sh watch --role review
+./scripts/control-plane.sh watch --role spec
 ./scripts/control-plane.sh watch-all
 ./scripts/control-plane.sh watch-all-status
 ./scripts/control-plane.sh watch-all-stop
@@ -66,9 +67,17 @@ This repo runs as a local polling workflow.
 - auto-merges autonomy PRs when every failing CI check matches a `ci_ignored_checks` pattern (pre-existing failures, not caused by the PR)
 - auto-resolves pip dependency conflicts in `requirements*.txt` / `pyproject.toml` without human review
 
+### `watch --role spec`
+
+- polls for spec campaign trigger conditions (drop-file, Plane label, queue drain)
+- when triggered: brainstorms a spec via Claude, creates a Plane campaign with child tasks
+- runs stall detection and self-recovery on every cycle
+- suppresses heuristic proposals for campaign area while campaign is active
+- controlled by `spec_director:` config block
+
 ### `watch-stop`
 
-Stop a single watcher role without stopping all five:
+Stop a single watcher role without stopping all six:
 
 ```bash
 ./scripts/control-plane.sh watch-stop --role goal

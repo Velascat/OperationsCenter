@@ -169,6 +169,7 @@ start_watch_role() {
     improve) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS:-${CONTROL_PLANE_IMPROVE_POLL_SECONDS:-60}}" ;;
     propose) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS:-${CONTROL_PLANE_PROPOSE_POLL_SECONDS:-120}}" ;;
     review) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS:-60}" ;;
+    spec) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_SPEC_SECONDS:-120}" ;;
   esac
   local pid_file
   pid_file="$(watch_pid_file "${role}")"
@@ -198,6 +199,26 @@ start_watch_role() {
           --watch \
           --poll-interval-seconds '${poll_interval}' \
           --status-dir '${WATCH_DIR}' &
+        _child_pid=\$!
+        wait \$_child_pid
+        _exit=\$?
+        [[ ! -f '${pid_file}' ]] && exit 0
+        [[ \$_exit -eq 0 ]] && exit 0
+        echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
+        sleep 5
+      done
+    " >>"${log_file}" 2>&1 < /dev/null &
+  elif [[ "${role}" == "spec" ]]; then
+    setsid /bin/bash -lc "
+      cd '${ROOT_DIR}'
+      set -a
+      source '${ENV_PATH}'
+      set +a
+      _child_pid=''
+      trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
+      while true; do
+        '${VENV_DIR}/bin/python' -m control_plane.entrypoints.spec_director.main \
+          --config '${CONFIG_PATH}' &
         _child_pid=\$!
         wait \$_child_pid
         _exit=\$?
@@ -341,6 +362,7 @@ case "${cmd}" in
     start_watch_role improve
     start_watch_role propose
     start_watch_role review
+    start_watch_role spec
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-down)
@@ -350,6 +372,7 @@ case "${cmd}" in
     stop_watch_role improve
     stop_watch_role propose
     stop_watch_role review
+    stop_watch_role spec
     run_with_log plane-down "${PLANE_MANAGER}" down
     ;;
   dev-restart)
@@ -359,6 +382,7 @@ case "${cmd}" in
     stop_watch_role improve
     stop_watch_role propose
     stop_watch_role review
+    stop_watch_role spec
     run_with_log plane-down "${PLANE_MANAGER}" down
     ensure_venv
     run_with_log plane-up "${PLANE_MANAGER}" up
@@ -368,6 +392,7 @@ case "${cmd}" in
     start_watch_role improve
     start_watch_role propose
     start_watch_role review
+    start_watch_role spec
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-status)
@@ -378,6 +403,7 @@ case "${cmd}" in
     status_watch_role improve
     status_watch_role propose
     status_watch_role review
+    status_watch_role spec
     ;;
   providers-status|doctor)
     ensure_venv
@@ -443,6 +469,7 @@ case "${cmd}" in
     start_watch_role improve
     start_watch_role propose
     start_watch_role review
+    start_watch_role spec
     ;;
   watch-all-stop)
     stop_watch_role goal
@@ -450,6 +477,7 @@ case "${cmd}" in
     stop_watch_role improve
     stop_watch_role propose
     stop_watch_role review
+    stop_watch_role spec
     ;;
   watch-all-status)
     status_watch_role goal
@@ -457,6 +485,7 @@ case "${cmd}" in
     status_watch_role improve
     status_watch_role propose
     status_watch_role review
+    status_watch_role spec
     ;;
   worker)
     ensure_venv
