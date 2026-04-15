@@ -38,7 +38,9 @@ class CampaignStateManager:
 
     def save(self, state: ActiveCampaigns) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(state.model_dump_json(indent=2))
+        tmp = self.state_path.with_suffix(".tmp")
+        tmp.write_text(state.model_dump_json(indent=2))
+        tmp.rename(self.state_path)
 
     def add_campaign(self, record: CampaignRecord) -> None:
         state = self.load()
@@ -69,10 +71,13 @@ class CampaignStateManager:
 
     def _update_status(self, campaign_id: str, status: str) -> None:
         state = self.load()
+        found = False
         for c in state.campaigns:
             if c.campaign_id == campaign_id:
                 c.status = status  # type: ignore[assignment]
-        self.save(state)
+                found = True
+        if found:
+            self.save(state)
 
     def rebuild_from_specs(self, specs_dir: Path) -> ActiveCampaigns:
         """Rebuild active campaigns list by scanning spec front matter."""
@@ -90,7 +95,11 @@ class CampaignStateManager:
                         status="active",
                         created_at=fm.created_at,
                     ))
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    '{"event": "spec_rebuild_skip", "file": "%s", "error": "%s"}',
+                    str(spec_file), str(exc),
+                )
                 continue
         rebuilt = ActiveCampaigns(campaigns=campaigns)
         self.save(rebuilt)
