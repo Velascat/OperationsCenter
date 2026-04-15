@@ -17,6 +17,9 @@ class TestVisibilityRule:
             if insight.kind == "test_status_continuity" and insight.subject == "test_signal":
                 current_status = str(insight.evidence.get("current_status", ""))
                 consecutive = int(insight.evidence.get("consecutive_snapshots", 0))
+                # Only 'unknown' triggers the persistent-unknown candidate.
+                # 'discoverable' and 'no_config' indicate bounded fallback
+                # succeeded, so they must NOT produce this candidate.
                 if (
                     current_status == "unknown"
                     and insight.dedup_key.endswith("persistent")
@@ -53,7 +56,11 @@ class TestVisibilityRule:
                             priority=(1, 1, "test_visibility|unknown_persistent"),
                         )
                     )
-                if insight.dedup_key.endswith("transition") and current_status == "failed" and insight.evidence.get("previous_status") == "passed":
+                if (
+                    insight.dedup_key.endswith("transition")
+                    and current_status == "failed"
+                    and insight.evidence.get("previous_status") == "passed"
+                ):
                     candidates.append(
                         CandidateSpec(
                             family="test_visibility",
