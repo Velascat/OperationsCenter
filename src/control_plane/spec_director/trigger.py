@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from control_plane.spec_director.models import TriggerSource
 
@@ -23,7 +24,7 @@ class TriggerDetector:
         drop_file_path: Path,
         plane_spec_label: str,
         queue_threshold: int,
-        client: object,
+        client: Any,
     ) -> None:
         self._drop_file = drop_file_path
         self._label = plane_spec_label

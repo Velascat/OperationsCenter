@@ -1,6 +1,8 @@
 # src/control_plane/entrypoints/spec_director/main.py
 from __future__ import annotations
 
+from typing import Any
+
 import argparse
 import json
 import logging
@@ -48,7 +50,7 @@ def _collect_board_summary(client: PlaneClient) -> list[dict]:
         return []
 
 
-def run_once(settings: object, client: PlaneClient) -> None:
+def run_once(settings: Any, client: PlaneClient) -> None:
     sd = settings.spec_director
     if not sd.enabled:
         return

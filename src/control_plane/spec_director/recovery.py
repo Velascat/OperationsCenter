@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.state import CampaignStateManager
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class RecoveryService:
     def __init__(
         self,
-        client: object,
+        client: Any,
         state_manager: CampaignStateManager,
         stall_hours: int = 24,
         abandon_hours: int = 72,
@@ -51,7 +52,7 @@ class RecoveryService:
         campaign: CampaignRecord,
         violations: list[str],
         spec_file_path: Path,
-        anthropic_client: object,
+        anthropic_client: Any,
         model: str = "claude-sonnet-4-6",
     ) -> bool:
         """Make a targeted API call to revise the failing spec section. Returns True on success."""

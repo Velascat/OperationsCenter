@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from control_plane.spec_director.models import SpecFrontMatter
 
@@ -24,7 +25,7 @@ class ChildTaskSpec:
 class CampaignBuilder:
     def __init__(
         self,
-        client: object,
+        client: Any,
         project_id: str,
         max_tasks: int = 6,
     ) -> None:
