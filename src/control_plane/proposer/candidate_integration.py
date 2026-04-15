@@ -19,6 +19,8 @@ from control_plane.proposer.result_models import (
     ProposerRepoRef,
     SkippedProposalResult,
 )
+from control_plane.spec_director.suppressor import is_suppressed as _spec_suppressed
+from control_plane.spec_director.models import ActiveCampaigns
 
 
 class CandidateLoaderProtocol(Protocol):
@@ -64,6 +66,13 @@ class CandidateProposerIntegrationService:
         skipped: list[SkippedProposalResult] = []
         failed: list[FailedProposalResult] = []
 
+        _active_campaigns: ActiveCampaigns | None = None
+        try:
+            from control_plane.spec_director.state import CampaignStateManager
+            _active_campaigns = CampaignStateManager().load()
+        except Exception:
+            _active_campaigns = ActiveCampaigns(campaigns=[])
+
         for candidate in candidates:
             if len(created) >= context.max_create:
                 skipped.append(
@@ -73,6 +82,21 @@ class CandidateProposerIntegrationService:
                         family=candidate.family,
                         reason="max_create_reached",
                         evidence={"max_create": context.max_create},
+                    )
+                )
+                continue
+
+            _paths = [str(f) for f in getattr(candidate, "changed_files", [])] + \
+                     [str(f) for f in getattr(candidate, "target_paths", [])]
+            _title = candidate.proposal_outline.title_hint or candidate.subject
+            if _spec_suppressed(_title, _paths, _active_campaigns):
+                skipped.append(
+                    SkippedProposalResult(
+                        candidate_id=candidate.candidate_id,
+                        dedup_key=candidate.dedup_key,
+                        family=candidate.family,
+                        reason="active_spec_campaign",
+                        evidence={},
                     )
                 )
                 continue
