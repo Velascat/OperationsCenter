@@ -245,6 +245,47 @@ Zero breaking change. Existing tasks without `task_kind` set continue to use `ko
 
 ---
 
+## Resource Constraints
+
+The spec director runs on the same machine as all other workers. It must not crowd out kodo processes or fill the disk.
+
+### Concurrency
+
+- **Brainstorm and compliance are API-only** (no kodo subprocess) — they do not increment the `max_concurrent_kodo` counter and do not need to pass the kodo gate.
+- **Campaign task creation is gated** — `campaign_builder` checks `max_concurrent_kodo` before promoting any child task to `Ready for AI`. If the machine is already at the kodo concurrency limit, the task is created in `Backlog` and a note is added: `[queued: kodo concurrency limit reached]`. The reviewer watcher promotes it when a slot opens.
+- **One campaign at a time** — enforced by `state/campaigns/active.json`. The spec director polls check this file before starting any new brainstorm call.
+
+### Memory
+
+- **Brainstorm does not launch kodo**, so `min_kodo_available_mb` is not checked before brainstorm calls.
+- **Context bundle size is capped** before the brainstorm API call:
+  - Insight snapshot: truncated to 8 KB (the most recent deriver outputs)
+  - Git log: capped at 30 commits (already specified)
+  - Board summary: capped at 50 task titles
+  - Diff passed to compliance: truncated at 32 KB — if diff exceeds this, only the first 32 KB is sent with a `[diff truncated]` note in the prompt
+
+### Disk Space
+
+The spec director calls `_check_disk_space` (existing helper, `src/control_plane/execution/usage_store.py`) at two points:
+
+1. **Before writing spec file** — checked against `docs/specs/` path. Below 200 MB free: log `spec_disk_space_low` warning and continue. Below 50 MB free: abort campaign creation, log `spec_disk_space_critical`, retry on next poll.
+2. **Before writing `state/campaigns/active.json`** — same thresholds.
+
+### Spec File Rotation
+
+Completed and cancelled campaign specs accumulate in `docs/specs/`. To keep the directory bounded:
+
+- On each spec director poll cycle, scan `docs/specs/*.md` for entries with `status: complete` or `status: cancelled` older than `spec_retention_days` (config, default `90`).
+- Expired specs are moved to `docs/specs/archive/<slug>.md`.
+- The archive is not automatically deleted — operator manages it.
+- This prevents the specs index passed to brainstorm from growing unbounded over time.
+
+### Campaign Task Limit
+
+`campaign_builder` enforces `max_tasks_per_campaign` (config, default `6`) — the maximum number of child tasks (implement + test + improve across all spec goals) a single campaign can create. Specs that decompose into more goals than this cap are truncated at creation time with a `[campaign_task_limit: N goals omitted]` note on the parent Plane task. This prevents a single verbose spec from flooding the board.
+
+---
+
 ## Configuration
 
 New fields in `config/control_plane.local.yaml` (all optional, with defaults):
@@ -253,12 +294,16 @@ New fields in `config/control_plane.local.yaml` (all optional, with defaults):
 spec_director:
   enabled: true
   poll_interval_seconds: 120
-  spec_trigger_queue_threshold: 3   # queue drain trigger
+  spec_trigger_queue_threshold: 3    # queue drain trigger
   brainstorm_model: claude-opus-4-6
   compliance_model: claude-sonnet-4-6
   drop_file_path: state/spec_direction.md
   plane_spec_label: spec-request
   max_active_campaigns: 1
+  max_tasks_per_campaign: 6          # child task cap per campaign
+  spec_retention_days: 90            # days before completed specs are archived
+  brainstorm_context_snapshot_kb: 8  # insight snapshot truncation limit
+  compliance_diff_max_kb: 32         # diff truncation limit for compliance checks
 ```
 
 ---
