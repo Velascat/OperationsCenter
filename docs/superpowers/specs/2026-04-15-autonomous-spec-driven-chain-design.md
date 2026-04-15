@@ -304,17 +304,86 @@ spec_director:
   spec_retention_days: 90            # days before completed specs are archived
   brainstorm_context_snapshot_kb: 8  # insight snapshot truncation limit
   compliance_diff_max_kb: 32         # diff truncation limit for compliance checks
+  # self-recovery
+  spec_revision_budget: 3            # max spec revisions per campaign before giving up
+  campaign_stall_hours: 24           # hours without progress before stall recovery kicks in
+  campaign_abandon_hours: 72         # hours before campaign self-cancels
 ```
 
 ---
 
-## Error Handling
+## Self-Recovery
 
-- **Brainstorm API failure**: log error, skip campaign creation, retry on next poll cycle. Do not archive the drop-file until a campaign is successfully created.
-- **Spec write failure**: log error, do not create Plane tasks (partial state worse than no state).
-- **Campaign builder partial failure**: if some child tasks fail to create, mark campaign `status: partial` in active.json and alert via Plane comment on parent task.
+The spec director runs a recovery scan on every poll cycle alongside trigger detection. The goal is that no campaign stalls permanently — every stuck state has an autonomous resolution path. Human intervention is the last resort, not the first.
+
+### Task-Level Recovery
+
+Campaign child tasks go through three tiers before escalation:
+
+**Tier 1 — Automatic retry (existing `retry_decision` / `record_retry_cap` mechanism)**
+- `goal` tasks: up to 3 retries (uses existing usage store retry budget)
+- `test_campaign` tasks: up to 2 retries (test failures are often environment noise)
+- `improve_campaign` tasks: up to 2 retries
+
+**Tier 2 — Spec-aware retry (new, spec director handles)**
+
+If a task hits the retry cap with a `compliance: FAIL` verdict (not a kodo failure — a spec mismatch), the spec director is invoked instead of marking the task Blocked:
+1. Reload the compliance verdicts from the task's retained artifacts
+2. Make a targeted Anthropic API call: "Given these spec violations, revise the relevant spec section." Model: `claude-sonnet-4-6`.
+3. Write the revised spec section back to `docs/specs/<slug>.md` and update the workspace copy
+4. Reset the retry counter for this task and re-queue it to `Ready for AI`
+5. Post a comment on the Plane task: `[spec revised: <section> updated based on compliance failures]`
+
+Spec revision is bounded: max `spec_revision_budget` revisions per campaign (config, default `3`). Once the budget is exhausted, the task is marked `Blocked` with `reason: spec_revision_budget_exhausted`.
+
+**Tier 3 — Blocked classification and decomposition**
+
+For tasks that hit the kodo retry cap (not spec violations), the existing `blocked_classification` logic applies:
+- `context_limit`: spec director splits the task into two smaller child tasks (each covering half the spec goal) and cancels the original. Uses existing `campaign_builder` task creation path.
+- `timeout`: spec director reduces the kodo `--cycles` and `--exchanges` parameters for the replacement task by 30% and re-queues.
+- `validation_loop` (same validation failure ≥3 times): spec director creates a new `goal` task whose goal is to fix the blocking validation failure, sets it as `depends_on` for the original task, and re-queues both.
+- All other blocked classifications: mark `Blocked` and post an escalation comment on the Plane task with the classification.
+
+### Campaign Stall Detection
+
+The spec director tracks `last_progress_at` in `state/campaigns/active.json` — updated whenever any child task transitions to Done or gets a compliance LGTM. On each poll cycle:
+
+1. **Stall check**: if `now - last_progress_at > campaign_stall_hours` (config, default `24`), the campaign is considered stalled.
+2. **Diagnose**: scan all child tasks for their current state. Classify the stall:
+   - `all_blocked`: every non-Done task is Blocked → trigger Tier 3 recovery for each
+   - `all_in_review`: tasks are in review but no human has responded → post a nudge comment on the oldest PR: `[campaign stalled: waiting for review — auto-resolving in 24h if no response]`; if still stalled after another `campaign_stall_hours`, merge with CONCERNS verdict treated as LGTM (operator was notified)
+   - `kodo_gate_stuck`: tasks are in `Ready for AI` but `max_concurrent_kodo` gate has not opened in `campaign_stall_hours` → log `campaign_kodo_gate_stuck` and reduce task priority (deprioritise rather than wait forever)
+   - `partial_done`: some tasks Done, some stuck in a terminal-like state → run targeted Tier 3 recovery on stuck tasks only
+3. If stall persists beyond `campaign_abandon_hours` (config, default `72`) with no recovery progress, the campaign self-cancels (see below).
+
+### Dependency Chain Unblocking
+
+When a `depends_on` task is cancelled or marked Blocked permanently:
+- If cancelled: spec director removes the dependency link and promotes the dependent task to `Ready for AI` with a note: `[dependency cancelled: proceeding without <task_id>]`
+- If blocked permanently: spec director evaluates whether the dependent task can proceed without it. For `test_campaign` tasks depending on a failed `implement` task: cancel the test task too (nothing to test). For `improve_campaign` depending on a failed `test_campaign`: check if the implement task's PR was merged anyway; if yes, promote improve; if no, cancel.
+
+### Campaign Self-Cancellation
+
+When recovery is exhausted (`campaign_abandon_hours` exceeded, or all tasks are in a permanent terminal state), the spec director performs an orderly shutdown:
+
+1. Close all open PRs for campaign tasks with comment: `[campaign abandoned: <reason>]`
+2. Cancel all non-Done Plane tasks with the same comment
+3. Mark campaign `status: cancelled` in `state/campaigns/active.json`
+4. Update `docs/specs/<slug>.md` front matter: `status: cancelled`
+5. Release heuristic suppression for the campaign's area
+6. Post a summary comment on the parent campaign Plane task listing which tasks completed and which were abandoned
+7. If a drop-file triggered this campaign and it was not yet archived, archive it now
+
+This ensures suppression never gets stuck and the heuristic loop resumes.
+
+### Brainstorm and Infrastructure Failure Recovery
+
+- **Brainstorm API failure**: log error, skip campaign creation, retry on next poll cycle. Drop-file is not archived until a campaign is successfully created.
+- **Spec write failure**: log error, do not create Plane tasks — partial state (spec exists, no tasks) is worse than no state. Retry next cycle.
+- **Campaign builder partial failure**: if some child tasks fail to create, mark campaign `status: partial` in active.json. Post a comment on the parent task listing which tasks were and were not created. Retry missing tasks on next poll cycle (idempotent — `campaign_builder` checks for existing tasks before creating).
 - **Compliance API failure**: 2 retries → CONCERNS verdict. Never blocks a PR silently.
-- **Suppressor read failure**: fail open (allow heuristic proposal) and log warning. Better to create a duplicate than to silently block.
+- **Suppressor read failure**: fail open (allow heuristic proposal) and log `spec_suppressor_read_error`. Better a duplicate proposal than a silently blocked one.
+- **State file corruption** (`state/campaigns/active.json` unparseable): log `spec_campaign_state_corrupt`, rename the file to `active.json.corrupt.<timestamp>`, and start with an empty active campaigns list. Any in-flight campaign recovers on next poll when the spec director re-scans `docs/specs/*.md` for `status: active` entries and rebuilds the state file.
 
 ---
 
@@ -331,6 +400,6 @@ spec_director:
 ## Out of Scope
 
 - Multi-campaign parallelism (one campaign per repo, one repo at a time)
-- Spec editing loop (Claude revises spec based on failed tasks — future work)
 - Webhook-driven triggers (polling only, consistent with existing architecture)
 - Auto-merge without human review for any task kind
+- Full spec rewrite (spec revision is bounded to targeted section fixes, not full regeneration)
