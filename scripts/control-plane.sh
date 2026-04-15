@@ -217,7 +217,7 @@ start_watch_role() {
       _child_pid=''
       trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
       while true; do
-        '${VENV_DIR}/bin/python' -m control_plane.entrypoints.spec_director.main \
+        '${VENV_DIR}/bin/python' -u -m control_plane.entrypoints.spec_director.main \
           --config '${CONFIG_PATH}' &
         _child_pid=\$!
         wait \$_child_pid

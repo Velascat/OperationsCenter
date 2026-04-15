@@ -55,6 +55,8 @@ def run_once(settings: object, client: PlaneClient) -> None:
     if not sd.enabled:
         return
 
+    logger.info(json.dumps({"event": "spec_cycle_start"}))
+
     state_mgr = CampaignStateManager()
     spec_writer = SpecWriter(specs_dir=_SPECS_DIR)
 
@@ -93,6 +95,7 @@ def run_once(settings: object, client: PlaneClient) -> None:
     )
 
     if trigger is None:
+        logger.info(json.dumps({"event": "spec_no_trigger", "ready_count": ready_count, "has_active": active.has_active()}))
         return
 
     logger.info(json.dumps({
