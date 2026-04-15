@@ -23,7 +23,7 @@ class CampaignRecord(BaseModel):
     created_at: str
     last_progress_at: str | None = None
     spec_revision_count: int = 0
-    trigger_source: str | None = None
+    trigger_source: TriggerSource | None = None
 
 
 class ActiveCampaigns(BaseModel):
@@ -66,9 +66,12 @@ class SpecFrontMatter(BaseModel):
     @classmethod
     def from_spec_text(cls, text: str) -> "SpecFrontMatter":
         """Parse YAML front matter from a spec document."""
-        if not text.startswith("---"):
+        if not (text.startswith("---") and len(text) > 3 and text[3] in ("\n", "\r", " ")):
             raise ValueError("Spec text does not have YAML front matter")
-        end = text.index("---", 3)
+        try:
+            end = text.index("---", 3)
+        except ValueError:
+            raise ValueError("Spec text is missing closing '---' for YAML front matter")
         front = text[3:end].strip()
         data = yaml.safe_load(front) or {}
         # Convert datetime objects (from YAML parsing) to ISO strings

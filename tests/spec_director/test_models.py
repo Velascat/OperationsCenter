@@ -86,3 +86,18 @@ def test_spec_director_settings_defaults():
     assert s.campaign_abandon_hours == 72
     assert s.compliance_diff_max_kb == 32
     assert s.brainstorm_context_snapshot_kb == 8
+
+
+def test_spec_front_matter_missing_close_delimiter():
+    import pytest
+    from control_plane.spec_director.models import SpecFrontMatter
+    with pytest.raises(ValueError, match="missing closing"):
+        SpecFrontMatter.from_spec_text("---\ncampaign_id: abc\n# no closing delimiter")
+
+
+def test_spec_front_matter_yaml_date_normalized():
+    from control_plane.spec_director.models import SpecFrontMatter
+    raw = "---\ncampaign_id: abc-123\nslug: test\ncreated_at: 2026-04-15\n---\n# Title\n"
+    fm = SpecFrontMatter.from_spec_text(raw)
+    assert isinstance(fm.created_at, str)
+    assert "2026-04-15" in fm.created_at
