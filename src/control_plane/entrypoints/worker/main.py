@@ -25,6 +25,17 @@ from control_plane.config import load_settings
 from control_plane.domain import ExecutionResult
 from control_plane.execution.usage_store import UsageStore
 from control_plane.proposer.rejection_store import ProposalRejectionStore
+
+# Maps each watcher role to the set of task-kind label values it will claim.
+# test_campaign and improve_campaign are spec-director campaign tasks that use
+# kodo --test and kodo --improve respectively.
+ROLE_TASK_KINDS: dict[str, set[str]] = {
+    "goal": {"goal"},
+    "test": {"test", "test_campaign"},
+    "improve": {"improve", "improve_campaign"},
+    "fix_pr": {"fix_pr"},
+}
+
 # ---------------------------------------------------------------------------
 # S6-8: Module-level kodo version cache (refreshed per watcher startup).
 # ---------------------------------------------------------------------------
@@ -1080,7 +1091,8 @@ def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI",
             detailed_issue = client.fetch_issue(task_id)
             status_name = issue_status_name(detailed_issue)
             task_kind = issue_task_kind(detailed_issue)
-        if task_kind != role:
+        allowed_kinds = ROLE_TASK_KINDS.get(role, {role})
+        if task_kind not in allowed_kinds:
             continue
         if _has_active_pr_review(task_id):
             continue
@@ -1088,7 +1100,8 @@ def select_ready_task_id(client: PlaneClient, ready_state: str = "Ready for AI",
             return task_id
         if not status_name or status_name == str(issue.get("state", "")):
             detailed_issue = client.fetch_issue(task_id)
-            if issue_task_kind(detailed_issue) == role and issue_status_name(detailed_issue) == ready_state:
+            _allowed = ROLE_TASK_KINDS.get(role, {role})
+            if issue_task_kind(detailed_issue) in _allowed and issue_status_name(detailed_issue) == ready_state:
                 return task_id
     raise ValueError(f"No work item found in state '{ready_state}'")
 
