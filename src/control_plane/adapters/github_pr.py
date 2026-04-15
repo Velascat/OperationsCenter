@@ -247,6 +247,25 @@ class GitHubPRClient:
         except Exception:
             return []
 
+    def get_pr_diff(self, owner: str, repo: str, pr_number: int) -> str:
+        """Return the unified diff for a pull request as a string.
+
+        Uses the GitHub ``diff`` media type on the pulls endpoint.
+        Returns an empty string on any error.
+        """
+        try:
+            diff_headers = dict(self._headers)
+            diff_headers["Accept"] = "application/vnd.github.v3.diff"
+            resp = httpx.get(
+                f"{self._API}/repos/{owner}/{repo}/pulls/{pr_number}",
+                headers=diff_headers,
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.text
+        except Exception:
+            return ""
+
     def get_mergeable(self, owner: str, repo: str, pr_number: int) -> bool | None:
         """Return the GitHub ``mergeable`` flag, or ``None`` while GitHub is computing it."""
         try:

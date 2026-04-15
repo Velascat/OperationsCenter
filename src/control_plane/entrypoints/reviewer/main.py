@@ -25,6 +25,79 @@ PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 PROPOSAL_FEEDBACK_DIR = Path("state/proposal_feedback")
 REVIEW_TIMEOUT_SECONDS = 86400  # 1 day
 MAX_CI_FIX_ATTEMPTS = 2
+
+
+# ---------------------------------------------------------------------------
+# Spec-director compliance helpers
+# ---------------------------------------------------------------------------
+
+def _get_spec_campaign_id(task_description: str) -> str | None:
+    """Extract spec_campaign_id from a task description's ## Execution section."""
+    m = re.search(r"^\s*spec_campaign_id\s*:\s*(.+)$", task_description, re.MULTILINE)
+    return m.group(1).strip() if m else None
+
+
+def _get_spec_file(task_description: str) -> str | None:
+    """Extract spec_file path from a task description's ## Execution section."""
+    m = re.search(r"^\s*spec_file\s*:\s*(.+)$", task_description, re.MULTILINE)
+    return m.group(1).strip() if m else None
+
+
+def _get_task_phase(task_description: str) -> str:
+    m = re.search(r"^\s*task_phase\s*:\s*(.+)$", task_description, re.MULTILINE)
+    return m.group(1).strip() if m else "implement"
+
+
+def _get_spec_coverage_hint(task_description: str) -> str:
+    m = re.search(r"^\s*spec_coverage_hint\s*:\s*(.+)$", task_description, re.MULTILINE)
+    return m.group(1).strip() if m else "full spec"
+
+
+def _run_spec_compliance(
+    spec_file: str,
+    diff: str,
+    task_description: str,
+    settings: object,
+    logger: logging.Logger,
+) -> str:
+    """Run SpecComplianceService and return verdict string: LGTM | CONCERNS | FAIL."""
+    from pathlib import Path as _Path
+    from control_plane.spec_director.compliance import SpecComplianceService
+    from control_plane.spec_director.models import ComplianceInput
+
+    spec_path = _Path(spec_file)
+    if not spec_path.exists():
+        logger.warning(json.dumps({"event": "compliance_spec_not_found", "spec_file": spec_file}))
+        return "CONCERNS"
+
+    spec_text = spec_path.read_text(encoding="utf-8")
+    sd_settings = getattr(settings, "spec_director", None)
+    model = getattr(sd_settings, "compliance_model", "claude-sonnet-4-6") if sd_settings else "claude-sonnet-4-6"
+    max_diff_kb = getattr(sd_settings, "compliance_diff_max_kb", 32) if sd_settings else 32
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    except Exception as exc:
+        logger.warning(json.dumps({"event": "compliance_client_error", "error": str(exc)}))
+        return "CONCERNS"
+
+    service = SpecComplianceService(client=client, model=model, max_diff_kb=max_diff_kb)
+    inp = ComplianceInput(
+        spec_text=spec_text,
+        diff=diff,
+        task_constraints=task_description,
+        task_phase=_get_task_phase(task_description),
+        spec_coverage_hint=_get_spec_coverage_hint(task_description),
+    )
+    verdict = service.check(inp)
+    logger.info(json.dumps({
+        "event": "spec_compliance_verdict",
+        "verdict": verdict.verdict,
+        "spec_coverage": verdict.spec_coverage,
+        "violations": verdict.violations,
+    }))
+    return verdict.verdict
 # S10-3: After this many failed revision attempts (zero changed files), close
 # the PR and create a fresh goal task rather than spinning indefinitely.
 REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD = 2
@@ -349,6 +422,97 @@ def _process_self_review(
         "task_id": task_id,
         "loop": self_review_loops,
     }))
+
+    # ---------------------------------------------------------------------------
+    # Spec-director compliance branch: campaign tasks skip kodo self-review and
+    # use a direct Anthropic API compliance check instead.
+    # ---------------------------------------------------------------------------
+    _task_desc_for_compliance = ""
+    try:
+        _issue = plane_client.fetch_issue(task_id)
+        _task_desc_for_compliance = str(
+            _issue.get("description") or _issue.get("description_stripped") or ""
+        )
+    except Exception:
+        pass
+
+    _campaign_id = _get_spec_campaign_id(_task_desc_for_compliance)
+    if _campaign_id:
+        logger.info(json.dumps({
+            "event": "compliance_check_start",
+            "task_id": task_id,
+            "campaign_id": _campaign_id,
+        }))
+        # Fetch the PR diff so compliance can check it.
+        _diff = ""
+        try:
+            _diff = gh.get_pr_diff(owner, repo, pr_number)
+        except Exception as _exc:
+            logger.warning(json.dumps({
+                "event": "compliance_diff_fetch_failed",
+                "task_id": task_id,
+                "error": str(_exc),
+            }))
+
+        _spec_file = _get_spec_file(_task_desc_for_compliance) or ""
+        _compliance_verdict = _run_spec_compliance(
+            spec_file=_spec_file,
+            diff=_diff,
+            task_description=_task_desc_for_compliance,
+            settings=service.settings,
+            logger=logger,
+        )
+
+        if _compliance_verdict == "LGTM":
+            try:
+                _post_bot_comment(
+                    gh, owner, repo, pr_number,
+                    "Spec compliance check passed — merging.",
+                    marker,
+                )
+            except Exception as _exc:
+                logger.warning("Failed to post compliance LGTM comment for PR %s: %s", pr_number, _exc)
+            _merge_and_finalize(
+                gh, state, state_file, plane_client, logger,
+                reason="spec_compliance_lgtm",
+            )
+            return 1
+
+        elif _compliance_verdict == "FAIL":
+            _fail_comment = (
+                "Spec compliance check **FAILED**. The implementation does not satisfy "
+                "the spec requirements. Re-queuing for revision."
+            )
+            try:
+                _post_bot_comment(gh, owner, repo, pr_number, _fail_comment, marker)
+            except Exception as _exc:
+                logger.warning("Failed to post compliance FAIL comment for PR %s: %s", pr_number, _exc)
+            try:
+                plane_client.transition_issue(task_id, "In Progress")
+                plane_client.comment_issue(
+                    task_id,
+                    "[Review] Spec compliance FAIL — re-queued for revision.",
+                )
+            except Exception as _exc:
+                logger.warning(json.dumps({
+                    "event": "plane_requeue_failed",
+                    "task_id": task_id,
+                    "error": str(_exc),
+                }))
+            state_file.unlink(missing_ok=True)
+            return 1
+
+        else:
+            # CONCERNS — escalate to human review
+            _concerns_comment = (
+                "Spec compliance check raised **CONCERNS**. "
+                "Please review the implementation against the spec before merging."
+            )
+            _escalate_to_human(
+                gh, state, state_file, plane_client, logger, service.settings,
+                reason=_concerns_comment,
+            )
+            return 1
 
     verdict = service.run_self_review_pass(
         repo_key=repo_key,
