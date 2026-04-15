@@ -72,7 +72,7 @@ Do the thing.
 
 def test_parser_rejects_invalid_execution_mode() -> None:
     parser = TaskParser()
-    with pytest.raises(ValueError, match="supports only 'goal'"):
+    with pytest.raises(ValueError, match="Unsupported execution mode"):
         parser.parse(
             """## Execution
 repo: repo_a

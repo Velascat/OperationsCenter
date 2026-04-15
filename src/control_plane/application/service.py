@@ -488,8 +488,14 @@ class ExecutionService:
             _profiles = getattr(self.settings, "kodo_profiles", {})
             if _profiles:
                 _kodo_profile = _profiles.get(task.execution_mode) or _profiles.get("default")
+            # Derive kodo mode from spec campaign task kinds
+            _kodo_mode = "goal"
+            if task.execution_mode == "test_campaign":
+                _kodo_mode = "test"
+            elif task.execution_mode == "improve_campaign":
+                _kodo_mode = "improve"
             self._assert_goal_sections_unique(goal_file)
-            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
+            kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile, kodo_mode=_kodo_mode)
             artifacts.extend(
                 self.reporter.write_kodo(
                     run_dir,
@@ -557,7 +563,7 @@ class ExecutionService:
                         validation_constraints = (task.constraints_text or "") + f"\n\nValidation Feedback:\n{error_text}"
                         self.kodo.write_goal_file(goal_file, assembled_goal_text, validation_constraints)
                 self._assert_goal_sections_unique(goal_file)
-                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile, kodo_mode=_kodo_mode)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,
@@ -608,7 +614,7 @@ class ExecutionService:
                 self.kodo.write_goal_file(goal_file, assembled_goal_text, scope_constraints)
                 self._log_event("policy_retry_start", run_id, violations=policy_violations)
                 self._assert_goal_sections_unique(goal_file)
-                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile)
+                kodo_result = self.kodo.run(goal_file, repo_path, env=run_env, profile=_kodo_profile, kodo_mode=_kodo_mode)
                 artifacts.extend(
                     self.reporter.write_kodo(
                         run_dir,

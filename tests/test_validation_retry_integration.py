@@ -98,7 +98,7 @@ def _stub_service(service: ExecutionService, tmp_path: Path) -> Path:
     service.git.changed_files = lambda repo_path: []  # type: ignore[assignment]
     service.git.commit_all = lambda repo_path, message: False  # type: ignore[assignment]
     service.kodo.write_goal_file = lambda path, goal_text, constraints_text: path  # type: ignore[assignment]
-    service.kodo.run = lambda goal_file, repo_path, env=None, profile=None: type(  # type: ignore[assignment]
+    service.kodo.run = lambda goal_file, repo_path, env=None, profile=None, kodo_mode="goal": type(  # type: ignore[assignment]
         "KodoResult",
         (),
         {"exit_code": 0, "stdout": "", "stderr": "", "command": ["kodo"]},
@@ -185,10 +185,10 @@ class TestBaselineFailureEmptyStderrRetry:
         kodo_run_count = 0
         original_kodo_run = service.kodo.run
 
-        def counting_kodo_run(goal_file, repo_path, env=None, profile=None):
+        def counting_kodo_run(goal_file, repo_path, env=None, profile=None, kodo_mode="goal"):
             nonlocal kodo_run_count
             kodo_run_count += 1
-            return original_kodo_run(goal_file, repo_path, env=env, profile=profile)
+            return original_kodo_run(goal_file, repo_path, env=env, profile=profile, kodo_mode=kodo_mode)
 
         service.kodo.run = counting_kodo_run  # type: ignore[assignment]
 

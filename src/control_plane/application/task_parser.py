@@ -12,7 +12,8 @@ SECTION_PATTERN = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 class TaskParser:
     REQUIRED_EXEC_FIELDS = ("repo",)
-    SUPPORTED_MODES = {"goal", "fix_pr"}
+    SUPPORTED_MODES = {"goal", "fix_pr", "test_campaign", "improve_campaign"}
+    _CAMPAIGN_PASSTHROUGH_FIELDS = {"spec_campaign_id", "spec_file", "task_phase", "spec_coverage_hint"}
 
     def parse(self, description: str, *, labels: list[str] | None = None) -> ParsedTaskBody:
         label_repo = self._repo_from_labels(labels or [])
@@ -87,7 +88,7 @@ class TaskParser:
         mode = str(data["mode"]).strip().lower()
         if mode not in self.SUPPORTED_MODES:
             raise ValueError(
-                f"Unsupported execution mode '{data['mode']}'. MVP currently supports only 'goal'."
+                f"Unsupported execution mode '{data['mode']}'. Supported: {sorted(self.SUPPORTED_MODES)}"
             )
         data["mode"] = mode
 
@@ -96,4 +97,8 @@ class TaskParser:
             allowed_paths = [allowed_paths]
         data["allowed_paths"] = [str(path).strip() for path in allowed_paths if str(path).strip()]
         data["open_pr"] = bool(data.get("open_pr", False))
+        # Pass campaign metadata fields through unchanged
+        for field in self._CAMPAIGN_PASSTHROUGH_FIELDS:
+            if field in data:
+                data[field] = str(data[field]).strip()
         return data

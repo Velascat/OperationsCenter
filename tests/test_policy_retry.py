@@ -155,7 +155,7 @@ def test_policy_retry_succeeds_clears_violations_routes_to_review(
 
     kodo_call_count = 0
 
-    def kodo_run(goal_file, repo_path, env=None, profile=None):  # type: ignore[no-untyped-def]
+    def kodo_run(goal_file, repo_path, env=None, profile=None, kodo_mode="goal"):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
         return type("KodoResult", (), {"exit_code": 0, "stdout": f"run{kodo_call_count}", "stderr": "", "command": ["kodo"]})()
@@ -204,7 +204,7 @@ def test_policy_retry_fails_writes_artifact_routes_to_blocked(
 
     kodo_call_count = 0
 
-    def kodo_run(goal_file, repo_path, env=None, profile=None):  # type: ignore[no-untyped-def]
+    def kodo_run(goal_file, repo_path, env=None, profile=None, kodo_mode="goal"):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
         return type("KodoResult", (), {"exit_code": 0, "stdout": f"run{kodo_call_count}", "stderr": "", "command": ["kodo"]})()
@@ -249,7 +249,7 @@ def test_no_allowed_paths_skips_policy_retry(
 
     kodo_call_count = 0
 
-    def kodo_run(goal_file, repo_path, env=None, profile=None):  # type: ignore[no-untyped-def]
+    def kodo_run(goal_file, repo_path, env=None, profile=None, kodo_mode="goal"):  # type: ignore[no-untyped-def]
         nonlocal kodo_call_count
         kodo_call_count += 1
         return type("KodoResult", (), {"exit_code": 0, "stdout": f"run{kodo_call_count}", "stderr": "", "command": ["kodo"]})()
