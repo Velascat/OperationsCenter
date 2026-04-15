@@ -44,6 +44,8 @@ source .env.control-plane.local
 
 ### Kodo
 
+Kodo ([github.com/ikamensh/kodo](https://github.com/ikamensh/kodo)) is the multi-agent coding engine ControlPlane uses for task execution.
+
 - install/verify `kodo`
 - configure orchestrator defaults
 - persist local execution settings

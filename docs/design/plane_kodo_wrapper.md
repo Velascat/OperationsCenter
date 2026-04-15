@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Build a self-hosted AI execution wrapper that uses Plane as the Jira-like board and Kodo as the coding engine, with explicit repo and base-branch selection per task.
+Build a self-hosted AI execution wrapper that uses Plane as the Jira-like board and [Kodo](https://github.com/ikamensh/kodo) as the coding engine, with explicit repo and base-branch selection per task.
 
 ## Current behavior
 
