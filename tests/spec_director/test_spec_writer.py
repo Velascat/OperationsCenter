@@ -1,7 +1,5 @@
 # tests/spec_director/test_spec_writer.py
 from __future__ import annotations
-from pathlib import Path
-import pytest
 
 
 _SPEC = """---
@@ -39,8 +37,6 @@ def test_copies_to_workspace(tmp_path):
 
 def test_archive_old_specs(tmp_path):
     from control_plane.spec_director.spec_writer import SpecWriter
-    from datetime import UTC, datetime, timedelta
-    import time
     specs_dir = tmp_path / "docs/specs"
     specs_dir.mkdir(parents=True)
     old_spec = specs_dir / "old-campaign.md"

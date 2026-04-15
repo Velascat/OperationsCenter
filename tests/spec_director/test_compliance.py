@@ -1,8 +1,7 @@
 # tests/spec_director/test_compliance.py
 from __future__ import annotations
 from unittest.mock import MagicMock
-import pytest
-from control_plane.spec_director.models import ComplianceInput, ComplianceVerdict
+from control_plane.spec_director.models import ComplianceInput
 
 
 def _make_client(verdict_json: str):
@@ -49,7 +48,7 @@ def test_api_failure_returns_concerns():
 def test_truncates_large_diff():
     from control_plane.spec_director.compliance import SpecComplianceService
     raw = '{"verdict": "LGTM", "spec_coverage": 0.8, "violations": [], "notes": "ok"}'
-    service = SpecComplianceService(client=_make_client(raw), model="claude-sonnet-4-6",
+    SpecComplianceService(client=_make_client(raw), model="claude-sonnet-4-6",
                                     max_diff_kb=1)
     large_diff = "+" + "x" * 5000
 

@@ -60,7 +60,7 @@ class TriggerDetector:
         except Exception:
             return None
         for issue in issues:
-            labels = [str(l.get("name", "")).lower() for l in (issue.get("labels") or [])]
+            labels = [str(lbl.get("name", "")).lower() for lbl in (issue.get("labels") or [])]
             if self._label.lower() in labels:
                 state = str((issue.get("state") or {}).get("name", "")).lower()
                 if state not in {"in progress", "done", "cancelled"}:

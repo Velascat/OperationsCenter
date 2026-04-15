@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 
 from control_plane.spec_director.models import SpecFrontMatter
 
@@ -97,9 +96,9 @@ class CampaignBuilder:
         state = "Ready for AI" if phase == "implement" else "Backlog"
         depends_note = ""
         if phase == "test_campaign":
-            depends_note = f"\n- task_phase_note: Promoted after implement task merges"
+            depends_note = "\n- task_phase_note: Promoted after implement task merges"
         elif phase == "improve_campaign":
-            depends_note = f"\n- task_phase_note: Promoted after test_campaign passes clean"
+            depends_note = "\n- task_phase_note: Promoted after test_campaign passes clean"
 
         body = f"""## Execution
 repo: {repo_key}

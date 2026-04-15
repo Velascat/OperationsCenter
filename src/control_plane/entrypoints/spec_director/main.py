@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +13,6 @@ from control_plane.config import load_settings
 from control_plane.execution.usage_store import _check_disk_space
 from control_plane.spec_director.brainstorm import BrainstormService
 from control_plane.spec_director.campaign_builder import CampaignBuilder
-from control_plane.spec_director.compliance import SpecComplianceService
 from control_plane.spec_director.context_bundle import ContextBundleBuilder
 from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.recovery import RecoveryService

@@ -1,12 +1,11 @@
 # src/control_plane/spec_director/recovery.py
 from __future__ import annotations
 
-import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.spec_director.models import CampaignRecord, ComplianceVerdict
+from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.state import CampaignStateManager
 
 logger = logging.getLogger(__name__)
@@ -66,7 +65,7 @@ class RecoveryService:
             return False
         spec_text = spec_file_path.read_text()
         prompt = (
-            f"The following spec compliance violations were found:\n"
+            "The following spec compliance violations were found:\n"
             + "\n".join(f"- {v}" for v in violations)
             + f"\n\nOriginal spec:\n{spec_text}\n\n"
             + "Revise the spec to resolve these violations. "
@@ -108,7 +107,7 @@ class RecoveryService:
         try:
             issues = self._client.list_issues()
             for issue in issues:
-                labels = [str(l.get("name", "")).lower() for l in (issue.get("labels") or [])]
+                labels = [str(lbl.get("name", "")).lower() for lbl in (issue.get("labels") or [])]
                 if f"campaign-id: {campaign.campaign_id}" in labels:
                     state_name = str((issue.get("state") or {}).get("name", "")).lower()
                     if state_name not in {"done", "cancelled"}:

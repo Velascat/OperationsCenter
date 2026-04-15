@@ -1,7 +1,6 @@
 # tests/spec_director/test_campaign_builder.py
 from __future__ import annotations
-from unittest.mock import MagicMock, call
-import pytest
+from unittest.mock import MagicMock
 
 _SPEC_FM = {
     "campaign_id": "abc-123",
@@ -43,7 +42,7 @@ def test_creates_parent_and_child_tasks():
     mock_client = MagicMock()
     mock_client.create_issue.return_value = {"id": "task-001"}
     builder = CampaignBuilder(client=mock_client, project_id="proj-1", max_tasks=6)
-    records = builder.build(spec_text=_SPEC_TEXT, repo_key="MyRepo", base_branch="main")
+    builder.build(spec_text=_SPEC_TEXT, repo_key="MyRepo", base_branch="main")
     # parent + 2 goals × 3 phases (capped) = parent + 6 tasks
     assert mock_client.create_issue.call_count >= 3  # at minimum parent + 2 implement tasks
 

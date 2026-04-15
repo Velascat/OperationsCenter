@@ -62,20 +62,17 @@ class CheckSignalCollector:
                     source="pytest --collect-only",
                     summary=f"{count} tests discoverable",
                 )
+            # returncode 5 or 0 but no test items found → unknown
+            return CheckSignal(status="unknown")
         except (subprocess.TimeoutExpired, OSError):
-            pass
-
-        has_tests = self._has_test_files(repo_root)
-        if has_tests:
-            return CheckSignal(status="discoverable", source="fallback:config+tests")
-        return CheckSignal(status="discoverable", source="fallback:config_only")
+            return CheckSignal(status="unknown")
 
     def _has_pytest_config(self, repo_root: Path) -> bool:
         pyproject = repo_root / "pyproject.toml"
         if pyproject.is_file():
             try:
                 text = pyproject.read_text(encoding="utf-8", errors="replace")
-                if "[tool.pytest]" in text or "[pytest]" in text:
+                if "[tool.pytest" in text or "[pytest]" in text:
                     return True
             except OSError:
                 pass
