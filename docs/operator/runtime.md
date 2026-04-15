@@ -93,7 +93,7 @@ Scans GitHub for open PRs on all `await_review`-enabled repos and creates missin
 
 ### `watch-all`
 
-- local convenience wrapper that launches all five lanes together: `goal`, `test`, `improve`, `propose`, `review`
+- local convenience wrapper that launches all six lanes together: `goal`, `test`, `improve`, `propose`, `review`, `spec`
 - writes separate logs and PID files
 - not a scheduler cluster or distributed supervisor
 

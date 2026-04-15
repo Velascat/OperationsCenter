@@ -136,7 +136,9 @@ The stale-running reconciler uses per-kind timeouts rather than a single global 
 |-----------|-----|
 | `goal` | 120 minutes |
 | `test` | 45 minutes |
+| `test_campaign` | 45 minutes |
 | `improve` | 30 minutes |
+| `improve_campaign` | 30 minutes |
 | `fix_pr` | 45 minutes |
 | (other / unknown) | 90 minutes |
 

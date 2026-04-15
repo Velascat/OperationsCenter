@@ -14,6 +14,7 @@ This document tracks what is deferred, what is partially done, and what must be 
 | 4 | Validation profiles + execution feedback depth | ✓ complete (S8) |
 | 5 | Richer signal depth (architecture, benchmark, security) | ✓ complete |
 | 5.1 | Learning and feedback loop hardening (S10) | ✓ complete |
+| S12 | Autonomous spec-driven campaign chain | ✓ complete |
 | 6 | Cross-run confidence calibration | deferred |
 | 7 | Bounded experiment mode | deferred — guarded |
 
@@ -70,6 +71,34 @@ Reads pip-audit, npm audit, or trivy JSON output from retained artifacts. Never 
 - Registered in both factory functions
 
 All three signals default to `status="unavailable"` when the tool output files are absent, making them safe no-ops on repos that do not use them.
+
+---
+
+## S12 — Autonomous Spec-Driven Campaign Chain ✓ Complete
+
+A fully autonomous spec-driven development chain giving ControlPlane a sixth watcher role (`spec`).
+
+### What was built
+
+**Trigger detection** (`spec_director/trigger.py`): Priority-ordered: drop-file (`state/spec_director_trigger.md`) > Plane label (`spec-director: trigger`) > queue drain (board goes quiet). Each trigger passes optional operator seed text to the brainstorm step.
+
+**Brainstorm service** (`spec_director/brainstorm.py`): Direct Anthropic API call (claude-opus-4-6) given context bundle (git log, existing specs index, board summary, insight snapshot). Produces a full spec document with YAML front matter (`campaign_id`, `slug`, `phases`, `area_keywords`).
+
+**Spec writer** (`spec_director/spec_writer.py`): Writes spec to `docs/specs/<slug>.md`; archives expired specs after 90 days.
+
+**Campaign builder** (`spec_director/campaign_builder.py`): Converts spec phases into Plane tasks — `implement` phase → `goal` task kinds, `test` phase → `test_campaign`, `improve` phase → `improve_campaign`. Enforces a max-tasks cap per campaign.
+
+**Campaign state** (`spec_director/state.py`): Atomic read/write of `state/campaigns/active.json` (`CampaignStateManager`). Tracks `status`, `last_progress_at`, `spec_revision_count` per campaign.
+
+**Suppressor** (`spec_director/suppressor.py`): Blocks heuristic `propose` candidates that overlap an active campaign's `area_keywords`. Fail-open: returns `False` on any load error.
+
+**Recovery service** (`spec_director/recovery.py`): Stall detection (24 h), spec revision via Anthropic API (budget 3), abandon + self-cancel (72 h).
+
+**Spec compliance reviewer** (`spec_director/compliance.py`): Direct Anthropic API call (claude-sonnet-4-6) that compares PR diff against the spec and returns a structured JSON verdict (`LGTM`/`CONCERNS`/`FAIL`). Wired into the reviewer watcher as an upstream step before kodo self-review.
+
+**New task kinds**: `test_campaign` (→ `kodo --test`), `improve_campaign` (→ `kodo --improve`). Both are claimed by their corresponding role workers via `ROLE_TASK_KINDS` in `worker/main.py`.
+
+**Entrypoint** (`entrypoints/spec_director/main.py`): Polling loop, `--once` flag for supervised runs. `watch --role spec` registered in `scripts/control-plane.sh`.
 
 ---
 

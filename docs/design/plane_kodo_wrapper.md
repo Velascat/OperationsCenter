@@ -8,14 +8,14 @@ Build a self-hosted AI execution wrapper that uses Plane as the Jira-like board 
 
 1. Worker fetches one Plane **work-item** by id.
 2. Parser extracts `Execution` metadata, `Goal`, and optional `Constraints`.
-3. Worker validates mode support (current: `goal` mode).
+3. Worker validates mode support (`goal`, `test_campaign`, `improve_campaign` modes).
 4. Worker resolves repo config and base-branch policy.
 5. Worker creates isolated ephemeral clone and task branch.
    - If the branch already exists on remote (retry), it is checked out with tracking and the base branch is merged in. Conflict markers are left in the working tree for kodo to resolve.
 6. Worker bootstraps a repo-local Python virtualenv inside the cloned repo when enabled.
 7. Worker runs baseline validation before kodo; pre-existing failures are flagged separately.
 8. Worker writes `goal.md` from Goal/Constraints (with conflict-resolution preamble if needed).
-9. Worker runs kodo and validation commands.
+9. Worker runs kodo (`--goal-file`, `--test`, or `--improve` depending on task kind) and validation commands.
 10. Worker enforces `allowed_paths` policy for changed files.
 11. Worker commits/pushes only when policy allows.
 12. When `await_review: true`: worker creates a PR and writes a state file for the `review` watcher to manage. Task transitions to `In Review`.
@@ -28,6 +28,15 @@ Build a self-hosted AI execution wrapper that uses Plane as the Jira-like board 
 - concurrency locks
 - multi-repo orchestration
 - distributed scheduling
+
+## Campaign task kinds
+
+The `spec` watcher creates campaign tasks with two additional task kinds:
+
+- `test_campaign` — runs `kodo --test` for adversarial testing; claimed by the `test` role worker.
+- `improve_campaign` — runs `kodo --improve` for simplification/architecture passes; claimed by the `improve` role worker.
+
+Campaign `implement` tasks use the standard `goal` task kind. The `spec_campaign_id` field in the `## Execution` block links each task back to its originating spec.
 
 ## Task metadata template
 

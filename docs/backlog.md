@@ -1,6 +1,6 @@
 # Backlog — Post-Hardening: Tuning, Trust, and Public Packaging
 
-The hardening phase is complete. The system is running with two active repos (ControlPlane and code_youtube_shorts), a functional five-lane watcher, repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
+The hardening phase is complete. The system is running with two active repos (ControlPlane and code_youtube_shorts), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
 
 ## Active
 
@@ -94,6 +94,15 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 **Status**: done
 
 `TuningRegulatorService` aggregates per-family metrics from retained decision and proposer artifacts and applies explicit recommendation rules (over-suppressed → loosen; noisy → tighten; healthy → keep). Recommendation-only by default; auto-apply mode (opt-in via `--apply` + `CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1`) writes conservative bounded changes to `config/autonomy_tuning.json` with full cooldown, quota, oscillation, and allowlist guardrails. `DecisionEngineService` reads tuning overrides at startup. Full audit trail retained in `tools/report/control_plane/tuning/`. 47 tests.
+
+---
+
+## Completed (Session 12 — Spec-Director)
+
+### autonomy — Fully autonomous spec-driven campaign chain (`watch --role spec`)
+**Status**: done
+
+New sixth watcher role `spec` that closes the direction gap in the reactive propose loop. `TriggerDetector` detects when to start a campaign (drop-file > Plane label > queue drain). `BrainstormService` calls the Anthropic API directly to produce a spec doc written to `docs/specs/`. `CampaignBuilder` converts the spec into a bounded set of Plane tasks across implement/test/improve phases. `SpecComplianceService` reviews each PR diff against the spec (structured JSON verdict) upstream of kodo self-review. `RecoveryService` handles stall detection, spec revision, and orderly self-cancel. `Suppressor` blocks conflicting heuristic proposals during an active campaign. New task kinds `test_campaign` and `improve_campaign` route to `kodo --test` / `kodo --improve` via `ROLE_TASK_KINDS` in `worker/main.py`.
 
 ---
 

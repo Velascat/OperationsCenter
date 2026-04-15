@@ -1,12 +1,13 @@
 # Lifecycle Contract
 
-Control Plane has five board-facing worker lanes:
+Control Plane has six board-facing worker lanes:
 
 - `goal`
 - `test`
 - `improve`
 - `propose`
 - `review`
+- `spec`
 
 The lanes are not independent scripts. They are stages in a board-level workflow.
 
@@ -20,6 +21,8 @@ test -> goal when verification fails
 propose -> bounded goal/test/improve tasks when the board is quiet or recent signals justify it
 review -> Done (self-review LGTM or human 👍 → PR merged)
 review -> human review phase (self-review unable to resolve → escalated to human)
+spec -> campaign of goal/test_campaign/improve_campaign tasks when trigger fires
+spec -> recovery/revision when campaign stalls; abandon when budget exhausted
 ```
 
 ## Lane Responsibilities
@@ -56,6 +59,16 @@ Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane
 - Creates bounded Plane tasks instead of directly editing the repo.
 - Places strong, high-confidence tasks in `Ready for AI` and lower-confidence tasks in `Backlog`.
 
+### `spec`
+
+- Monitors board state and external triggers (drop-file, Plane label, queue drain) to decide when to start a spec-driven campaign.
+- Autonomously brainstorms what is worth building via direct Anthropic API call, producing a spec doc written to `docs/specs/`.
+- Converts the spec into a bounded campaign of Plane tasks (`goal`, `test_campaign`, `improve_campaign`) covering implement → test → improve phases.
+- Tracks campaign progress in `state/campaigns/active.json` (via `CampaignStateManager`).
+- Runs recovery logic each cycle: revises the spec (up to 3 times) when the campaign stalls; abandons and self-cancels when the 72-hour budget is exhausted.
+- Suppresses heuristic `propose` candidates that overlap an active campaign's `area_keywords`, preventing conflicting parallel board work.
+- Picks up operator direction from a drop-file (`state/spec_director_trigger.md`) or a Plane task label (`spec-director: trigger`).
+
 ### `review`
 
 - Manages open PRs created by the `goal` lane when `await_review: true` is set for the repo.
@@ -75,6 +88,7 @@ Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane
 - `improve` may create bounded `goal`, `test`, or explicit `improve` follow-up tasks.
 - `propose` may create bounded `goal`, `test`, or `improve` tasks when its guardrails allow it.
 - `review` marks tasks Done on merge; does not create follow-up tasks.
+- `spec` creates a campaign of `goal`, `test_campaign`, and `improve_campaign` tasks when a trigger fires. It does not directly implement changes.
 - Every handoff should remain visible on the board through comments and child-task context.
 
 ## Task Lineage
@@ -101,6 +115,26 @@ The parent task receives a comment with created child task ids, and the child ta
 - `Done`
 
 These are board-facing workflow states, not a queue implementation.
+
+## Campaign Task Kinds
+
+The `spec` lane introduces two new task kinds for the test and improve phases of a campaign:
+
+- `test_campaign` — picked up by the `test` role worker (alongside plain `test`); runs `kodo --test` for adversarial testing of campaign implementation.
+- `improve_campaign` — picked up by the `improve` role worker (alongside plain `improve`); runs `kodo --improve` for simplification/architecture/usability passes.
+
+Campaign `implement` phase tasks use the standard `goal` task kind and are executed by the existing `goal` lane workers unchanged.
+
+The `ROLE_TASK_KINDS` map in `worker/main.py` controls which task kinds each role claims:
+
+```python
+ROLE_TASK_KINDS = {
+    "goal":    {"goal"},
+    "test":    {"test", "test_campaign"},
+    "improve": {"improve", "improve_campaign"},
+    "fix_pr":  {"fix_pr"},
+}
+```
 
 ## Awaiting-Input Flow
 
