@@ -1793,6 +1793,14 @@ _DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL = 50
 _MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN = 2
 # Stale global editable install cleanup runs every 100 improve cycles.
 _STALE_EDITABLE_CLEANUP_CYCLE_INTERVAL = 100
+# Stale blocked follow-up cancellation + validation re-queue runs every 30 improve cycles.
+_STALE_BLOCKED_RECONCILE_CYCLE_INTERVAL = 30
+# Label added to validation_failure blocked tasks after one automatic re-queue attempt.
+_VALIDATION_REQUEUE_LABEL = "validation-requeue-attempted"
+# Minimum age (hours) a validation_failure blocked task must be before automatic re-queue.
+_VALIDATION_REQUEUE_MIN_AGE_HOURS = 8
+# Proposal dedup window: suppress proposals whose work was completed within this many days.
+_DONE_PROPOSAL_DEDUP_WINDOW_DAYS = 30
 
 
 def handle_feedback_loop_scan(
@@ -2590,6 +2598,161 @@ def handle_dependency_update_scan(
                 continue
 
     return created_ids
+
+
+# ---------------------------------------------------------------------------
+# Stale blocked follow-up cancellation + validation failure re-queue
+# ---------------------------------------------------------------------------
+
+def reconcile_stale_blocked_issues(
+    client: PlaneClient,
+    *,
+    ready_state: str = "Ready for AI",
+    now: datetime | None = None,
+) -> dict[str, list[str]]:
+    """Auto-cancel superseded Blocked follow-ups and re-queue stale validation failures.
+
+    **Cancellation pass** — walks all Blocked issues and cancels any that are
+    follow-up tasks for a source that is now Done/Cancelled.  Detects source
+    linkage via:
+
+    * ``original_task_id`` in the description (improve-worker "Resolve blocked X"
+      tasks built by ``build_follow_up_description``).
+    * ``source_task_id`` in the Constraints section (test-worker follow-up tasks
+      whose ``constraints_text`` contains ``- source_task_id: {id}``).
+
+    **Re-queue pass** — finds Blocked tasks that have a
+    ``blocked_classification: validation_failure`` comment, are at least
+    ``_VALIDATION_REQUEUE_MIN_AGE_HOURS`` old, and have not yet been re-queued
+    (no ``validation-requeue-attempted`` label).  Transitions them back to
+    *ready_state* and adds the guard label so the same task is not re-queued
+    a second time automatically.
+
+    Returns a dict with keys ``"cancelled"`` and ``"requeued"``, each a list of
+    task IDs affected.
+    """
+    _now = now or datetime.now(UTC)
+    cancelled_ids: list[str] = []
+    requeued_ids: list[str] = []
+
+    issues = client.list_issues()
+
+    # Pre-build terminal-status lookup to avoid individual fetches where possible.
+    terminal_statuses: dict[str, str] = {}
+    for _iss in issues:
+        _s = issue_status_name(_iss).strip().lower()
+        if _s in ("done", "cancelled"):
+            terminal_statuses[str(_iss["id"])] = _s
+
+    for issue in issues:
+        if issue_status_name(issue).strip().lower() != "blocked":
+            continue
+        task_id = str(issue["id"])
+        title = str(issue.get("name", "")).strip()
+
+        # ------------------------------------------------------------------ #
+        # Cancellation pass: find source task and check if it's terminal.
+        # ------------------------------------------------------------------ #
+        description = issue_description_text(issue)
+        source_id = parse_context_value(description, "original_task_id")
+        if not source_id:
+            source_id = parse_context_value(description, "source_task_id")
+
+        if source_id:
+            source_terminal = terminal_statuses.get(source_id)
+            if source_terminal is None:
+                try:
+                    src_issue = client.fetch_issue(source_id)
+                    src_status = issue_status_name(src_issue).strip().lower()
+                    if src_status in ("done", "cancelled"):
+                        source_terminal = src_status
+                except Exception:
+                    pass
+
+            if source_terminal:
+                try:
+                    client.transition_issue(task_id, "Cancelled")
+                    client.comment_issue(
+                        task_id,
+                        render_worker_comment(
+                            "[Improve] Stale blocked follow-up auto-cancelled",
+                            [
+                                f"task_id: {task_id}",
+                                f"source_task_id: {source_id}",
+                                f"source_status: {source_terminal}",
+                                "result_status: cancelled",
+                                "reason: source task is Done/Cancelled — this follow-up is no longer needed",
+                                "next_action: no action required",
+                            ],
+                        ),
+                    )
+                    cancelled_ids.append(task_id)
+                    _logger.info(json.dumps({
+                        "event": "stale_blocked_follow_up_cancelled",
+                        "task_id": task_id,
+                        "task_title": title,
+                        "source_task_id": source_id,
+                        "source_status": source_terminal,
+                    }))
+                except Exception:
+                    pass
+                continue  # Don't also re-queue a task we just cancelled.
+
+        # ------------------------------------------------------------------ #
+        # Re-queue pass: validation_failure blocked tasks that are old enough.
+        # ------------------------------------------------------------------ #
+        labels = {lbl.strip().lower() for lbl in issue_label_names(issue)}
+        if _VALIDATION_REQUEUE_LABEL in labels:
+            continue  # Already had one automatic re-queue — needs manual triage.
+
+        updated_raw = issue.get("updated_at") or issue.get("created_at") or ""
+        if not updated_raw:
+            continue
+        try:
+            updated_dt = datetime.fromisoformat(str(updated_raw).replace("Z", "+00:00"))
+            if updated_dt.tzinfo is None:
+                from datetime import timezone as _tz2
+                updated_dt = updated_dt.replace(tzinfo=_tz2.utc)
+            age_hours = (_now.timestamp() - updated_dt.timestamp()) / 3600
+            if age_hours < _VALIDATION_REQUEUE_MIN_AGE_HOURS:
+                continue
+        except (ValueError, TypeError):
+            continue
+
+        has_validation_failure = any(
+            "blocked_classification: validation_failure" in extract_comment_text(c).lower()
+            for c in client.list_comments(task_id)
+        )
+        if not has_validation_failure:
+            continue
+
+        try:
+            new_labels = list(issue_label_names(issue)) + [_VALIDATION_REQUEUE_LABEL]
+            client.update_issue_labels(task_id, new_labels)
+            client.transition_issue(task_id, ready_state)
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Improve] Validation failure re-queued",
+                    [
+                        f"task_id: {task_id}",
+                        "result_status: ready_for_ai",
+                        f"reason: validation_failure block is >{_VALIDATION_REQUEUE_MIN_AGE_HOURS}h old — re-queueing for one retry",
+                        "note: label 'validation-requeue-attempted' added; if this blocks again with validation_failure it will require manual triage",
+                    ],
+                ),
+            )
+            requeued_ids.append(task_id)
+            _logger.info(json.dumps({
+                "event": "validation_failure_requeued",
+                "task_id": task_id,
+                "task_title": title,
+                "age_hours": round(age_hours, 1),
+            }))
+        except Exception:
+            pass
+
+    return {"cancelled": cancelled_ids, "requeued": requeued_ids}
 
 
 # ---------------------------------------------------------------------------
@@ -3533,6 +3696,57 @@ def existing_proposal_keys(client: PlaneClient, *, issues: list[dict[str, Any]] 
         if proposal_key:
             keys.add(proposal_key.strip().lower())
     return keys
+
+
+def recently_completed_proposal_keys(
+    issues: list[dict[str, Any]],
+    *,
+    window_days: int = _DONE_PROPOSAL_DEDUP_WINDOW_DAYS,
+    now: datetime | None = None,
+) -> tuple[set[str], set[str]]:
+    """Return (dedup_keys, title_tokens) for Done/Cancelled tasks completed recently.
+
+    *dedup_keys* — normalised ``proposal_dedup_key`` values from recently
+    completed tasks so the proposer can skip re-proposing identical work.
+
+    *title_tokens* — normalised titles of recently completed tasks so a
+    semantic-similarity check can catch near-duplicate titles even when the
+    dedup key differs.
+
+    Only tasks completed within *window_days* are included so suppression does
+    not persist indefinitely for work that may be worth revisiting later.
+    """
+    _now = now or datetime.now(UTC)
+    cutoff_ts = _now.timestamp() - window_days * 86400
+    done_keys: set[str] = set()
+    done_names: set[str] = set()
+
+    for issue in issues:
+        status = issue_status_name(issue).strip().lower()
+        if status not in ("done", "cancelled"):
+            continue
+        # Age gate: use updated_at as a proxy for completion timestamp.
+        updated_raw = issue.get("updated_at") or issue.get("created_at") or ""
+        if updated_raw:
+            try:
+                updated_dt = datetime.fromisoformat(str(updated_raw).replace("Z", "+00:00"))
+                if updated_dt.tzinfo is None:
+                    from datetime import timezone as _tz3
+                    updated_dt = updated_dt.replace(tzinfo=_tz3.utc)
+                if updated_dt.timestamp() < cutoff_ts:
+                    continue  # Too old — allow re-proposal.
+            except (ValueError, TypeError):
+                pass
+
+        description = issue_description_text(issue)
+        key = parse_context_value(description, "proposal_dedup_key")
+        if key:
+            done_keys.add(key.strip().lower())
+        name = str(issue.get("name", "")).strip().lower()
+        if name:
+            done_names.add(name)
+
+    return done_keys, done_names
 
 
 def _summarise_prior_failures(client: PlaneClient, task_id: str) -> str:
@@ -5205,6 +5419,8 @@ def create_proposed_task_if_missing(
     proposal_keys: set[str],
     memory: dict[str, Any] | None = None,
     now: datetime | None = None,
+    done_keys: set[str] | None = None,
+    done_names: set[str] | None = None,
 ) -> dict[str, Any] | None:
     normalized_title = proposal.title.strip().lower()
     normalized_key = proposal.dedup_key.strip().lower()
@@ -5223,6 +5439,26 @@ def create_proposed_task_if_missing(
     if memory is not None and now is not None:
         if recently_proposed(memory, title=proposal.title, dedup_key=proposal.dedup_key, now=now):
             return None
+    # Dedup against recently completed (Done/Cancelled) work so the proposer does
+    # not recreate tasks for work that was just finished.
+    if done_keys and normalized_key in done_keys:
+        _logger.info(json.dumps({
+            "event": "propose_done_dedup_suppressed",
+            "title": proposal.title,
+            "dedup_key": proposal.dedup_key,
+            "reason": "matching dedup_key found in recently completed tasks",
+        }))
+        return None
+    if done_names:
+        for done_name in done_names:
+            if _semantic_title_similarity(normalized_title, done_name) >= _SEMANTIC_DEDUP_THRESHOLD:
+                _logger.info(json.dumps({
+                    "event": "propose_done_dedup_suppressed",
+                    "title": proposal.title,
+                    "similar_to": done_name,
+                    "reason": "semantically similar title found in recently completed tasks",
+                }))
+                return None
 
     description = build_proposal_description(service=service, proposal=proposal)
     reason_label = re.sub(r"[^a-z0-9_]+", "_", proposal.source_signal.lower()).strip("_")
@@ -5702,6 +5938,7 @@ def handle_propose_cycle(
 
     existing_names = existing_issue_names(client, issues=issues)
     proposal_keys = existing_proposal_keys(client, issues=issues)
+    done_keys, done_names = recently_completed_proposal_keys(issues, now=now)
     created_ids: list[str] = []
     created_states: set[str] = set()
     skipped_conflict = 0
@@ -5738,6 +5975,8 @@ def handle_propose_cycle(
             proposal_keys=proposal_keys,
             memory=memory,
             now=now,
+            done_keys=done_keys,
+            done_names=done_names,
         )
         if created is None:
             deduped_count += 1
@@ -6654,6 +6893,29 @@ def run_watch_loop(
                         _removed = cleanup_stale_global_editables()
                         if _removed:
                             logger.info(json.dumps({"event": "watch_stale_editables_removed", "role": role, "cycle": cycle, "packages": _removed}))
+                    except Exception:
+                        pass
+                # Stale blocked reconcile — cancel superseded follow-ups, re-queue stale
+                # validation_failure blocks — every 30 improve cycles.
+                if role == "improve" and cycle % _STALE_BLOCKED_RECONCILE_CYCLE_INTERVAL == 0:
+                    try:
+                        _sb_result = reconcile_stale_blocked_issues(
+                            client, ready_state=ready_state, now=datetime.now(UTC)
+                        )
+                        if _sb_result.get("cancelled"):
+                            logger.info(json.dumps({
+                                "event": "watch_stale_blocked_cancelled",
+                                "role": role,
+                                "cycle": cycle,
+                                "task_ids": _sb_result["cancelled"],
+                            }))
+                        if _sb_result.get("requeued"):
+                            logger.info(json.dumps({
+                                "event": "watch_validation_failure_requeued",
+                                "role": role,
+                                "cycle": cycle,
+                                "task_ids": _sb_result["requeued"],
+                            }))
                     except Exception:
                         pass
                 # S6-4: Failure-rate degradation check — every 5 cycles on primary slot.
