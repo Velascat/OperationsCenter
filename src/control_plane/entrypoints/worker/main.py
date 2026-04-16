@@ -6067,24 +6067,47 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
             time.sleep(ORCHESTRATOR_RATE_LIMIT_BACKOFF_SECONDS)
         return created_ids
     if result.outcome_status == "no_op":
-        client.comment_issue(
-            task_id,
-            render_worker_comment(
-                "[Goal] No meaningful repo change produced",
-                [
-                    f"run_id: {result.run_id}",
-                    f"task_id: {task_id}",
-                    "task_kind: goal",
-                    "result_status: blocked",
-                    f"outcome_reason: {result.outcome_reason or 'no_op'}",
-                    f"selected_evidence: {selected_evidence}",
-                    f"target_area_hint: {target_area_hint}",
-                    "bounded_scope_reason: execution produced no meaningful repo change to verify",
-                    "follow_up_task_ids: none",
-                    "next_action: investigate why execution only changed internal executor files",
-                ],
-            ),
-        )
+        if not result.validation_passed:
+            # No changes made but validation fails → pre-existing failure.
+            # Service already set status=Cancelled and created a fix-validation task.
+            _noop_fix_ids = result.follow_up_task_ids or []
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Goal] No repo change produced; pre-existing validation failure detected",
+                    [
+                        f"run_id: {result.run_id}",
+                        f"task_id: {task_id}",
+                        "task_kind: goal",
+                        "result_status: cancelled",
+                        f"outcome_reason: {result.outcome_reason or 'no_op'}",
+                        f"selected_evidence: {selected_evidence}",
+                        f"target_area_hint: {target_area_hint}",
+                        "blocked_classification: pre_existing_validation",
+                        f"follow_up_task_ids: {', '.join(_noop_fix_ids) if _noop_fix_ids else 'none'}",
+                        "next_action: fix-validation task created; this task cancelled to break triage loop",
+                    ],
+                ),
+            )
+        else:
+            client.comment_issue(
+                task_id,
+                render_worker_comment(
+                    "[Goal] No meaningful repo change produced",
+                    [
+                        f"run_id: {result.run_id}",
+                        f"task_id: {task_id}",
+                        "task_kind: goal",
+                        "result_status: done",
+                        f"outcome_reason: {result.outcome_reason or 'no_op'}",
+                        f"selected_evidence: {selected_evidence}",
+                        f"target_area_hint: {target_area_hint}",
+                        "bounded_scope_reason: execution produced no meaningful repo change to verify",
+                        "follow_up_task_ids: none",
+                        "next_action: no change needed; task marked done",
+                    ],
+                ),
+            )
         rewrite_worker_summary(result, service, task_id)
         return created_ids
     if goal_failure_needs_manual_env_fix(result):

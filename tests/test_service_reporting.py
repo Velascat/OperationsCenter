@@ -226,7 +226,14 @@ def test_internal_kodo_only_changes_are_classified_as_no_op(tmp_path: Path, monk
     assert any("internal_changed_files: kodo/config.json, kodo/run-status.md" in comment for comment in comments)
 
 
-def test_no_op_with_validation_failure_routes_to_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_no_op_with_validation_failure_cancels_and_creates_fix_task(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """no_op + validation_failed → Cancelled (not Blocked) + fix-validation task created.
+
+    A no_op run makes no changes to the repo, so any validation failure is
+    definitively pre-existing.  The old behaviour (Blocked) triggered an infinite
+    triage → follow-up → also-fails loop.  The new behaviour cancels the task and
+    ensures a 'Fix pre-existing validation failure' task exists.
+    """
     monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
     settings = Settings.model_validate(
         {
@@ -257,6 +264,7 @@ def test_no_op_with_validation_failure_routes_to_blocked(tmp_path: Path, monkeyp
 
     transitions: list[str] = []
     comments: list[str] = []
+    created_issues: list[dict[str, object]] = []
 
     class Client(ValidPlaneClient):
         def transition_issue(self, task_id: str, state: str) -> None:  # noqa: ARG002
@@ -264,6 +272,14 @@ def test_no_op_with_validation_failure_routes_to_blocked(tmp_path: Path, monkeyp
 
         def comment_issue(self, task_id: str, comment_markdown: str) -> None:  # noqa: ARG002
             comments.append(comment_markdown)
+
+        def list_issues(self) -> list[dict[str, object]]:
+            return []
+
+        def create_issue(self, name: str, description: str = "", state: str = "Ready for AI", label_names: list[str] | None = None) -> dict[str, object]:
+            issue = {"id": f"FIX-{len(created_issues) + 1}", "name": name}
+            created_issues.append(issue)
+            return issue
 
     service.workspace.create = lambda: workspace  # type: ignore[assignment]
     service.workspace.cleanup = lambda path: None  # type: ignore[assignment]
@@ -291,8 +307,12 @@ def test_no_op_with_validation_failure_routes_to_blocked(tmp_path: Path, monkeyp
     result = service.run_task(Client(), "TASK-NOOP-FAIL", preauthorized=True)
 
     assert result.outcome_status == "no_op"
-    assert result.final_status == "Blocked"
-    assert transitions[-1] == "Blocked"
+    assert result.final_status == "Cancelled"
+    assert transitions[-1] == "Cancelled"
+    # A fix-validation task must be created to break the triage loop
+    assert len(created_issues) == 1
+    assert "Fix pre-existing validation failure" in created_issues[0]["name"]
+    assert result.follow_up_task_ids != []
 
 
 def test_comment_markdown_includes_validation_errors_on_failure() -> None:

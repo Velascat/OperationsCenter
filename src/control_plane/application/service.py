@@ -788,8 +788,22 @@ class ExecutionService:
 
             if status is None:
                 if outcome_status == "no_op":
-                    # No material changes — task is done if validation passed, blocked if pre-existing issue remains
-                    status = "Done" if validation_ok else "Blocked"
+                    if validation_ok:
+                        status = "Done"
+                    else:
+                        # No changes were made but validation still fails — the failure is
+                        # definitively pre-existing (a no_op run cannot introduce new failures).
+                        # Cancel this task and ensure a fix-validation task exists rather than
+                        # leaving it Blocked, which triggers triage → follow-up → same failure
+                        # → infinite loop.
+                        status = "Cancelled"
+                        if fix_validation_task_id is None:
+                            _no_op_err = self._validation_excerpt(validation_results) or "validation failed on no-op run"
+                            fix_validation_task_id = self._maybe_create_fix_validation_task(
+                                plane_client, task, _no_op_err, run_id,
+                                validation_results=validation_results,
+                                repo_target=repo_target,
+                            )
                 elif policy_violations or not success:
                     status = "Blocked"
                 else:
