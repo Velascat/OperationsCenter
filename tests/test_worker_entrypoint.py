@@ -48,6 +48,7 @@ from control_plane.entrypoints.worker.main import (
     issue_status_name,
     issue_task_kind,
     parse_task_dependencies,
+    execution_gate_decision,
     recently_proposed,
     record_proposed,
     reconcile_stale_running_issues,
@@ -4194,3 +4195,88 @@ def test_board_health_check_returns_empty_for_healthy_board() -> None:
     assert all(a["kind"] != "stuck_running" for a in anomalies)
     assert all(a["kind"] != "clustered_blocked_reason" for a in anomalies)
     assert all(a["kind"] != "quiet_repo_lane" for a in anomalies)
+
+
+# ---------------------------------------------------------------------------
+# Regression: kodo concurrency cap must not poison the no-op signature cache
+# ---------------------------------------------------------------------------
+
+def test_kodo_gate_blocked_does_not_record_execution_signature(tmp_path: Path) -> None:
+    """When the kodo concurrency gate fires, execution_gate_decision must return
+    kodo_gate_blocked WITHOUT writing a signature to the usage store.
+
+    Previously the gate was checked after execution_gate_decision, meaning the
+    signature was already recorded.  On the next cycle the matching signature
+    triggered skip_noop and closed the task as Done — without kodo ever running.
+    """
+    from control_plane.execution import ExecutionControlSettings, UsageStore
+    from control_plane.application.service import ExecutionService
+
+    usage_path = tmp_path / "usage.json"
+    store = UsageStore(path=usage_path)
+
+    settings = ExecutionControlSettings(
+        max_exec_per_hour=10,
+        max_exec_per_day=50,
+        max_retries_per_task=3,
+        min_watch_interval_seconds=5,
+        min_remaining_exec_for_proposals=3,
+        usage_path=usage_path,
+    )
+
+    issue = {
+        "id": "task-abc",
+        "state": {"name": "Ready for AI"},
+        "updated_at": "2026-01-01T00:00:00Z",
+        "description": "some goal",
+        "labels": [{"name": "task-kind: goal"}],
+    }
+
+    class FakeService:
+        usage_store = store
+
+        class settings:
+            max_concurrent_kodo = 1
+            min_kodo_available_mb = 0
+
+    # Simulate concurrency cap: kodo_gate_check always returns blocked
+    def cap_blocked() -> tuple[bool, str]:
+        return False, "kodo_concurrency_cap (running=1, max=1)"
+
+    result = execution_gate_decision(
+        service=FakeService(),  # type: ignore[arg-type]
+        role="goal",
+        action="execute",
+        issue=issue,
+        kodo_gate_check=cap_blocked,
+    )
+
+    # Gate fires correctly
+    assert result is not None
+    gate_action, evidence = result
+    assert gate_action == "kodo_gate_blocked"
+    assert "kodo_concurrency_cap" in evidence["reason"]
+
+    # Critical: no signature recorded — next cycle must not skip_noop
+    data = store.load()
+    assert "goal:task-abc" not in data.get("last_task_signatures", {}), (
+        "Concurrency cap must not write a signature; "
+        "the next cycle would incorrectly close the task as no-op"
+    )
+
+    # Second call with gate open: execution proceeds and signature IS recorded
+    def cap_open() -> tuple[bool, str]:
+        return True, ""
+
+    result2 = execution_gate_decision(
+        service=FakeService(),  # type: ignore[arg-type]
+        role="goal",
+        action="execute",
+        issue=issue,
+        kodo_gate_check=cap_open,
+    )
+    assert result2 is None  # all gates pass → proceed
+    data2 = store.load()
+    assert "goal:task-abc" in data2.get("last_task_signatures", {}), (
+        "Signature must be recorded when the gate passes"
+    )

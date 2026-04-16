@@ -694,6 +694,7 @@ def execution_gate_decision(
     action: str,
     issue: dict[str, Any],
     now: datetime | None = None,
+    kodo_gate_check: "Callable[[], tuple[bool, str]] | None" = None,
 ) -> tuple[str, dict[str, object]] | None:
     if action not in EXECUTION_ACTIONS:
         return None
@@ -805,6 +806,15 @@ def execution_gate_decision(
                     }))
     except Exception:
         pass
+
+    # Kodo concurrency / resource gate — checked last so it never records a
+    # signature before kodo actually runs.  If blocked here, return a gate
+    # action WITHOUT writing to the usage store so the next cycle retries
+    # the full gate sequence rather than treating this task as a no-op.
+    if kodo_gate_check is not None:
+        _gate_ok, _gate_reason = kodo_gate_check()
+        if not _gate_ok:
+            return "kodo_gate_blocked", {"reason": _gate_reason}
 
     store.record_execution(role=role, task_id=task_id, signature=signature, now=now)
     if _extra_credit:
@@ -6619,7 +6629,22 @@ def run_watch_loop(
                     counters=counters,
                 )
             else:
-                gate = execution_gate_decision(service=service, role=role, action=action, issue=issue)
+                # Pass the kodo resource gate into execution_gate_decision so it
+                # runs AFTER budget/noop checks but BEFORE record_execution.
+                # This prevents a concurrency-cap skip from writing a signature
+                # that would cause the next cycle to treat the task as a no-op.
+                _kodo_gate_fn = (
+                    (lambda: _check_kodo_execution_gate(service.settings))
+                    if action == "execute" and role in {"goal", "test"}
+                    else None
+                )
+                gate = execution_gate_decision(
+                    service=service,
+                    role=role,
+                    action=action,
+                    issue=issue,
+                    kodo_gate_check=_kodo_gate_fn,
+                )
                 if gate is not None:
                     gate_action, evidence = gate
                     logger.info(
@@ -6669,6 +6694,8 @@ def run_watch_loop(
                                 ],
                             ),
                         )
+                    # kodo_gate_blocked: resource contention, no board state change needed.
+                    # Task stays in Ready for AI and is retried next cycle.
                     write_watch_status(
                         status_dir=status_dir,
                         role=role,
@@ -6711,36 +6738,6 @@ def run_watch_loop(
                             state="idle",
                             run_id=cycle_run_id,
                             last_action="pre_exec_rejected",
-                            task_id=task_id,
-                            task_kind=task_kind,
-                            counters=counters,
-                        )
-                        if max_cycles is not None and cycle >= max_cycles:
-                            logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))
-                            return
-                        logger.info(json.dumps({"event": "watch_cycle_end", "role": role, "cycle": cycle, "sleep_interval_seconds": poll_interval_seconds, "run_id": cycle_run_id}))
-                        time.sleep(poll_interval_seconds)
-                        continue
-                # Resource gates: kodo concurrency cap + memory pressure.
-                # Only applies to roles that actually launch kodo (goal, test).
-                if action == "execute" and role in {"goal", "test"}:
-                    _gate_ok, _gate_reason = _check_kodo_execution_gate(service.settings)
-                    if not _gate_ok:
-                        logger.info(json.dumps({
-                            "event": "watch_skip_kodo_gate",
-                            "role": role,
-                            "cycle": cycle,
-                            "task_id": task_id,
-                            "reason": _gate_reason,
-                            "run_id": cycle_run_id,
-                        }))
-                        write_watch_status(
-                            status_dir=status_dir,
-                            role=role,
-                            cycle=cycle,
-                            state="idle",
-                            run_id=cycle_run_id,
-                            last_action="kodo_gate_blocked",
                             task_id=task_id,
                             task_kind=task_kind,
                             counters=counters,
