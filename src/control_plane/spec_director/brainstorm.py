@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any
 
+from control_plane.spec_director._claude_cli import call_claude
 from control_plane.spec_director.context_bundle import ContextBundle
 from control_plane.spec_director.models import SpecFrontMatter
 
@@ -37,8 +37,6 @@ After the front matter, write a markdown spec document with:
 Be specific and bounded. Prefer 2-4 goals over vague large ones. \
 Each goal should be completable by one kodo run in under 1 hour."""
 
-_SYSTEM_PROMPT_CACHED = True
-
 
 class BrainstormError(Exception):
     pass
@@ -56,29 +54,16 @@ class BrainstormResult:
 
 
 class BrainstormService:
-    def __init__(self, client: Any, model: str = "claude-opus-4-6") -> None:
-        self._client = client
+    def __init__(self, model: str = "claude-opus-4-6") -> None:
         self._model = model
 
     def brainstorm(self, bundle: ContextBundle) -> BrainstormResult:
         user_content = self._build_user_prompt(bundle)
         try:
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=4096,
-                system=[
-                    {
-                        "type": "text",
-                        "text": _SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                messages=[{"role": "user", "content": user_content}],
-            )
+            raw = call_claude(user_content, system_prompt=_SYSTEM_PROMPT, model=self._model)
         except Exception as exc:
-            raise BrainstormError(f"Anthropic API call failed: {exc}") from exc
+            raise BrainstormError(f"claude CLI call failed: {exc}") from exc
 
-        raw = response.content[0].text
         try:
             fm = SpecFrontMatter.from_spec_text(raw)
         except Exception as exc:
@@ -90,8 +75,8 @@ class BrainstormService:
             phases=fm.phases,
             area_keywords=fm.area_keywords,
             campaign_id=fm.campaign_id or str(uuid.uuid4()),
-            prompt_tokens=response.usage.input_tokens,
-            completion_tokens=response.usage.output_tokens,
+            prompt_tokens=0,
+            completion_tokens=0,
         )
 
     @staticmethod
@@ -111,9 +96,3 @@ class BrainstormService:
             parts.append(f"## Current Board\n{lines}")
         parts.append("Generate the spec document now.")
         return "\n\n".join(parts)
-
-    @staticmethod
-    def make_client(api_key_env: str = "ANTHROPIC_API_KEY") -> Any:
-        import os
-        import anthropic  # ty: ignore[unresolved-import]
-        return anthropic.Anthropic(api_key=os.environ[api_key_env])

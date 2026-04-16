@@ -128,13 +128,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     )
 
     # Brainstorm
-    try:
-        anthropic_client = BrainstormService.make_client()
-    except Exception as exc:
-        logger.error(json.dumps({"event": "spec_anthropic_init_failed", "error": str(exc)}))
-        return
-
-    brainstorm_svc = BrainstormService(client=anthropic_client, model=sd.brainstorm_model)
+    brainstorm_svc = BrainstormService(model=sd.brainstorm_model)
     try:
         result = brainstorm_svc.brainstorm(bundle)
     except Exception as exc:

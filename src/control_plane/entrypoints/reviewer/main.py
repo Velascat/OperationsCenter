@@ -75,14 +75,7 @@ def _run_spec_compliance(
     model = getattr(sd_settings, "compliance_model", "claude-sonnet-4-6") if sd_settings else "claude-sonnet-4-6"
     max_diff_kb = getattr(sd_settings, "compliance_diff_max_kb", 32) if sd_settings else 32
 
-    try:
-        import anthropic  # ty: ignore[unresolved-import]
-        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    except Exception as exc:
-        logger.warning(json.dumps({"event": "compliance_client_error", "error": str(exc)}))
-        return "CONCERNS"
-
-    service = SpecComplianceService(client=client, model=model, max_diff_kb=max_diff_kb)
+    service = SpecComplianceService(model=model, max_diff_kb=max_diff_kb)
     inp = ComplianceInput(
         spec_text=spec_text,
         diff=diff,

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 
+from control_plane.spec_director._claude_cli import call_claude
 from control_plane.spec_director.models import ComplianceInput, ComplianceVerdict
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,10 @@ Verdict meanings:
 class SpecComplianceService:
     def __init__(
         self,
-        client: Any,
         model: str = "claude-sonnet-4-6",
         max_retries: int = 2,
         max_diff_kb: int = 32,
     ) -> None:
-        self._client = client
         self._model = model
         self._max_retries = max_retries
         self._max_diff_bytes = max_diff_kb * 1024
@@ -50,19 +48,7 @@ class SpecComplianceService:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                response = self._client.messages.create(
-                    model=self._model,
-                    max_tokens=1024,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": _SYSTEM_PROMPT,
-                            "cache_control": {"type": "ephemeral"},
-                        }
-                    ],
-                    messages=[{"role": "user", "content": user_prompt}],
-                )
-                raw = response.content[0].text.strip()
+                raw = call_claude(user_prompt, system_prompt=_SYSTEM_PROMPT, model=self._model)
                 data = json.loads(raw)
                 return ComplianceVerdict(
                     verdict=data["verdict"],
@@ -70,8 +56,8 @@ class SpecComplianceService:
                     violations=list(data.get("violations", [])),
                     notes=str(data.get("notes", "")),
                     model=self._model,
-                    prompt_tokens=response.usage.input_tokens,
-                    completion_tokens=response.usage.output_tokens,
+                    prompt_tokens=0,
+                    completion_tokens=0,
                 )
             except Exception as exc:
                 last_exc = exc

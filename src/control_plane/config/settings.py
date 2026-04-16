@@ -70,7 +70,7 @@ class ErrorIngestSettings(BaseModel):
 class SpecDirectorSettings(BaseModel):
     enabled: bool = True
     poll_interval_seconds: int = 120
-    spec_trigger_queue_threshold: int = 3
+    spec_trigger_queue_threshold: int = 5
     brainstorm_model: str = "claude-opus-4-6"
     compliance_model: str = "claude-sonnet-4-6"
     drop_file_path: str = "state/spec_direction.md"

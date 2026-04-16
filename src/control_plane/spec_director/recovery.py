@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from control_plane.spec_director._claude_cli import call_claude
 from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.state import CampaignStateManager
 
@@ -52,10 +53,9 @@ class RecoveryService:
         campaign: CampaignRecord,
         violations: list[str],
         spec_file_path: Path,
-        anthropic_client: Any,
         model: str = "claude-sonnet-4-6",
     ) -> bool:
-        """Make a targeted API call to revise the failing spec section. Returns True on success."""
+        """Revise the failing spec section via the claude CLI. Returns True on success."""
         if not self.revision_budget_ok(campaign):
             logger.warning(
                 '{"event": "spec_revision_budget_exhausted", "campaign_id": "%s"}',
@@ -73,12 +73,7 @@ class RecoveryService:
             + "Return the full revised spec document with updated YAML front matter."
         )
         try:
-            response = anthropic_client.messages.create(
-                model=model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            revised = response.content[0].text.strip()
+            revised = call_claude(prompt, model=model)
             spec_file_path.write_text(revised)
             self._state.increment_revision_count(campaign.campaign_id)
             logger.info(
