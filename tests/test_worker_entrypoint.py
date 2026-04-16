@@ -2510,13 +2510,26 @@ def test_is_proposal_satiated_false_when_creating_tasks() -> None:
 
 
 def test_handle_propose_cycle_returns_satiated_when_store_satiated(monkeypatch) -> None:
-    """handle_propose_cycle should short-circuit with 'satiated' decision."""
+    """handle_propose_cycle should short-circuit with 'satiated' decision.
+
+    Satiation only fires when there are active tasks on the board (active_count > 0).
+    When the board is fully drained the satiation window is reset so the proposer
+    can restart immediately — so this test needs at least one active task.
+    """
     now = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
     service = FakeService()
     # Seed 5 all-deduped cycles so is_proposal_satiated returns True
     for _ in range(5):
         service.usage_store.record_proposal_cycle(created=0, deduped=5, skipped=0, now=now)
-    client = FakePlaneClient(issues=[])
+    # Need at least one active task so active_count > 0 and satiation is checked.
+    active_issue = {
+        "id": "active-1",
+        "name": "Some in-flight task",
+        "state": {"name": "Ready for AI"},
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: myrepo"}],
+        "description": "",
+    }
+    client = FakePlaneClient(issues=[active_issue])
     result = handle_propose_cycle(client, service, now=now)
     assert result.decision == "satiated"
 

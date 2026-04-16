@@ -731,6 +731,23 @@ class UsageStore:
             return False
         return (total_deduped + total_skipped) / total >= dedup_ratio_threshold
 
+    def reset_satiation_window(self, *, now: datetime) -> None:
+        """Remove proposal_cycle events so the satiation window starts fresh.
+
+        Called when the board fully drains (active_count == 0) so the proposer
+        can re-evaluate immediately after tasks complete rather than staying
+        silent until an external autonomy-cycle refresh.
+        """
+        with self._exclusive():
+            data = self.load()
+            data["events"] = [
+                e for e in data.get("events", []) if e.get("kind") != "proposal_cycle"
+            ]
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_name(self.path.name + ".tmp")
+            tmp.write_text(json.dumps(data, indent=2))
+            tmp.replace(self.path)
+
     def record_proposal_outcome(self, *, category: str, succeeded: bool, now: datetime) -> None:
         """Record whether a task of a given category succeeded or failed."""
         with self._exclusive():

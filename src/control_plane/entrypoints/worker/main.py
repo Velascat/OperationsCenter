@@ -13,6 +13,7 @@ import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -119,7 +120,7 @@ RECENTLY_PROPOSED_WINDOW_SECONDS = 7 * 24 * 60 * 60
 LOW_BACKLOG_THRESHOLD = 6
 # Don't create new proposals if this many tasks are already active (Ready for AI or Running).
 # Prevents flooding the board when work is already queued.
-MAX_ACTIVE_TASKS_FOR_PROPOSALS = 3
+MAX_ACTIVE_TASKS_FOR_PROPOSALS = 5
 # Don't create new autonomy proposals if this many source:autonomy tasks are already
 # queued in Ready for AI or Backlog.  Prevents the propose lane from flooding the board
 # faster than the goal/test lanes can drain it.
@@ -694,7 +695,7 @@ def execution_gate_decision(
     action: str,
     issue: dict[str, Any],
     now: datetime | None = None,
-    kodo_gate_check: "Callable[[], tuple[bool, str]] | None" = None,
+    kodo_gate_check: Callable[[], tuple[bool, str]] | None = None,
 ) -> tuple[str, dict[str, object]] | None:
     if action not in EXECUTION_ACTIONS:
         return None
@@ -5455,7 +5456,12 @@ def handle_propose_cycle(
 
     # Point 8: Satiation — if the last several cycles produced nothing new, the
     # repo is in a stable state.  Stop generating proposals until something changes.
-    if service.usage_store.is_proposal_satiated(now=now):
+    # Exception: when the board is fully drained (active_count == 0), reset the
+    # satiation window so the proposer can restart immediately once work completes
+    # rather than staying silent until a manual autonomy-cycle refresh.
+    if active_count == 0:
+        service.usage_store.reset_satiation_window(now=now)
+    elif service.usage_store.is_proposal_satiated(now=now):
         return ProposalCycleResult(
             created_task_ids=[],
             decision="satiated",
