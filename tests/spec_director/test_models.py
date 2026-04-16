@@ -78,7 +78,7 @@ def test_spec_director_settings_defaults():
     s = SpecDirectorSettings()
     assert s.enabled is True
     assert s.poll_interval_seconds == 120
-    assert s.spec_trigger_queue_threshold == 3
+    assert s.spec_trigger_queue_threshold == 5
     assert s.max_tasks_per_campaign == 6
     assert s.spec_retention_days == 90
     assert s.spec_revision_budget == 3
