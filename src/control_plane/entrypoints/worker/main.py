@@ -1019,14 +1019,28 @@ def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]], *, rep
     return ready_or_running_count == 0 and open_count <= LOW_BACKLOG_THRESHOLD
 
 
-def active_task_count_from_issues(issues: list[dict[str, Any]]) -> int:
-    """Count goal/test tasks currently in Ready for AI or Running state."""
+def active_task_count_from_issues(
+    issues: list[dict[str, Any]],
+    *,
+    service: "ExecutionService | None" = None,
+) -> int:
+    """Count goal/test tasks currently in Ready for AI or Running state.
+
+    Tasks that are Ready for AI but blocked by the self-modify guard (self-repo
+    without approval) are excluded — they will never execute and should not
+    prevent backlog promotion or new proposal generation.
+    """
     count = 0
     for issue in issues:
         if issue_task_kind(issue) not in {"goal", "test"}:
             continue
-        if issue_status_name(issue) in {"Ready for AI", "Running"}:
-            count += 1
+        if issue_status_name(issue) not in {"Ready for AI", "Running"}:
+            continue
+        if service is not None and issue_status_name(issue) == "Ready for AI":
+            repo_key = _extract_repo_key(issue, service)
+            if _is_self_repo(repo_key, service) and not _self_modify_approved(issue):
+                continue  # parked pending approval — don't count as active
+        count += 1
     return count
 
 
@@ -1035,6 +1049,7 @@ def promote_backlog_tasks(
     issues: list[dict[str, Any]],
     *,
     max_promotions: int = MAX_BACKLOG_PROMOTIONS_PER_CYCLE,
+    service: "ExecutionService | None" = None,
 ) -> list[str]:
     """Promote the oldest Backlog tasks to Ready for AI when the board is idle.
 
@@ -1049,6 +1064,12 @@ def promote_backlog_tasks(
             continue
         if issue_task_kind(issue) not in {"goal", "test"}:
             continue
+        # Don't promote self-repo tasks that haven't been approved — they'd
+        # immediately be skipped by the self-modify guard and re-block the board.
+        if service is not None:
+            repo_key = _extract_repo_key(issue, service)
+            if _is_self_repo(repo_key, service) and not _self_modify_approved(issue):
+                continue
         labels = issue_label_names(issue)
         source = next(
             (lbl.split(":", 1)[1].strip().lower() for lbl in labels if lbl.lower().startswith("source:")),
@@ -5470,9 +5491,9 @@ def handle_propose_cycle(
     # tasks exist but nothing is in RFA/Running — nothing runs because nothing is
     # promoted, and nothing is promoted because the board looks "not idle".
     # We only reach here when autonomy saturation hasn't fired, so it's safe to promote.
-    active_count = active_task_count_from_issues(issues)
+    active_count = active_task_count_from_issues(issues, service=service)
     if active_count == 0:
-        promoted_ids = promote_backlog_tasks(client, issues)
+        promoted_ids = promote_backlog_tasks(client, issues, service=service)
         if promoted_ids:
             logger = logging.getLogger(__name__)
             logger.info(json.dumps({"event": "propose_backlog_promoted", "task_ids": promoted_ids}))
