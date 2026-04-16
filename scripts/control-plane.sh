@@ -13,6 +13,7 @@ PLANE_MANAGER="${ROOT_DIR}/deployment/plane/manage.sh"
 JANITOR_MAX_AGE_DAYS="${CONTROL_PLANE_RETENTION_DAYS:-1}"
 
 ensure_venv() {
+  ensure_pip_conf
   if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
     python3 -m venv "${VENV_DIR}"
   fi
@@ -20,6 +21,19 @@ ensure_venv() {
     "${VENV_DIR}/bin/python" -m pip install --upgrade pip
     "${VENV_DIR}/bin/python" -m pip install -e '.[dev]'
     touch "${BOOTSTRAP_STAMP}"
+  fi
+}
+
+# Ensure the user-level pip config requires a virtualenv for all pip installs.
+# This prevents kodo's internal bootstrapping (which uses the global Python)
+# from accidentally depositing editable installs in the global site-packages.
+# Safe to run repeatedly; skips if require-virtualenv is already set.
+ensure_pip_conf() {
+  local pip_conf="${XDG_CONFIG_HOME:-${HOME}/.config}/pip/pip.conf"
+  mkdir -p "$(dirname "${pip_conf}")"
+  if ! grep -q "require-virtualenv" "${pip_conf}" 2>/dev/null; then
+    printf '[global]\nrequire-virtualenv = true\n' >> "${pip_conf}"
+    echo "pip.conf: require-virtualenv = true added to ${pip_conf}"
   fi
 }
 

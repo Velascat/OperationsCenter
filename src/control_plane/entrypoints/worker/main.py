@@ -1791,6 +1791,8 @@ _STALE_AUTONOMY_SCAN_CYCLE_INTERVAL = 30
 # S7-5: Dependency update scan runs every N improve cycles.
 _DEPENDENCY_UPDATE_SCAN_CYCLE_INTERVAL = 50
 _MAX_DEPENDENCY_UPDATE_TASKS_PER_SCAN = 2
+# Stale global editable install cleanup runs every 100 improve cycles.
+_STALE_EDITABLE_CLEANUP_CYCLE_INTERVAL = 100
 
 
 def handle_feedback_loop_scan(
@@ -2588,6 +2590,76 @@ def handle_dependency_update_scan(
                 continue
 
     return created_ids
+
+
+# ---------------------------------------------------------------------------
+# Stale global editable install cleanup
+# ---------------------------------------------------------------------------
+
+def cleanup_stale_global_editables() -> list[str]:
+    """Remove stale editable installs from the global Python site-packages.
+
+    kodo's internal bootstrapping occasionally runs ``pip install -e .`` using
+    the global (pyenv) Python without a virtualenv, depositing an editable
+    install pointer in the global site-packages.  When the temp dir that kodo
+    used is later removed, the editable entry becomes a dangling reference that
+    confuses ``pip``.
+
+    This function locates all editable installs in the global Python whose
+    ``editable_project_location`` no longer exists on disk and uninstalls them.
+    Returns the list of package names that were removed.
+
+    Also removes aged ``/tmp/cp-task-*`` scratch directories that are more
+    than 24 hours old and were not cleaned up by the kodo adapter.
+    """
+    global_python = shutil.which("python3") or ""
+    removed: list[str] = []
+
+    # --- stale editable installs ---
+    if global_python:
+        try:
+            result = subprocess.run(
+                [global_python, "-m", "pip", "list", "--format=json"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env={**os.environ, "PIP_REQUIRE_VIRTUALENV": "0"},
+            )
+            if result.returncode == 0:
+                packages = json.loads(result.stdout)
+                stale = [
+                    pkg["name"]
+                    for pkg in packages
+                    if "editable_project_location" in pkg
+                    and pkg["editable_project_location"]
+                    and not Path(pkg["editable_project_location"]).exists()
+                ]
+                for pkg_name in stale:
+                    uninstall = subprocess.run(
+                        [global_python, "-m", "pip", "uninstall", "-y", pkg_name],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        env={**os.environ, "PIP_REQUIRE_VIRTUALENV": "0"},
+                    )
+                    if uninstall.returncode == 0:
+                        removed.append(pkg_name)
+        except Exception:
+            pass
+
+    # --- aged /tmp/cp-task-* scratch dirs ---
+    try:
+        cutoff = time.time() - 86400  # 24 hours
+        for entry in Path("/tmp").glob("cp-task-*"):
+            try:
+                if entry.stat().st_mtime < cutoff:
+                    shutil.rmtree(entry, ignore_errors=True)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return removed
 
 
 # ---------------------------------------------------------------------------
@@ -6574,6 +6646,14 @@ def run_watch_loop(
                         if dep_ids:
                             counters["follow_up_tasks_created"] += len(dep_ids)
                             logger.info(json.dumps({"event": "watch_dependency_update_tasks", "role": role, "cycle": cycle, "task_ids": dep_ids}))
+                    except Exception:
+                        pass
+                # Stale global editable install cleanup — every 100 improve cycles.
+                if role == "improve" and cycle % _STALE_EDITABLE_CLEANUP_CYCLE_INTERVAL == 0:
+                    try:
+                        _removed = cleanup_stale_global_editables()
+                        if _removed:
+                            logger.info(json.dumps({"event": "watch_stale_editables_removed", "role": role, "cycle": cycle, "packages": _removed}))
                     except Exception:
                         pass
                 # S6-4: Failure-rate degradation check — every 5 cycles on primary slot.
