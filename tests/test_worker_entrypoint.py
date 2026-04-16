@@ -4209,20 +4209,10 @@ def test_kodo_gate_blocked_does_not_record_execution_signature(tmp_path: Path) -
     signature was already recorded.  On the next cycle the matching signature
     triggered skip_noop and closed the task as Done — without kodo ever running.
     """
-    from control_plane.execution import ExecutionControlSettings, UsageStore
-    from control_plane.application.service import ExecutionService
+    from control_plane.execution import UsageStore
 
     usage_path = tmp_path / "usage.json"
     store = UsageStore(path=usage_path)
-
-    settings = ExecutionControlSettings(
-        max_exec_per_hour=10,
-        max_exec_per_day=50,
-        max_retries_per_task=3,
-        min_watch_interval_seconds=5,
-        min_remaining_exec_for_proposals=3,
-        usage_path=usage_path,
-    )
 
     issue = {
         "id": "task-abc",

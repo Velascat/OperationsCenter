@@ -13,6 +13,7 @@ import subprocess
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import httpx
