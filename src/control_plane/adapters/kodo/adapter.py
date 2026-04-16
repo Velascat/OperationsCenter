@@ -190,10 +190,16 @@ class KodoAdapter:
 
         def _sigterm_handler(signum: int, frame: object) -> None:
             _kill_group()
-            # Restore the previous handler and re-raise so normal shutdown
-            # (finally blocks, atexit, etc.) can still run.
+            # Restore the previous handler.  We raise SystemExit rather than
+            # re-sending the signal via os.kill: re-sending with SIG_DFL causes
+            # the OS to terminate the process immediately, bypassing Python's
+            # finally blocks (including workspace cleanup in service.py).
+            # SystemExit is a BaseException so it is NOT caught by bare
+            # "except Exception" handlers — it unwinds the stack normally,
+            # runs every finally clause, then exits.  Exit code 128+SIGTERM
+            # (143) follows the shell convention for signal-terminated processes.
             signal.signal(signal.SIGTERM, _prev_sigterm)
-            os.kill(os.getpid(), signum)
+            raise SystemExit(128 + signum)
 
         signal.signal(signal.SIGTERM, _sigterm_handler)
         try:

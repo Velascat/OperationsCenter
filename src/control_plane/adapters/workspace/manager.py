@@ -14,4 +14,4 @@ class WorkspaceManager:
 
     def cleanup(self, path: Path) -> None:
         if path.exists():
-            shutil.rmtree(path)
+            shutil.rmtree(path, ignore_errors=True)
