@@ -49,6 +49,11 @@ class SpecComplianceService:
         for attempt in range(self._max_retries):
             try:
                 raw = call_claude(user_prompt, system_prompt=_SYSTEM_PROMPT, model=self._model)
+                # Strip any preamble before the JSON object
+                if not raw.startswith("{"):
+                    idx = raw.find("\n{")
+                    if idx != -1:
+                        raw = raw[idx + 1:]
                 data = json.loads(raw)
                 return ComplianceVerdict(
                     verdict=data["verdict"],

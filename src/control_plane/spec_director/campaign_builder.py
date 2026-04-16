@@ -49,7 +49,7 @@ class CampaignBuilder:
         parent = self._client.create_issue(
             name=f"[Campaign] {fm.slug}",
             description=parent_body,
-            labels=["source: spec-campaign", f"campaign-id: {fm.campaign_id}"],
+            label_names=["source: spec-campaign", f"campaign-id: {fm.campaign_id}"],
         )
         parent_id = str(parent["id"])
         created_ids = [parent_id]
@@ -126,7 +126,7 @@ spec_coverage_hint: Goal {goal_index}
         issue = self._client.create_issue(
             name=title,
             description=body,
-            labels=labels,
+            label_names=labels,
             state=state,
         )
         return str(issue["id"])

@@ -64,9 +64,26 @@ class BrainstormService:
         except Exception as exc:
             raise BrainstormError(f"claude CLI call failed: {exc}") from exc
 
+        # The CLI may wrap the spec in a markdown code fence (```markdown ... ```)
+        # or add conversational preamble. Strip both so the parser sees raw spec text.
+        import re as _re
+        # Remove ```markdown / ```yaml / ``` fences and their closing ```
+        raw = _re.sub(r"^```(?:markdown|yaml)?\n", "", raw, flags=_re.MULTILINE)
+        raw = _re.sub(r"\n```\s*(?:\n|$)", "\n", raw, flags=_re.MULTILINE)
+        raw = raw.strip()
+        # Find the --- that is immediately followed by a YAML key (word: value),
+        # skipping bare --- separators that appear before the real front matter.
+        m = _re.search(r"(---\n\w+:)", raw)
+        if m:
+            raw = raw[m.start():]
+
         try:
             fm = SpecFrontMatter.from_spec_text(raw)
         except Exception as exc:
+            import logging as _logging
+            _logging.getLogger(__name__).error(
+                "brainstorm_parse_failure | first_300: %r", raw[:300]
+            )
             raise BrainstormError(f"Response missing valid YAML front matter: {exc}") from exc
 
         return BrainstormResult(
