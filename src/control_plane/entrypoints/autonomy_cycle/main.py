@@ -630,5 +630,96 @@ def _write_cycle_report(
     )
 
 
+def run_pipeline(
+    settings,
+    client: PlaneClient,
+    *,
+    repo_filter: str | None = None,
+    max_candidates: int = 3,
+    cooldown_minutes: int = 120,
+    max_create: int = 2,
+) -> dict:
+    """Run the observe→insights→decide→propose pipeline programmatically.
+
+    Called by the propose watcher when the board drains and decision
+    artifacts are stale, replacing the removed cron job.  Returns a summary
+    dict with 'created', 'skipped', 'failed' keys; adds 'error' on failure.
+    """
+    from control_plane.decision.service import _DEFAULT_ALLOWED_FAMILIES
+    from control_plane.proposer import CandidateProposerIntegrationService
+    from control_plane.proposer.candidate_integration import new_proposer_integration_context
+
+    try:
+        repo_path, repo_name = resolve_repo_path(repo_filter, settings)
+        ensure_git_repo(repo_path)
+        configured_key, configured_base_branch = configured_repo_match(settings, repo_path)
+
+        try:
+            run_git(["pull", "--ff-only"], repo_path)
+        except Exception:
+            pass  # non-fatal; observe local state as-is
+
+        # Stage 1: Observe
+        observer = build_observer_service()
+        obs_context = new_observer_context(
+            repo_path=repo_path,
+            repo_name=configured_key or repo_name,
+            base_branch=configured_base_branch,
+            settings=settings,
+            source_command="control-plane watcher (autonomy-refresh observe)",
+            commit_limit=10,
+            hotspot_window=25,
+            todo_limit=5,
+            logs_root=Path("logs/local"),
+        )
+        snapshot, _ = observer.observe(obs_context)
+
+        # Stage 2: Insights
+        insight_svc = build_insight_service()
+        ins_context = new_generation_context(
+            repo_filter=repo_filter,
+            snapshot_run_id=snapshot.run_id,
+            history_limit=5,
+            source_command="control-plane watcher (autonomy-refresh insights)",
+        )
+        insight_artifact, _ = insight_svc.generate(ins_context)
+
+        # Stage 3: Decide
+        decision_svc = build_decision_service()
+        dec_context = new_decision_context(
+            repo_filter=repo_filter,
+            insight_run_id=insight_artifact.run_id,
+            history_limit=5,
+            max_candidates=max_candidates,
+            cooldown_minutes=cooldown_minutes,
+            source_command="control-plane watcher (autonomy-refresh decide)",
+            dry_run=False,
+            allowed_families=_DEFAULT_ALLOWED_FAMILIES,
+        )
+        candidates_artifact, _ = decision_svc.decide(dec_context)
+        emitted = [c for c in candidates_artifact.candidates if c.status == "emit"]
+
+        if not emitted:
+            return {"created": 0, "skipped": 0, "failed": 0}
+
+        # Stage 4: Propose
+        proposer_svc = CandidateProposerIntegrationService(settings=settings, client=client)
+        prop_context = new_proposer_integration_context(
+            repo_filter=repo_filter,
+            decision_run_id=candidates_artifact.run_id,
+            max_create=max_create,
+            dry_run=False,
+            source_command="control-plane watcher (autonomy-refresh propose)",
+        )
+        prop_artifact, _ = proposer_svc.run(prop_context)
+        return {
+            "created": len(prop_artifact.created),
+            "skipped": len(prop_artifact.skipped),
+            "failed": len(prop_artifact.failed),
+        }
+    except Exception as exc:
+        return {"created": 0, "skipped": 0, "failed": 0, "error": str(exc)}
+
+
 if __name__ == "__main__":
     main()

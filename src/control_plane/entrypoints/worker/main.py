@@ -125,6 +125,9 @@ MAX_ACTIVE_TASKS_FOR_PROPOSALS = 5
 # queued in Ready for AI or Backlog.  Prevents the propose lane from flooding the board
 # faster than the goal/test lanes can drain it.
 MAX_QUEUED_AUTONOMY_TASKS = int(os.environ.get("CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS", "15"))
+# Refresh the observe→insights→decide pipeline when decision artifacts are older than this.
+# Applies only when the board is fully empty (no active or backlog tasks).
+_AUTONOMY_ARTIFACT_STALE_HOURS = int(os.environ.get("CONTROL_PLANE_AUTONOMY_STALE_HOURS", "8"))
 # Maximum tasks to promote from Backlog → Ready for AI when the board is idle.
 MAX_BACKLOG_PROMOTIONS_PER_CYCLE = 2
 # Blocked tasks with human_attention_required that have sat untouched longer than this
@@ -5312,6 +5315,45 @@ def _score_proposal_utility(
     return score
 
 
+def _decision_artifacts_stale(stale_hours: int = _AUTONOMY_ARTIFACT_STALE_HOURS) -> bool:
+    """Return True if no decision artifact has been written within *stale_hours*."""
+    decision_root = Path("tools/report/control_plane/decision")
+    if not decision_root.exists():
+        return True
+    run_dirs = sorted(
+        (p for p in decision_root.iterdir() if p.is_dir()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not run_dirs:
+        return True
+    age_hours = (datetime.now(UTC).timestamp() - run_dirs[0].stat().st_mtime) / 3600
+    return age_hours >= stale_hours
+
+
+def _trigger_autonomy_refresh(settings: Any, client: PlaneClient) -> None:
+    """Run the observe→insights→decide→propose pipeline inline.
+
+    Called by the propose watcher when the board drains and decision artifacts
+    are stale.  Replaces the removed cron job.  Errors are logged but never
+    propagated so the propose cycle always continues normally.
+    """
+    _ac_logger = logging.getLogger(__name__)
+    _ac_logger.info(json.dumps({"event": "propose_autonomy_refresh_start"}))
+    try:
+        from control_plane.entrypoints.autonomy_cycle.main import run_pipeline
+        result = run_pipeline(settings, client)
+        _ac_logger.info(json.dumps({
+            "event": "propose_autonomy_refresh_done",
+            "created": result.get("created", 0),
+            "skipped": result.get("skipped", 0),
+            "failed": result.get("failed", 0),
+            "error": result.get("error"),
+        }))
+    except Exception as exc:
+        _ac_logger.error(json.dumps({"event": "propose_autonomy_refresh_error", "error": str(exc)}))
+
+
 def handle_propose_cycle(
     client: PlaneClient,
     service: ExecutionService,
@@ -5457,10 +5499,12 @@ def handle_propose_cycle(
     # Point 8: Satiation — if the last several cycles produced nothing new, the
     # repo is in a stable state.  Stop generating proposals until something changes.
     # Exception: when the board is fully drained (active_count == 0), reset the
-    # satiation window so the proposer can restart immediately once work completes
-    # rather than staying silent until a manual autonomy-cycle refresh.
+    # satiation window and refresh the decision artifacts inline so the proposer
+    # has fresh candidates rather than waiting for an external trigger.
     if active_count == 0:
         service.usage_store.reset_satiation_window(now=now)
+        if _decision_artifacts_stale():
+            _trigger_autonomy_refresh(service.settings, client)
     elif service.usage_store.is_proposal_satiated(now=now):
         return ProposalCycleResult(
             created_task_ids=[],
