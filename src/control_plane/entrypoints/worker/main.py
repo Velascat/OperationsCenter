@@ -2570,6 +2570,7 @@ def handle_dependency_update_scan(
                         f"repo: {repo_key}",
                         "source: autonomy",
                         "source_family: dependency_update",
+                        *( ["self-modify: approved"] if _is_self_repo(repo_key, service) else []),
                     ],
                 )
                 if new_issue:

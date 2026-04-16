@@ -155,12 +155,11 @@ def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
     assert "## Provenance" in draft.description
     assert "candidate_dedup_key: candidate|test_visibility|test_signal|unknown_persistent" in draft.description
     assert "insight_run_id: ins_1" in draft.description
-    assert draft.label_names == [
-        "task-kind: goal",
-        "source: autonomy",
-        "source: propose",
-        "source-family: test_visibility",
-    ]
+    assert "task-kind: goal" in draft.label_names
+    assert "source: autonomy" in draft.label_names
+    assert "source: propose" in draft.label_names
+    assert "source-family: test_visibility" in draft.label_names
+    assert any(lbl.startswith("repo:") for lbl in draft.label_names)
 
 
 def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:

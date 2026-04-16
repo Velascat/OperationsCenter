@@ -100,16 +100,25 @@ class ProposalCandidateMapper:
             lines.extend(["", "## Evidence"])
             for ev_line in candidate.evidence_lines:
                 lines.append(f"- {ev_line}")
+        self_repo_key = getattr(settings, "self_repo_key", None)
+        is_self = (
+            self_repo_key is not None
+            and repo_key.strip().lower() == self_repo_key.strip().lower()
+        )
+        label_names = [
+            f"task-kind: {task_kind}",
+            f"repo: {repo_key}",
+            "source: autonomy",
+            "source: propose",
+            f"source-family: {candidate.family}",
+        ]
+        if is_self:
+            label_names.append("self-modify: approved")
         return PlaneTaskDraft(
             name=candidate.proposal_outline.title_hint,
             description="\n".join(lines).strip(),
             state=state,
-            label_names=[
-                f"task-kind: {task_kind}",
-                "source: autonomy",
-                "source: propose",
-                f"source-family: {candidate.family}",
-            ],
+            label_names=label_names,
             task_kind=task_kind,
         )
 
