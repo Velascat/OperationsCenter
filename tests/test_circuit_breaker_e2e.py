@@ -204,6 +204,8 @@ def test_below_threshold_no_insight_and_execution_proceeds(tmp_path: Path) -> No
     Confirms the threshold boundary: count=1 < threshold=2 means no insight,
     and without a fix-task on the board, run_task proceeds past the circuit-breaker.
     """
+    import os
+    from unittest.mock import patch
 
     # --- Step 1: Only 1 failure — below threshold ---
     snapshot = _snapshot_with_validation_failures(REPO_KEY, fail_count=1)
@@ -213,11 +215,15 @@ def test_below_threshold_no_insight_and_execution_proceeds(tmp_path: Path) -> No
     assert not any("persistent_validation_failures" in i.dedup_key for i in insights)
 
     # --- Step 2: No fix task on board — circuit-breaker does not fire ---
-    pc = _make_plane_client(fix_issues=[])
-    settings = _settings(tmp_path)
-    service = ExecutionService(settings)
+    # Isolate the usage store so live execution history doesn't trip the budget
+    # circuit breaker before execution reaches the git clone step.
+    isolated_usage = str(tmp_path / "usage.json")
+    with patch.dict(os.environ, {"CONTROL_PLANE_EXECUTION_USAGE_PATH": isolated_usage}):
+        pc = _make_plane_client(fix_issues=[])
+        settings = _settings(tmp_path)
+        service = ExecutionService(settings)
 
-    # Execution should proceed past the circuit-breaker and fail deeper in the
-    # pipeline (e.g. during git clone), proving the breaker didn't block it.
-    with pytest.raises(Exception):  # noqa: B017
-        service.run_task(pc, "TASK-42")
+        # Execution should proceed past the circuit-breaker and fail deeper in the
+        # pipeline (e.g. during git clone), proving the breaker didn't block it.
+        with pytest.raises(Exception):  # noqa: B017
+            service.run_task(pc, "TASK-42")
