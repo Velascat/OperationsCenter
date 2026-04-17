@@ -47,7 +47,7 @@ def _campaign_id_from_issue(issue: dict) -> str | None:
 def _task_kind(issue: dict) -> str:
     for lbl in _labels(issue):
         if lbl.strip().lower().startswith("task-kind:"):
-            return lbl.split(":", 1)[1].strip()
+            return lbl.split(":", 1)[1].strip().lower()
     return "goal"
 
 
@@ -161,6 +161,15 @@ class PhaseOrchestrator:
                 if _status(issue) == "blocked":
                     self._handle_blocked(issue, result)
 
+        # Phase advancement is evaluated independently for each phase transition.
+        # Both checks run every cycle: if goal and test_campaign tasks happen to be
+        # terminal simultaneously, both transitions fire in the same cycle (fast-path).
+        # The board is the ground truth; next cycle's state reflects actual outcomes.
+
+        # NOTE: _handle_blocked transitions issues on the board, but the in-memory
+        # `issues` list still reflects the old state for this cycle. Phase advancement
+        # will see the updated state on the next cycle (correct — the task was re-queued).
+
         # Phase advancement: implement (goal) → test_campaign
         if by_phase["goal"] and self._all_terminal(by_phase["goal"]):
             backlog_test = [i for i in by_phase["test_campaign"] if _status(i) == "backlog"]
@@ -225,6 +234,13 @@ class PhaseOrchestrator:
             description = str(
                 issue.get("description") or issue.get("description_stripped") or ""
             )
+
+        if len(description.strip()) < 20:
+            logger.warning(
+                '{"event": "blocked_rewrite_skipped", "task_id": "%s", "reason": "empty_description"}',
+                task_id,
+            )
+            return
 
         # Fetch the most recent comment (failure comment left by kodo)
         last_comment_body: str | None = None

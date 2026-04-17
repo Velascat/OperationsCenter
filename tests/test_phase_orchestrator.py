@@ -86,6 +86,9 @@ def test_advances_to_test_when_all_implement_done(tmp_path):
     result = orch.run(issues)
     assert result.phases_advanced == 1
     client.transition_issue.assert_any_call("test-1", "Ready for AI")
+    # Parent should receive advancement comment
+    comment_calls = [str(c) for c in client.comment_issue.call_args_list]
+    assert any("Advancing to test phase" in c for c in comment_calls)
 
 
 def test_does_not_advance_if_implement_blocked(tmp_path):
