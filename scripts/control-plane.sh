@@ -276,17 +276,25 @@ stop_watch_role() {
   local role="$1"
   local pid_file
   pid_file="$(watch_pid_file "${role}")"
-  if [[ ! -f "${pid_file}" ]]; then
-    echo "watch-${role} is not running"
-    return 0
+
+  # Always kill any stray watcher processes for this role, regardless of the
+  # PID file.  Multiple watcher processes for the same role can accumulate if
+  # previous stops failed or the PID file was overwritten without terminating
+  # the old process (e.g. after a crash or SIGKILL during restart).
+  local stray_count=0
+  while IFS= read -r stray_pid; do
+    if [[ -n "${stray_pid}" ]] && kill -0 "${stray_pid}" >/dev/null 2>&1; then
+      kill "${stray_pid}" >/dev/null 2>&1 || true
+      stray_count=$((stray_count + 1))
+    fi
+  done < <(pgrep -f "worker.main.*--role ${role}" 2>/dev/null || true)
+  if [[ "${stray_count}" -gt 0 ]]; then
+    echo "watch-${role} stopped: killed ${stray_count} process(es) matching --role ${role}"
   fi
-  local pid
-  pid="$(cat "${pid_file}")"
-  if kill -0 "${pid}" >/dev/null 2>&1; then
-    kill "${pid}" >/dev/null 2>&1 || true
-    echo "watch-${role} stopped: pid=${pid}"
-  else
-    echo "watch-${role} was not running"
+
+  if [[ ! -f "${pid_file}" ]]; then
+    [[ "${stray_count}" -eq 0 ]] && echo "watch-${role} is not running"
+    return 0
   fi
   rm -f "${pid_file}"
 }
