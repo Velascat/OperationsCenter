@@ -21,7 +21,7 @@ phases:
   - test
   - improve
 repos:
-  - <repo name from context>
+  - <one of the available repos listed in the context>
 area_keywords:
   - <directory prefix or topic keyword>
 status: active
@@ -35,7 +35,8 @@ After the front matter, write a markdown spec document with:
 - ## Success Criteria (how to know it is done)
 
 Be specific and bounded. Prefer 2-4 goals over vague large ones. \
-Each goal should be completable by one kodo run in under 1 hour."""
+Each goal should be completable by one kodo run in under 1 hour. \
+Set repos: to exactly one repo from the available repos list."""
 
 
 class BrainstormError(Exception):
@@ -99,17 +100,22 @@ class BrainstormService:
     @staticmethod
     def _build_user_prompt(bundle: ContextBundle) -> str:
         parts = []
+        if bundle.available_repos:
+            parts.append("## Available Repos\n" + "\n".join(f"- {r}" for r in bundle.available_repos))
         if bundle.seed_text:
             parts.append(f"## Operator Direction\n{bundle.seed_text}")
-        if bundle.insight_snapshot:
-            parts.append(f"## Insight Snapshot\n```json\n{bundle.insight_snapshot}\n```")
-        if bundle.git_log:
-            parts.append(f"## Recent Git Activity\n```\n{bundle.git_log}\n```")
+        for repo_key, log_text in bundle.git_logs.items():
+            if log_text:
+                parts.append(f"## Recent Git Activity ({repo_key})\n```\n{log_text}\n```")
         if bundle.specs_index:
             lines = "\n".join(f"- {s.get('slug', '?')} ({s.get('status', '?')})" for s in bundle.specs_index)
             parts.append(f"## Existing Specs\n{lines}")
-        if bundle.board_summary:
-            lines = "\n".join(f"- {t.get('name', t.get('title', '?'))} [{t.get('state', '?')}]" for t in bundle.board_summary[:50])
-            parts.append(f"## Current Board\n{lines}")
+        if bundle.recent_done_tasks:
+            lines = "\n".join(f"- {t.get('name', '?')} [Done]" for t in bundle.recent_done_tasks[:20])
+            parts.append(f"## Recently Completed Tasks\n{lines}")
+        if bundle.recent_cancelled_tasks:
+            lines = "\n".join(f"- {t.get('name', '?')} [Cancelled]" for t in bundle.recent_cancelled_tasks[:10])
+            parts.append(f"## Recently Cancelled Tasks (avoid re-proposing)\n{lines}")
+        parts.append(f"## Board Summary\n{bundle.open_task_count} open task(s) currently active.")
         parts.append("Generate the spec document now.")
         return "\n\n".join(parts)

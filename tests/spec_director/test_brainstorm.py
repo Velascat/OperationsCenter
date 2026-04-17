@@ -32,11 +32,13 @@ def test_brainstorm_returns_spec_text_and_front_matter(mock_call):
 
     service = BrainstormService(model="claude-opus-4-6")
     bundle = ContextBundle(
-        insight_snapshot="{}",
-        git_log="abc123 fix auth",
+        git_logs={"main_repo": "abc123 fix auth"},
         specs_index=[],
-        board_summary=[],
+        recent_done_tasks=[],
+        recent_cancelled_tasks=[],
+        open_task_count=0,
         seed_text="add webhook ingestion",
+        available_repos=["main_repo"],
     )
     result = service.brainstorm(bundle)
     assert result.spec_text.startswith("---")
@@ -51,6 +53,14 @@ def test_brainstorm_raises_on_missing_front_matter(mock_call):
     from control_plane.spec_director.context_bundle import ContextBundle
 
     service = BrainstormService(model="claude-opus-4-6")
-    bundle = ContextBundle(insight_snapshot="", git_log="", specs_index=[], board_summary=[], seed_text="")
+    bundle = ContextBundle(
+        git_logs={},
+        specs_index=[],
+        recent_done_tasks=[],
+        recent_cancelled_tasks=[],
+        open_task_count=0,
+        seed_text="",
+        available_repos=[],
+    )
     with pytest.raises(BrainstormError):
         service.brainstorm(bundle)

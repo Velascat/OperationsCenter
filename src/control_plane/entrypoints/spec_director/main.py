@@ -50,13 +50,9 @@ def _count_running_tasks(client: PlaneClient) -> int:
         return 99  # fail-safe: don't trigger queue drain on error
 
 
-def _collect_board_summary(client: PlaneClient) -> list[dict]:
+def _collect_board_issues(client: PlaneClient) -> list[dict]:
     try:
-        issues = client.list_issues()
-        return [
-            {"name": i.get("name", ""), "state": (i.get("state") or {}).get("name", "")}
-            for i in issues[:50]
-        ]
+        return client.list_issues()
     except Exception:
         return []
 
@@ -120,19 +116,21 @@ def run_once(settings: Any, client: PlaneClient) -> None:
         return
 
     # Build context bundle
-    repo_key = next(iter(settings.repos)) if settings.repos else ""
-    repo_cfg = settings.repos.get(repo_key) if settings.repos else None
-    repo_path = Path(repo_cfg.local_path) if (repo_cfg and getattr(repo_cfg, "local_path", None)) else None
+    available_repos = list(settings.repos.keys()) if settings.repos else []
+    git_logs: dict[str, str] = {}
+    for rk, rcfg in (settings.repos or {}).items():
+        rpath = Path(rcfg.local_path) if getattr(rcfg, "local_path", None) else None
+        git_logs[rk] = ContextBundleBuilder.collect_git_log(rpath) if rpath else ""
 
-    bundle_builder = ContextBundleBuilder(max_snapshot_kb=sd.brainstorm_context_snapshot_kb)
+    bundle_builder = ContextBundleBuilder()
     specs_index = ContextBundleBuilder.collect_specs_index(_SPECS_DIR)
-    git_log = ContextBundleBuilder.collect_git_log(repo_path) if repo_path else ""
-    board_summary = _collect_board_summary(client)
+    board_issues = _collect_board_issues(client)
     bundle = bundle_builder.build(
         seed_text=trigger.seed_text,
-        board_summary=board_summary,
+        board_issues=board_issues,
         specs_index=specs_index,
-        git_log=git_log,
+        git_logs=git_logs,
+        available_repos=available_repos,
     )
 
     # Brainstorm

@@ -124,3 +124,39 @@ created_at: 2026-01-01T00:00:00
         specs_dir=specs_dir,
     )
     assert suppressed is False
+
+
+def test_context_bundle_has_no_insight_snapshot():
+    from control_plane.spec_director.context_bundle import ContextBundle
+    bundle = ContextBundle(
+        git_logs={},
+        specs_index=[],
+        recent_done_tasks=[],
+        recent_cancelled_tasks=[],
+        open_task_count=0,
+        seed_text="",
+        available_repos=[],
+    )
+    assert not hasattr(bundle, "insight_snapshot")
+
+
+def test_context_bundle_build_includes_board_signals():
+    from control_plane.spec_director.context_bundle import ContextBundleBuilder
+    builder = ContextBundleBuilder()
+    board_issues = [
+        {"name": "Fix login bug", "state": {"name": "Done"}, "updated_at": "2026-04-10T00:00:00Z"},
+        {"name": "Add tests", "state": {"name": "Cancelled"}, "updated_at": "2026-04-11T00:00:00Z"},
+        {"name": "Refactor DB", "state": {"name": "Ready for AI"}, "updated_at": "2026-04-12T00:00:00Z"},
+    ]
+    bundle = builder.build(
+        seed_text="",
+        board_issues=board_issues,
+        specs_index=[],
+        git_logs={},
+        available_repos=["repo_a", "repo_b"],
+    )
+    assert any(t["name"] == "Fix login bug" for t in bundle.recent_done_tasks)
+    assert any(t["name"] == "Add tests" for t in bundle.recent_cancelled_tasks)
+    assert bundle.open_task_count == 1
+    assert bundle.available_repos == ["repo_a", "repo_b"]
+    assert not hasattr(bundle, "insight_snapshot")
