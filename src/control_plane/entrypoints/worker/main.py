@@ -3513,6 +3513,117 @@ def handle_stale_pr_scan(
 
 
 # ---------------------------------------------------------------------------
+# Orphaned plane/ branch cleanup
+# ---------------------------------------------------------------------------
+
+def cleanup_orphaned_plane_branches(
+    client: PlaneClient,
+    service: "ExecutionService",
+) -> list[str]:
+    """Delete remote ``plane/<task-id>-*`` branches whose Plane task is Done/Cancelled.
+
+    When kodo runs with ``push_on_validation_failure`` the system pushes a
+    ``plane/<uuid>-<slug>`` branch as a draft review artifact.  These branches
+    are never cleaned up automatically, accumulating as orphaned refs on GitHub.
+
+    This function:
+    1. Lists all remote branches matching ``plane/*`` for every repo that has
+       a local checkout and a GitHub token.
+    2. Extracts the task UUID from the branch name prefix.
+    3. Fetches the Plane task state; if Done or Cancelled → deletes the branch.
+
+    Returns a list of ``"<repo_key>/<branch>"`` strings for every deleted branch.
+    """
+    deleted: list[str] = []
+
+    # Pre-build terminal status cache from a single list_issues call.
+    try:
+        all_issues = client.list_issues()
+    except Exception:
+        return deleted
+    terminal_statuses: dict[str, str] = {}
+    for _iss in all_issues:
+        _s = issue_status_name(_iss).strip().lower()
+        if _s in ("done", "cancelled"):
+            terminal_statuses[str(_iss["id"])] = _s
+
+    _UUID_PREFIX = re.compile(
+        r"^plane/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+        re.IGNORECASE,
+    )
+
+    for repo_key, repo_cfg in service.settings.repos.items():
+        local_path = getattr(repo_cfg, "local_path", None)
+        token = service.settings.repo_git_token(repo_key)
+        if not local_path or not token:
+            continue
+        repo_path = Path(local_path)
+        if not repo_path.exists():
+            continue
+
+        try:
+            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+            gh = GitHubPRClient(token)
+        except Exception:
+            continue
+
+        # List remote plane/* branches via git ls-remote (fast, no full fetch needed).
+        try:
+            proc = subprocess.run(
+                ["git", "ls-remote", "--heads", "origin", "plane/*"],
+                capture_output=True, text=True, cwd=str(repo_path), timeout=30,
+            )
+            if proc.returncode != 0:
+                continue
+        except Exception:
+            continue
+
+        for line in proc.stdout.splitlines():
+            # Format: "<sha>\trefs/heads/<branch>"
+            parts = line.strip().split("\t", 1)
+            if len(parts) != 2:
+                continue
+            ref = parts[1]
+            branch = ref.removeprefix("refs/heads/")
+            m = _UUID_PREFIX.match(branch)
+            if not m:
+                continue
+            task_id = m.group(1)
+
+            # Check if this task is terminal.
+            status = terminal_statuses.get(task_id)
+            if status is None:
+                try:
+                    iss = client.fetch_issue(task_id)
+                    status = issue_status_name(iss).strip().lower()
+                    if status in ("done", "cancelled"):
+                        terminal_statuses[task_id] = status
+                    else:
+                        status = None
+                except Exception:
+                    pass
+
+            if not status:
+                continue  # Task is still active — keep the branch.
+
+            # Delete the branch on GitHub.
+            try:
+                gh.delete_branch(owner, repo_name, branch)
+                deleted.append(f"{repo_key}/{branch}")
+                _logger.info(json.dumps({
+                    "event": "orphaned_plane_branch_deleted",
+                    "repo_key": repo_key,
+                    "branch": branch,
+                    "task_id": task_id,
+                    "task_status": status,
+                }))
+            except Exception:
+                pass
+
+    return deleted
+
+
+# ---------------------------------------------------------------------------
 # Point 5: Self-modification controls
 # ---------------------------------------------------------------------------
 
@@ -7075,6 +7186,18 @@ def run_watch_loop(
                                 "role": role,
                                 "cycle": cycle,
                                 "task_ids": _sb_result["requeued"],
+                            }))
+                    except Exception:
+                        pass
+                    # Orphaned plane/ branch cleanup — same cadence as stale-blocked reconcile.
+                    try:
+                        _deleted_branches = cleanup_orphaned_plane_branches(client, service)
+                        if _deleted_branches:
+                            logger.info(json.dumps({
+                                "event": "watch_orphaned_branches_deleted",
+                                "role": role,
+                                "cycle": cycle,
+                                "branches": _deleted_branches,
                             }))
                     except Exception:
                         pass
