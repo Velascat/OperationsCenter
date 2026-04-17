@@ -2532,7 +2532,11 @@ def handle_dependency_update_scan(
 
     Returns a list of created task IDs.
     """
-    existing_names = existing_issue_names(client)
+    # Include terminal (Done/Cancelled) issues so that a previously-completed
+    # "Update X from A to B" task suppresses re-creation of the identical task.
+    # A version bump to a *different* target will have a different title and
+    # won't be suppressed.
+    existing_names = existing_issue_names(client, include_terminal=True)
     created_ids: list[str] = []
 
     for repo_key, repo_cfg in service.settings.repos.items():
@@ -2869,6 +2873,96 @@ def reconcile_stale_blocked_issues(
             pass
 
     return {"cancelled": cancelled_ids, "requeued": requeued_ids}
+
+
+# ---------------------------------------------------------------------------
+# Campaign tracker completion
+# ---------------------------------------------------------------------------
+
+def reconcile_campaign_trackers(client: PlaneClient) -> list[str]:
+    """Close [Campaign] parent tasks when all their child tasks are terminal.
+
+    The campaign builder creates a ``[Campaign] <slug>`` parent issue labelled
+    ``source: spec-campaign`` and ``campaign-id: <uuid>``.  Child tasks carry
+    the same ``campaign-id`` label.  Nothing in the normal worker flow ever
+    closes the parent — it sits in Backlog/RFA indefinitely even after every
+    child is Done or Cancelled.
+
+    This function finds campaign tracker issues whose every sibling (same
+    campaign-id label, excluding the tracker itself) is in a terminal state,
+    then transitions the tracker to Done.
+
+    Returns a list of closed campaign tracker task IDs.
+    """
+    closed: list[str] = []
+    try:
+        all_issues = client.list_issues()
+    except Exception:
+        return closed
+
+    # Group issues by campaign-id label value.
+    campaign_issues: dict[str, list[dict[str, Any]]] = {}
+    for iss in all_issues:
+        for lbl in issue_label_names(iss):
+            if lbl.lower().startswith("campaign-id:"):
+                cid = lbl.split(":", 1)[1].strip()
+                campaign_issues.setdefault(cid, []).append(iss)
+
+    for cid, members in campaign_issues.items():
+        # Find the tracker (title starts with "[Campaign]").
+        tracker: dict[str, Any] | None = None
+        children: list[dict[str, Any]] = []
+        for iss in members:
+            name = str(iss.get("name", "")).strip()
+            if name.startswith("[Campaign]"):
+                tracker = iss
+            else:
+                children.append(iss)
+
+        if tracker is None or not children:
+            continue
+
+        tracker_status = issue_status_name(tracker).strip().lower()
+        if tracker_status in ("done", "cancelled"):
+            continue  # Already closed.
+
+        # All children must be terminal.
+        if not all(issue_status_name(c).strip().lower() in ("done", "cancelled") for c in children):
+            continue
+
+        tracker_id = str(tracker["id"])
+        tracker_title = str(tracker.get("name", "")).strip()
+        child_summary = ", ".join(
+            f"{str(c.get('name',''))[:40]} ({issue_status_name(c)})"
+            for c in children
+        )
+        try:
+            client.transition_issue(tracker_id, "Done")
+            client.comment_issue(
+                tracker_id,
+                render_worker_comment(
+                    "[Campaign] All child tasks resolved — campaign complete",
+                    [
+                        f"campaign_id: {cid}",
+                        f"child_count: {len(children)}",
+                        f"children: {child_summary}",
+                        "result_status: done",
+                        "reason: every child task is Done or Cancelled",
+                    ],
+                ),
+            )
+            closed.append(tracker_id)
+            _logger.info(json.dumps({
+                "event": "campaign_tracker_closed",
+                "campaign_id": cid,
+                "tracker_id": tracker_id,
+                "tracker_title": tracker_title,
+                "child_count": len(children),
+            }))
+        except Exception:
+            pass
+
+    return closed
 
 
 # ---------------------------------------------------------------------------
@@ -4465,12 +4559,27 @@ def issue_execution_target(issue: dict[str, Any], service: ExecutionService) -> 
     return repo_key, repo_cfg.default_branch, allowed_paths_for_repo(repo_key)
 
 
-def existing_issue_names(client: PlaneClient, *, issues: list[dict[str, Any]] | None = None) -> set[str]:
+def existing_issue_names(
+    client: PlaneClient,
+    *,
+    issues: list[dict[str, Any]] | None = None,
+    include_terminal: bool = False,
+) -> set[str]:
+    """Return the lowercased set of existing issue names.
+
+    By default Done/Cancelled issues are excluded so that proposers don't
+    treat a completed task as a duplicate of a new (different) proposal.
+    Pass ``include_terminal=True`` for deduplication checks that *should*
+    treat a previously-completed task title as already covered — used by
+    the dependency update scanner to prevent re-creating tasks whose exact
+    version bump has already been Done.
+    """
     names: set[str] = set()
     for issue in issues or client.list_issues():
-        state_name = issue_status_name(issue).strip().lower()
-        if state_name in {"done", "cancelled"}:
-            continue
+        if not include_terminal:
+            state_name = issue_status_name(issue).strip().lower()
+            if state_name in {"done", "cancelled"}:
+                continue
         name = str(issue.get("name", "")).strip().lower()
         if name:
             names.add(name)
@@ -7198,6 +7307,18 @@ def run_watch_loop(
                                 "role": role,
                                 "cycle": cycle,
                                 "branches": _deleted_branches,
+                            }))
+                    except Exception:
+                        pass
+                    # Campaign tracker completion — close [Campaign] parents when all children resolve.
+                    try:
+                        _closed_campaigns = reconcile_campaign_trackers(client)
+                        if _closed_campaigns:
+                            logger.info(json.dumps({
+                                "event": "watch_campaign_trackers_closed",
+                                "role": role,
+                                "cycle": cycle,
+                                "task_ids": _closed_campaigns,
                             }))
                     except Exception:
                         pass
