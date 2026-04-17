@@ -2654,12 +2654,17 @@ def reconcile_stale_blocked_issues(
     * ``source_task_id`` in the Constraints section (test-worker follow-up tasks
       whose ``constraints_text`` contains ``- source_task_id: {id}``).
 
-    **Re-queue pass** — finds Blocked tasks that have a
-    ``blocked_classification: validation_failure`` comment, are at least
-    ``_VALIDATION_REQUEUE_MIN_AGE_HOURS`` old, and have not yet been re-queued
-    (no ``validation-requeue-attempted`` label).  Transitions them back to
-    *ready_state* and adds the guard label so the same task is not re-queued
-    a second time automatically.
+    **Re-queue pass** — finds Blocked tasks whose most recent execution comment
+    contains a retryable ``blocked_classification`` (``validation_failure`` or
+    ``unknown``), are at least ``_VALIDATION_REQUEUE_MIN_AGE_HOURS`` old, and
+    have not yet been re-queued (no ``validation-requeue-attempted`` label).
+    Transitions them back to *ready_state* and adds the guard label so the same
+    task is not re-queued a second time automatically.
+
+    The ``unknown`` classification covers executions that failed before kodo
+    could produce a meaningful result (e.g. arg-parse errors from a code bug).
+    These are retryable once — if the bug is fixed, the task will succeed; if
+    it blocks again the guard label prevents a second automatic retry.
 
     Returns a dict with keys ``"cancelled"`` and ``"requeued"``, each a list of
     task IDs affected.
@@ -2732,8 +2737,78 @@ def reconcile_stale_blocked_issues(
                 continue  # Don't also re-queue a task we just cancelled.
 
         # ------------------------------------------------------------------ #
-        # Re-queue pass: validation_failure blocked tasks that are old enough.
+        # Reverse cancellation pass: if THIS task created follow-ups and any
+        # of those follow-ups are now terminal (Done/Cancelled), cancel this
+        # task — its remediation work is complete.
         # ------------------------------------------------------------------ #
+        # Extract follow_up_task_ids from comments on this blocked task.
+        _follow_up_ids: list[str] = []
+        try:
+            for _c in client.list_comments(task_id):
+                _ct = extract_comment_text(_c).lower()
+                # Match "follow_up_task_ids: id1, id2" lines
+                for _line in _ct.splitlines():
+                    if "follow_up_task_ids:" in _line:
+                        _raw = _line.split("follow_up_task_ids:", 1)[1].strip()
+                        for _fid in _raw.split(","):
+                            _fid = _fid.strip()
+                            if _fid and _fid != "none":
+                                _follow_up_ids.append(_fid)
+        except Exception:
+            pass
+
+        _terminal_followup_id: str | None = None
+        for _fid in _follow_up_ids:
+            _fstatus = terminal_statuses.get(_fid)
+            if _fstatus is None:
+                try:
+                    _fissue = client.fetch_issue(_fid)
+                    _fs = issue_status_name(_fissue).strip().lower()
+                    if _fs in ("done", "cancelled"):
+                        _fstatus = _fs
+                        terminal_statuses[_fid] = _fs
+                except Exception:
+                    pass
+            if _fstatus:
+                _terminal_followup_id = _fid
+                break
+
+        if _terminal_followup_id:
+            try:
+                client.transition_issue(task_id, "Cancelled")
+                client.comment_issue(
+                    task_id,
+                    render_worker_comment(
+                        "[Improve] Blocked source task auto-cancelled — follow-up resolved",
+                        [
+                            f"task_id: {task_id}",
+                            f"follow_up_task_id: {_terminal_followup_id}",
+                            f"follow_up_status: {terminal_statuses.get(_terminal_followup_id, 'terminal')}",
+                            "result_status: cancelled",
+                            "reason: this task's follow-up work is Done/Cancelled — no further action needed on the source",
+                            "next_action: no action required",
+                        ],
+                    ),
+                )
+                cancelled_ids.append(task_id)
+                _logger.info(json.dumps({
+                    "event": "blocked_source_cancelled_followup_resolved",
+                    "task_id": task_id,
+                    "task_title": title,
+                    "follow_up_task_id": _terminal_followup_id,
+                }))
+            except Exception:
+                pass
+            continue  # Don't also re-queue a task we just cancelled.
+
+        # ------------------------------------------------------------------ #
+        # Re-queue pass: retryable blocked tasks that are old enough.
+        # Retryable classifications: validation_failure, unknown.
+        # Non-retryable (handled elsewhere or permanently broken):
+        #   retry_cap_exceeded, pre_existing_validation, parse_config.
+        # ------------------------------------------------------------------ #
+        _RETRYABLE_CLASSIFICATIONS = {"validation_failure", "unknown"}
+
         labels = {lbl.strip().lower() for lbl in issue_label_names(issue)}
         if _VALIDATION_REQUEUE_LABEL in labels:
             continue  # Already had one automatic re-queue — needs manual triage.
@@ -2752,11 +2827,17 @@ def reconcile_stale_blocked_issues(
         except (ValueError, TypeError):
             continue
 
-        has_validation_failure = any(
-            "blocked_classification: validation_failure" in extract_comment_text(c).lower()
-            for c in client.list_comments(task_id)
-        )
-        if not has_validation_failure:
+        comments = client.list_comments(task_id)
+        retryable_classification: str | None = None
+        for c in comments:
+            text = extract_comment_text(c).lower()
+            for cls in _RETRYABLE_CLASSIFICATIONS:
+                if f"blocked_classification: {cls}" in text:
+                    retryable_classification = cls
+                    break
+            if retryable_classification:
+                break
+        if not retryable_classification:
             continue
 
         try:
@@ -2766,20 +2847,22 @@ def reconcile_stale_blocked_issues(
             client.comment_issue(
                 task_id,
                 render_worker_comment(
-                    "[Improve] Validation failure re-queued",
+                    "[Improve] Stale blocked task re-queued for one retry",
                     [
                         f"task_id: {task_id}",
                         "result_status: ready_for_ai",
-                        f"reason: validation_failure block is >{_VALIDATION_REQUEUE_MIN_AGE_HOURS}h old — re-queueing for one retry",
-                        "note: label 'validation-requeue-attempted' added; if this blocks again with validation_failure it will require manual triage",
+                        f"blocked_classification: {retryable_classification}",
+                        f"reason: {retryable_classification} block is >{_VALIDATION_REQUEUE_MIN_AGE_HOURS}h old — re-queueing for one retry",
+                        "note: label 'validation-requeue-attempted' added; if this blocks again it will require manual triage",
                     ],
                 ),
             )
             requeued_ids.append(task_id)
             _logger.info(json.dumps({
-                "event": "validation_failure_requeued",
+                "event": "stale_blocked_requeued",
                 "task_id": task_id,
                 "task_title": title,
+                "blocked_classification": retryable_classification,
                 "age_hours": round(age_hours, 1),
             }))
         except Exception:
