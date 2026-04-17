@@ -638,9 +638,16 @@ class UsageStore:
     ) -> None:
         with self._exclusive():
             data = self.load()
-            signatures = dict(data.get("last_task_signatures", {}))
-            signatures[f"{role}:{task_id}"] = signature
-            data["last_task_signatures"] = signatures
+            # Only persist the signature for genuine no-op skips (kodo ran and
+            # made no changes).  Budget, cooldown, and kodo-gate skips must NOT
+            # update last_task_signatures — they mean "worker was busy, try
+            # again later", not "task is already satisfied".  Storing the
+            # signature for non-noop skips causes a false noop match on the
+            # very next cycle (same updated_at + empty description = same sig).
+            if reason == "no_op":
+                signatures = dict(data.get("last_task_signatures", {}))
+                signatures[f"{role}:{task_id}"] = signature
+                data["last_task_signatures"] = signatures
             kind = "skip_noop" if reason == "no_op" else "skip_budget"
             if reason == "cooldown_active":
                 kind = "skip_cooldown"
@@ -1063,7 +1070,16 @@ class UsageStore:
         else:
             state_name = str(state or "").strip()
         updated_at = str(issue.get("updated_at") or issue.get("updated") or "").strip()
-        description = str(issue.get("description") or issue.get("description_stripped") or "").strip()
+        # Plane stores descriptions in description_html; description and
+        # description_stripped are typically null.  Fall back to description_html
+        # so the signature actually varies with task content — otherwise every
+        # task has an empty description and a re-queued task with unchanged
+        # updated_at produces a false noop match on the next cycle.
+        description = (
+            str(issue.get("description") or "").strip()
+            or str(issue.get("description_stripped") or "").strip()
+            or str(issue.get("description_html") or "").strip()
+        )
         return "|".join([str(issue.get("id", "")), state_name, updated_at, description])
 
     @staticmethod
