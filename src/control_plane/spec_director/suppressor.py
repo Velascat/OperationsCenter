@@ -38,14 +38,28 @@ def is_suppressed(
 def _load_area_keywords(campaign: "CampaignRecord", specs_dir: Path | None) -> list[str]:
     """Load area_keywords from the campaign's spec front matter."""
     spec_path = Path(campaign.spec_file)
-    if specs_dir is not None and not spec_path.is_absolute():
-        spec_path = specs_dir / spec_path.name
+    # Resolve to an absolute path: if specs_dir is given, look up by filename
+    # (specs live flat in specs_dir, never in subdirectories).
+    # If no specs_dir, use the stored path as-is (may be relative to CWD).
+    if specs_dir is not None:
+        candidate = specs_dir / spec_path.name
+        if candidate.exists():
+            spec_path = candidate
+        elif spec_path.is_absolute() and spec_path.exists():
+            pass  # use the absolute path as stored
+        else:
+            # Try the stored path relative to specs_dir parent
+            spec_path = candidate  # best guess; will fail gracefully below
     try:
         from control_plane.spec_director.models import SpecFrontMatter
         text = spec_path.read_text(encoding="utf-8")
         fm = SpecFrontMatter.from_spec_text(text)
         return fm.area_keywords
-    except Exception:
+    except Exception as exc:
+        logger.debug(
+            '{"event": "spec_keywords_load_failed", "spec_file": "%s", "error": "%s"}',
+            str(campaign.spec_file), str(exc),
+        )
         return []
 
 

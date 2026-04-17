@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Protocol
 
 from control_plane.adapters.plane import PlaneClient
@@ -88,7 +89,7 @@ class CandidateProposerIntegrationService:
             _paths = [str(f) for f in getattr(candidate, "changed_files", [])] + \
                      [str(f) for f in getattr(candidate, "target_paths", [])]
             _title = candidate.proposal_outline.title_hint or candidate.subject
-            if _spec_suppressed(_title, _paths, _active_campaign_list):
+            if _spec_suppressed(_title, _paths, _active_campaign_list, specs_dir=Path("docs/specs")):
                 skipped.append(
                     SkippedProposalResult(
                         candidate_id=candidate.candidate_id,
