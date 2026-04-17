@@ -18,12 +18,8 @@ class CampaignRecord(BaseModel):
     campaign_id: str
     slug: str
     spec_file: str
-    area_keywords: list[str]
     status: Literal["active", "complete", "cancelled", "partial"]
     created_at: str
-    last_progress_at: str | None = None
-    spec_revision_count: int = 0
-    trigger_source: TriggerSource | None = None
 
 
 class ActiveCampaigns(BaseModel):

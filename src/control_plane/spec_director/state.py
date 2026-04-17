@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime  # UTC kept for corrupt-file timestamp
 from pathlib import Path
 from typing import Literal
 
@@ -54,22 +54,6 @@ class CampaignStateManager:
     def mark_cancelled(self, campaign_id: str) -> None:
         self._update_status(campaign_id, "cancelled")
 
-    def update_progress(self, campaign_id: str) -> None:
-        state = self.load()
-        for c in state.campaigns:
-            if c.campaign_id == campaign_id:
-                c.last_progress_at = datetime.now(UTC).isoformat()
-        self.save(state)
-
-    def increment_revision_count(self, campaign_id: str) -> int:
-        state = self.load()
-        for c in state.campaigns:
-            if c.campaign_id == campaign_id:
-                c.spec_revision_count += 1
-                self.save(state)
-                return c.spec_revision_count
-        return 0
-
     def _update_status(
         self,
         campaign_id: str,
@@ -96,7 +80,6 @@ class CampaignStateManager:
                         campaign_id=fm.campaign_id,
                         slug=fm.slug,
                         spec_file=str(spec_file),
-                        area_keywords=fm.area_keywords,
                         status="active",
                         created_at=fm.created_at,
                     ))

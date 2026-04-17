@@ -29,7 +29,7 @@ class RecoveryService:
         self._budget = spec_revision_budget
 
     def is_stalled(self, campaign: CampaignRecord) -> bool:
-        ts_str = campaign.last_progress_at or campaign.created_at
+        ts_str = campaign.created_at
         try:
             last = datetime.fromisoformat(ts_str)
         except Exception:
@@ -46,7 +46,7 @@ class RecoveryService:
         return elapsed > self._abandon_hours
 
     def revision_budget_ok(self, campaign: CampaignRecord) -> bool:
-        return campaign.spec_revision_count < self._budget
+        return True  # spec_revision_count removed; budget check removed in Task 3
 
     def revise_spec(
         self,
@@ -75,7 +75,6 @@ class RecoveryService:
         try:
             revised = call_claude(prompt, model=model)
             spec_file_path.write_text(revised)
-            self._state.increment_revision_count(campaign.campaign_id)
             logger.info(
                 '{"event": "spec_revised", "campaign_id": "%s"}',
                 campaign.campaign_id,

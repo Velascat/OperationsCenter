@@ -11,21 +11,19 @@ def test_campaign_record_defaults():
         campaign_id="abc-123",
         slug="add-auth",
         spec_file="docs/specs/add-auth.md",
-        area_keywords=["src/auth/"],
         status="active",
         created_at="2026-04-15T00:00:00+00:00",
     )
     assert r.status == "active"
-    assert r.last_progress_at is None
-    assert r.spec_revision_count == 0
+    assert r.campaign_id == "abc-123"
 
 
 def test_active_campaigns_active_only():
     ac = ActiveCampaigns(campaigns=[
         CampaignRecord(campaign_id="1", slug="a", spec_file="docs/specs/a.md",
-                       area_keywords=[], status="active", created_at="2026-01-01T00:00:00+00:00"),
+                       status="active", created_at="2026-01-01T00:00:00+00:00"),
         CampaignRecord(campaign_id="2", slug="b", spec_file="docs/specs/b.md",
-                       area_keywords=[], status="complete", created_at="2026-01-01T00:00:00+00:00"),
+                       status="complete", created_at="2026-01-01T00:00:00+00:00"),
     ])
     assert len(ac.active_campaigns()) == 1
     assert ac.active_campaigns()[0].campaign_id == "1"

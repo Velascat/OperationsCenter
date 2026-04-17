@@ -161,11 +161,8 @@ def run_once(settings: Any, client: PlaneClient) -> None:
         campaign_id=result.campaign_id,
         slug=result.slug,
         spec_file=str(spec_path),
-        area_keywords=result.area_keywords,
         status="active",
         created_at=datetime.now(UTC).isoformat(),
-        trigger_source=trigger.source,
-        last_progress_at=datetime.now(UTC).isoformat(),
     )
     state_mgr.add_campaign(campaign_record)
 

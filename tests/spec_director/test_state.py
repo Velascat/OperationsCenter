@@ -15,8 +15,7 @@ def test_save_and_load_roundtrip(tmp_path):
     mgr = CampaignStateManager(state_path=tmp_path / "active.json")
     record = CampaignRecord(
         campaign_id="abc", slug="test", spec_file="docs/specs/test.md",
-        area_keywords=["src/auth/"], status="active",
-        created_at="2026-04-15T00:00:00+00:00",
+        status="active", created_at="2026-04-15T00:00:00+00:00",
     )
     mgr.save(ActiveCampaigns(campaigns=[record]))
     loaded = mgr.load()
@@ -39,7 +38,7 @@ def test_mark_complete(tmp_path):
     mgr = CampaignStateManager(state_path=tmp_path / "active.json")
     record = CampaignRecord(
         campaign_id="abc", slug="test", spec_file="docs/specs/test.md",
-        area_keywords=[], status="active", created_at="2026-04-15T00:00:00+00:00",
+        status="active", created_at="2026-04-15T00:00:00+00:00",
     )
     mgr.save(ActiveCampaigns(campaigns=[record]))
     mgr.mark_complete("abc")
