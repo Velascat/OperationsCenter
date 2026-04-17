@@ -79,8 +79,6 @@ def test_spec_director_settings_defaults():
     assert s.spec_trigger_queue_threshold == 5
     assert s.max_tasks_per_campaign == 6
     assert s.spec_retention_days == 90
-    assert s.spec_revision_budget == 3
-    assert s.campaign_stall_hours == 24
     assert s.campaign_abandon_hours == 72
     assert s.compliance_diff_max_kb == 32
     assert s.brainstorm_context_snapshot_kb == 8

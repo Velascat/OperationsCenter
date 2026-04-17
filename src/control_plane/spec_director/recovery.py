@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from control_plane.spec_director._claude_cli import call_claude
 from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.state import CampaignStateManager
 
@@ -18,74 +17,20 @@ class RecoveryService:
         self,
         client: Any,
         state_manager: CampaignStateManager,
-        stall_hours: int = 24,
         abandon_hours: int = 72,
-        spec_revision_budget: int = 3,
     ) -> None:
         self._client = client
         self._state = state_manager
-        self._stall_hours = stall_hours
         self._abandon_hours = abandon_hours
-        self._budget = spec_revision_budget
-
-    def is_stalled(self, campaign: CampaignRecord) -> bool:
-        ts_str = campaign.created_at
-        try:
-            last = datetime.fromisoformat(ts_str)
-        except Exception:
-            return True
-        elapsed = (datetime.now(UTC) - last).total_seconds() / 3600
-        return elapsed > self._stall_hours
 
     def should_abandon(self, campaign: CampaignRecord) -> bool:
+        """True if campaign has been active beyond abandon_hours."""
         try:
             created = datetime.fromisoformat(campaign.created_at)
         except Exception:
             return True
         elapsed = (datetime.now(UTC) - created).total_seconds() / 3600
         return elapsed > self._abandon_hours
-
-    def revision_budget_ok(self, campaign: CampaignRecord) -> bool:
-        return True  # spec_revision_count removed; budget check removed in Task 3
-
-    def revise_spec(
-        self,
-        campaign: CampaignRecord,
-        violations: list[str],
-        spec_file_path: Path,
-        model: str = "claude-sonnet-4-6",
-    ) -> bool:
-        """Revise the failing spec section via the claude CLI. Returns True on success."""
-        if not self.revision_budget_ok(campaign):
-            logger.warning(
-                '{"event": "spec_revision_budget_exhausted", "campaign_id": "%s"}',
-                campaign.campaign_id,
-            )
-            return False
-        if not spec_file_path.exists():
-            return False
-        spec_text = spec_file_path.read_text()
-        prompt = (
-            "The following spec compliance violations were found:\n"
-            + "\n".join(f"- {v}" for v in violations)
-            + f"\n\nOriginal spec:\n{spec_text}\n\n"
-            + "Revise the spec to resolve these violations. "
-            + "Return the full revised spec document with updated YAML front matter."
-        )
-        try:
-            revised = call_claude(prompt, model=model)
-            spec_file_path.write_text(revised)
-            logger.info(
-                '{"event": "spec_revised", "campaign_id": "%s"}',
-                campaign.campaign_id,
-            )
-            return True
-        except Exception as exc:
-            logger.error(
-                '{"event": "spec_revision_failed", "campaign_id": "%s", "error": "%s"}',
-                campaign.campaign_id, str(exc),
-            )
-            return False
 
     def self_cancel(
         self,
@@ -106,10 +51,7 @@ class RecoveryService:
                 if f"campaign-id: {campaign.campaign_id}" in labels:
                     state_name = str((issue.get("state") or {}).get("name", "")).lower()
                     if state_name not in {"done", "cancelled"}:
-                        self._client.update_issue(
-                            str(issue["id"]),
-                            {"state": "Cancelled"},
-                        )
+                        self._client.transition_issue(str(issue["id"]), "Cancelled")
         except Exception as exc:
             logger.warning(
                 '{"event": "campaign_cancel_issues_error", "error": "%s"}', str(exc)

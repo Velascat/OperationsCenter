@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from control_plane.spec_director.models import CampaignRecord
 
 
-def _stalled_campaign(hours_ago: int = 30) -> CampaignRecord:
+def _campaign(hours_ago: int = 30) -> CampaignRecord:
     past = (datetime.now(UTC) - timedelta(hours=hours_ago)).isoformat()
     return CampaignRecord(
         campaign_id="abc", slug="add-auth", spec_file="docs/specs/add-auth.md",
@@ -14,52 +14,39 @@ def _stalled_campaign(hours_ago: int = 30) -> CampaignRecord:
     )
 
 
-def test_stall_detected_after_threshold():
+def test_abandon_threshold_exceeded():
     from control_plane.spec_director.recovery import RecoveryService
-    campaign = _stalled_campaign(hours_ago=30)
+    campaign = _campaign(hours_ago=80)
     service = RecoveryService(
         client=MagicMock(), state_manager=MagicMock(),
-        stall_hours=24, abandon_hours=72,
-    )
-    assert service.is_stalled(campaign) is True
-
-
-def test_no_stall_when_recent_progress():
-    from control_plane.spec_director.recovery import RecoveryService
-    campaign = _stalled_campaign(hours_ago=1)
-    service = RecoveryService(
-        client=MagicMock(), state_manager=MagicMock(),
-        stall_hours=24, abandon_hours=72,
-    )
-    assert service.is_stalled(campaign) is False
-
-
-def test_abandon_threshold_check():
-    from control_plane.spec_director.recovery import RecoveryService
-    campaign = _stalled_campaign(hours_ago=80)
-    service = RecoveryService(
-        client=MagicMock(), state_manager=MagicMock(),
-        stall_hours=24, abandon_hours=72,
+        abandon_hours=72,
     )
     assert service.should_abandon(campaign) is True
 
 
-def test_spec_revision_within_budget():
+def test_no_abandon_when_recent():
     from control_plane.spec_director.recovery import RecoveryService
-    campaign = _stalled_campaign(hours_ago=1)
+    campaign = _campaign(hours_ago=1)
     service = RecoveryService(
         client=MagicMock(), state_manager=MagicMock(),
-        stall_hours=24, abandon_hours=72, spec_revision_budget=3,
+        abandon_hours=72,
     )
-    assert service.revision_budget_ok(campaign) is True
+    assert service.should_abandon(campaign) is False
 
 
-def test_spec_revision_exhausted():
+def test_self_cancel_marks_cancelled(tmp_path):
     from control_plane.spec_director.recovery import RecoveryService
-    campaign = _stalled_campaign(hours_ago=1)
-    service = RecoveryService(
-        client=MagicMock(), state_manager=MagicMock(),
-        stall_hours=24, abandon_hours=72, spec_revision_budget=3,
-    )
-    # Budget always OK after field removal; Task 3 will remove this method
-    assert service.revision_budget_ok(campaign) is True
+
+    spec_file = tmp_path / "add-auth.md"
+    spec_file.write_text("---\nstatus: active\n---\n# Spec\n")
+
+    state_mock = MagicMock()
+    client_mock = MagicMock()
+    client_mock.list_issues.return_value = []
+
+    service = RecoveryService(client=client_mock, state_manager=state_mock)
+    campaign = _campaign(hours_ago=80)
+    service.self_cancel(campaign, "abandon_hours_exceeded", tmp_path)
+
+    state_mock.mark_cancelled.assert_called_once_with("abc")
+    assert "status: cancelled" in spec_file.read_text()

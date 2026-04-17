@@ -69,9 +69,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     _recovery = RecoveryService(
         client=client,
         state_manager=state_mgr,
-        stall_hours=sd.campaign_stall_hours,
         abandon_hours=sd.campaign_abandon_hours,
-        spec_revision_budget=sd.spec_revision_budget,
     )
     for campaign in active.active_campaigns():
         if _recovery.should_abandon(campaign):

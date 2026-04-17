@@ -80,8 +80,6 @@ class SpecDirectorSettings(BaseModel):
     spec_retention_days: int = 90
     brainstorm_context_snapshot_kb: int = 8
     compliance_diff_max_kb: int = 32
-    spec_revision_budget: int = 3
-    campaign_stall_hours: int = 24
     campaign_abandon_hours: int = 72
 
 
