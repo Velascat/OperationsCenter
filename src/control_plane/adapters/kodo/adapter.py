@@ -95,10 +95,10 @@ class KodoAdapter:
         the kodo invocation mode: "goal" (default), "test", or "improve".
         """
         s = self.settings
-        base = [
-            s.binary,
-            "--goal-file",
-            str(goal_file),
+        # --goal-file, --test, and --improve are mutually exclusive in kodo's
+        # argparse (same group).  Build the shared tail without any mode flag,
+        # then prepend the correct mode flag per kodo_mode.
+        tail = [
             "--project",
             str(repo_path),
             "--team",
@@ -114,10 +114,10 @@ class KodoAdapter:
             "--yes",
         ]
         if kodo_mode == "test":
-            return [s.binary, "--test"] + base[1:]
+            return [s.binary, "--test"] + tail
         if kodo_mode == "improve":
-            return [s.binary, "--improve"] + base[1:]
-        return base
+            return [s.binary, "--improve"] + tail
+        return [s.binary, "--goal-file", str(goal_file)] + tail
 
     @staticmethod
     def _is_codex_quota_error(result: KodoRunResult) -> bool:

@@ -116,7 +116,8 @@ def test_kodo_adapter_build_command_test_mode():
     cmd = adapter.build_command(Path("/tmp/goal.md"), Path("/tmp/repo"), kodo_mode="test")
     assert cmd[0] == "kodo"
     assert "--test" in cmd
-    assert "--goal-file" in cmd
+    # --goal-file and --test are mutually exclusive in kodo's argparse — must not coexist
+    assert "--goal-file" not in cmd
     assert "--improve" not in cmd
 
 
@@ -130,7 +131,8 @@ def test_kodo_adapter_build_command_improve_mode():
     cmd = adapter.build_command(Path("/tmp/goal.md"), Path("/tmp/repo"), kodo_mode="improve")
     assert cmd[0] == "kodo"
     assert "--improve" in cmd
-    assert "--goal-file" in cmd
+    # --goal-file and --improve are mutually exclusive in kodo's argparse — must not coexist
+    assert "--goal-file" not in cmd
     assert "--test" not in cmd
 
 
