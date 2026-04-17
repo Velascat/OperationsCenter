@@ -5,7 +5,7 @@ from pathlib import Path
 # foreign venv. A foreign venv has a different package set and produces
 # misleading results (wrong versions, missing packages, extra packages).
 _REPO_ROOT = Path(__file__).parent.parent.resolve()
-_EXPECTED_VENV = _REPO_ROOT / ".venv"
+_EXPECTED_VENV = (_REPO_ROOT / ".venv").resolve()
 _ACTIVE_PREFIX = Path(sys.prefix).resolve()
 
 if _ACTIVE_PREFIX != _EXPECTED_VENV:
