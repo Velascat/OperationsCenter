@@ -12,7 +12,7 @@ def _make_issue(*, task_id: str, state: str, labels: list[str]) -> dict:
         "name": f"Task {task_id}",
         "state": {"name": state},
         "labels": [{"name": lbl} for lbl in labels],
-        "description": f"## Execution\nrepo: repo_a\nbase_branch: main\nmode: goal\n",
+        "description": "## Execution\nrepo: repo_a\nbase_branch: main\nmode: goal\n",
     }
 
 
@@ -30,14 +30,17 @@ def test_spec_campaign_source_task_is_promoted():
 
     assert "task-1" in promoted
     client.transition_issue.assert_called_once_with("task-1", "Ready for AI")
+    client.comment_issue.assert_called_once()
 
 
-def test_non_spec_campaign_task_without_known_source_is_not_promoted():
+def test_unknown_source_task_is_not_promoted():
+    """A task with an unrecognized source label is not auto-promoted."""
     issue = _make_issue(
         task_id="task-2",
         state="Backlog",
-        labels=["task-kind: goal"],  # no source label, no repo label
+        labels=["task-kind: goal", "source: some-unknown-source", "repo: repo_a"],
     )
     client = MagicMock()
     promoted = promote_backlog_tasks(client, [issue], max_promotions=5)
     assert promoted == []
+    client.transition_issue.assert_not_called()
