@@ -144,17 +144,28 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     # Write spec
     spec_path = spec_writer.write(slug=result.slug, spec_text=result.spec_text)
 
+    # Determine repo from spec front matter
+    from control_plane.spec_director.models import SpecFrontMatter
+    available_repos = list(settings.repos.keys()) if settings.repos else []
+    try:
+        fm = SpecFrontMatter.from_spec_text(result.spec_text)
+        spec_repo_key = fm.repos[0] if fm.repos else (available_repos[0] if available_repos else "")
+    except Exception:
+        spec_repo_key = available_repos[0] if available_repos else ""
+
+    repo_cfg = settings.repos.get(spec_repo_key) if settings.repos else None
+    base_branch = getattr(repo_cfg, "default_branch", "main") if repo_cfg else "main"
+
     # Create Plane campaign tasks
     builder = CampaignBuilder(
         client=client,
         project_id=settings.plane.project_id,
         max_tasks=sd.max_tasks_per_campaign,
     )
-    base_branch = getattr(repo_cfg, "default_branch", "main") if repo_cfg else "main"
     try:
         task_ids = builder.build(
             spec_text=result.spec_text,
-            repo_key=repo_key,
+            repo_key=spec_repo_key,
             base_branch=base_branch,
         )
     except Exception as exc:
