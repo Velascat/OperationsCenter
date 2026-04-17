@@ -18,3 +18,8 @@ tools/report/control_plane/
 state/
 .review/
 .worktrees/
+.kodo/
+uv.lock
+scripts/audit_*.py
+scripts/debug_*.py
+scripts/tmp_*.py
