@@ -15,7 +15,7 @@ class DummyPlaneClient:
             "description": """## Execution
 repo: repo_a
 base_branch: main
-mode: test
+mode: bad_mode
 
 ## Goal
 Do thing.

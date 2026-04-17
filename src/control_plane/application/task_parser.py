@@ -83,9 +83,17 @@ class TaskParser:
             sections[title] = description[content_start:content_end].strip("\n")
         return sections
 
+    # Short-form aliases written by humans or older campaign-builder versions.
+    _MODE_ALIASES: dict[str, str] = {
+        "test": "test_campaign",
+        "improve": "improve_campaign",
+    }
+
     def _normalize_metadata(self, metadata: dict[str, Any]) -> dict[str, object]:
         data = dict(metadata)
         mode = str(data["mode"]).strip().lower()
+        # Accept human-friendly short names alongside canonical names.
+        mode = self._MODE_ALIASES.get(mode, mode)
         if mode not in self.SUPPORTED_MODES:
             raise ValueError(
                 f"Unsupported execution mode '{data['mode']}'. Supported: {sorted(self.SUPPORTED_MODES)}"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from enum import Enum
-from typing import Literal
+from typing import ClassVar, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -63,6 +63,14 @@ class SpecFrontMatter(BaseModel):
     status: str = "active"
     created_at: str = ""
 
+    # Human-friendly phase names → canonical task-mode names used in descriptions.
+    # Specs written by hand (or by Claude) often use the short form; normalise so
+    # campaign_builder always writes the correct `mode:` value into task descriptions.
+    _PHASE_ALIASES: ClassVar[dict[str, str]] = {
+        "test": "test_campaign",
+        "improve": "improve_campaign",
+    }
+
     @classmethod
     def from_spec_text(cls, text: str) -> "SpecFrontMatter":
         """Parse YAML front matter from a spec document."""
@@ -80,4 +88,7 @@ class SpecFrontMatter(BaseModel):
             for k, v in data.items()
             if k in cls.model_fields
         }
-        return cls(**normalized)
+        fm = cls(**normalized)
+        # Normalise short-form phase names so campaign tasks get the correct mode.
+        fm.phases = [cls._PHASE_ALIASES.get(p, p) for p in fm.phases]
+        return fm

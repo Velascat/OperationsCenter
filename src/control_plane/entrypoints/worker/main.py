@@ -4070,6 +4070,22 @@ def build_improve_triage_result(
             recommended_action="retry",
             human_attention_required=False,
         )
+    if classification == "parse_config":
+        # The task description or repo config is structurally invalid — kodo
+        # cannot execute it and retrying will never help.  Creating a
+        # "Resolve blocked" follow-up would also fail for the same reason.
+        # Cancel the task so the board stays clean and the proposer can
+        # eventually re-propose a correctly-formed replacement.
+        return ImproveTriageResult(
+            classification=classification,
+            certainty="high",
+            reason_summary=(
+                f"{rationale} This is a structural description or configuration problem "
+                "that cannot be fixed by re-running the task — cancelling to keep the board clean."
+            ),
+            recommended_action="cancel",
+            human_attention_required=False,
+        )
     if classification == UNKNOWN_BLOCKED_CLASSIFICATION:
         return ImproveTriageResult(
             classification=classification,
@@ -6606,6 +6622,7 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
             "recursive unblock follow-up."
         )
 
+    _triage_result_status = "cancelled" if triage.recommended_action == "cancel" else "blocked"
     client.comment_issue(
         task_id,
         render_worker_comment(
@@ -6613,7 +6630,7 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
             [
                 f"task_id: {task_id}",
                 f"task_kind: {task_kind_for_issue(issue)}",
-                "result_status: blocked",
+                f"result_status: {_triage_result_status}",
                 f"blocked_classification: {triage.classification}",
                 f"certainty: {triage.certainty}",
                 f"reason: {triage.reason_summary}",
@@ -6628,6 +6645,10 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
         # Auto-retry path (e.g. infra_tooling): move back to Ready for AI so
         # the goal watcher picks it up again without manual operator action.
         client.transition_issue(task_id, "Ready for AI")
+    elif triage.recommended_action == "cancel":
+        # Structural problem (parse_config): no retry will help; cancel so the
+        # board stays clean and the proposer can re-create a valid replacement.
+        client.transition_issue(task_id, "Cancelled")
     else:
         client.transition_issue(task_id, "Blocked")
     # Record triage event for escalation tracking

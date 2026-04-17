@@ -77,9 +77,41 @@ def test_parser_rejects_invalid_execution_mode() -> None:
             """## Execution
 repo: repo_a
 base_branch: main
-mode: improve
+mode: totally_invalid
 
 ## Goal
 Do the thing.
 """
         )
+
+
+def test_parser_accepts_mode_test_alias() -> None:
+    """'mode: test' is a human-friendly alias for 'test_campaign'."""
+    parser = TaskParser()
+    parsed = parser.parse(
+        """## Execution
+repo: repo_a
+base_branch: main
+mode: test
+
+## Goal
+Run verification tests.
+"""
+    )
+    assert parsed.execution_metadata["mode"] == "test_campaign"
+
+
+def test_parser_accepts_mode_improve_alias() -> None:
+    """'mode: improve' is a human-friendly alias for 'improve_campaign'."""
+    parser = TaskParser()
+    parsed = parser.parse(
+        """## Execution
+repo: repo_a
+base_branch: main
+mode: improve
+
+## Goal
+Simplify the implementation.
+"""
+    )
+    assert parsed.execution_metadata["mode"] == "improve_campaign"
