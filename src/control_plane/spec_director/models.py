@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 class TriggerSource(str, Enum):
     DROP_FILE = "drop_file"
-    PLANE_LABEL = "plane_label"
     QUEUE_DRAIN = "queue_drain"
 
 

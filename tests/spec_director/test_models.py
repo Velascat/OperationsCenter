@@ -67,8 +67,8 @@ body text
 
 def test_trigger_source_values():
     assert TriggerSource.DROP_FILE == "drop_file"
-    assert TriggerSource.PLANE_LABEL == "plane_label"
     assert TriggerSource.QUEUE_DRAIN == "queue_drain"
+    assert not hasattr(TriggerSource, "PLANE_LABEL")
 
 
 def test_spec_director_settings_defaults():
@@ -76,7 +76,6 @@ def test_spec_director_settings_defaults():
     s = SpecDirectorSettings()
     assert s.enabled is True
     assert s.poll_interval_seconds == 120
-    assert s.spec_trigger_queue_threshold == 5
     assert s.max_tasks_per_campaign == 6
     assert s.spec_retention_days == 90
     assert s.campaign_abandon_hours == 72

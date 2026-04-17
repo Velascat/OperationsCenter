@@ -39,6 +39,17 @@ def _count_ready_tasks(client: PlaneClient) -> int:
         return 99  # fail-safe: don't trigger queue drain on error
 
 
+def _count_running_tasks(client: PlaneClient) -> int:
+    try:
+        issues = client.list_issues()
+        return sum(
+            1 for i in issues
+            if str((i.get("state") or {}).get("name", "")).lower() == "in progress"
+        )
+    except Exception:
+        return 99  # fail-safe: don't trigger queue drain on error
+
+
 def _collect_board_summary(client: PlaneClient) -> list[dict]:
     try:
         issues = client.list_issues()
@@ -82,18 +93,17 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     # Trigger detection
     trigger_detector = TriggerDetector(
         drop_file_path=Path(sd.drop_file_path),
-        plane_spec_label=sd.plane_spec_label,
-        queue_threshold=sd.spec_trigger_queue_threshold,
-        client=client,
     )
     ready_count = _count_ready_tasks(client)
+    running_count = _count_running_tasks(client)
     trigger = trigger_detector.detect(
         ready_count=ready_count,
+        running_count=running_count,
         has_active_campaign=active.has_active(),
     )
 
     if trigger is None:
-        logger.info(json.dumps({"event": "spec_no_trigger", "ready_count": ready_count, "has_active": active.has_active()}))
+        logger.info(json.dumps({"event": "spec_no_trigger", "ready_count": ready_count, "running_count": running_count, "has_active": active.has_active()}))
         return
 
     logger.info(json.dumps({

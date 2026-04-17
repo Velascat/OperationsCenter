@@ -70,11 +70,9 @@ class ErrorIngestSettings(BaseModel):
 class SpecDirectorSettings(BaseModel):
     enabled: bool = True
     poll_interval_seconds: int = 120
-    spec_trigger_queue_threshold: int = 5
     brainstorm_model: str = "claude-opus-4-6"
     compliance_model: str = "claude-sonnet-4-6"
     drop_file_path: str = "state/spec_direction.md"
-    plane_spec_label: str = "spec-request"
     max_active_campaigns: int = 1
     max_tasks_per_campaign: int = 6
     spec_retention_days: int = 90
