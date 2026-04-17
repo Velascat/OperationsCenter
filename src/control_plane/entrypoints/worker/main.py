@@ -1081,7 +1081,7 @@ def promote_backlog_tasks(
         # systematic source labeling and would otherwise sit in Backlog forever.
         # reviewer-dep-conflict and post-merge-ci are autonomy-generated and should
         # flow freely without waiting for a human to promote them.
-        _AUTO_SOURCES = {"proposer", "autonomy", "improve-worker", "reviewer-dep-conflict", "post-merge-ci"}
+        _AUTO_SOURCES = {"proposer", "autonomy", "improve-worker", "reviewer-dep-conflict", "post-merge-ci", "multi-step-plan"}
         if source in _AUTO_SOURCES or (has_repo_label and not source):
             candidates.append(issue)
     if not candidates:
