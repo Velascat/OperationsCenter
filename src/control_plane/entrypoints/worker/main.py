@@ -6156,15 +6156,19 @@ def handle_propose_cycle(
             ),
         )
 
-    # Promote existing Backlog tasks whenever nothing is actively being worked on,
-    # regardless of total backlog size. The board_idle check also requires
-    # open_count <= LOW_BACKLOG_THRESHOLD, which creates a deadlock when many Backlog
-    # tasks exist but nothing is in RFA/Running — nothing runs because nothing is
-    # promoted, and nothing is promoted because the board looks "not idle".
-    # We only reach here when autonomy saturation hasn't fired, so it's safe to promote.
+    # Promote existing Backlog tasks whenever the board has capacity.  Previously
+    # this only fired when active_count == 0, which caused a deadlock with
+    # multi-step-plan sub-tasks: after step 1 runs, the board still has other
+    # RFA tasks, so active_count > 0 → promotion never fires → steps 2/3 stuck
+    # in Backlog indefinitely.  We now promote up to the congestion limit so
+    # queued Backlog tasks (proposer, multi-step-plan, etc.) flow through as
+    # capacity opens up.
     active_count = active_task_count_from_issues(issues, service=service)
-    if active_count == 0:
-        promoted_ids = promote_backlog_tasks(client, issues, service=service)
+    _promotion_slots = max(0, MAX_ACTIVE_TASKS_FOR_PROPOSALS - active_count)
+    if _promotion_slots > 0:
+        promoted_ids = promote_backlog_tasks(
+            client, issues, max_promotions=_promotion_slots, service=service
+        )
         if promoted_ids:
             logger = logging.getLogger(__name__)
             logger.info(json.dumps({"event": "propose_backlog_promoted", "task_ids": promoted_ids}))
