@@ -5780,8 +5780,15 @@ def create_proposed_task_if_missing(
         return None
     # S8-3b: Semantic near-duplicate check — suppress proposals whose title is
     # highly similar to an existing board task even if the wording differs.
+    _new_files = _extract_filename_tokens(normalized_title)
     for existing_name in existing_names:
         if _semantic_title_similarity(normalized_title, existing_name) >= _SEMANTIC_DEDUP_THRESHOLD:
+            # If both titles name specific .py files but those files don't overlap,
+            # they target different code — not a duplicate (e.g. "Decompose main.py"
+            # must not be suppressed by "Decompose stage_driver.py").
+            _existing_files = _extract_filename_tokens(existing_name)
+            if _new_files and _existing_files and not (_new_files & _existing_files):
+                continue
             _logger.info(json.dumps({
                 "event": "propose_semantic_dedup_suppressed",
                 "title": proposal.title,
@@ -5804,6 +5811,9 @@ def create_proposed_task_if_missing(
     if done_names:
         for done_name in done_names:
             if _semantic_title_similarity(normalized_title, done_name) >= _SEMANTIC_DEDUP_THRESHOLD:
+                _done_files = _extract_filename_tokens(done_name)
+                if _new_files and _done_files and not (_new_files & _done_files):
+                    continue
                 _logger.info(json.dumps({
                     "event": "propose_done_dedup_suppressed",
                     "title": proposal.title,

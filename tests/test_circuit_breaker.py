@@ -49,6 +49,13 @@ Do something.
     return pc
 
 
+@pytest.fixture(autouse=True)
+def _isolate_usage_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Redirect usage store to a temp path so tests don't pollute the real store."""
+    usage_path = tmp_path / "usage.json"
+    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(usage_path))
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings.model_validate(
