@@ -2488,6 +2488,31 @@ def handle_stale_autonomy_task_scan(
 # S7-5: Dependency update loop
 # ---------------------------------------------------------------------------
 
+_REQUIREMENTS_GLOB_PATTERNS = [
+    "requirements*.txt",
+    "requirements/*.txt",
+    "pyproject.toml",
+    "setup.cfg",
+    "setup.py",
+    "package.json",
+]
+
+
+def _discover_requirements_paths(repo_path: Path) -> list[str]:
+    """Return repo-relative paths to dependency manifests found in *repo_path*.
+
+    Results are sorted and deduplicated.  Falls back to ``requirements.txt``
+    when nothing is found so the task description always has at least one entry.
+    """
+    found: list[str] = []
+    for pattern in _REQUIREMENTS_GLOB_PATTERNS:
+        for match in sorted(repo_path.glob(pattern)):
+            rel = str(match.relative_to(repo_path))
+            if rel not in found:
+                found.append(rel)
+    return found or ["requirements.txt"]
+
+
 def handle_dependency_update_scan(
     client: PlaneClient,
     service: "ExecutionService",
@@ -2556,22 +2581,30 @@ def handle_dependency_update_scan(
                 if task_title.lower() in existing_names:
                     continue
                 base_branch = getattr(repo_cfg, "default_branch", "main")
+                _req_paths = _discover_requirements_paths(repo_path)
+                _allowed_paths_yaml = "\n".join(f"  - {p}" for p in _req_paths)
                 new_issue = client.create_issue(
                     name=task_title,
                     description=(
                         f"## Execution\n"
                         f"repo: {repo_key}\n"
                         f"base_branch: {base_branch}\n"
-                        f"mode: goal\n\n"
+                        f"mode: goal\n"
+                        f"allowed_paths:\n{_allowed_paths_yaml}\n\n"
                         f"## Goal\n"
                         f"Update the `{name}` dependency from `{current}` to `{latest}` "
-                        f"(major version bump). Verify the upgrade does not break existing "
-                        f"tests or imports. Update any API callsites that have changed.\n\n"
+                        f"(major version bump). Bump the version pin in the relevant "
+                        f"requirements file(s) and verify the upgrade does not break "
+                        f"existing tests or imports. Do NOT modify source files beyond "
+                        f"the requirements files listed in allowed_paths — if API "
+                        f"callsites need updating, surface that as a separate concern "
+                        f"in the PR description.\n\n"
                         f"## Constraints\n"
                         f"- source: dependency_update_scan\n"
                         f"- package: {name}\n"
                         f"- current_version: {current}\n"
                         f"- target_version: {latest}\n"
+                        f"- Only edit files listed in allowed_paths (requirements files).\n"
                         f"- Run validation commands after upgrading to confirm no regressions.\n"
                     ),
                     state="Backlog",
