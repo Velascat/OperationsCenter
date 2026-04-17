@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from control_plane.spec_director.phase_orchestrator import PhaseOrchestrator
-from control_plane.spec_director.models import ActiveCampaigns, CampaignRecord
+from control_plane.spec_director.models import CampaignRecord
 from control_plane.spec_director.state import CampaignStateManager
 
 
@@ -108,7 +108,7 @@ def test_does_not_advance_if_implement_blocked(tmp_path):
             "spec_campaign_id: test-campaign-uuid\nspec_file: docs/specs/my-slug.md\n"
             "task_phase: implement\nblock_rewrite_count: 1\n\n## Goal\nRewritten.\n"
         )
-        result = orch.run(issues)
+        orch.run(issues)
 
     # test-1 must NOT be transitioned to Ready for AI (implement is blocked, not terminal)
     transition_calls = [str(c) for c in client.transition_issue.call_args_list]
