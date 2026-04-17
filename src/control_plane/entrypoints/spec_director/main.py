@@ -17,6 +17,7 @@ from control_plane.spec_director.brainstorm import BrainstormService
 from control_plane.spec_director.campaign_builder import CampaignBuilder
 from control_plane.spec_director.context_bundle import ContextBundleBuilder
 from control_plane.spec_director.models import CampaignRecord
+from control_plane.spec_director.phase_orchestrator import PhaseOrchestrator
 from control_plane.spec_director.recovery import RecoveryService
 from control_plane.spec_director.spec_writer import SpecWriter
 from control_plane.spec_director.state import CampaignStateManager
@@ -28,33 +29,13 @@ logger = logging.getLogger(__name__)
 _SPECS_DIR = Path("docs/specs")
 
 
-def _count_ready_tasks(client: PlaneClient) -> int:
-    try:
-        issues = client.list_issues()
-        return sum(
-            1 for i in issues
-            if str((i.get("state") or {}).get("name", "")).lower() == "ready for ai"
-        )
-    except Exception:
-        return 99  # fail-safe: don't trigger queue drain on error
-
-
-def _count_running_tasks(client: PlaneClient) -> int:
-    try:
-        issues = client.list_issues()
-        return sum(
-            1 for i in issues
-            if str((i.get("state") or {}).get("name", "")).lower() == "in progress"
-        )
-    except Exception:
-        return 99  # fail-safe: don't trigger queue drain on error
-
-
-def _collect_board_issues(client: PlaneClient) -> list[dict]:
-    try:
-        return client.list_issues()
-    except Exception:
-        return []
+def _count_state(issues: list[dict], state_name: str) -> int:
+    """Count issues matching a board state name (case-insensitive)."""
+    target = state_name.lower()
+    return sum(
+        1 for i in issues
+        if str((i.get("state") or {}).get("name", "")).lower() == target
+    )
 
 
 def run_once(settings: Any, client: PlaneClient) -> None:
@@ -66,32 +47,55 @@ def run_once(settings: Any, client: PlaneClient) -> None:
 
     state_mgr = CampaignStateManager()
     spec_writer = SpecWriter(specs_dir=_SPECS_DIR)
-
-    # Rotate expired specs
     spec_writer.archive_expired(retention_days=sd.spec_retention_days)
 
-    active = state_mgr.load()
+    # Step 1: Fetch all issues once — shared across orchestration, recovery, and trigger detection
+    try:
+        all_issues = client.list_issues()
+    except Exception as exc:
+        logger.error(json.dumps({"event": "spec_board_fetch_failed", "error": str(exc)}))
+        return
 
-    # Recovery scan
-    _recovery = RecoveryService(
+    # Step 2: Phase orchestration — advance phases, unblock tasks, detect completions
+    orch = PhaseOrchestrator(
+        client=client,
+        state_manager=state_mgr,
+        specs_dir=_SPECS_DIR,
+    )
+    orch_result = orch.run(all_issues)
+    if any([
+        orch_result.phases_advanced,
+        orch_result.tasks_unblocked,
+        orch_result.tasks_cancelled,
+        orch_result.campaigns_completed,
+    ]):
+        logger.info(json.dumps({
+            "event": "spec_phase_orchestration",
+            "phases_advanced": orch_result.phases_advanced,
+            "tasks_unblocked": orch_result.tasks_unblocked,
+            "tasks_cancelled": orch_result.tasks_cancelled,
+            "campaigns_completed": orch_result.campaigns_completed,
+        }))
+
+    # Step 3: Recovery scan (runs after orchestration so completions are already processed)
+    active = state_mgr.load()
+    recovery = RecoveryService(
         client=client,
         state_manager=state_mgr,
         abandon_hours=sd.campaign_abandon_hours,
     )
     for campaign in active.active_campaigns():
-        if _recovery.should_abandon(campaign):
-            _recovery.self_cancel(campaign, "abandon_hours_exceeded", _SPECS_DIR)
+        if recovery.should_abandon(campaign):
+            recovery.self_cancel(campaign, "abandon_hours_exceeded", _SPECS_DIR)
             logger.info(json.dumps({"event": "spec_campaign_abandoned", "campaign_id": campaign.campaign_id}))
 
     # Reload after potential cancellations
     active = state_mgr.load()
 
-    # Trigger detection
-    trigger_detector = TriggerDetector(
-        drop_file_path=Path(sd.drop_file_path),
-    )
-    ready_count = _count_ready_tasks(client)
-    running_count = _count_running_tasks(client)
+    # Step 4: Trigger detection — derive counts from already-fetched issues
+    ready_count = _count_state(all_issues, "ready for ai")
+    running_count = _count_state(all_issues, "in progress")
+    trigger_detector = TriggerDetector(drop_file_path=Path(sd.drop_file_path))
     trigger = trigger_detector.detect(
         ready_count=ready_count,
         running_count=running_count,
@@ -99,7 +103,12 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     )
 
     if trigger is None:
-        logger.info(json.dumps({"event": "spec_no_trigger", "ready_count": ready_count, "running_count": running_count, "has_active": active.has_active()}))
+        logger.info(json.dumps({
+            "event": "spec_no_trigger",
+            "ready_count": ready_count,
+            "running_count": running_count,
+            "has_active": active.has_active(),
+        }))
         return
 
     logger.info(json.dumps({
@@ -115,7 +124,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
         logger.error(json.dumps({"event": "spec_disk_space_critical", "error": str(exc)}))
         return
 
-    # Build context bundle
+    # Step 5a: Build context bundle — reuse already-fetched issues
     available_repos = list(settings.repos.keys()) if settings.repos else []
     git_logs: dict[str, str] = {}
     for rk, rcfg in (settings.repos or {}).items():
@@ -124,16 +133,15 @@ def run_once(settings: Any, client: PlaneClient) -> None:
 
     bundle_builder = ContextBundleBuilder()
     specs_index = ContextBundleBuilder.collect_specs_index(_SPECS_DIR)
-    board_issues = _collect_board_issues(client)
     bundle = bundle_builder.build(
         seed_text=trigger.seed_text,
-        board_issues=board_issues,
+        board_issues=all_issues,
         specs_index=specs_index,
         git_logs=git_logs,
         available_repos=available_repos,
     )
 
-    # Brainstorm
+    # Step 5b: Brainstorm
     brainstorm_svc = BrainstormService(model=sd.brainstorm_model)
     try:
         result = brainstorm_svc.brainstorm(bundle)
@@ -141,7 +149,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
         logger.error(json.dumps({"event": "spec_brainstorm_failed", "error": str(exc)}))
         return
 
-    # Write spec
+    # Step 5c: Write spec
     spec_path = spec_writer.write(slug=result.slug, spec_text=result.spec_text)
 
     # Determine repo from spec front matter
@@ -156,7 +164,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     repo_cfg = settings.repos.get(spec_repo_key) if settings.repos else None
     base_branch = getattr(repo_cfg, "default_branch", "main") if repo_cfg else "main"
 
-    # Create Plane campaign tasks
+    # Step 5d: Create Plane campaign tasks
     builder = CampaignBuilder(
         client=client,
         project_id=settings.plane.project_id,
@@ -173,7 +181,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
         spec_path.unlink(missing_ok=True)
         return
 
-    # Record in state
+    # Step 5e: Record in state
     campaign_record = CampaignRecord(
         campaign_id=result.campaign_id,
         slug=result.slug,
