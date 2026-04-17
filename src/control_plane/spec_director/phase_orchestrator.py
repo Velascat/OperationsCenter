@@ -67,8 +67,19 @@ def _set_rewrite_count(description: str, count: int) -> str:
         count=1,
     )
     if updated == description:
-        # Fallback: append before ## Goal section
-        updated = description.replace("## Goal\n", f"block_rewrite_count: {count}\n\n## Goal\n", 1)
+        # Fallback: inject at end of ## Execution section (before next ## or end of string)
+        new_updated = re.sub(
+            r"(## Execution\n(?:(?!##).)*?)(\n## |\Z)",
+            lambda m: m.group(1) + f"\nblock_rewrite_count: {count}" + m.group(2),
+            description,
+            count=1,
+            flags=re.DOTALL,
+        )
+        if new_updated != description:
+            updated = new_updated
+        else:
+            # No ## Execution section at all — append at end
+            updated = description.rstrip("\n") + f"\nblock_rewrite_count: {count}\n"
     return updated
 
 
@@ -159,7 +170,7 @@ class PhaseOrchestrator:
             if backlog_test:
                 self._comment_parent(
                     by_phase["parent"],
-                    f"Advancing to test phase: {len(backlog_test)} task(s) promoted.",
+                    f"Advancing to test phase: {len(backlog_test)} tasks promoted.",
                 )
                 logger.info(
                     '{"event": "phase_advanced", "campaign_id": "%s", "to": "test_campaign", "count": %d}',
@@ -175,7 +186,7 @@ class PhaseOrchestrator:
             if backlog_improve:
                 self._comment_parent(
                     by_phase["parent"],
-                    f"Advancing to improve phase: {len(backlog_improve)} task(s) promoted.",
+                    f"Advancing to improve phase: {len(backlog_improve)} tasks promoted.",
                 )
                 logger.info(
                     '{"event": "phase_advanced", "campaign_id": "%s", "to": "improve_campaign", "count": %d}',
@@ -191,7 +202,7 @@ class PhaseOrchestrator:
                 self._client.transition_issue(str(parent["id"]), "Done")
                 self._client.comment_issue(
                     str(parent["id"]),
-                    f"Campaign complete. {done_n} task(s) done, {cancelled_n} cancelled.",
+                    f"Campaign complete. {done_n} tasks done, {cancelled_n} cancelled.",
                 )
             self._state.mark_complete(campaign_id)
             result.campaigns_completed += 1
@@ -215,12 +226,25 @@ class PhaseOrchestrator:
                 issue.get("description") or issue.get("description_stripped") or ""
             )
 
+        # Fetch the most recent comment (failure comment left by kodo)
+        last_comment_body: str | None = None
+        try:
+            comments = self._client.list_issue_comments(task_id)
+            if comments:
+                last_comment_body = str(comments[-1].get("body", "") or "")
+        except Exception:
+            logger.debug(
+                '{"event": "blocked_comments_fetch_failed", "task_id": "%s"}',
+                task_id,
+            )
+
         rewrite_count = _parse_rewrite_count(description)
         if rewrite_count >= self._max_rewrites:
+            cancel_reason = last_comment_body or "no reason available"
             self._client.transition_issue(task_id, "Cancelled")
             self._client.comment_issue(
                 task_id,
-                f"Task cancelled after {self._max_rewrites} rewrite attempts.",
+                f"Task cancelled after {self._max_rewrites} rewrite attempts: {cancel_reason}",
             )
             result.tasks_cancelled += 1
             logger.info(
@@ -241,6 +265,8 @@ class PhaseOrchestrator:
         )
         if spec_text:
             prompt += f"\n## Spec context (do not change the spec)\n{spec_text[:3000]}\n"
+        if last_comment_body:
+            prompt += f"\n## Failure comment\n{last_comment_body}\n"
 
         try:
             rewritten = call_claude(prompt)
