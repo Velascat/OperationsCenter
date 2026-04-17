@@ -12,6 +12,8 @@ class ObservationCoverageDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        if not snapshots:
+            return []
         current = snapshots[0]
         insights: list[DerivedInsight] = []
         unavailable_signals = set(current.collector_errors.keys())

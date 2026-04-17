@@ -12,6 +12,8 @@ class DependencyDriftDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        if not snapshots:
+            return []
         current_status = snapshots[0].signals.dependency_drift.status
         insights: list[DerivedInsight] = []
         if current_status == "available":

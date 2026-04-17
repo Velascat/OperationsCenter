@@ -47,8 +47,20 @@ class TaskParser:
 
         goal_text = sections.get("goal", "").strip()
         if not goal_text:
-            # No ## Goal section — treat full description as the goal (label-based tasks)
-            goal_text = (description or "").strip()
+            # No ## Goal section — strip ## Execution block and use remainder as goal
+            fallback = (description or "").strip()
+            if execution_raw and fallback:
+                # Remove the ## Execution header and its content from the fallback
+                exec_match = re.search(r"##\s+Execution\s*\n", fallback, re.IGNORECASE)
+                if exec_match:
+                    # Remove from the ## Execution header to the next ## header or end
+                    remaining = fallback[exec_match.end():]
+                    next_header = re.search(r"^##\s+", remaining, re.MULTILINE)
+                    if next_header:
+                        fallback = fallback[:exec_match.start()].strip() + "\n" + remaining[next_header.start():].strip()
+                    else:
+                        fallback = fallback[:exec_match.start()].strip()
+            goal_text = fallback.strip()
         if not goal_text:
             raise ValueError(
                 "Missing goal text. Add a '## Goal' section or write the goal as the task description."

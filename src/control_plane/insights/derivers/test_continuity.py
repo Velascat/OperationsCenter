@@ -19,6 +19,8 @@ class TestContinuityDeriver:
         when the same status repeats for >= 2 snapshots and a ``transition``
         insight whenever the status changes between adjacent snapshots.
         """
+        if not snapshots:
+            return []
         current_status = snapshots[0].signals.test_signal.status
         consecutive = 0
         consecutive_snapshots: list[RepoStateSnapshot] = []

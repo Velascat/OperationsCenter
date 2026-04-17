@@ -12,6 +12,8 @@ class FileHotspotsDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        if not snapshots:
+            return []
         current = snapshots[0]
         hotspots = current.signals.file_hotspots
         if not hotspots:

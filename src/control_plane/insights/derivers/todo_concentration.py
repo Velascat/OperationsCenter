@@ -12,6 +12,8 @@ class TodoConcentrationDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        if not snapshots:
+            return []
         current = snapshots[0].signals.todo_signal
         insights: list[DerivedInsight] = []
         total = current.todo_count + current.fixme_count

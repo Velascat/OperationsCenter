@@ -43,6 +43,18 @@ class InsightEngineService:
             snapshot_run_id=context.snapshot_run_id,
             history_limit=context.history_limit,
         )
+        if not snapshots:
+            # No snapshots available — return empty artifact
+            artifact = RepoInsightsArtifact(
+                run_id=context.run_id,
+                generated_at=context.generated_at,
+                source_command=context.source_command,
+                repo=InsightRepoRef(name=context.repo_filter or "unknown", path=""),
+                source_snapshots=[],
+                insights=[],
+            )
+            written = self.artifact_writer.write(artifact) if self.artifact_writer else []
+            return artifact, written
         current = snapshots[0]
         insights = []
         for deriver in self.derivers:

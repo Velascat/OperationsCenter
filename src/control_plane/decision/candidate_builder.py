@@ -34,24 +34,28 @@ def _synthesize_evidence_bundle(
     """
     ev = cast(dict[str, Any], evidence)
     if family == "lint_fix":
-        count_raw = ev.get("violation_count") or ev.get("current_count")
+        count_raw = ev.get("violation_count")
+        if count_raw is None:
+            count_raw = ev.get("current_count")
         return EvidenceBundle(
             kind="lint_count",
             count=int(count_raw) if count_raw is not None else None,
             distinct_file_count=int(ev["distinct_file_count"]) if "distinct_file_count" in ev else None,
             delta=int(ev["delta"]) if "delta" in ev else None,
-            trend="worsening" if "delta" in ev else "present",
+            trend="worsening" if ev.get("delta", 0) > 0 else ("improving" if ev.get("delta", 0) < 0 else "present"),
             top_codes=[str(c) for c in ev.get("top_codes", [])],
             source=str(ev.get("source", "ruff")),
         )
     if family == "type_fix":
-        count_raw = ev.get("error_count") or ev.get("current_count")
+        count_raw = ev.get("error_count")
+        if count_raw is None:
+            count_raw = ev.get("current_count")
         return EvidenceBundle(
             kind="type_count",
             count=int(count_raw) if count_raw is not None else None,
             distinct_file_count=int(ev["distinct_file_count"]) if "distinct_file_count" in ev else None,
             delta=int(ev["delta"]) if "delta" in ev else None,
-            trend="worsening" if "delta" in ev else "present",
+            trend="worsening" if ev.get("delta", 0) > 0 else ("improving" if ev.get("delta", 0) < 0 else "present"),
             top_codes=[str(c) for c in ev.get("top_codes", [])],
             source=str(ev.get("source", "type_checker")),
         )

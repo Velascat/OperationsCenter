@@ -12,6 +12,8 @@ class CommitActivityDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        if not snapshots:
+            return []
         current = snapshots[0]
         current_count = len(current.signals.recent_commits)
         current_authors = len({commit.author for commit in current.signals.recent_commits})

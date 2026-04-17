@@ -12,6 +12,8 @@ class DirtyTreeDeriver:
         self.normalizer = normalizer
 
     def derive(self, snapshots: Sequence[RepoStateSnapshot]) -> list[DerivedInsight]:
+        if not snapshots:
+            return []
         current = snapshots[0]
         if not current.repo.is_dirty:
             return []

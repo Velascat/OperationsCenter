@@ -167,6 +167,84 @@ class ExecutionService:
                 allowed_paths=task.allowed_paths,
             )
             signature = self.usage_store.issue_signature(issue)
+
+            # Circuit-breaker: skip if an unresolved fix-validation task exists for the repo
+            fix_task_id = self._find_open_fix_validation_task(plane_client, task.repo_key, skip_task_id=task.task_id)
+            if fix_task_id is not None:
+                self._log_event(
+                    "circuit_breaker_skip",
+                    run_id,
+                    fix_task_id=fix_task_id,
+                    repo_key=task.repo_key,
+                )
+                result = ExecutionResult(
+                    run_id=run_id,
+                    worker_role=worker_role,
+                    task_kind=task.execution_mode,
+                    success=True,
+                    outcome_status="skipped",
+                    outcome_reason=f"open_fix_validation_task:{fix_task_id}",
+                    summary=(
+                        f"run_id={run_id} status=skipped reason=open_fix_validation_task "
+                        f"fix_task={fix_task_id} repo={task.repo_key}"
+                    ),
+                    final_status=task.status,
+                    artifacts=artifacts,
+                )
+                artifacts.append(
+                    self.reporter.write_control_outcome(
+                        run_dir,
+                        {
+                            "action": "execute_task",
+                            "status": "skipped",
+                            "reason": "open_fix_validation_task",
+                            "fix_task_id": fix_task_id,
+                            "repo_key": task.repo_key,
+                            "task_id": task.task_id,
+                            "worker_role": worker_role,
+                        },
+                    )
+                )
+                artifacts.append(self.reporter.write_summary(run_dir, result))
+                return result
+
+            # Circuit-breaker: skip if recent runs show repeated unknown/error outcomes
+            if self._check_repeated_unknown_failures(task.repo_key):
+                self._log_event(
+                    "circuit_breaker_skip_unknown_failures",
+                    run_id,
+                    repo_key=task.repo_key,
+                )
+                result = ExecutionResult(
+                    run_id=run_id,
+                    worker_role=worker_role,
+                    task_kind=task.execution_mode,
+                    success=True,
+                    outcome_status="skipped",
+                    outcome_reason="repeated_unknown_failures",
+                    summary=(
+                        f"run_id={run_id} status=skipped reason=repeated_unknown_failures "
+                        f"repo={task.repo_key}"
+                    ),
+                    final_status=task.status,
+                    artifacts=artifacts,
+                )
+                artifacts.append(
+                    self.reporter.write_control_outcome(
+                        run_dir,
+                        {
+                            "action": "execute_task",
+                            "status": "skipped",
+                            "reason": "repeated_unknown_failures",
+                            "repo_key": task.repo_key,
+                            "task_id": task.task_id,
+                            "worker_role": worker_role,
+                        },
+                    )
+                )
+                artifacts.append(self.reporter.write_summary(run_dir, result))
+                return result
+
             if not preauthorized:
                 noop = self.usage_store.noop_decision(role=worker_role, task_id=task.task_id, signature=signature)
                 if noop.should_skip:
@@ -286,83 +364,6 @@ class ExecutionService:
                     )
                     artifacts.append(self.reporter.write_summary(run_dir, result))
                     return result
-
-            # Circuit-breaker: skip if an unresolved fix-validation task exists for the repo
-            fix_task_id = self._find_open_fix_validation_task(plane_client, task.repo_key, skip_task_id=task.task_id)
-            if fix_task_id is not None:
-                self._log_event(
-                    "circuit_breaker_skip",
-                    run_id,
-                    fix_task_id=fix_task_id,
-                    repo_key=task.repo_key,
-                )
-                result = ExecutionResult(
-                    run_id=run_id,
-                    worker_role=worker_role,
-                    task_kind=task.execution_mode,
-                    success=True,
-                    outcome_status="skipped",
-                    outcome_reason=f"open_fix_validation_task:{fix_task_id}",
-                    summary=(
-                        f"run_id={run_id} status=skipped reason=open_fix_validation_task "
-                        f"fix_task={fix_task_id} repo={task.repo_key}"
-                    ),
-                    final_status=task.status,
-                    artifacts=artifacts,
-                )
-                artifacts.append(
-                    self.reporter.write_control_outcome(
-                        run_dir,
-                        {
-                            "action": "execute_task",
-                            "status": "skipped",
-                            "reason": "open_fix_validation_task",
-                            "fix_task_id": fix_task_id,
-                            "repo_key": task.repo_key,
-                            "task_id": task.task_id,
-                            "worker_role": worker_role,
-                        },
-                    )
-                )
-                artifacts.append(self.reporter.write_summary(run_dir, result))
-                return result
-
-            # Circuit-breaker: skip if recent runs show repeated unknown/error outcomes
-            if self._check_repeated_unknown_failures(task.repo_key):
-                self._log_event(
-                    "circuit_breaker_skip_unknown_failures",
-                    run_id,
-                    repo_key=task.repo_key,
-                )
-                result = ExecutionResult(
-                    run_id=run_id,
-                    worker_role=worker_role,
-                    task_kind=task.execution_mode,
-                    success=True,
-                    outcome_status="skipped",
-                    outcome_reason="repeated_unknown_failures",
-                    summary=(
-                        f"run_id={run_id} status=skipped reason=repeated_unknown_failures "
-                        f"repo={task.repo_key}"
-                    ),
-                    final_status=task.status,
-                    artifacts=artifacts,
-                )
-                artifacts.append(
-                    self.reporter.write_control_outcome(
-                        run_dir,
-                        {
-                            "action": "execute_task",
-                            "status": "skipped",
-                            "reason": "repeated_unknown_failures",
-                            "repo_key": task.repo_key,
-                            "task_id": task.task_id,
-                            "worker_role": worker_role,
-                        },
-                    )
-                )
-                artifacts.append(self.reporter.write_summary(run_dir, result))
-                return result
 
             if not branch_allowed(task.base_branch, repo_target.allowed_base_branches):
                 raise TaskContractError(

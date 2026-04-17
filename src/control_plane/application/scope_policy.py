@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import os
 from pathlib import Path
 
 
@@ -13,7 +14,11 @@ class ChangedFilePolicyChecker:
         violations: list[str] = []
         for changed in changed_files:
             normalized_changed = self._normalize_changed_path(changed)
-            if not any(fnmatch.fnmatch(normalized_changed, pattern) for pattern in normalized_patterns):
+            if not any(
+                fnmatch.fnmatch(normalized_changed, pattern)
+                or normalized_changed.startswith(pattern + "/")
+                for pattern in normalized_patterns
+            ):
                 violations.append(normalized_changed)
         return sorted(set(violations))
 
@@ -22,11 +27,13 @@ class ChangedFilePolicyChecker:
         cleaned = path.strip().replace("\\", "/").lstrip("./")
         if cleaned.endswith("/"):
             return f"{cleaned}*"
-        return str(Path(cleaned)).replace("\\", "/")
+        normalized = str(Path(cleaned)).replace("\\", "/")
+        # Also match directory contents: "src" should match "src/foo.py"
+        return normalized
 
     @staticmethod
     def _normalize_changed_path(path: str) -> str:
         normalized = path.strip()
         if " -> " in normalized:
             normalized = normalized.split(" -> ", maxsplit=1)[1]
-        return str(Path(normalized)).replace("\\", "/").lstrip("./")
+        return os.path.normpath(normalized).replace("\\", "/").lstrip("./")
