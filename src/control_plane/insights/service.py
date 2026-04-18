@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Protocol, Sequence
 
 from control_plane.insights.artifact_writer import InsightArtifactWriter
@@ -49,7 +50,7 @@ class InsightEngineService:
                 run_id=context.run_id,
                 generated_at=context.generated_at,
                 source_command=context.source_command,
-                repo=InsightRepoRef(name=context.repo_filter or "unknown", path=""),
+                repo=InsightRepoRef(name=context.repo_filter or "unknown", path=Path("")),
                 source_snapshots=[],
                 insights=[],
             )
