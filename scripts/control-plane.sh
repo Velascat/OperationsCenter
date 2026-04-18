@@ -139,6 +139,7 @@ Usage:
   scripts/control-plane.sh plane-status
   scripts/control-plane.sh dev-up
   scripts/control-plane.sh dev-down
+  scripts/control-plane.sh dev-down-safe
   scripts/control-plane.sh dev-restart
   scripts/control-plane.sh providers-status
   scripts/control-plane.sh doctor
@@ -459,6 +460,53 @@ case "${cmd}" in
     stop_watch_role propose
     stop_watch_role review
     stop_watch_role spec
+    run_with_log plane-down "${PLANE_MANAGER}" down
+    ;;
+  dev-down-safe)
+    ensure_venv
+    load_env_file
+    # Stop watchdog first so it doesn't revive roles during drain.
+    stop_watchdog
+    # Stop watchers from claiming new tasks.
+    stop_watch_role goal
+    stop_watch_role test
+    stop_watch_role improve
+    stop_watch_role propose
+    stop_watch_role review
+    stop_watch_role spec
+    # Poll until all Running tasks complete or timeout is reached.
+    _safe_timeout="${CONTROL_PLANE_SAFE_DOWN_TIMEOUT_SECONDS:-600}"
+    _safe_start=$(date +%s)
+    echo "Waiting for in-flight tasks (timeout: ${_safe_timeout}s)..."
+    while true; do
+      _elapsed=$(( $(date +%s) - _safe_start ))
+      if [[ $_elapsed -ge $_safe_timeout ]]; then
+        echo "Timeout after ${_elapsed}s — proceeding with forced shutdown"
+        break
+      fi
+      _running=$("${VENV_DIR}/bin/python" - <<PYEOF 2>/dev/null || echo "0"
+import sys
+sys.path.insert(0, '${ROOT_DIR}/src')
+from control_plane.settings import load_settings
+from control_plane.adapters.plane.client import PlaneClient
+s = load_settings('${CONFIG_PATH}')
+c = PlaneClient(base_url=s.plane.base_url, api_token=s.plane_token(),
+                workspace_slug=s.plane.workspace_slug, project_id=s.plane.project_id)
+try:
+    issues = c.list_issues()
+    running = [i for i in issues if (i.get('state') or {}).get('name') == 'Running']
+    print(len(running))
+finally:
+    c.close()
+PYEOF
+)
+      if [[ "${_running}" == "0" ]]; then
+        echo "No tasks in Running state — safe to shut down"
+        break
+      fi
+      echo "  ${_running} task(s) still Running (${_elapsed}s elapsed) — waiting 30s..."
+      sleep 30
+    done
     run_with_log plane-down "${PLANE_MANAGER}" down
     ;;
   dev-restart)
