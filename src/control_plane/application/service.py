@@ -716,7 +716,12 @@ class ExecutionService:
             pull_request_url: str | None = None
             status: str | None = None
             if changed_files and policy_success:
-                committed = self.git.commit_all(repo_path, f"chore: apply Plane task {task.task_id}")
+                _commit_msg = (
+                    f"{task.title}\n\nPlane task: {task.task_id}"
+                    if getattr(task, "title", None)
+                    else f"chore: apply Plane task {task.task_id}"
+                )
+                committed = self.git.commit_all(repo_path, _commit_msg)
                 if committed:
                     if success:
                         self.git.push_branch(repo_path, task_branch)

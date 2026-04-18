@@ -77,6 +77,14 @@ class KodoAdapter:
         lines = ["## Goal", goal_text.strip()]
         if constraints_text:
             lines.extend(["", "## Constraints", constraints_text.strip()])
+        lines.extend([
+            "",
+            "## Commit message",
+            "Write a descriptive conventional-commit message explaining WHAT changed and WHY.",
+            "Format: `<type>(<scope>): <short summary>`",
+            "Follow with a blank line and 1-3 sentences of body context (motivation, approach, trade-offs).",
+            "Do NOT use generic messages like 'apply task' or include task IDs in the subject line.",
+        ])
         path.write_text("\n".join(lines).strip() + "\n")
         return path
 
