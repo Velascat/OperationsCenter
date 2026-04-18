@@ -19,6 +19,7 @@ state/
 .review/
 .worktrees/
 .kodo/
+.claude/scheduled_tasks.lock
 uv.lock
 scripts/audit_*.py
 scripts/debug_*.py
