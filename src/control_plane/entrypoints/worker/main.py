@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -7179,9 +7180,9 @@ def run_watch_loop(
                     logger.error(json.dumps({
                         "event": "watch_credential_failure",
                         "role": role,
-                        "action": "aborting",
+                        "action": "restarting",
                     }))
-                    return
+                    sys.exit(1)
                 reconciled_ids = reconcile_stale_running_issues(client, role=role, ready_state=ready_state, usage_store=service.usage_store, startup=True)
                 if reconciled_ids:
                     logger.info(json.dumps({"event": "watch_reconciled_stale_running", "role": role, "task_ids": reconciled_ids}))
@@ -7931,8 +7932,6 @@ def run_parallel_watch_loop(
 
 
 def main() -> None:
-    import sys
-
     # Quick subcommands that don't need a Plane connection
     if len(sys.argv) >= 2 and sys.argv[1] == "heartbeat-check":
         hb_parser = argparse.ArgumentParser(description="Check watcher heartbeats")

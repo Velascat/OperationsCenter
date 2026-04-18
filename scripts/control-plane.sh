@@ -125,6 +125,7 @@ Usage:
   scripts/control-plane.sh watch-all
   scripts/control-plane.sh watch-all-stop
   scripts/control-plane.sh watch-all-status
+  scripts/control-plane.sh watchdog
   scripts/control-plane.sh dev-status
   scripts/control-plane.sh watch --role goal
   scripts/control-plane.sh watch --role review
@@ -195,10 +196,11 @@ start_watch_role() {
   mkdir -p "${WATCH_DIR}"
   local log_file
   log_file="$(watch_log_file "${role}")"
-  # The outer bash wrapper restarts the watcher automatically on non-zero exit.
-  # It traps SIGTERM so that stop_watch_role kills both the wrapper and any
-  # running python child.  A clean exit (exit code 0) breaks the loop — this
-  # covers deliberate stops such as credential failures at startup.
+  # The outer bash wrapper restarts the watcher automatically on any non-zero exit.
+  # Deliberate stops are communicated via PID file deletion — stop_watch_role removes
+  # the PID file before killing the Python child, so the wrapper exits cleanly on the
+  # next check rather than looping.  Any Python exit (including code 0) is treated as
+  # a crash and triggers a restart with a 30-second backoff.
   if [[ "${role}" == "review" ]]; then
     setsid /bin/bash -lc "
       cd '${ROOT_DIR}'
@@ -217,9 +219,8 @@ start_watch_role() {
         wait \$_child_pid
         _exit=\$?
         [[ ! -f '${pid_file}' ]] && exit 0
-        [[ \$_exit -eq 0 ]] && exit 0
         echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
-        sleep 5
+        sleep 30
       done
     " >>"${log_file}" 2>&1 < /dev/null &
   elif [[ "${role}" == "spec" ]]; then
@@ -237,9 +238,8 @@ start_watch_role() {
         wait \$_child_pid
         _exit=\$?
         [[ ! -f '${pid_file}' ]] && exit 0
-        [[ \$_exit -eq 0 ]] && exit 0
         echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
-        sleep 5
+        sleep 30
       done
     " >>"${log_file}" 2>&1 < /dev/null &
   else
@@ -261,9 +261,8 @@ start_watch_role() {
         wait \$_child_pid
         _exit=\$?
         [[ ! -f '${pid_file}' ]] && exit 0
-        [[ \$_exit -eq 0 ]] && exit 0
         echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
-        sleep 5
+        sleep 30
       done
     " >>"${log_file}" 2>&1 < /dev/null &
   fi
@@ -297,6 +296,69 @@ stop_watch_role() {
     return 0
   fi
   rm -f "${pid_file}"
+}
+
+start_watchdog() {
+  local pid_file="${WATCH_DIR}/watchdog.pid"
+  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
+    echo "watchdog already running with PID $(cat "${pid_file}")"
+    return 0
+  fi
+  rm -f "${pid_file}"
+  mkdir -p "${WATCH_DIR}"
+  local log_file="${WATCH_DIR}/$(timestamp)_watchdog.log"
+  # Runs every 2 minutes; revives any watcher whose PID file exists but PID is dead.
+  # Exits when its own PID file is removed (by stop_watchdog / dev-down).
+  setsid /bin/bash -lc "
+    cd '${ROOT_DIR}'
+    set -a
+    source '${ENV_PATH}'
+    set +a
+    _ROLES='goal test improve propose review spec'
+    while [[ -f '${pid_file}' ]]; do
+      sleep 120
+      [[ ! -f '${pid_file}' ]] && break
+      for _r in \$_ROLES; do
+        _pf='${WATCH_DIR}'/\"\$_r\".pid
+        [[ ! -f \"\$_pf\" ]] && continue
+        _p=\$(cat \"\$_pf\" 2>/dev/null)
+        [[ -z \"\$_p\" ]] && continue
+        if ! kill -0 \"\$_p\" >/dev/null 2>&1; then
+          echo \"{\\\"event\\\":\\\"watchdog_revive\\\",\\\"role\\\":\\\"\$_r\\\",\\\"stale_pid\\\":\\\"\$_p\\\"}\"
+          '${ROOT_DIR}/scripts/control-plane.sh' watch --role \"\$_r\"
+        fi
+      done
+    done
+    echo '{\"event\":\"watchdog_exit\"}'
+  " >>"${log_file}" 2>&1 < /dev/null &
+  echo $! > "${pid_file}"
+  echo "watchdog started: pid=$! log=${log_file}"
+}
+
+stop_watchdog() {
+  local pid_file="${WATCH_DIR}/watchdog.pid"
+  if [[ ! -f "${pid_file}" ]]; then
+    echo "watchdog is not running"
+    return 0
+  fi
+  local pid
+  pid=$(cat "${pid_file}")
+  rm -f "${pid_file}"
+  if kill -0 "${pid}" >/dev/null 2>&1; then
+    kill "${pid}" >/dev/null 2>&1 || true
+    echo "watchdog stopped (pid ${pid})"
+  else
+    echo "watchdog was not running (stale pid ${pid})"
+  fi
+}
+
+status_watchdog() {
+  local pid_file="${WATCH_DIR}/watchdog.pid"
+  if [[ -f "${pid_file}" ]] && kill -0 "$(cat "${pid_file}")" >/dev/null 2>&1; then
+    echo "watchdog: running (pid $(cat "${pid_file}"))"
+  else
+    echo "watchdog: stopped"
+  fi
 }
 
 status_watch_role() {
@@ -352,7 +414,7 @@ shift || true
 cd "${ROOT_DIR}"
 # Skip janitor for read-only / stop commands — they're fast and don't need it.
 case "${cmd}" in
-  watch-all-status|dev-status|watch-all-stop|watch-stop|plane-status|providers-status|doctor) ;;
+  watch-all-status|dev-status|watch-all-stop|watch-stop|watchdog-stop|plane-status|providers-status|doctor) ;;
   *) run_janitor ;;
 esac
 
@@ -385,10 +447,12 @@ case "${cmd}" in
     start_watch_role propose
     start_watch_role review
     start_watch_role spec
+    start_watchdog
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-down)
     load_env_file
+    stop_watchdog
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -399,6 +463,7 @@ case "${cmd}" in
     ;;
   dev-restart)
     load_env_file
+    stop_watchdog
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -415,6 +480,7 @@ case "${cmd}" in
     start_watch_role propose
     start_watch_role review
     start_watch_role spec
+    start_watchdog
     run_with_log plane-status "${PLANE_MANAGER}" status
     ;;
   dev-status)
@@ -426,6 +492,7 @@ case "${cmd}" in
     status_watch_role propose
     status_watch_role review
     status_watch_role spec
+    status_watchdog
     ;;
   providers-status|doctor)
     ensure_venv
@@ -492,8 +559,10 @@ case "${cmd}" in
     start_watch_role propose
     start_watch_role review
     start_watch_role spec
+    start_watchdog
     ;;
   watch-all-stop)
+    stop_watchdog
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -508,6 +577,7 @@ case "${cmd}" in
     status_watch_role propose
     status_watch_role review
     status_watch_role spec
+    status_watchdog
     ;;
   worker)
     ensure_venv
@@ -576,6 +646,13 @@ case "${cmd}" in
     ;;
   janitor)
     echo "Janitor complete. Retention window: ${JANITOR_MAX_AGE_DAYS} day(s)"
+    ;;
+  watchdog)
+    load_env_file
+    start_watchdog
+    ;;
+  watchdog-stop)
+    stop_watchdog
     ;;
   *)
     usage
