@@ -1638,11 +1638,13 @@ def _check_kodo_execution_gate(settings: Any) -> tuple[bool, str]:
     if min_mb > 0:
         try:
             available_kb = 0
+            swap_free_kb = 0
             for line in Path("/proc/meminfo").read_text().splitlines():
                 if line.startswith("MemAvailable:"):
                     available_kb = int(line.split()[1])
-                    break
-            available_mb = available_kb // 1024
+                elif line.startswith("SwapFree:"):
+                    swap_free_kb = int(line.split()[1])
+            available_mb = (available_kb + swap_free_kb) // 1024
             if available_mb < min_mb:
                 return False, f"low_memory (available={available_mb}MB, min={min_mb}MB)"
         except OSError:
