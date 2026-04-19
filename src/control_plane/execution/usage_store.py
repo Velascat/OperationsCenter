@@ -141,15 +141,19 @@ class UsageStore:
                 limit=self.settings.max_exec_per_day,
                 current=daily,
             )
-        # Circuit breaker: if ≥ threshold fraction of last _CB_WINDOW execution
-        # outcomes failed, pause execution until the operator investigates.
-        # Requires at least 3 samples to avoid false positives at startup.
+        # Circuit breaker: if ≥ threshold fraction of last _CB_WINDOW *fresh*
+        # execution outcomes failed, pause execution until the operator investigates.
+        # "Fresh" means within the last _CB_STALENESS_HOURS — stale failures age
+        # out of the window naturally rather than blocking indefinitely.
+        # Requires at least 3 fresh samples to avoid false positives at startup.
         # S6-8: If the kodo binary was updated during the window (multiple versions
         # present), skip the circuit breaker — failures from the old version should
         # not block the newly deployed version.
+        stale_cutoff = now - timedelta(hours=_CB_STALENESS_HOURS)
         outcomes = [
             e for e in reversed(events)
             if e.get("kind") == "execution_outcome"
+            and datetime.fromisoformat(e["timestamp"]) > stale_cutoff
         ][:_CB_WINDOW]
         if len(outcomes) >= 3:
             versions_in_window = {
@@ -158,19 +162,6 @@ class UsageStore:
             if len(versions_in_window) <= 1:  # only block if all outcomes same version
                 failures = sum(1 for e in outcomes if not e.get("succeeded"))
                 if failures / len(outcomes) >= _CB_THRESHOLD:
-                    # Staleness bypass: if every failure is older than _CB_STALENESS_HOURS,
-                    # the underlying issue has likely been resolved (or operator cleared it).
-                    # Auto-recover rather than blocking indefinitely.
-                    try:
-                        newest_ts = max(
-                            datetime.fromisoformat(e["timestamp"])
-                            for e in outcomes
-                            if e.get("timestamp")
-                        )
-                        if (now - newest_ts) > timedelta(hours=_CB_STALENESS_HOURS):
-                            return BudgetDecision(allowed=True)
-                    except Exception:
-                        pass
                     return BudgetDecision(
                         allowed=False,
                         reason="circuit_breaker_open",

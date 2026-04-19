@@ -3337,6 +3337,24 @@ def test_budget_decision_circuit_breaker_does_not_fire_on_mixed_outcomes() -> No
     assert decision.allowed
 
 
+def test_budget_decision_circuit_breaker_stale_failures_age_out() -> None:
+    """Failures older than _CB_STALENESS_HOURS are excluded from the CB window."""
+    import os
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD"] = "0.8"
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW"] = "5"
+    os.environ["CONTROL_PLANE_CIRCUIT_BREAKER_STALENESS_HOURS"] = "4"
+    store = UsageStore(Path(tempfile.mkdtemp()) / "usage.json")
+    past = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+    # Record 4 failures at T=0 (will be 6 hours stale by check time)
+    for i in range(4):
+        store.record_execution_outcome(task_id=f"T-{i}", role="goal", succeeded=False, now=past)
+    store.record_execution_outcome(task_id="T-4", role="goal", succeeded=True, now=past)
+    # Advance time by 6 hours — all outcomes are now beyond the 4h staleness cutoff
+    now = past + timedelta(hours=6)
+    decision = store.budget_decision(now=now)
+    assert decision.allowed  # Stale failures aged out; fresh window is empty
+
+
 # ---- Stale autonomy task scan ----
 
 def test_handle_stale_autonomy_task_scan_cancels_stale_task() -> None:
