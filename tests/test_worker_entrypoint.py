@@ -293,10 +293,10 @@ def test_classify_blocked_issue_true_positive_taskcontracterror() -> None:
     assert classification == "parse_config"
 
 
-def test_classify_blocked_issue_no_false_positive_code_youtube_shorts_scenario() -> None:
+def test_classify_blocked_issue_no_false_positive_video_foundry_scenario() -> None:
     classification, _ = classify_blocked_issue(
         {
-            "name": "code_youtube_shorts: Fix validation errors",
+            "name": "VideoFoundry: Fix validation errors",
             "description": "The configured validation commands are failing",
         },
         [{"comment_html": "<p>Need to parse and fix the validation output.</p>"}],
@@ -2376,7 +2376,7 @@ def test_is_self_repo_matches_self_repo_key() -> None:
     service = FakeService()
     service.settings.self_repo_key = "ControlPlane"
     assert _is_self_repo("ControlPlane", service) is True
-    assert _is_self_repo("code_youtube_shorts", service) is False
+    assert _is_self_repo("VideoFoundry", service) is False
 
 
 def test_is_self_repo_case_insensitive() -> None:
@@ -2402,7 +2402,7 @@ def test_select_watch_candidate_skips_self_repo_without_label() -> None:
     }
     task_other = {
         "id": "OTHER-1", "state": {"name": "Ready for AI"},
-        "labels": [{"name": "task-kind: goal"}, {"name": "repo: code_youtube_shorts"}],
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: VideoFoundry"}],
         "name": "Fix something",
         "description": "",
     }

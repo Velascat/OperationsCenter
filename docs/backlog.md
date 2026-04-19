@@ -1,6 +1,6 @@
 # Backlog — Post-Hardening: Tuning, Trust, and Public Packaging
 
-The hardening phase is complete. The system is running with two active repos (ControlPlane and code_youtube_shorts), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
+The hardening phase is complete. The system is running with two active repos (ControlPlane and VideoFoundry), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
 
 ## Active
 
@@ -150,7 +150,7 @@ Define "trusted" in terms of measurable execution health and tuning stability (l
 
 ### config — Per-repo execution budget overrides
 **Type**: feature
-Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when code_youtube_shorts and ControlPlane have different execution intensity.
+Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when VideoFoundry and ControlPlane have different execution intensity.
 
 ### ci — Enforce `analyze-artifacts` output as a CI artifact
 **Type**: maintenance

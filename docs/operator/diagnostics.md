@@ -134,7 +134,7 @@ Returns JSON:
   "total_estimated_usd": 6.30,
   "per_repo": {
     "ControlPlane": {"executions": 18, "estimated_usd": 2.70},
-    "code_youtube_shorts": {"executions": 24, "estimated_usd": 3.60}
+    "VideoFoundry": {"executions": 24, "estimated_usd": 3.60}
   }
 }
 ```

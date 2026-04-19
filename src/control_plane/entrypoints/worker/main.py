@@ -996,7 +996,7 @@ def board_is_idle_for_proposals_from_issues(issues: list[dict[str, Any]], *, rep
 
     When repo_key is given, only tasks belonging to that repo count toward the
     active-work gate — so a busy ControlPlane board no longer blocks
-    code_youtube_shorts proposals and vice versa.
+    VideoFoundry proposals and vice versa.
     """
     open_count = 0
     ready_or_running_count = 0
