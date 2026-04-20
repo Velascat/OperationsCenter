@@ -81,6 +81,10 @@ def _read_pid(path: Path) -> int | None:
 
 def _watcher_rows(repo_filter: list[str] | None) -> list[str]:
     lines = []
+    task_repos: dict[str, str] = {}
+    if repo_filter:
+        snapshot = _read_json(SNAPSHOT_PATH) or {}
+        task_repos = {i["id"]: i.get("repo", "") for i in snapshot.get("issues", [])}
     for role in ROLES:
         pid_path = WATCH_DIR / f"{role}.pid"
         status_path = WATCH_DIR / f"{role}.status.json"
@@ -96,12 +100,9 @@ def _watcher_rows(repo_filter: list[str] | None) -> list[str]:
         age = _elapsed(updated_at)
         alive_marker = "" if alive else f" {_RED}[dead]{_RESET}"
 
-        # Repo filter: dim rows where current task belongs to another repo
         dim = ""
         other_repo_tag = ""
         if repo_filter and task_id and task_id != "-":
-            snapshot = _read_json(SNAPSHOT_PATH) or {}
-            task_repos = {i["id"]: i.get("repo", "") for i in snapshot.get("issues", [])}
             task_repo = task_repos.get(task_id, "")
             if task_repo and task_repo not in repo_filter:
                 dim = _DIM
@@ -246,7 +247,8 @@ def _memory_row() -> str:
         threshold_mb = int(os.environ.get("CONTROL_PLANE_MIN_KODO_AVAILABLE_MB", "6144"))
         threshold_gb = threshold_mb / 1024
         color = _RED if total_mb < threshold_mb else ""
-        return f"  {color}{total_gb:.1f} GB available (RAM + swap){_RESET}   threshold: {threshold_gb:.1f} GB"
+        reset = _RESET if color else ""
+        return f"  {color}{total_gb:.1f} GB available (RAM + swap){reset}   threshold: {threshold_gb:.1f} GB"
     except Exception:
         return "  unavailable"
 
