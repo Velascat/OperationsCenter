@@ -397,20 +397,6 @@ def render_worker_comment(title: str, bullets: list[str]) -> str:
     return "\n".join(lines)
 
 
-def blocked_classification_token(raw: str) -> str:
-    mapping = {
-        "scope-policy violation": "scope_policy",
-        "validation failure": "validation_failure",
-        "infra/tooling": "infra_tooling",
-        "parse/config issue": "parse_config",
-        "context limit": "context_limit",
-        "dependency missing": "dependency_missing",
-        "flaky test": "flaky_test",
-        "unknown/manual attention": UNKNOWN_BLOCKED_CLASSIFICATION,
-    }
-    return mapping.get(raw, UNKNOWN_BLOCKED_CLASSIFICATION)
-
-
 def classification_display_name(classification: str) -> str:
     return classification.replace("_", " ")
 
@@ -3344,17 +3330,10 @@ def handle_review_revision_scan(
         if pr_num is None:
             continue
 
-        repo_cfg = service.settings.repos.get(repo_key)
-        if not repo_cfg:
+        _result = _gh_client_for_repo(service, repo_key)
+        if _result is None:
             continue
-        token = service.settings.repo_git_token(repo_key)
-        if not token:
-            continue
-        gh = GitHubPRClient(token)
-        try:
-            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
-        except Exception:
-            continue
+        gh, owner, repo_name = _result
 
         try:
             reviews = gh.list_pr_reviews(owner, repo_name, pr_num)
@@ -3433,11 +3412,21 @@ def _pr_number_from_url(pr_url: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _gh_client_for_repo(service: "ExecutionService", repo_key: str) -> "GitHubPRClient | None":
+def _gh_client_for_repo(
+    service: "ExecutionService", repo_key: str
+) -> "tuple[GitHubPRClient, str, str] | None":
+    """Return ``(GitHubPRClient, owner, repo_name)`` or *None* when unavailable."""
     token = service.settings.repo_git_token(repo_key)
     if not token:
         return None
-    return GitHubPRClient(token)
+    repo_cfg = service.settings.repos.get(repo_key)
+    if not repo_cfg:
+        return None
+    try:
+        owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
+    except Exception:
+        return None
+    return GitHubPRClient(token), owner, repo_name
 
 
 def handle_merge_conflict_scan(
@@ -3456,14 +3445,10 @@ def handle_merge_conflict_scan(
     git = GitClient()
 
     for repo_key, repo_cfg in service.settings.repos.items():
-        token = service.settings.repo_git_token(repo_key)
-        if not token:
+        _result = _gh_client_for_repo(service, repo_key)
+        if _result is None:
             continue
-        gh = GitHubPRClient(token)
-        try:
-            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
-        except Exception:
-            continue
+        gh, owner, repo_name = _result
 
         try:
             open_prs = gh.list_open_prs(owner, repo_name)
@@ -3560,14 +3545,10 @@ def handle_stale_pr_scan(
     git = GitClient()
 
     for repo_key, repo_cfg in service.settings.repos.items():
-        token = service.settings.repo_git_token(repo_key)
-        if not token:
+        _result = _gh_client_for_repo(service, repo_key)
+        if _result is None:
             continue
-        gh = GitHubPRClient(token)
-        try:
-            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
-        except Exception:
-            continue
+        gh, owner, repo_name = _result
         try:
             open_prs = gh.list_open_prs(owner, repo_name)
         except Exception:
@@ -3698,18 +3679,15 @@ def cleanup_orphaned_plane_branches(
 
     for repo_key, repo_cfg in service.settings.repos.items():
         local_path = getattr(repo_cfg, "local_path", None)
-        token = service.settings.repo_git_token(repo_key)
-        if not local_path or not token:
+        if not local_path:
             continue
         repo_path = Path(local_path)
         if not repo_path.exists():
             continue
-
-        try:
-            owner, repo_name = GitHubPRClient.owner_repo_from_clone_url(repo_cfg.clone_url)
-            gh = GitHubPRClient(token)
-        except Exception:
+        _result = _gh_client_for_repo(service, repo_key)
+        if _result is None:
             continue
+        gh, owner, repo_name = _result
 
         # List remote plane/* branches via git ls-remote (fast, no full fetch needed).
         try:
@@ -6432,6 +6410,88 @@ def handle_propose_cycle(
     )
 
 
+def _record_duration_and_flag_anomaly(
+    service: ExecutionService,
+    task_id: str,
+    role: str,
+    duration: float,
+) -> None:
+    """Record execution duration and log a warning when it exceeds 2× the median."""
+    try:
+        service.usage_store.record_execution_duration(
+            task_id=task_id, role=role, duration_seconds=duration, now=datetime.now(UTC)
+        )
+        _median = service.usage_store.median_execution_duration(role)
+        if _median is not None and duration > _median * 2:
+            logging.getLogger(__name__).warning(json.dumps({
+                "event": "duration_anomaly",
+                "role": role,
+                "task_id": task_id,
+                "duration_seconds": round(duration, 1),
+                "median_seconds": round(_median, 1),
+            }))
+    except Exception:
+        pass
+
+
+def _record_validation_outcomes(
+    service: ExecutionService,
+    result: ExecutionResult,
+) -> None:
+    """Record per-command validation outcomes for flaky-test detection."""
+    _now_vr = datetime.now(UTC)
+    for vr in result.validation_results:
+        service.usage_store.record_validation_outcome(
+            command=vr.command, passed=(vr.exit_code == 0), now=_now_vr
+        )
+
+
+def _record_circuit_breaker_outcome(
+    service: ExecutionService,
+    result: ExecutionResult,
+    task_id: str,
+    role: str,
+    *,
+    is_fix_validation: bool = False,
+) -> None:
+    """Record circuit-breaker outcome, skipping quota-exhaustion events."""
+    try:
+        if _is_quota_exhausted_result(result):
+            service.usage_store.record_kodo_quota_event(
+                task_id=task_id, role=role, now=datetime.now(UTC)
+            )
+        elif not is_fix_validation:
+            service.usage_store.record_execution_outcome(
+                task_id=task_id,
+                role=role,
+                succeeded=result.success,
+                now=datetime.now(UTC),
+                kodo_version=_get_kodo_version(service.settings.kodo.binary),
+            )
+    except Exception:
+        pass
+
+
+def _record_cost_telemetry(
+    service: ExecutionService,
+    task_id: str,
+    issue: dict[str, Any],
+) -> None:
+    """Record per-execution cost telemetry when a cost is configured."""
+    try:
+        _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
+        if _cost > 0:
+            _repo_key = _extract_repo_key(issue, service)
+            service.usage_store.record_execution_cost(
+                task_id=task_id,
+                repo_key=_repo_key,
+                estimated_usd=_cost,
+                now=datetime.now(UTC),
+            )
+    except Exception:
+        pass
+
+
 def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
 
@@ -6446,19 +6506,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     result = run_service_task(service, client, task_id, worker_role="goal")
     _goal_duration = time.monotonic() - _goal_t0
     # S6-5: Record execution duration and flag anomalies.
-    try:
-        service.usage_store.record_execution_duration(task_id=task_id, role="goal", duration_seconds=_goal_duration, now=datetime.now(UTC))
-        _median_goal = service.usage_store.median_execution_duration("goal")
-        if _median_goal is not None and _goal_duration > _median_goal * 2:
-            logging.getLogger(__name__).warning(json.dumps({
-                "event": "duration_anomaly",
-                "role": "goal",
-                "task_id": task_id,
-                "duration_seconds": round(_goal_duration, 1),
-                "median_seconds": round(_median_goal, 1),
-            }))
-    except Exception:
-        pass
+    _record_duration_and_flag_anomaly(service, task_id, "goal", _goal_duration)
     created_ids: list[str] = []
     if result.outcome_status == "skipped":
         # Circuit-breaker skip: service returned early without transitioning the task.
@@ -6555,8 +6603,9 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
 
     if result.success:
         if goal_requires_test_follow_up(issue, result):
-            existing_names = existing_issue_names(client)
-            existing_follow_ups = existing_follow_up_keys(client)
+            issues = client.list_issues()
+            existing_names = existing_issue_names(client, issues=issues)
+            existing_follow_ups = existing_follow_up_keys(client, issues=issues)
             follow_up = create_follow_up_task_if_missing(
                 client,
                 service,
@@ -6616,11 +6665,7 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
             )
     else:
         # Record validation outcomes for flaky-test detection
-        _now_vr = datetime.now(UTC)
-        for vr in result.validation_results:
-            service.usage_store.record_validation_outcome(
-                command=vr.command, passed=(vr.exit_code == 0), now=_now_vr
-            )
+        _record_validation_outcomes(service, result)
         result.blocked_classification = classify_execution_result(result, service.usage_store)
         client.comment_issue(
             task_id,
@@ -6656,41 +6701,10 @@ def handle_goal_task(client: PlaneClient, service: ExecutionService, task_id: st
     except Exception:
         pass
     # Circuit-breaker outcome recording.
-    # Quota exhaustion is an infrastructure failure — do NOT drain the circuit
-    # breaker window (it would block all tasks until the operator investigates,
-    # without the circuit-breaker being the right signal).
-    # Fix-validation tasks are created to fix pre-existing failures and are
-    # expected to fail or timeout occasionally — their outcomes should not count
-    # against the circuit breaker, which tracks regular task quality.
     _is_fix_validation = str(issue.get("name", "")).startswith("Fix pre-existing validation failure in")
-    try:
-        if _is_quota_exhausted_result(result):
-            service.usage_store.record_kodo_quota_event(
-                task_id=task_id, role="goal", now=datetime.now(UTC)
-            )
-        elif not _is_fix_validation:
-            service.usage_store.record_execution_outcome(
-                task_id=task_id,
-                role="goal",
-                succeeded=result.success,
-                now=datetime.now(UTC),
-                kodo_version=_get_kodo_version(service.settings.kodo.binary),
-            )
-    except Exception:
-        pass
+    _record_circuit_breaker_outcome(service, result, task_id, "goal", is_fix_validation=_is_fix_validation)
     # Cost telemetry
-    try:
-        _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
-        if _cost > 0:
-            _repo_key = _extract_repo_key(issue, service)
-            service.usage_store.record_execution_cost(
-                task_id=task_id,
-                repo_key=_repo_key,
-                estimated_usd=_cost,
-                now=datetime.now(UTC),
-            )
-    except Exception:
-        pass
+    _record_cost_telemetry(service, task_id, issue)
     # S7-6: Cross-repo impact analysis.
     # When changed files overlap with shared interface paths declared in any other
     # repo's impact_report_paths, annotate the task with a cross-repo warning.
@@ -6788,19 +6802,7 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
     result = run_service_task(service, client, task_id, worker_role="test")
     _test_duration = time.monotonic() - _test_t0
     # S6-5: Record execution duration and flag anomalies.
-    try:
-        service.usage_store.record_execution_duration(task_id=task_id, role="test", duration_seconds=_test_duration, now=datetime.now(UTC))
-        _median_test = service.usage_store.median_execution_duration("test")
-        if _median_test is not None and _test_duration > _median_test * 2:
-            logging.getLogger(__name__).warning(json.dumps({
-                "event": "duration_anomaly",
-                "role": "test",
-                "task_id": task_id,
-                "duration_seconds": round(_test_duration, 1),
-                "median_seconds": round(_median_test, 1),
-            }))
-    except Exception:
-        pass
+    _record_duration_and_flag_anomaly(service, task_id, "test", _test_duration)
     if result.outcome_status == "no_op":
         result.final_status = "Blocked"
         client.comment_issue(
@@ -6848,11 +6850,7 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
         return []
 
     # Record validation outcomes for flaky-test detection
-    _now_vr2 = datetime.now(UTC)
-    for vr in result.validation_results:
-        service.usage_store.record_validation_outcome(
-            command=vr.command, passed=(vr.exit_code == 0), now=_now_vr2
-        )
+    _record_validation_outcomes(service, result)
     blocked_classification = classify_execution_result(result, service.usage_store)
     follow_up = create_follow_up_task(
         client,
@@ -6896,43 +6894,18 @@ def handle_test_task(client: PlaneClient, service: ExecutionService, task_id: st
         ),
     )
     # Circuit-breaker outcome recording (skip for quota exhaustion — infra failure).
-    try:
-        if _is_quota_exhausted_result(result):
-            service.usage_store.record_kodo_quota_event(
-                task_id=task_id, role="test", now=datetime.now(UTC)
-            )
-        else:
-            service.usage_store.record_execution_outcome(
-                task_id=task_id,
-                role="test",
-                succeeded=result.success,
-                now=datetime.now(UTC),
-                kodo_version=_get_kodo_version(service.settings.kodo.binary),
-            )
-    except Exception:
-        pass
+    _record_circuit_breaker_outcome(service, result, task_id, "test")
     # Cost telemetry
-    try:
-        _cost = float(getattr(service.settings, "cost_per_execution_usd", 0.0))
-        if _cost > 0:
-            _issue_t = client.fetch_issue(task_id)
-            _repo_key_t = _extract_repo_key(_issue_t, service)
-            service.usage_store.record_execution_cost(
-                task_id=task_id,
-                repo_key=_repo_key_t,
-                estimated_usd=_cost,
-                now=datetime.now(UTC),
-            )
-    except Exception:
-        pass
+    _record_cost_telemetry(service, task_id, issue)
     rewrite_worker_summary(result, service, task_id)
     return result.follow_up_task_ids
 
 
 def handle_improve_task(client: PlaneClient, service: ExecutionService, task_id: str) -> list[str]:
     issue = client.fetch_issue(task_id)
-    existing_names = existing_issue_names(client)
-    existing_follow_ups = existing_follow_up_keys(client)
+    issues = client.list_issues()
+    existing_names = existing_issue_names(client, issues=issues)
+    existing_follow_ups = existing_follow_up_keys(client, issues=issues)
     repo_key, base_branch, _allowed_paths = issue_execution_target(issue, service)
     findings, report_notes = discover_improvement_candidates(service, repo_key=repo_key, base_branch=base_branch)
     created_ids: list[str] = []
@@ -6997,8 +6970,9 @@ def handle_blocked_triage(client: PlaneClient, service: ExecutionService, task_i
     triage = build_improve_triage_result(client, issue, comments, usage_store=service.usage_store)
     created_ids: list[str] = []
 
-    existing_names = existing_issue_names(client)
-    existing_follow_ups = existing_follow_up_keys(client)
+    issues = client.list_issues()
+    existing_names = existing_issue_names(client, issues=issues)
+    existing_follow_ups = existing_follow_up_keys(client, issues=issues)
 
     if triage.follow_up is not None and not issue_is_unblock_chain(issue):
         created = create_follow_up_task_if_missing(

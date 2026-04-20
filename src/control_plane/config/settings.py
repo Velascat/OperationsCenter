@@ -19,6 +19,7 @@ class PlaneSettings(BaseModel):
 class GitSettings(BaseModel):
     provider: str = "github"
     token_env: str | None = None
+    # TODO: not yet wired — no runtime code reads this
     open_pr_default: bool = True
     push_on_validation_failure: bool = True
     author_name: str = "Control Plane Bot"
