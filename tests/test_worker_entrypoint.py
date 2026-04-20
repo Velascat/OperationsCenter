@@ -298,7 +298,7 @@ def test_classify_blocked_issue_true_positive_taskcontracterror() -> None:
 def test_classify_blocked_issue_no_false_positive_video_foundry_scenario() -> None:
     classification, _ = classify_blocked_issue(
         {
-            "name": "VideoFoundry: Fix validation errors",
+            "name": "ExternalRepo: Fix validation errors",
             "description": "The configured validation commands are failing",
         },
         [{"comment_html": "<p>Need to parse and fix the validation output.</p>"}],
@@ -2378,7 +2378,7 @@ def test_is_self_repo_matches_self_repo_key() -> None:
     service = FakeService()
     service.settings.self_repo_key = "ControlPlane"
     assert _is_self_repo("ControlPlane", service) is True
-    assert _is_self_repo("VideoFoundry", service) is False
+    assert _is_self_repo("ExternalRepo", service) is False
 
 
 def test_is_self_repo_case_insensitive() -> None:
@@ -2404,7 +2404,7 @@ def test_select_watch_candidate_skips_self_repo_without_label() -> None:
     }
     task_other = {
         "id": "OTHER-1", "state": {"name": "Ready for AI"},
-        "labels": [{"name": "task-kind: goal"}, {"name": "repo: VideoFoundry"}],
+        "labels": [{"name": "task-kind: goal"}, {"name": "repo: ExternalRepo"}],
         "name": "Fix something",
         "description": "",
     }
@@ -2643,7 +2643,7 @@ def test_write_board_snapshot_creates_file() -> None:
             "id": "bbb",
             "name": "Update deps",
             "state": {"name": "Ready for AI"},
-            "labels": ["repo: VideoFoundry", "task-kind: improve"],
+            "labels": ["repo: ExternalRepo", "task-kind: improve"],
         },
         {
             "id": "ccc",
@@ -2659,7 +2659,7 @@ def test_write_board_snapshot_creates_file() -> None:
     assert data["written_by"] == "goal"
     assert "updated_at" in data
     assert data["counts"]["ControlPlane"]["Running"] == 1
-    assert data["counts"]["VideoFoundry"]["Ready for AI"] == 1
+    assert data["counts"]["ExternalRepo"]["Ready for AI"] == 1
     # Done issues excluded
     active_ids = {i["id"] for i in data["issues"]}
     assert "ccc" not in active_ids

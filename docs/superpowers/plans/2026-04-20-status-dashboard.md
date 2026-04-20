@@ -47,7 +47,7 @@ def test_write_board_snapshot_creates_file() -> None:
             "id": "bbb",
             "name": "Update deps",
             "state_detail": {"name": "Ready for AI"},
-            "labels": ["repo: VideoFoundry", "task-kind: improve"],
+            "labels": ["repo: ExternalRepo", "task-kind: improve"],
         },
         {
             "id": "ccc",
@@ -63,7 +63,7 @@ def test_write_board_snapshot_creates_file() -> None:
     assert data["written_by"] == "goal"
     assert "updated_at" in data
     assert data["counts"]["ControlPlane"]["Running"] == 1
-    assert data["counts"]["VideoFoundry"]["Ready for AI"] == 1
+    assert data["counts"]["ExternalRepo"]["Ready for AI"] == 1
     # Done issues excluded
     active_ids = {i["id"] for i in data["issues"]}
     assert "ccc" not in active_ids
@@ -496,7 +496,7 @@ def main() -> None:
     parser.add_argument(
         "--repo",
         default="",
-        help="Comma-separated repo keys to filter (e.g. ControlPlane,VideoFoundry). Empty = show all.",
+        help="Comma-separated repo keys to filter (e.g. ControlPlane,ExternalRepo). Empty = show all.",
     )
     args = parser.parse_args()
     repo_filter: list[str] | None = None
@@ -599,7 +599,7 @@ git add scripts/control-plane.sh
 git commit -m "feat(status): add control-plane.sh status command
 
 Thin wrapper around cp-status.py. Passes --repo filter args through.
-Usage: control-plane.sh status [--repo ControlPlane,VideoFoundry]"
+Usage: control-plane.sh status [--repo ControlPlane,ExternalRepo]"
 ```
 
 ---

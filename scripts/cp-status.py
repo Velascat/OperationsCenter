@@ -289,7 +289,7 @@ def main() -> None:
     parser.add_argument(
         "--repo",
         default="",
-        help="Comma-separated repo keys to filter (e.g. ControlPlane,VideoFoundry). Empty = show all.",
+        help="Comma-separated repo keys to filter (e.g. ControlPlane,ExternalRepo). Empty = show all.",
     )
     args = parser.parse_args()
     repo_filter: list[str] | None = None

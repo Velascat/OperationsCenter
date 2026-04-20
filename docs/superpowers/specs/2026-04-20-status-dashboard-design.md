@@ -30,7 +30,7 @@ A live-refresh terminal status dashboard for ControlPlane operators. Reads only 
   "written_by": "goal",
   "counts": {
     "ControlPlane": {"Running": 1, "Ready for AI": 2, "Blocked": 0, "Review": 0},
-    "VideoFoundry":  {"Running": 0, "Ready for AI": 1, "Blocked": 0, "Review": 0}
+    "ExternalRepo":  {"Running": 0, "Ready for AI": 1, "Blocked": 0, "Review": 0}
   },
   "issues": [
     {
@@ -77,7 +77,7 @@ A live-refresh terminal status dashboard for ControlPlane operators. Reads only 
 **Location:** `scripts/control-plane.sh` — new `status` command.
 
 ```bash
-control-plane.sh status [--repo ControlPlane,VideoFoundry]
+control-plane.sh status [--repo ControlPlane,ExternalRepo]
 ```
 
 Passes all args through to `cp-status.py`. Example:
@@ -109,7 +109,7 @@ ACTIVE KODO
 BOARD  (snapshot 18s old)
   ControlPlane
     Running: 1   Ready for AI: 2   Blocked: 0   Review: 0
-  VideoFoundry
+  ExternalRepo
     Running: 0   Ready for AI: 1   Blocked: 0   Review: 0
 
 CIRCUIT BREAKER  closed  (1/5 fresh outcomes failed, threshold 80%)
@@ -123,7 +123,7 @@ MEMORY           15.2 GB available (RAM + swap)   threshold: 6.0 GB
 
 ## Repo Filter (`--repo`)
 
-**Syntax:** `--repo ControlPlane` or `--repo ControlPlane,VideoFoundry`
+**Syntax:** `--repo ControlPlane` or `--repo ControlPlane,ExternalRepo`
 
 **Effect per section:**
 
