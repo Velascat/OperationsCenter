@@ -650,6 +650,53 @@ def write_watch_status(
     path.write_text(json.dumps(payload, indent=2))
 
 
+_BOARD_SNAPSHOT_ACTIVE_STATES = {"Running", "Ready for AI", "Blocked", "Review"}
+
+
+def write_board_snapshot(
+    issues: list[dict[str, Any]],
+    *,
+    role: str,
+    status_dir: Path | None,
+) -> None:
+    if status_dir is None:
+        return
+    snapshot_path = status_dir / "board_snapshot.json"
+    tmp_path = status_dir / "board_snapshot.json.tmp"
+    counts: dict[str, dict[str, int]] = {}
+    active_issues: list[dict[str, Any]] = []
+    for issue in issues:
+        state = issue_status_name(issue)
+        if state not in _BOARD_SNAPSHOT_ACTIVE_STATES:
+            continue
+        repo = "unknown"
+        kind = ""
+        for lbl in issue_label_names(issue):
+            if lbl.lower().startswith("repo:"):
+                repo = lbl.split(":", 1)[1].strip()
+            elif lbl.lower().startswith("task-kind:"):
+                kind = lbl.split(":", 1)[1].strip()
+        if repo not in counts:
+            counts[repo] = {"Running": 0, "Ready for AI": 0, "Blocked": 0, "Review": 0}
+        if state in counts[repo]:
+            counts[repo][state] += 1
+        active_issues.append({
+            "id": str(issue.get("id", "")),
+            "name": str(issue.get("name", "")),
+            "state": state,
+            "repo": repo,
+            "kind": kind,
+        })
+    payload = {
+        "updated_at": datetime.now(UTC).isoformat(),
+        "written_by": role,
+        "counts": counts,
+        "issues": active_issues,
+    }
+    tmp_path.write_text(json.dumps(payload, indent=2))
+    os.replace(tmp_path, snapshot_path)
+
+
 _HEARTBEAT_MAX_AGE_SECONDS = 300  # 5 minutes
 
 
@@ -859,7 +906,7 @@ def rewrite_worker_summary(
 
 
 def issue_status_name(issue: dict[str, Any]) -> str:
-    state = issue.get("state")
+    state = issue.get("state") or issue.get("state_detail")
     if isinstance(state, dict):
         return str(state.get("name", ""))
     return str(state or "")
@@ -7854,6 +7901,12 @@ def run_watch_loop(
         else:
             # Successful cycle: reset consecutive-error counter
             _consecutive_errors = 0
+            if _is_primary_slot:
+                try:
+                    _snap_issues = client.list_issues()
+                    write_board_snapshot(_snap_issues, role=role, status_dir=status_dir)
+                except Exception:
+                    pass
 
         if max_cycles is not None and cycle >= max_cycles:
             logger.info(json.dumps({"event": "watch_complete", "role": role, "cycles": cycle, "run_id": cycle_run_id}))

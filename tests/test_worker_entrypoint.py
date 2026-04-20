@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import tempfile
@@ -59,6 +60,7 @@ from control_plane.entrypoints.worker.main import (
     select_watch_candidate,
     validate_credentials,
     validate_task_pre_execution,
+    write_board_snapshot,
     write_heartbeat,
 )
 
@@ -2625,6 +2627,61 @@ def test_check_heartbeats_empty_dir(tmp_path) -> None:
 def test_heartbeat_path_naming(tmp_path) -> None:
     p = _heartbeat_path(tmp_path, "improve")
     assert p.name == "heartbeat_improve.json"
+
+
+def test_write_board_snapshot_creates_file() -> None:
+    """write_board_snapshot writes a valid JSON snapshot atomically."""
+    import tempfile
+    status_dir = Path(tempfile.mkdtemp())
+    issues = [
+        {
+            "id": "aaa",
+            "name": "Fix login bug",
+            "state_detail": {"name": "Running"},
+            "labels": ["repo: ControlPlane", "task-kind: goal"],
+        },
+        {
+            "id": "bbb",
+            "name": "Update deps",
+            "state_detail": {"name": "Ready for AI"},
+            "labels": ["repo: VideoFoundry", "task-kind: improve"],
+        },
+        {
+            "id": "ccc",
+            "name": "Old task",
+            "state_detail": {"name": "Done"},
+            "labels": ["repo: ControlPlane"],
+        },
+    ]
+    write_board_snapshot(issues, role="goal", status_dir=status_dir)
+    snapshot_path = status_dir / "board_snapshot.json"
+    assert snapshot_path.exists()
+    data = json.loads(snapshot_path.read_text())
+    assert data["written_by"] == "goal"
+    assert "updated_at" in data
+    assert data["counts"]["ControlPlane"]["Running"] == 1
+    assert data["counts"]["VideoFoundry"]["Ready for AI"] == 1
+    # Done issues excluded
+    active_ids = {i["id"] for i in data["issues"]}
+    assert "ccc" not in active_ids
+    assert "aaa" in active_ids
+    assert "bbb" in active_ids
+
+
+def test_write_board_snapshot_no_op_when_status_dir_none() -> None:
+    """write_board_snapshot is a no-op when status_dir is None."""
+    # Should not raise
+    write_board_snapshot([], role="goal", status_dir=None)
+
+
+def test_write_board_snapshot_atomic_replace() -> None:
+    """Snapshot file is never left in a torn state (tmp file cleaned up)."""
+    import tempfile
+    status_dir = Path(tempfile.mkdtemp())
+    write_board_snapshot([], role="test", status_dir=status_dir)
+    tmp = status_dir / "board_snapshot.json.tmp"
+    assert not tmp.exists()
+    assert (status_dir / "board_snapshot.json").exists()
 
 
 # Item 4: Context handoff — prior_progress injection
