@@ -661,6 +661,7 @@ def write_board_snapshot(
 ) -> None:
     if status_dir is None:
         return
+    status_dir.mkdir(parents=True, exist_ok=True)
     snapshot_path = status_dir / "board_snapshot.json"
     tmp_path = status_dir / "board_snapshot.json.tmp"
     counts: dict[str, dict[str, int]] = {}

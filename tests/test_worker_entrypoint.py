@@ -2631,25 +2631,24 @@ def test_heartbeat_path_naming(tmp_path) -> None:
 
 def test_write_board_snapshot_creates_file() -> None:
     """write_board_snapshot writes a valid JSON snapshot atomically."""
-    import tempfile
     status_dir = Path(tempfile.mkdtemp())
     issues = [
         {
             "id": "aaa",
             "name": "Fix login bug",
-            "state_detail": {"name": "Running"},
+            "state": {"name": "Running"},
             "labels": ["repo: ControlPlane", "task-kind: goal"],
         },
         {
             "id": "bbb",
             "name": "Update deps",
-            "state_detail": {"name": "Ready for AI"},
+            "state": {"name": "Ready for AI"},
             "labels": ["repo: VideoFoundry", "task-kind: improve"],
         },
         {
             "id": "ccc",
             "name": "Old task",
-            "state_detail": {"name": "Done"},
+            "state": {"name": "Done"},
             "labels": ["repo: ControlPlane"],
         },
     ]
@@ -2676,7 +2675,6 @@ def test_write_board_snapshot_no_op_when_status_dir_none() -> None:
 
 def test_write_board_snapshot_atomic_replace() -> None:
     """Snapshot file is never left in a torn state (tmp file cleaned up)."""
-    import tempfile
     status_dir = Path(tempfile.mkdtemp())
     write_board_snapshot([], role="test", status_dir=status_dir)
     tmp = status_dir / "board_snapshot.json.tmp"
