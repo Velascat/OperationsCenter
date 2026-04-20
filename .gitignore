@@ -1,3 +1,4 @@
+*.fob
 __pycache__/
 *.pyc
 *.pyo
