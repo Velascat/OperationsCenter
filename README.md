@@ -453,6 +453,14 @@ Useful companions:
 - `./scripts/control-plane.sh dev-down`
 - `./scripts/control-plane.sh dev-restart`
 
+### Live Status Dashboard
+
+```bash
+./scripts/control-plane.sh status [--repo REPO,REPO]
+```
+
+Runs `scripts/cp-status.py` — a live terminal dashboard that refreshes every 2 seconds, showing watcher state (role, cycle, last action, task ID, age, alive), active Kodo workspaces, board counts per repo, circuit breaker status, and available memory. Uses direct row addressing so it never grows the terminal scrollback. Pass `--repo ControlPlane,FOB` to filter board and workspace rows by repo key.
+
 ## Runtime Files
 
 - Command logs: `logs/local/`
@@ -545,6 +553,8 @@ The repo-aware autonomy loop is behaving well when:
 The minimum required to create a task manually in Plane:
 
 **Labels:** `repo: ControlPlane`, `task-kind: goal`
+
+Repos currently managed: `ControlPlane`, `FOB`, `SwitchBoard`, `WorkStation`.
 
 **Description (plain):**
 ```text
