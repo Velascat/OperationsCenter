@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -253,9 +254,8 @@ def _memory_row() -> str:
         return "  unavailable"
 
 
-def _render(repo_filter: list[str] | None) -> str:
+def _render(repo_filter: list[str] | None, width: int = 78) -> str:
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-    width = 78
     header = f"────────── ControlPlane Status  [{now_str}]  (Ctrl+C to exit) "
     header = header.ljust(width - 1, "─")
     divider = "─" * (width - 1)
@@ -298,13 +298,23 @@ def main() -> None:
 
     try:
         while True:
-            output = _render(repo_filter)
-            sys.stdout.write("\033[2J\033[H")
-            sys.stdout.write(output + "\n")
+            cols, rows = shutil.get_terminal_size(fallback=(78, 24))
+            output = _render(repo_filter, width=cols)
+            lines = output.split("\n")
+            # Truncate to terminal height so content never overflows into scrollback
+            if len(lines) > rows - 1:
+                lines = lines[:rows - 1]
+            # Overwrite in place using direct row addressing — never writes \n so
+            # the terminal cannot scroll, avoiding scrollback growth.
+            # \033[?7l disables auto-wrap so long lines clip rather than wrap.
+            sys.stdout.write("\033[?7l")
+            for i, line in enumerate(lines, 1):
+                sys.stdout.write(f"\033[{i};1H{line}\033[K")
+            sys.stdout.write(f"\033[{len(lines) + 1};1H\033[J\033[?7h")
             sys.stdout.flush()
             time.sleep(2)
     except KeyboardInterrupt:
-        sys.stdout.write("\nStopped.\n")
+        sys.stdout.write("\033[J\033[?7h\nStopped.\n")
 
 
 if __name__ == "__main__":
