@@ -125,6 +125,7 @@ Usage:
   scripts/control-plane.sh watch-all
   scripts/control-plane.sh watch-all-stop
   scripts/control-plane.sh watch-all-status
+  scripts/control-plane.sh status [--repo REPO,REPO]
   scripts/control-plane.sh watchdog
   scripts/control-plane.sh dev-status
   scripts/control-plane.sh watch --role goal
@@ -415,7 +416,7 @@ shift || true
 cd "${ROOT_DIR}"
 # Skip janitor for read-only / stop commands — they're fast and don't need it.
 case "${cmd}" in
-  watch-all-status|dev-status|watch-all-stop|watch-stop|watchdog-stop|plane-status|providers-status|doctor) ;;
+  watch-all-status|dev-status|watch-all-stop|watch-stop|watchdog-stop|plane-status|providers-status|doctor|status) ;;
   *) run_janitor ;;
 esac
 
@@ -626,6 +627,11 @@ PYEOF
     status_watch_role review
     status_watch_role spec
     status_watchdog
+    ;;
+  status)
+    ensure_venv
+    load_env_file
+    "${VENV_DIR}/bin/python" "${ROOT_DIR}/scripts/cp-status.py" "${@}"
     ;;
   worker)
     ensure_venv
