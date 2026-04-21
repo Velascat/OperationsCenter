@@ -79,6 +79,10 @@ class SpecDirectorSettings(BaseModel):
     brainstorm_context_snapshot_kb: int = 8
     compliance_diff_max_kb: int = 32
     campaign_abandon_hours: int = 72
+    # Phase 5 — SwitchBoard integration. When set, all spec_director LLM calls
+    # are routed through SwitchBoard instead of the Claude CLI. Takes precedence
+    # over the SWITCHBOARD_URL environment variable when both are present.
+    switchboard_url: str | None = None
 
 
 class ScheduledTask(BaseModel):
