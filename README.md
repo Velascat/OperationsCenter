@@ -32,6 +32,26 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 - Expensive execution is budget-aware and suppresses unnecessary runs.
 - Repo-aware autonomy stages remain explicit and inspectable for now.
 
+## What ControlPlane Is Not
+
+- **Not the execution runner.** ControlPlane decides what to work on and dispatches
+  the task. kodo performs the coding. Archon (if present) enforces workflow discipline.
+  ControlPlane does not edit files.
+
+- **Not the lane selector.** ControlPlane may supply lane hints, but SwitchBoard
+  makes the final lane selection. ControlPlane does not know which execution lane
+  will run a task.
+
+- **Not the workflow harness.** Multi-step workflow structure (plan → implement →
+  validate → PR) is Archon's responsibility. ControlPlane drives the autonomy loop;
+  it does not own execution step sequencing.
+
+- **Not the infrastructure layer.** ControlPlane does not deploy or manage services.
+  WorkStation owns the Plane stack, SwitchBoard container, and local model deployment.
+
+- **Not the operator shell.** OpenClaw (optional) provides the human-facing operator
+  experience. ControlPlane is the autonomous engine that runs beneath it.
+
 ## Repo-Aware Autonomy Loop
 
 ```text
