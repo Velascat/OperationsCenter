@@ -2,15 +2,13 @@
 """Unit tests for ExecutorFactory — executor selection and creation."""
 from __future__ import annotations
 
-import os
-from unittest.mock import MagicMock
 
 import pytest
 
 from control_plane.adapters.executor.aider import AiderAdapter
 from control_plane.adapters.executor.factory import ExecutorFactory
 from control_plane.adapters.executor.kodo import KodoExecutorAdapter
-from control_plane.config.settings import AiderSettings, KodoSettings, RepoSettings, Settings
+from control_plane.config.settings import Settings
 
 
 def _minimal_settings(

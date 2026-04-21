@@ -6,8 +6,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from control_plane.adapters.executor.aider import AiderAdapter
 from control_plane.adapters.executor.protocol import ExecutorTask
 from control_plane.config.settings import AiderSettings

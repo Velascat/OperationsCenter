@@ -15,10 +15,8 @@ backend are affected.  This limitation is documented in ``docs/phase6.md``.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Any
 
-from control_plane.adapters.executor.protocol import Executor, ExecutorResult, ExecutorTask
+from control_plane.adapters.executor.protocol import ExecutorResult, ExecutorTask
 from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
 from control_plane.config.settings import KodoSettings
 

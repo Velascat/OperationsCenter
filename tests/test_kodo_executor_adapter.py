@@ -2,16 +2,14 @@
 """Unit tests for KodoExecutorAdapter."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from control_plane.adapters.executor.kodo import KodoExecutorAdapter
 from control_plane.adapters.executor.protocol import ExecutorTask
 from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
-from control_plane.config.settings import KodoSettings
 
 
 def _make_kodo_result(exit_code: int = 0, stdout: str = "ok", stderr: str = "") -> KodoRunResult:
