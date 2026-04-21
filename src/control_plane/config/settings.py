@@ -37,6 +37,20 @@ class KodoSettings(BaseModel):
     timeout_seconds: int = 3600
 
 
+class AiderSettings(BaseModel):
+    # Absolute path to the aider binary, e.g.
+    # /home/dev/Documents/GitHub/SwitchBoard/.venv-aider/bin/aider
+    binary: str = "aider"
+    # Model prefix sent to SwitchBoard, combined as "<prefix>/<profile>"
+    model_prefix: str = "openai"
+    # Default SwitchBoard routing profile for Aider tasks
+    profile: str = "capable"
+    timeout_seconds: int = 3600
+    # Optional path to aider model-settings YAML (from SwitchBoard repo)
+    model_settings_file: str = ""
+    extra_args: list[str] = Field(default_factory=list)
+
+
 class EscalationSettings(BaseModel):
     webhook_url: str = ""
     # Number of same-classification blocks within 24h before escalating
@@ -164,12 +178,15 @@ class RepoSettings(BaseModel):
     # (e.g. a file-tag linter that was broken before the PR landed).  Checks
     # whose names contain any of these strings are excluded from the failed list.
     ci_ignored_checks: list[str] = Field(default_factory=list)
+    # Phase 6 — executor selection. ``"kodo"`` (default) or ``"aider"``.
+    executor: str = "kodo"
 
 
 class Settings(BaseModel):
     plane: PlaneSettings
     git: GitSettings
     kodo: KodoSettings
+    aider: AiderSettings = Field(default_factory=AiderSettings)
     repos: dict[str, RepoSettings]
     reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")
