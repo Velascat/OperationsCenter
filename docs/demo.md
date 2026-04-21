@@ -52,8 +52,10 @@ source .env.control-plane.local
 ```
 
 This starts:
-- **Plane** on `http://localhost:8080`
+- **Plane** on `http://localhost:8080` — Plane infra is owned by WorkStation; `dev-up` delegates to `WorkStation/scripts/plane.sh` automatically
 - **Watchers**: `goal`, `test`, `improve`, `propose`, `review`
+
+**Prerequisite:** WorkStation must be cloned as a sibling of ControlPlane (or `CONTROL_PLANE_WORKSTATION_DIR` set). If WorkStation is not found, the Plane step will print instructions and exit.
 
 Confirm everything is running:
 

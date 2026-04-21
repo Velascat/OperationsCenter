@@ -595,6 +595,8 @@ ControlPlane owns everything about how autonomous agents reason, act, and intera
 
 ControlPlane does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/Velascat/WorkStation). ControlPlane's `.env.control-plane.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
 
+**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `WorkStation/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. WorkStation must be cloned as a sibling directory (or `CONTROL_PLANE_WORKSTATION_DIR` must be set).
+
 For the full platform ownership model see `WorkStation/docs/architecture/ownership.md`.
 
 ---

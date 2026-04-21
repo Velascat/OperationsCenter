@@ -1,164 +1,49 @@
 #!/usr/bin/env bash
+# =============================================================================
+# ControlPlane — deployment/plane/manage.sh
+#
+# DELEGATION WRAPPER — ControlPlane no longer owns canonical Plane infra.
+#
+# Plane infrastructure is managed by WorkStation/scripts/plane.sh.
+# This script is kept for backward-compatibility with existing commands
+# (start, plane-up, dev-up, dev-down) that call it via PLANE_MANAGER.
+#
+# Usage (unchanged):
+#   deployment/plane/manage.sh up
+#   deployment/plane/manage.sh down
+#   deployment/plane/manage.sh status
+#
+# See WorkStation/docs/service-map.md and WorkStation/docs/operations.md
+# for canonical Plane lifecycle documentation.
+# =============================================================================
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PLANE_DIR="${ROOT_DIR}/deployment/plane"
-RUNTIME_DIR="${PLANE_DIR}/runtime"
-RUNTIME_LOG_DIR="${ROOT_DIR}/logs/local/plane-runtime"
-SETUP_SH="${RUNTIME_DIR}/setup.sh"
-PLANE_APP_DIR="${RUNTIME_DIR}/plane-app"
-PLANE_ENV="${PLANE_APP_DIR}/plane.env"
-PLANE_URL="${CONTROL_PLANE_PLANE_URL:-http://localhost:8080}"
-PLANE_VERSION="${CONTROL_PLANE_PLANE_VERSION:-}"
-PLANE_SETUP_URL="${CONTROL_PLANE_PLANE_SETUP_URL:-}"
-LAST_RUNTIME_LOG=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTROL_PLANE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-timestamp() {
-  date +"%Y%m%dT%H%M%S"
-}
+# WorkStation is expected as a sibling of ControlPlane.
+# Override with CONTROL_PLANE_WORKSTATION_DIR if the layout differs.
+WORKSTATION_DIR="${CONTROL_PLANE_WORKSTATION_DIR:-$(cd "${CONTROL_PLANE_ROOT}/.." && pwd)/WorkStation}"
 
-download_setup() {
-  mkdir -p "${RUNTIME_DIR}"
-  if [[ ! -x "${SETUP_SH}" ]]; then
-    local setup_url="${PLANE_SETUP_URL}"
-    if [[ -z "${setup_url}" ]]; then
-      if [[ -n "${PLANE_VERSION}" ]]; then
-        setup_url="https://github.com/makeplane/plane/releases/download/${PLANE_VERSION}/setup.sh"
-      else
-        setup_url="https://github.com/makeplane/plane/releases/latest/download/setup.sh"
-      fi
-    fi
-    echo "Using Plane setup source: ${setup_url}"
-    curl -fsSL -o "${SETUP_SH}" "${setup_url}"
-    chmod +x "${SETUP_SH}"
-  fi
-}
-
-run_setup_menu() {
-  local action="$1"
-  mkdir -p "${RUNTIME_LOG_DIR}"
-  local log_path="${RUNTIME_LOG_DIR}/$(timestamp)_plane_${action}.log"
-  LAST_RUNTIME_LOG="${log_path}"
-  if ! (
-    cd "${RUNTIME_DIR}"
-    printf '%s\n8\n' "${action}" | ./setup.sh
-  ) >"${log_path}" 2>&1; then
-    echo "Plane command failed. Runtime log: ${log_path}"
-    tail -n 40 "${log_path}" || true
-    return 1
-  fi
-  echo "Plane runtime log: ${log_path}"
-}
-
-compose_cmd() {
-  (
-    cd "${PLANE_APP_DIR}"
-    docker compose --env-file "${PLANE_ENV}" -f docker-compose.yaml "$@"
-  )
-}
-
-set_env_value() {
-  local key="$1"
-  local value="$2"
-  if [[ ! -f "${PLANE_ENV}" ]]; then
-    return 1
-  fi
-  if grep -q "^${key}=" "${PLANE_ENV}"; then
-    sed -i "s#^${key}=.*#${key}=${value}#" "${PLANE_ENV}"
-  else
-    printf '%s=%s\n' "${key}" "${value}" >> "${PLANE_ENV}"
-  fi
-}
-
-configure_plane_env() {
-  if [[ ! -f "${PLANE_ENV}" ]]; then
-    return 1
-  fi
-
-  local host_port="8080"
-  if [[ "${PLANE_URL}" =~ :([0-9]+)$ ]]; then
-    host_port="${BASH_REMATCH[1]}"
-  fi
-
-  set_env_value "LISTEN_HTTP_PORT" "${host_port}"
-  set_env_value "WEB_URL" "${PLANE_URL}"
-  set_env_value "CORS_ALLOWED_ORIGINS" "${PLANE_URL}"
-}
-
-ensure_installed() {
-  download_setup
-  if [[ ! -d "${PLANE_APP_DIR}" ]]; then
-    run_setup_menu 1
-  fi
-  configure_plane_env
-}
-
-fallback_up() {
-  echo "Falling back to direct docker compose startup..."
-  compose_cmd down --remove-orphans >/dev/null 2>&1 || true
-  compose_cmd up -d
-}
-
-fallback_down() {
-  echo "Falling back to direct docker compose shutdown..."
-  compose_cmd down --remove-orphans || true
-}
-
-wait_until_ready() {
-  local attempts=30
-  local delay_seconds=5
-
-  for ((i=1; i<=attempts; i++)); do
-    if curl -fsS --max-time 5 "${PLANE_URL}" >/dev/null 2>&1; then
-      echo "Plane is reachable at ${PLANE_URL}"
-      return 0
-    fi
-    sleep "${delay_seconds}"
-  done
-
-  echo "Plane did not become reachable at ${PLANE_URL}"
-  echo "Check logs with: (cd ${RUNTIME_DIR} && ./setup.sh and choose 'View Logs')"
-  return 1
-}
-
-cmd="${1:-}"
-if [[ -z "${cmd}" ]]; then
-  echo "Usage: deployment/plane/manage.sh {up|down|status}"
+if [[ ! -f "${WORKSTATION_DIR}/scripts/plane.sh" ]]; then
+  echo ""
+  echo "  [ControlPlane] Plane infra delegation — WorkStation not found"
+  echo ""
+  echo "  Expected WorkStation at: ${WORKSTATION_DIR}"
+  echo ""
+  echo "  Plane infrastructure is canonically owned by WorkStation."
+  echo "  Clone WorkStation alongside ControlPlane:"
+  echo ""
+  echo "    git clone https://github.com/Velascat/WorkStation ${WORKSTATION_DIR}"
+  echo ""
+  echo "  Or set CONTROL_PLANE_WORKSTATION_DIR to the WorkStation repo root:"
+  echo ""
+  echo "    export CONTROL_PLANE_WORKSTATION_DIR=/path/to/WorkStation"
+  echo ""
   exit 1
 fi
 
-case "${cmd}" in
-  up)
-    echo "Preparing local Plane runtime..."
-    ensure_installed
-    echo "Starting Plane containers..."
-    if ! run_setup_menu 2; then
-      fallback_up
-    fi
-    echo "Checking Plane readiness..."
-    wait_until_ready
-    ;;
-  down)
-    if [[ -x "${SETUP_SH}" ]]; then
-      echo "Stopping Plane containers..."
-      if ! run_setup_menu 3; then
-        fallback_down
-      fi
-      echo "Plane containers stopped."
-    else
-      echo "Plane runtime is not installed yet."
-    fi
-    ;;
-  status)
-    if curl -fsS --max-time 5 "${PLANE_URL}" >/dev/null 2>&1; then
-      echo "Plane is reachable at ${PLANE_URL}"
-      exit 0
-    fi
-    echo "Plane is not reachable at ${PLANE_URL}"
-    exit 1
-    ;;
-  *)
-    echo "Usage: deployment/plane/manage.sh {up|down|status}"
-    exit 1
-    ;;
-esac
+echo "  [ControlPlane] Delegating Plane infra to WorkStation canonical stack"
+echo "  WorkStation: ${WORKSTATION_DIR}"
+echo ""
+exec bash "${WORKSTATION_DIR}/scripts/plane.sh" "$@"
