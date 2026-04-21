@@ -589,6 +589,16 @@ Notes:
 - Kodo receives Goal/Constraints, not the `## Execution` block.
 - Use labels like `task-kind: goal`, `task-kind: test`, `task-kind: improve`, and `source: manual` for explicit routing.
 
+## Ownership boundary
+
+ControlPlane owns everything about how autonomous agents reason, act, and interact with platform services: the autonomy loop, proposal/decision logic, executor adapters (Aider, Kodo), and client adapters for Plane and SwitchBoard (`PlaneClient`, `SwitchBoardClient`).
+
+ControlPlane does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/Velascat/WorkStation). ControlPlane's `.env.control-plane.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
+
+For the full platform ownership model see `WorkStation/docs/architecture/ownership.md`.
+
+---
+
 ## Honesty Check
 
 This repo is not trying to be a production distributed control plane yet. It is a local autonomous workflow system with clear worker lanes, explicit lifecycle handoffs, and operator-visible board/runtime feedback.
