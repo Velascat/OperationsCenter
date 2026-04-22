@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from control_plane.application.service import _build_scope_constraints_section
+from control_plane.legacy_execution.service import _build_scope_constraints_section
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.domain.models import BoardTask
 

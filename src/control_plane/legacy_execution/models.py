@@ -1,3 +1,5 @@
+"""Compatibility-only request/result models for the quarantined legacy runtime."""
+
 from __future__ import annotations
 
 from pathlib import Path

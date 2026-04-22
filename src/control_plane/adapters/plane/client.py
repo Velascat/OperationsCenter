@@ -9,7 +9,7 @@ from typing import Any, cast
 import httpx
 
 from control_plane.application.task_parser import TaskParser
-from control_plane.domain import BoardTask
+from control_plane.domain.models import BoardTask
 
 
 class PlaneClient:
@@ -105,6 +105,8 @@ class PlaneClient:
         return []
 
     def to_board_task(self, issue: dict[str, Any]) -> BoardTask:
+        """Build the legacy Plane compatibility shape from a Plane work item."""
+
         description = self._issue_description_text(issue)
         label_names = [label.get("name", "") for label in issue.get("labels", []) if isinstance(label, dict)]
         parsed_body = self.task_parser.parse(description, labels=label_names)

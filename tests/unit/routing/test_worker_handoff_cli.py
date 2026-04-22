@@ -22,6 +22,7 @@ def test_default_planning_client_is_http_boundary() -> None:
 
 def test_domain_no_longer_exports_competing_execution_contracts() -> None:
     domain_init = (REPO_ROOT / "src" / "control_plane" / "domain" / "__init__.py").read_text(encoding="utf-8")
+    assert '"BoardTask"' not in domain_init
     assert '"ExecutionRequest"' not in domain_init
     assert '"ExecutionResult"' not in domain_init
 

@@ -18,7 +18,7 @@ from control_plane.adapters.workspace import RepoEnvironmentBootstrapper, Worksp
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
-from control_plane.domain import (
+from control_plane.domain.models import (
     BoardTask,
     RepoTarget,
     ValidationResult,

@@ -1,3 +1,10 @@
+"""Plane-ingest compatibility models.
+
+The supported runtime crosses repo boundaries with canonical contract types under
+``control_plane.contracts``. The models in this module remain for Plane/task-board
+ingest and legacy-execution compatibility only.
+"""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -15,6 +22,8 @@ class ParsedTaskBody(BaseModel):
 
 
 class BoardTask(BaseModel):
+    """Legacy Plane task shape retained for compatibility-only execution paths."""
+
     task_id: str
     project_id: str
     title: str
@@ -32,6 +41,8 @@ class BoardTask(BaseModel):
 
 
 class RepoTarget(BaseModel):
+    """Repo metadata used by compatibility-only execution code."""
+
     repo_key: str
     clone_url: str
     default_branch: str
@@ -47,6 +58,8 @@ class RepoTarget(BaseModel):
 
 
 class ValidationResult(BaseModel):
+    """Validation result shape used by compatibility-only execution code."""
+
     command: str
     exit_code: int
     stdout: str
