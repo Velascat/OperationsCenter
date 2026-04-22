@@ -185,10 +185,13 @@ class TestChangedFiles:
     def test_no_workspace_returns_empty_changed_files(self):
         result = _normalize(_capture())
         assert result.changed_files == []
+        assert result.changed_files_source == "unknown"
+        assert result.changed_files_confidence == 0.0
 
     def test_nonexistent_workspace_returns_empty(self):
         result = _normalize(_capture(), workspace_path=Path("/tmp/nonexistent-workspace-xyz"))
         assert result.changed_files == []
+        assert result.changed_files_source == "unknown"
 
     def test_diff_stat_none_when_no_changed_files(self):
         result = _normalize(_capture())

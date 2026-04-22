@@ -16,6 +16,7 @@ from typing import Optional
 
 from control_plane.observability.models import ExecutionRecord
 from control_plane.observability.trace import ExecutionTrace
+from control_plane.observability.changed_files import normalize_changed_files
 
 from .models import ShellInspectionResult, ShellStatusSummary
 
@@ -76,7 +77,7 @@ def status_from_result_only(
         summary=summary,
         selected_lane=lane,
         selected_backend=backend,
-        changed_files_status="known" if result.changed_files else "unknown",
+        changed_files_status=normalize_changed_files(result).status.value,
         validation_status=result.validation.status.value,
         artifact_count=len(result.artifacts),
         recorded_at=None,

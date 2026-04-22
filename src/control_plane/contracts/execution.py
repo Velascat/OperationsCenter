@@ -162,6 +162,22 @@ class ExecutionResult(BaseModel):
 
     # What changed
     changed_files: list[ChangedFileRef] = Field(default_factory=list)
+    changed_files_source: Optional[str] = Field(
+        default=None,
+        description=(
+            "How changed-file evidence was obtained: git_diff, backend_manifest, "
+            "event_stream, backend_confirmed_empty, unknown, or similar."
+        ),
+    )
+    changed_files_confidence: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confidence in changed-file evidence provenance. "
+            "Adapters should set this explicitly when they know the source."
+        ),
+    )
     diff_stat_excerpt: Optional[str] = Field(
         default=None,
         description="Short summary of the diff (e.g. '3 files changed, 47 insertions(+)')",

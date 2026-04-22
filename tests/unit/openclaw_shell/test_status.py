@@ -148,10 +148,14 @@ def test_status_from_record_validation_status_passed():
 
 
 def test_status_from_record_changed_files_status_known():
-    result = _success_result(changed_files=[make_changed_file("src/main.py")])
+    result = _success_result(
+        changed_files=[make_changed_file("src/main.py")],
+        changed_files_source="git_diff",
+        changed_files_confidence=1.0,
+    )
     record, trace = _make_record_and_trace(result)
     summary = status_from_record(record, trace)
-    assert summary.changed_files_status != "unknown"
+    assert summary.changed_files_status == "known"
 
 
 def test_status_from_record_is_frozen():
@@ -227,9 +231,33 @@ def test_status_from_result_only_recorded_at_none():
 
 
 def test_status_from_result_only_changed_files_known():
-    result = _success_result(changed_files=[make_changed_file("src/a.py")])
+    result = _success_result(
+        changed_files=[make_changed_file("src/a.py")],
+        changed_files_source="git_diff",
+        changed_files_confidence=1.0,
+    )
     summary = status_from_result_only(result)
     assert summary.changed_files_status == "known"
+
+
+def test_status_from_result_only_changed_files_inferred():
+    result = _success_result(
+        changed_files=[make_changed_file("src/a.py")],
+        changed_files_source="event_stream",
+        changed_files_confidence=0.5,
+    )
+    summary = status_from_result_only(result)
+    assert summary.changed_files_status == "inferred"
+
+
+def test_status_from_result_only_changed_files_not_upgraded_without_source():
+    result = _success_result(
+        changed_files=[make_changed_file("src/a.py")],
+        changed_files_source=None,
+        changed_files_confidence=None,
+    )
+    summary = status_from_result_only(result)
+    assert summary.changed_files_status == "unknown"
 
 
 def test_status_from_result_only_changed_files_unknown():

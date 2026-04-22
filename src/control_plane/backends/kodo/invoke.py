@@ -12,6 +12,7 @@ wraps the result into KodoRunCapture for normalization.
 from __future__ import annotations
 
 import os
+import warnings
 from datetime import datetime, timezone
 
 from control_plane.adapters.kodo.adapter import KodoAdapter
@@ -31,8 +32,11 @@ class KodoBackendInvoker:
 
     Args:
         kodo_adapter:    The underlying KodoAdapter (subprocess layer).
-        switchboard_url: When set, injects OPENAI_API_BASE into the subprocess
-                         env so kodo worker agents route through SwitchBoard.
+        switchboard_url: Legacy compatibility-only transport override.
+                         The canonical execution path no longer routes backend
+                         traffic through SwitchBoard. When set explicitly, the
+                         invoker still injects OPENAI_API_BASE for older
+                         compatibility scenarios.
     """
 
     def __init__(
@@ -42,6 +46,13 @@ class KodoBackendInvoker:
     ) -> None:
         self._kodo = kodo_adapter
         self._switchboard_url = switchboard_url.rstrip("/")
+        if self._switchboard_url:
+            warnings.warn(
+                "switchboard_url is a legacy compatibility-only execution proxy override. "
+                "The canonical execution path no longer routes backend traffic through SwitchBoard.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def invoke(self, prepared: KodoPreparedRun) -> KodoRunCapture:
         """Execute kodo for the given prepared run and return structured capture.

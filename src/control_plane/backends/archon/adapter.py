@@ -23,12 +23,14 @@ canonical ExecutionResult.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Optional
 
 from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
 from control_plane.contracts.execution import ExecutionRequest, ExecutionResult
+from control_plane.observability.models import BackendDetailRef
 
 from .invoke import ArchonAdapter, ArchonBackendInvoker
 from .mapper import check_support, map_request
@@ -155,6 +157,48 @@ class ArchonBackendAdapter:
         )
         return result, capture
 
+    def build_backend_detail_refs(
+        self,
+        request: ExecutionRequest,
+        capture: ArchonRunCapture,
+    ) -> list[BackendDetailRef]:
+        """Persist raw Archon detail by reference for observability retention."""
+        detail_dir = _detail_dir(Path(request.workspace_path), request.run_id)
+        refs: list[BackendDetailRef] = []
+
+        if capture.workflow_events:
+            path = detail_dir / "archon-workflow-events.json"
+            path.write_text(json.dumps(capture.workflow_events, indent=2) + "\n", encoding="utf-8")
+            refs.append(
+                BackendDetailRef(
+                    detail_type="event_trace",
+                    path=str(path),
+                    description="Raw Archon workflow events retained by reference.",
+                    is_required_for_debug=True,
+                )
+            )
+
+        capture_path = detail_dir / "archon-run-capture.json"
+        payload = {
+            "run_id": capture.run_id,
+            "outcome": capture.outcome,
+            "exit_code": capture.exit_code,
+            "duration_ms": capture.duration_ms,
+            "timeout_hit": capture.timeout_hit,
+            "output_text": capture.output_text,
+            "error_text": capture.error_text,
+        }
+        capture_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        refs.append(
+            BackendDetailRef(
+                detail_type="structured_result",
+                path=str(capture_path),
+                description="Structured Archon run capture retained by reference.",
+                is_required_for_debug=not capture.succeeded,
+            )
+        )
+        return refs
+
     # ------------------------------------------------------------------
     # Factory
     # ------------------------------------------------------------------
@@ -220,3 +264,9 @@ def _invocation_error_result(request: ExecutionRequest, error: str) -> Execution
         failure_category=FailureReasonCategory.BACKEND_ERROR,
         failure_reason=f"Archon invocation failed: {error}",
     )
+
+
+def _detail_dir(workspace_path: Path, run_id: str) -> Path:
+    detail_dir = workspace_path / ".control_plane" / "backend_details" / run_id
+    detail_dir.mkdir(parents=True, exist_ok=True)
+    return detail_dir

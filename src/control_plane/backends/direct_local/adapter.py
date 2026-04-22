@@ -7,6 +7,7 @@ ExecutionRequest -> ExecutionResult contract for the local execution lane.
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -27,6 +28,14 @@ class DirectLocalBackendAdapter:
     """Canonical adapter for the local direct execution backend."""
 
     def __init__(self, settings: AiderSettings, switchboard_url: str = "") -> None:
+        if switchboard_url:
+            warnings.warn(
+                "switchboard_url on DirectLocalBackendAdapter is a legacy compatibility-only "
+                "proxy override. The canonical execution path no longer depends on "
+                "SwitchBoard as execution transport.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self._executor = AiderAdapter(settings, switchboard_url=switchboard_url)
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
@@ -38,7 +47,9 @@ class DirectLocalBackendAdapter:
             )
         )
 
-        changed_files = _discover_changed_files(Path(request.workspace_path))
+        changed_files, changed_files_source, changed_files_confidence = _discover_changed_files(
+            Path(request.workspace_path)
+        )
         failure_category = _failure_category(result)
         failure_reason = None if result.success else (result.output or "direct_local execution failed")
 
@@ -59,6 +70,8 @@ class DirectLocalBackendAdapter:
             status=ExecutionStatus.SUCCESS if result.success else _failure_status(result),
             success=result.success,
             changed_files=changed_files,
+            changed_files_source=changed_files_source,
+            changed_files_confidence=changed_files_confidence,
             diff_stat_excerpt=_diff_stat(changed_files),
             validation=ValidationSummary(status=ValidationStatus.SKIPPED),
             branch_pushed=False,
@@ -83,7 +96,7 @@ def _failure_category(result) -> Optional[FailureReasonCategory]:
     return FailureReasonCategory.BACKEND_ERROR
 
 
-def _discover_changed_files(workspace_path: Path) -> list[ChangedFileRef]:
+def _discover_changed_files(workspace_path: Path) -> tuple[list[ChangedFileRef], str, float]:
     import subprocess
 
     try:
@@ -96,10 +109,10 @@ def _discover_changed_files(workspace_path: Path) -> list[ChangedFileRef]:
             check=False,
         )
     except Exception:
-        return []
+        return [], "unknown", 0.0
 
     if proc.returncode != 0:
-        return []
+        return [], "unknown", 0.0
 
     refs: list[ChangedFileRef] = []
     for line in proc.stdout.strip().splitlines():
@@ -113,7 +126,7 @@ def _discover_changed_files(workspace_path: Path) -> list[ChangedFileRef]:
                 change_type=_git_status_to_change_type(status_char),
             )
         )
-    return refs
+    return refs, "git_diff", 1.0
 
 
 def _git_status_to_change_type(status: str) -> str:

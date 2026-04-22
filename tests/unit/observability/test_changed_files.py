@@ -14,35 +14,67 @@ from .conftest import make_changed_file, make_result
 
 
 # ---------------------------------------------------------------------------
-# KNOWN: files enumerated
+# KNOWN: files with authoritative provenance
 # ---------------------------------------------------------------------------
 
 
 def test_non_empty_changed_files_status_is_known():
-    result = make_result(changed_files=[make_changed_file("src/main.py")])
+    result = make_result(
+        changed_files=[make_changed_file("src/main.py")],
+        changed_files_source="git_diff",
+        changed_files_confidence=1.0,
+    )
     ev = normalize_changed_files(result)
     assert ev.status == ChangedFilesStatus.KNOWN
 
 
 def test_known_preserves_files():
     files = [make_changed_file("src/a.py"), make_changed_file("src/b.py")]
-    result = make_result(changed_files=files)
+    result = make_result(changed_files=files, changed_files_source="backend_manifest")
     ev = normalize_changed_files(result)
     assert len(ev.files) == 2
     paths = {f.path for f in ev.files}
     assert paths == {"src/a.py", "src/b.py"}
 
 
-def test_known_source_is_backend_manifest():
-    result = make_result(changed_files=[make_changed_file()])
+def test_known_source_is_explicit_provenance():
+    result = make_result(changed_files=[make_changed_file()], changed_files_source="backend_manifest")
     ev = normalize_changed_files(result)
     assert ev.source == "backend_manifest"
 
 
 def test_known_confidence_is_1():
-    result = make_result(changed_files=[make_changed_file()])
+    result = make_result(
+        changed_files=[make_changed_file()],
+        changed_files_source="git_diff",
+        changed_files_confidence=1.0,
+    )
     ev = normalize_changed_files(result)
     assert ev.confidence == 1.0
+
+
+def test_non_empty_changed_files_without_provenance_is_not_upgraded_to_known():
+    result = make_result(changed_files=[make_changed_file()], changed_files_source=None)
+    ev = normalize_changed_files(result)
+    assert ev.status == ChangedFilesStatus.UNKNOWN
+    assert ev.confidence == 0.0
+
+
+# ---------------------------------------------------------------------------
+# INFERRED: non-authoritative evidence
+# ---------------------------------------------------------------------------
+
+
+def test_event_stream_changed_files_are_inferred():
+    result = make_result(
+        changed_files=[make_changed_file("src/inferred.py")],
+        changed_files_source="event_stream",
+        changed_files_confidence=0.5,
+    )
+    ev = normalize_changed_files(result)
+    assert ev.status == ChangedFilesStatus.INFERRED
+    assert ev.source == "event_stream"
+    assert ev.confidence == 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +168,17 @@ def test_unknown_source_is_none():
     result = make_result(changed_files=[], failure_category=None)
     ev = normalize_changed_files(result)
     assert ev.source == "none"
+
+
+def test_authoritative_empty_git_diff_is_none_not_unknown():
+    result = make_result(
+        changed_files=[],
+        changed_files_source="git_diff",
+        changed_files_confidence=1.0,
+    )
+    ev = normalize_changed_files(result)
+    assert ev.status == ChangedFilesStatus.NONE
+    assert ev.source == "git_diff"
 
 
 # ---------------------------------------------------------------------------

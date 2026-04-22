@@ -137,6 +137,17 @@ def test_known_changed_files_evidence(recorder, successful_rich_result):
     assert len(record.changed_files_evidence.files) == 2
 
 
+def test_inferred_changed_files_evidence(recorder):
+    result = make_result(
+        changed_files=[make_changed_file("src/inferred.py")],
+        changed_files_source="event_stream",
+        changed_files_confidence=0.5,
+    )
+    record = recorder.record(result)
+    assert record.changed_files_evidence.status == ChangedFilesStatus.INFERRED
+    assert record.changed_files_evidence.source == "event_stream"
+
+
 def test_policy_blocked_gives_not_applicable(recorder, policy_blocked_result):
     record = recorder.record(policy_blocked_result)
     assert record.changed_files_evidence.status == ChangedFilesStatus.NOT_APPLICABLE

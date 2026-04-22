@@ -15,6 +15,7 @@ API, or another mechanism — belongs here and must not escape into the wider ad
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -99,7 +100,17 @@ class OpenClawBackendInvoker:
         switchboard_url: str = "",
     ) -> None:
         self._runner = runner
+        # Legacy compatibility-only transport override. The canonical runtime
+        # no longer depends on SwitchBoard as an execution proxy.
         self._switchboard_url = switchboard_url.rstrip("/")
+        if self._switchboard_url:
+            warnings.warn(
+                "switchboard_url is ignored by OpenClawBackendInvoker and remains only as a "
+                "legacy compatibility parameter. The canonical execution path does not proxy "
+                "OpenClaw traffic through SwitchBoard.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def invoke(self, prepared: OpenClawPreparedRun) -> OpenClawRunCapture:
         """Execute the OpenClaw run and return structured capture."""

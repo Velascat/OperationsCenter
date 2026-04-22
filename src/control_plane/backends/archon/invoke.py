@@ -12,6 +12,7 @@ ArchonRunCapture, isolating invocation mechanics from the rest of the adapter.
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -90,7 +91,16 @@ class ArchonBackendInvoker:
         switchboard_url: str = "",
     ) -> None:
         self._archon = archon_adapter
+        # Legacy compatibility-only transport override. The canonical runtime
+        # no longer depends on SwitchBoard as an execution proxy.
         self._switchboard_url = switchboard_url.rstrip("/")
+        if self._switchboard_url:
+            warnings.warn(
+                "switchboard_url is a legacy compatibility-only execution proxy override. "
+                "The canonical execution path no longer routes backend traffic through SwitchBoard.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def invoke(self, config: ArchonWorkflowConfig) -> ArchonRunCapture:
         """Execute the Archon workflow and return structured capture."""

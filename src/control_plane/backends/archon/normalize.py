@@ -61,7 +61,9 @@ def normalize(
     success = capture.succeeded
     status = ExecutionStatus.SUCCESS if success else _map_failure_status(capture)
 
-    changed_files = _discover_changed_files(workspace_path) if workspace_path else []
+    changed_files, changed_files_source, changed_files_confidence = (
+        _discover_changed_files(workspace_path) if workspace_path else ([], "unknown", 0.0)
+    )
     diff_stat = _build_diff_stat(changed_files)
 
     validation = _build_validation_summary(
@@ -88,6 +90,8 @@ def normalize(
         status=status,
         success=success,
         changed_files=changed_files,
+        changed_files_source=changed_files_source,
+        changed_files_confidence=changed_files_confidence,
         diff_stat_excerpt=diff_stat,
         validation=validation,
         branch_pushed=False,
@@ -109,7 +113,7 @@ def _map_failure_status(capture: ArchonRunCapture) -> ExecutionStatus:
     return ExecutionStatus.FAILED
 
 
-def _discover_changed_files(workspace_path: Path) -> list[ChangedFileRef]:
+def _discover_changed_files(workspace_path: Path) -> tuple[list[ChangedFileRef], str, float]:
     import subprocess
 
     try:
@@ -121,7 +125,7 @@ def _discover_changed_files(workspace_path: Path) -> list[ChangedFileRef]:
             timeout=10,
         )
         if result.returncode != 0:
-            return []
+            return [], "unknown", 0.0
 
         refs: list[ChangedFileRef] = []
         for line in result.stdout.strip().splitlines():
@@ -131,9 +135,9 @@ def _discover_changed_files(workspace_path: Path) -> list[ChangedFileRef]:
             status_char, path = parts
             change_type = _git_status_to_change_type(status_char)
             refs.append(ChangedFileRef(path=path.strip(), change_type=change_type))
-        return refs
+        return refs, "git_diff", 1.0
     except Exception:
-        return []
+        return [], "unknown", 0.0
 
 
 def _git_status_to_change_type(status: str) -> str:

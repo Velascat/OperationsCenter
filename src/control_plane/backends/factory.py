@@ -6,8 +6,6 @@ ExecutionRequest and returns ExecutionResult.
 """
 
 from __future__ import annotations
-
-import os
 from typing import Mapping, Protocol
 
 from control_plane.config.settings import Settings
@@ -51,35 +49,22 @@ class CanonicalBackendRegistry:
         archon_adapter=None,
         openclaw_runner=None,
     ) -> "CanonicalBackendRegistry":
-        switchboard_url = _resolve_switchboard_url(settings)
         adapters: dict[BackendName, CanonicalBackendAdapter] = {
             BackendName.KODO: KodoBackendAdapter.from_settings(
                 settings=settings.kodo,
-                switchboard_url=switchboard_url,
             ),
             BackendName.DIRECT_LOCAL: DirectLocalBackendAdapter(
                 settings.aider,
-                switchboard_url=switchboard_url,
             ),
         }
         if archon_adapter is not None:
             archon_backend = ArchonBackendAdapter(
                 archon_adapter=archon_adapter,
-                switchboard_url=switchboard_url,
             )
             adapters[BackendName.ARCHON] = archon_backend
             adapters[BackendName.ARCHON_THEN_KODO] = archon_backend
         if openclaw_runner is not None:
             adapters[BackendName.OPENCLAW] = OpenClawBackendAdapter(
                 runner=openclaw_runner,
-                switchboard_url=switchboard_url,
             )
         return cls(adapters)
-
-
-def _resolve_switchboard_url(settings: Settings) -> str:
-    from_env = os.environ.get("SWITCHBOARD_URL", "")
-    if from_env:
-        return from_env
-    configured = getattr(settings.spec_director, "switchboard_url", None)
-    return configured or ""

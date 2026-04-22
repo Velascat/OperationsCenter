@@ -248,10 +248,14 @@ class TestExecutionResult:
             changed_files=[
                 ChangedFileRef(path="src/main.py", lines_added=10, lines_removed=3),
                 ChangedFileRef(path="src/utils.py", change_type="added", lines_added=50),
-            ]
+            ],
+            changed_files_source="git_diff",
+            changed_files_confidence=1.0,
         )
         assert len(r.changed_files) == 2
         assert r.changed_files[0].lines_added == 10
+        assert r.changed_files_source == "git_diff"
+        assert r.changed_files_confidence == 1.0
 
     def test_with_validation_summary(self):
         r = _minimal_result(
@@ -322,6 +326,8 @@ class TestContractIntegration:
             status=ExecutionStatus.SUCCESS,
             success=True,
             changed_files=[ChangedFileRef(path="src/x.py", lines_added=5)],
+            changed_files_source="git_diff",
+            changed_files_confidence=1.0,
             diff_stat_excerpt="1 file changed, 5 insertions(+)",
             validation=ValidationSummary(
                 status=ValidationStatus.PASSED,

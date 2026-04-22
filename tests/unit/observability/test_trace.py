@@ -144,7 +144,7 @@ def test_key_artifacts_empty_when_no_primary(recorder, builder, sparse_result):
 def test_changed_files_summary_known(recorder, builder, successful_rich_result):
     trace = _trace(successful_rich_result, recorder, builder)
     assert "2 files" in trace.changed_files_summary
-    assert "backend_manifest" in trace.changed_files_summary
+    assert "git_diff" in trace.changed_files_summary
 
 
 def test_changed_files_summary_none(recorder, builder, no_changes_result):

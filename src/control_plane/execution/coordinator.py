@@ -14,13 +14,15 @@ This module makes the live supported execution path explicit:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
+from typing import Protocol, runtime_checkable
 
 from control_plane.backends.factory import CanonicalBackendRegistry
 from control_plane.contracts.common import ValidationSummary
 from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
 from control_plane.contracts.enums import ValidationStatus
 from control_plane.contracts.execution import ExecutionResult
-from control_plane.observability.models import ExecutionRecord
+from control_plane.observability.models import BackendDetailRef, ExecutionRecord
 from control_plane.observability.service import ExecutionObservabilityService
 from control_plane.observability.trace import ExecutionTrace
 from control_plane.planning.models import ProposalDecisionBundle
@@ -28,6 +30,20 @@ from control_plane.policy.engine import PolicyEngine
 from control_plane.policy.models import PolicyDecision, PolicyStatus
 
 from .handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
+
+logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class _CaptureCapableAdapter(Protocol):
+    def execute_and_capture(self, request) -> tuple[ExecutionResult, object | None]:
+        ...
+
+
+@runtime_checkable
+class _DetailRefBuilder(Protocol):
+    def build_backend_detail_refs(self, request, capture) -> list[BackendDetailRef]:
+        ...
 
 
 @dataclass(frozen=True)
@@ -78,8 +94,8 @@ class ExecutionCoordinator:
 
         request = self._builder.build(bundle, runtime, policy_decision)
         adapter = self._registry.for_backend(bundle.decision.selected_backend)
-        result = adapter.execute(request)
-        record, trace = self._observe(bundle, result, policy_decision)
+        result, raw_detail_refs = self._execute_adapter(adapter, request)
+        record, trace = self._observe(bundle, result, policy_decision, raw_detail_refs=raw_detail_refs)
         return ExecutionRunOutcome(
             request=request,
             policy_decision=policy_decision,
@@ -94,16 +110,35 @@ class ExecutionCoordinator:
         bundle: ProposalDecisionBundle,
         result: ExecutionResult,
         policy_decision: PolicyDecision,
+        raw_detail_refs: list[BackendDetailRef] | None = None,
     ) -> tuple[ExecutionRecord, ExecutionTrace]:
         return self._observability.observe(
             result,
             backend=bundle.decision.selected_backend.value,
             lane=bundle.decision.selected_lane.value,
+            raw_detail_refs=raw_detail_refs,
             notes=policy_decision.notes,
             metadata={
                 "policy": policy_decision.model_dump(mode="json"),
             },
         )
+
+    def _execute_adapter(self, adapter, request) -> tuple[ExecutionResult, list[BackendDetailRef]]:
+        if isinstance(adapter, _CaptureCapableAdapter):
+            result, capture = adapter.execute_and_capture(request)
+            refs = self._build_detail_refs(adapter, request, capture)
+            return result, refs
+        return adapter.execute(request), []
+
+    def _build_detail_refs(self, adapter, request, capture) -> list[BackendDetailRef]:
+        if capture is None:
+            return []
+        if isinstance(adapter, _DetailRefBuilder):
+            try:
+                return adapter.build_backend_detail_refs(request, capture)
+            except Exception as exc:
+                logger.warning("Failed to retain backend detail refs for run %s: %s", request.run_id, exc)
+        return []
 
 
 def _policy_blocked_result(request, policy_decision: PolicyDecision) -> ExecutionResult:

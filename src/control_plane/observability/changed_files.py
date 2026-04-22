@@ -3,11 +3,12 @@ observability/changed_files.py — Changed-file evidence with honest uncertainty
 
 Three states are supported:
   KNOWN          — files enumerated by the backend
+  INFERRED       — files present but provenance is indirect / lower-confidence
   NONE           — backend confirmed no files changed (e.g. NO_CHANGES outcome)
   UNKNOWN        — backend did not report; could not determine
   NOT_APPLICABLE — execution never ran (e.g. policy_blocked)
 
-Do not coerce UNKNOWN into an empty KNOWN. Downstream code must handle uncertainty.
+Do not coerce UNKNOWN or INFERRED into KNOWN. Downstream code must handle uncertainty.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from control_plane.contracts.execution import ExecutionResult
 
 class ChangedFilesStatus(str, Enum):
     KNOWN = "known"
+    INFERRED = "inferred"
     NONE = "none"
     UNKNOWN = "unknown"
     NOT_APPLICABLE = "not_applicable"
@@ -50,6 +52,9 @@ class ChangedFilesEvidence(BaseModel):
 
 def normalize_changed_files(result: ExecutionResult) -> ChangedFilesEvidence:
     """Derive ChangedFilesEvidence from a canonical ExecutionResult."""
+    source = (result.changed_files_source or "").strip()
+    confidence = result.changed_files_confidence
+
     if result.failure_category == FailureReasonCategory.POLICY_BLOCKED:
         return ChangedFilesEvidence(
             status=ChangedFilesStatus.NOT_APPLICABLE,
@@ -57,23 +62,55 @@ def normalize_changed_files(result: ExecutionResult) -> ChangedFilesEvidence:
             confidence=1.0,
             notes="Execution was blocked by policy; no files were changed.",
         )
-    if result.changed_files:
-        return ChangedFilesEvidence(
-            status=ChangedFilesStatus.KNOWN,
-            files=list(result.changed_files),
-            source="backend_manifest",
-            confidence=1.0,
-        )
+
     if result.failure_category == FailureReasonCategory.NO_CHANGES:
         return ChangedFilesEvidence(
             status=ChangedFilesStatus.NONE,
-            source="backend_confirmed_empty",
-            confidence=1.0,
-            notes="Backend confirmed no files were changed.",
+            source=source or "backend_confirmed_empty",
+            confidence=confidence if confidence is not None else 1.0,
+            notes="Execution completed with authoritative evidence of no file changes.",
         )
+
+    if source in {"git_diff", "backend_manifest"} and result.changed_files:
+        return ChangedFilesEvidence(
+            status=ChangedFilesStatus.KNOWN,
+            files=list(result.changed_files),
+            source=source,
+            confidence=confidence if confidence is not None else 1.0,
+        )
+
+    if source in {"git_diff", "backend_manifest"} and not result.changed_files:
+        return ChangedFilesEvidence(
+            status=ChangedFilesStatus.NONE,
+            source=source,
+            confidence=confidence if confidence is not None else 1.0,
+            notes="Authoritative diff evidence confirms no files were changed.",
+        )
+
+    if source == "event_stream" and result.changed_files:
+        return ChangedFilesEvidence(
+            status=ChangedFilesStatus.INFERRED,
+            files=list(result.changed_files),
+            source=source,
+            confidence=confidence if confidence is not None else 0.5,
+            notes="Changed-file list was inferred from backend event data.",
+        )
+
+    if result.changed_files:
+        return ChangedFilesEvidence(
+            status=ChangedFilesStatus.UNKNOWN,
+            files=list(result.changed_files),
+            source=source or "unspecified",
+            confidence=confidence if confidence is not None else 0.0,
+            notes=(
+                "Changed-file list was present without trustworthy provenance; "
+                "certainty was not upgraded."
+            ),
+        )
+
     return ChangedFilesEvidence(
         status=ChangedFilesStatus.UNKNOWN,
-        source="none",
-        confidence=0.0,
+        source=source or "none",
+        confidence=confidence if confidence is not None else 0.0,
         notes="Backend did not report changed files.",
     )

@@ -192,3 +192,11 @@ def test_invoker_failure_succeeds_property():
     invoker = OpenClawBackendInvoker(_stub(outcome="failure", exit_code=1))
     capture = invoker.invoke(_prepared())
     assert capture.succeeded is False
+
+
+def test_switchboard_url_is_ignored_and_legacy_only():
+    with pytest.warns(DeprecationWarning, match="ignored by OpenClawBackendInvoker"):
+        invoker = OpenClawBackendInvoker(_stub(), switchboard_url="http://sb:20401")
+
+    capture = invoker.invoke(_prepared())
+    assert capture.run_id == "run-inv-01"

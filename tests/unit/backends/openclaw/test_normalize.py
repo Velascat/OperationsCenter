@@ -197,6 +197,20 @@ def test_changed_files_source_set_to_git_diff(tmp_path):
     assert capture.changed_files_source == "git_diff"
 
 
+def test_result_preserves_git_diff_provenance(tmp_path):
+    (tmp_path / "repo").mkdir()
+    with patch(
+        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git"
+    ) as mock_git:
+        from control_plane.contracts.common import ChangedFileRef
+        mock_git.return_value = [ChangedFileRef(path="src/a.py", change_type="modified")]
+        capture = _capture()
+        result = normalize(capture, proposal_id="p1", decision_id="d1", workspace_path=tmp_path / "repo")
+
+    assert result.changed_files_source == "git_diff"
+    assert result.changed_files_confidence == 1.0
+
+
 # ---------------------------------------------------------------------------
 # Changed-file evidence — event_stream fallback
 # ---------------------------------------------------------------------------
@@ -227,6 +241,20 @@ def test_changed_files_source_event_stream_after_git_fallback():
                   workspace_path=Path("/nonexistent/workspace"))
 
     assert capture.changed_files_source == "event_stream"
+
+
+def test_result_preserves_event_stream_provenance():
+    files = [{"path": "src/a.py", "change_type": "added"}]
+    capture = _capture(reported_changed_files=files)
+    with patch(
+        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        return_value=None,
+    ):
+        result = normalize(capture, proposal_id="p1", decision_id="d1",
+                           workspace_path=Path("/nonexistent/workspace"))
+
+    assert result.changed_files_source == "event_stream"
+    assert result.changed_files_confidence == 0.5
 
 
 def test_event_stream_change_type_preserved():

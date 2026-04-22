@@ -104,6 +104,8 @@ def normalize(
         status=status,
         success=success,
         changed_files=changed_files,
+        changed_files_source=resolved_source,
+        changed_files_confidence=_changed_files_confidence(resolved_source),
         diff_stat_excerpt=diff_stat,
         validation=validation,
         branch_pushed=False,
@@ -212,6 +214,14 @@ def _build_diff_stat(changed_files: list[ChangedFileRef]) -> Optional[str]:
         return None
     n = len(changed_files)
     return f"{n} file{'s' if n != 1 else ''} changed"
+
+
+def _changed_files_confidence(source: str) -> float:
+    if source == "git_diff":
+        return 1.0
+    if source == "event_stream":
+        return 0.5
+    return 0.0
 
 
 def _build_validation_summary(

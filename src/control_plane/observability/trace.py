@@ -94,6 +94,9 @@ class RunReportBuilder:
             if cfe.status == ChangedFilesStatus.KNOWN:
                 n = len(cfe.files)
                 parts.append(f"changed {n} {'file' if n == 1 else 'files'}")
+            elif cfe.status == ChangedFilesStatus.INFERRED:
+                n = len(cfe.files)
+                parts.append(f"changed {n} {'file' if n == 1 else 'files'} (inferred)")
             elif cfe.status == ChangedFilesStatus.NONE:
                 parts.append("completed with no file changes")
             else:
@@ -122,8 +125,11 @@ class RunReportBuilder:
         if cfe.status == ChangedFilesStatus.KNOWN:
             n = len(cfe.files)
             return f"{n} {'file' if n == 1 else 'files'} changed (source: {cfe.source})"
+        if cfe.status == ChangedFilesStatus.INFERRED:
+            n = len(cfe.files)
+            return f"{n} {'file' if n == 1 else 'files'} changed (inferred from {cfe.source})"
         if cfe.status == ChangedFilesStatus.NONE:
-            return "no files changed (confirmed by backend)"
+            return f"no files changed (source: {cfe.source})"
         if cfe.status == ChangedFilesStatus.NOT_APPLICABLE:
             return "not applicable (execution did not run)"
         return "unknown (backend did not report changed files)"
@@ -131,6 +137,10 @@ class RunReportBuilder:
     def _warnings(self, record: ExecutionRecord) -> list[str]:
         warnings: list[str] = []
         cfe = record.changed_files_evidence
+        if cfe.status == ChangedFilesStatus.INFERRED:
+            warnings.append(
+                "changed-file manifest is inferred from backend event data and is not authoritative"
+            )
         if cfe.status == ChangedFilesStatus.UNKNOWN:
             warnings.append(
                 "changed-file manifest unavailable; backend did not report file changes"

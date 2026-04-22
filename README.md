@@ -119,6 +119,11 @@ TaskProposal -> LaneDecision -> ExecutionRequest -> adapter -> ExecutionResult
 `ExecutionRequest`, evaluates policy before execution, invokes the selected adapter,
 and records the resulting `ExecutionRecord` / `ExecutionTrace`.
 
+When an adapter supports `execute_and_capture()`, the coordinator also retains
+backend-native raw detail by reference in `record.backend_detail_refs`. Changed-file
+status in the retained record remains source-aware: inferred or unknown file lists
+are not silently upgraded to authoritative.
+
 ```python
 from pathlib import Path
 

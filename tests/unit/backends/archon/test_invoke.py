@@ -221,3 +221,12 @@ def test_combined_output_combines_stdout_and_stderr():
     capture = invoker.invoke(_config())
     assert "out" in capture.combined_output
     assert "err" in capture.combined_output
+
+
+def test_switchboard_url_is_legacy_compatibility_only(tmp_path):
+    adapter = _mock_archon()
+    with pytest.warns(DeprecationWarning, match="legacy compatibility-only"):
+        invoker = ArchonBackendInvoker(adapter, switchboard_url="http://sb:20401")
+
+    capture = invoker.invoke(_config(repo_path=tmp_path))
+    assert capture.run_id == "run-001"

@@ -242,3 +242,5 @@ def test_no_changed_files_without_workspace():
     result = normalize(_capture(), proposal_id="p1", decision_id="d1", workspace_path=None)
     assert result.changed_files == []
     assert result.diff_stat_excerpt is None
+    assert result.changed_files_source == "unknown"
+    assert result.changed_files_confidence == 0.0

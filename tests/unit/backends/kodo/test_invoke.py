@@ -117,11 +117,12 @@ class TestInvocation:
 # ---------------------------------------------------------------------------
 
 class TestSwitchboardUrlInjection:
-    def test_openai_api_base_injected(self, tmp_path: Path):
+    def test_openai_api_base_injected_in_legacy_compatibility_mode(self, tmp_path: Path):
         repo = tmp_path / "repo"
         repo.mkdir()
         kodo = _mock_kodo()
-        invoker = _invoker(kodo, switchboard_url="http://sb:20401")
+        with pytest.warns(DeprecationWarning, match="legacy compatibility-only"):
+            invoker = _invoker(kodo, switchboard_url="http://sb:20401")
 
         captured_env = {}
 
