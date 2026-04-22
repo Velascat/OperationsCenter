@@ -14,7 +14,7 @@ def _minimal_decision(**kw) -> LaneDecision:
     defaults = dict(
         proposal_id="prop-123",
         selected_lane=LaneName.AIDER_LOCAL,
-        selected_backend=BackendName.KODO,
+        selected_backend=BackendName.DIRECT_LOCAL,
     )
     defaults.update(kw)
     return LaneDecision(**defaults)
@@ -25,7 +25,7 @@ class TestLaneDecisionConstruction:
         d = _minimal_decision()
         assert d.proposal_id == "prop-123"
         assert d.selected_lane == LaneName.AIDER_LOCAL
-        assert d.selected_backend == BackendName.KODO
+        assert d.selected_backend == BackendName.DIRECT_LOCAL
 
     def test_auto_decision_id(self):
         d1 = _minimal_decision()
@@ -89,7 +89,7 @@ class TestLaneDecisionSerialization:
         d = _minimal_decision()
         parsed = json.loads(d.model_dump_json())
         assert parsed["selected_lane"] == "aider_local"
-        assert parsed["selected_backend"] == "kodo"
+        assert parsed["selected_backend"] == "direct_local"
 
     def test_alternatives_serialised_as_list(self):
         d = LaneDecision(

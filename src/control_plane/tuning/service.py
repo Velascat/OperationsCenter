@@ -49,10 +49,9 @@ def new_tuning_context(
 class TuningRegulatorService:
     """Bounded self-tuning regulation loop.
 
-    Default mode: recommendation-only (no config mutation).
-    Auto-apply mode (opt-in): applies small bounded changes within guardrails.
-
-    Every run produces retained artifacts regardless of mode.
+    Supported runtime posture: recommendation-only. The regulator may retain
+    what would have been auto-apply candidates as skipped changes for review,
+    but it never mutates live tuning config automatically.
     """
 
     def __init__(
@@ -81,50 +80,32 @@ class TuningRegulatorService:
         # 2. Generate recommendations
         recommendations = self.engine.evaluate(family_metrics)
 
-        # 3. If auto-apply, evaluate each actionable recommendation through guardrails
+        # 3. Runtime truth posture: tuning remains recommendation-only.
         changes_applied: list[TuningChange] = []
         from control_plane.tuning.models import SkippedTuningChange
         changes_skipped: list[SkippedTuningChange] = []
 
         if context.auto_apply:
-            prior_runs = self.loader.load_recent(limit=30)
-
             for rec in recommendations:
-                for key in AUTO_APPLY_KEYS:
-                    # Only process families/keys that have an apply path
-                    if rec.action not in ("loosen_threshold", "tighten_threshold"):
-                        continue
-                    current_val = self.applier.current_value(rec.family, key)
-                    can_apply, skip_reason = self.guardrails.evaluate(
-                        recommendation=rec,
-                        current_value=current_val,
-                        prior_runs=prior_runs,
-                        changes_so_far=changes_applied,
-                        generated_at=context.generated_at,
-                        sample_runs=sample_runs,
-                    )
-                    if can_apply:
-                        change = self.applier.apply(
+                if rec.action in ("loosen_threshold", "tighten_threshold"):
+                    changes_skipped.append(
+                        SkippedTuningChange(
                             family=rec.family,
-                            key=key,
-                            action=rec.action,
-                            reason=rec.rationale,
-                            generated_at=context.generated_at,
+                            intended_action=rec.action,
+                            reason="review_only_runtime",
+                            evidence={
+                                "requested_auto_apply": True,
+                                "sample_runs": sample_runs,
+                            },
                         )
-                        if change is not None:
-                            changes_applied.append(change)
-                    else:
-                        changes_skipped.append(
-                            self.guardrails.build_skipped(rec, skip_reason, sample_runs)
-                        )
-                        break  # only record one skip per recommendation
+                    )
 
         artifact = TuningRunArtifact(
             run_id=context.run_id,
             generated_at=context.generated_at,
             source_command=context.source_command,
-            dry_run=not context.auto_apply,
-            auto_apply=context.auto_apply,
+            dry_run=True,
+            auto_apply=False,
             window_runs=sample_runs,
             window_start=window_start,
             window_end=window_end,

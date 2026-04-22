@@ -32,8 +32,10 @@ class LaneName(str, Enum):
 
 class BackendName(str, Enum):
     """Backend implementations that execute tasks inside a lane."""
+    DIRECT_LOCAL = "direct_local"
     KODO = "kodo"
     ARCHON = "archon"
+    ARCHON_THEN_KODO = "archon_then_kodo"
     OPENCLAW = "openclaw"
 
 

@@ -1,0 +1,1 @@
+"""Canonical execute entrypoint package."""

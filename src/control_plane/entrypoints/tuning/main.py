@@ -15,7 +15,7 @@ def main() -> None:
             "Bounded self-tuning regulation loop. "
             "Reads retained autonomy artifacts, computes per-family behavior metrics, "
             "and emits conservative tuning recommendations. "
-            "Recommendation-only by default — pass --apply to enable bounded auto-apply."
+            "Supported runtime is recommendation-only."
         )
     )
     parser.add_argument("--config", required=True)
@@ -30,10 +30,8 @@ def main() -> None:
         action="store_true",
         default=False,
         help=(
-            "Enable bounded auto-apply mode. "
-            "Applies conservative threshold changes within strict guardrails. "
-            "Writes to config/autonomy_tuning.json. "
-            "Requires CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 as an additional safety check."
+            "Deprecated. Supported runtime no longer auto-applies tuning changes; "
+            "requested apply actions are recorded as skipped recommendations."
         ),
     )
     args = parser.parse_args()
@@ -43,11 +41,11 @@ def main() -> None:
     load_settings(args.config)  # validates config is readable
     report_root = Path("tools/report/control_plane")
 
-    auto_apply = args.apply and os.environ.get("CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED") == "1"
-    if args.apply and not auto_apply:
+    auto_apply = False
+    if args.apply:
         print(
-            "  [warn] --apply passed but CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 is not set. "
-            "Running in recommendation-only mode."
+            "  [warn] --apply is deprecated. Supported runtime remains recommendation-only; "
+            "apply candidates will be recorded as skipped."
         )
 
     context = new_tuning_context(

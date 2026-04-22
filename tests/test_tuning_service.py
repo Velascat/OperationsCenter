@@ -122,10 +122,10 @@ def test_returns_empty_artifact_when_no_artifacts(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Auto-apply mode
+# Requested auto-apply is retained as skipped review work
 # ---------------------------------------------------------------------------
 
-def test_auto_apply_writes_config_for_over_suppressed_family(tmp_path: Path) -> None:
+def test_requested_auto_apply_is_recorded_as_skipped_review_work(tmp_path: Path) -> None:
     dec = tmp_path / "decision"
     config_path = tmp_path / "autonomy_tuning.json"
 
@@ -150,21 +150,14 @@ def test_auto_apply_writes_config_for_over_suppressed_family(tmp_path: Path) -> 
     )
     artifact, _ = svc.run(ctx)
 
-    assert artifact.auto_apply is True
-    assert len(artifact.changes_applied) == 1
-    change = artifact.changes_applied[0]
-    assert change.family == "observation_coverage"
-    assert change.key == "min_consecutive_runs"
-    assert int(change.before) > int(change.after)  # loosened = decreased
-
-    # Config was written
-    assert config_path.exists()
-    config = load_tuning_config(config_path)
-    assert config is not None
-    assert config.get_int("observation_coverage", "min_consecutive_runs", 2) == int(change.after)
+    assert artifact.auto_apply is False
+    assert artifact.changes_applied == []
+    assert not config_path.exists()
+    assert any(s.family == "observation_coverage" for s in artifact.changes_skipped)
+    assert all(s.reason == "review_only_runtime" for s in artifact.changes_skipped)
 
 
-def test_auto_apply_respects_family_not_in_allowlist(tmp_path: Path) -> None:
+def test_requested_auto_apply_never_mutates_runtime_config(tmp_path: Path) -> None:
     dec = tmp_path / "decision"
 
     # hotspot_concentration is not in AUTO_APPLY_FAMILIES
@@ -182,7 +175,7 @@ def test_auto_apply_respects_family_not_in_allowlist(tmp_path: Path) -> None:
     )
     artifact, _ = svc.run(ctx)
 
-    assert all(c.family != "hotspot_concentration" for c in artifact.changes_applied)
+    assert artifact.changes_applied == []
     assert any(s.family == "hotspot_concentration" for s in artifact.changes_skipped)
 
 

@@ -9,7 +9,8 @@ ControlPlane is operated through **planning + routing handoff**:
 1. Gather or derive work intent.
 2. Build a canonical `TaskProposal`.
 3. Route it through SwitchBoard to get a `LaneDecision`.
-4. Hand the proposal/decision bundle to a separate execution boundary.
+4. Hand the proposal/decision bundle to the canonical execution boundary.
+5. The execution boundary builds `ExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
 
 For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it as a validation ritual after any significant config or threshold change.
 
@@ -85,7 +86,7 @@ bundle = service.plan(PlanningContext(
 ))
 # bundle.proposal  → TaskProposal
 # bundle.decision  → LaneDecision (from SwitchBoard)
-# bundle.run_summary → "proposal=... task=... lane=aider_local backend=kodo rule=..."
+# bundle.run_summary → "proposal=... task=... lane=aider_local backend=direct_local rule=..."
 ```
 
 For full architecture and examples see:
@@ -108,6 +109,41 @@ See `WorkStation/docs/architecture/contracts.md` for full documentation.
 
 ### Backend adapters (outside ControlPlane runtime ownership)
 
+The supported live execution path is:
+
+```text
+TaskProposal -> LaneDecision -> ExecutionRequest -> adapter -> ExecutionResult
+```
+
+`ExecutionCoordinator` is the supported execution boundary. It builds the canonical
+`ExecutionRequest`, evaluates policy before execution, invokes the selected adapter,
+and records the resulting `ExecutionRecord` / `ExecutionTrace`.
+
+```python
+from pathlib import Path
+
+from control_plane.backends.factory import CanonicalBackendRegistry
+from control_plane.config.settings import load_settings
+from control_plane.execution.coordinator import ExecutionCoordinator
+from control_plane.execution.handoff import ExecutionRuntimeContext
+
+settings = load_settings("config/control_plane.local.yaml")
+registry = CanonicalBackendRegistry.from_settings(settings)
+coordinator = ExecutionCoordinator(adapter_registry=registry)
+
+outcome = coordinator.execute(
+    bundle,
+    ExecutionRuntimeContext(
+        workspace_path=Path("/tmp/ws"),
+        task_branch="auto/task-123",
+    ),
+)
+# outcome.request         -> canonical ExecutionRequest
+# outcome.policy_decision -> mandatory gate result
+# outcome.result          -> canonical ExecutionResult
+# outcome.record/trace    -> retained observability view
+```
+
 `KodoBackendAdapter` wraps the kodo subprocess behind the canonical interface:
 
 ```python
@@ -115,7 +151,9 @@ from control_plane.backends.kodo import KodoBackendAdapter
 result = KodoBackendAdapter.from_settings().execute(request)  # ExecutionRequest → ExecutionResult
 ```
 
-These adapters still live in the repo as contract-aligned integration modules, but the default ControlPlane runtime no longer invokes them directly.
+These adapters still live in the repo as contract-aligned integration modules, but
+they are reached through the canonical execution boundary rather than legacy worker
+runtime code.
 
 ### Archon Backend Adapter (Phase 8, optional)
 
@@ -240,6 +278,10 @@ elif decision.is_allowed:
     # proceed (check decision.warnings if relevant)
 ```
 
+In the supported runtime, policy is evaluated after `ExecutionRequest` construction
+and before any adapter invocation. `BLOCK` and `REQUIRE_REVIEW` stop autonomous
+execution and are retained as inspectable blocked-execution records.
+
 **PolicyStatus values:**
 - `ALLOW` — no restrictions
 - `ALLOW_WITH_WARNINGS` — warnings present (e.g. missing branch prefix)
@@ -280,6 +322,7 @@ report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisR
 **Design rules:**
 
 - Recommendations are proposals, not policy mutations — `requires_review=True` always
+- Supported runtime is recommendation-only. Requested auto-apply actions are retained as skipped review items rather than mutating live config.
 - Sparse evidence (< 8 samples) produces only `sparse_data` findings and no recommendations
 - Contradictory signals (high success + poor change evidence) are surfaced explicitly
 - `StrategyAnalysisReport` is frozen and does not modify SwitchBoard routing policy

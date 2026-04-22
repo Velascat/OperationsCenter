@@ -57,7 +57,7 @@ def test_stub_client_satisfies_protocol():
 
 
 def test_stub_returns_fixed_decision():
-    decision = _stub_decision(lane=LaneName.AIDER_LOCAL, backend=BackendName.KODO)
+    decision = _stub_decision(lane=LaneName.AIDER_LOCAL, backend=BackendName.DIRECT_LOCAL)
     stub = StubLaneRoutingClient(decision)
     proposal = build_proposal(_ctx())
     result = stub.select_lane(proposal)
@@ -143,7 +143,7 @@ def test_local_client_accepts_custom_policy():
         version="1",
         rules=[],
         backend_rules=[],
-        fallback=FallbackPolicy(lane="aider_local", backend="kodo"),
+        fallback=FallbackPolicy(lane="aider_local", backend="direct_local"),
         thresholds={},
         excluded_backends=[],
     )

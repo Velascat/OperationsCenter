@@ -141,6 +141,7 @@ def test_default_service_uses_real_routing():
     bundle = service.plan(ctx)
     # Real policy routes lint_fix/low to aider_local
     assert bundle.decision.selected_lane == LaneName.AIDER_LOCAL
+    assert bundle.decision.selected_backend == BackendName.DIRECT_LOCAL
 
 
 # ---------------------------------------------------------------------------
