@@ -15,14 +15,7 @@ import argparse
 import json
 from dataclasses import asdict
 from pathlib import Path
-import sys
 from typing import Any
-
-_THIS_FILE = Path(__file__).resolve()
-_CONTROLPLANE_ROOT = _THIS_FILE.parents[4]
-_SWITCHBOARD_SRC = _CONTROLPLANE_ROOT.parent / "SwitchBoard" / "src"
-if _SWITCHBOARD_SRC.exists():
-    sys.path.insert(0, str(_SWITCHBOARD_SRC))
 
 from control_plane.planning.models import PlanningContext
 from control_plane.routing.service import PlanningService

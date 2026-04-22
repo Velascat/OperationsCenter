@@ -106,6 +106,11 @@ class _BaselineResult:
 
 class ExecutionService:
     def __init__(self, settings: Settings) -> None:
+        if os.environ.get("CONTROL_PLANE_ENABLE_LEGACY_EXECUTION") != "1":
+            raise RuntimeError(
+                "control_plane.legacy_execution is compatibility-only and disabled by default. "
+                "Set CONTROL_PLANE_ENABLE_LEGACY_EXECUTION=1 only for explicit legacy-runtime forensics."
+            )
         self.settings = settings
         self.git = GitClient()
         self.workspace = WorkspaceManager()

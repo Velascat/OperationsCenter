@@ -23,7 +23,7 @@ from control_plane.planning.models import (
 )
 from control_plane.planning.proposal_builder import build_proposal
 
-from .client import LaneRoutingClient, LocalLaneRoutingClient
+from .client import HttpLaneRoutingClient, LaneRoutingClient
 
 
 class PlanningService:
@@ -62,8 +62,8 @@ class PlanningService:
 
     @classmethod
     def default(cls) -> "PlanningService":
-        """Create a PlanningService backed by LocalLaneRoutingClient."""
-        return cls(routing_client=LocalLaneRoutingClient.with_default_policy())
+        """Create a PlanningService backed by the SwitchBoard HTTP client."""
+        return cls(routing_client=HttpLaneRoutingClient.from_env())
 
     @classmethod
     def with_client(cls, client: LaneRoutingClient) -> "PlanningService":

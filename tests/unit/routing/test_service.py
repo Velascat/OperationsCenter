@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from control_plane.contracts.enums import BackendName, LaneName
 from control_plane.contracts.routing import LaneDecision
 from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.routing.client import StubLaneRoutingClient
+from control_plane.routing.client import HttpLaneRoutingClient, StubLaneRoutingClient
 from control_plane.routing.service import PlanningService
 
 
@@ -137,9 +138,29 @@ def test_invalid_repo_key_raises():
 
 def test_default_service_uses_real_routing():
     service = PlanningService.default()
-    ctx = _ctx(task_type="lint_fix", risk_level="low")
-    bundle = service.plan(ctx)
-    # Real policy routes lint_fix/low to aider_local
+    assert isinstance(service._client, HttpLaneRoutingClient)
+    service._client.close()
+
+
+def test_http_backed_service_routes_over_switchboard_boundary():
+    decision = LaneDecision(
+        proposal_id="prop-http-1",
+        selected_lane=LaneName.AIDER_LOCAL,
+        selected_backend=BackendName.DIRECT_LOCAL,
+        confidence=0.95,
+        policy_rule_matched="http_rule",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=decision.model_dump(mode="json"))
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    service = PlanningService.with_client(client)
+    try:
+        bundle = service.plan(_ctx(task_type="lint_fix", risk_level="low"))
+    finally:
+        client.close()
+
     assert bundle.decision.selected_lane == LaneName.AIDER_LOCAL
     assert bundle.decision.selected_backend == BackendName.DIRECT_LOCAL
 

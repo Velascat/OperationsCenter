@@ -1,20 +1,22 @@
 """
-routing/client.py — LaneRoutingClient protocol and LocalLaneRoutingClient implementation.
+routing/client.py — LaneRoutingClient protocol and concrete routing clients.
 
-ControlPlane uses this boundary to route TaskProposals to SwitchBoard without
-depending on SwitchBoard internals elsewhere. The protocol isolates the call
-mechanism so callers never know if routing is local or over HTTP.
-
-LocalLaneRoutingClient imports LaneSelector directly (switchboard installed
-editable in the ControlPlane venv). It is the default implementation.
+ControlPlane's supported routing path crosses the SwitchBoard service boundary
+over HTTP. A compatibility-only in-process client remains available for local
+development and narrowly scoped tests, but it is not the default path.
 """
 
 from __future__ import annotations
 
+import os
 from typing import Protocol, runtime_checkable
+
+import httpx
 
 from control_plane.contracts.proposal import TaskProposal
 from control_plane.contracts.routing import LaneDecision
+
+DEFAULT_SWITCHBOARD_URL = "http://localhost:20401"
 
 
 @runtime_checkable
@@ -30,13 +32,51 @@ class LaneRoutingClient(Protocol):
         ...
 
 
-class LocalLaneRoutingClient:
-    """Routes proposals through SwitchBoard's LaneSelector in-process.
+class HttpLaneRoutingClient:
+    """Routes proposals through the SwitchBoard HTTP service boundary.
 
-    Requires the `switchboard` package to be installed in the current venv.
-    Use this in production when ControlPlane and SwitchBoard share a Python
-    environment, and in tests when you want real policy evaluation without an
-    HTTP server.
+    This is the canonical ControlPlane -> SwitchBoard integration path.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        timeout: float = 10.0,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self._client = httpx.Client(
+            base_url=self.base_url,
+            timeout=timeout,
+            transport=transport,
+            headers={"Content-Type": "application/json"},
+        )
+
+    def select_lane(self, proposal: TaskProposal) -> LaneDecision:
+        response = self._client.post("/route", json=proposal.model_dump(mode="json"))
+        response.raise_for_status()
+        return LaneDecision.model_validate(response.json())
+
+    def close(self) -> None:
+        self._client.close()
+
+    @classmethod
+    def from_env(cls) -> "HttpLaneRoutingClient":
+        base_url = (
+            os.environ.get("CONTROL_PLANE_SWITCHBOARD_URL")
+            or os.environ.get("SWITCHBOARD_URL")
+            or DEFAULT_SWITCHBOARD_URL
+        )
+        return cls(base_url=base_url)
+
+
+class LocalLaneRoutingClient:
+    """Compatibility-only in-process routing client.
+
+    This client imports SwitchBoard internals directly and therefore bypasses
+    the service boundary. Keep it limited to local development or tests that
+    intentionally exercise policy code in-process.
     """
 
     def __init__(self, policy=None) -> None:
@@ -48,8 +88,8 @@ class LocalLaneRoutingClient:
         return self._selector.select(proposal)
 
     @classmethod
-    def with_default_policy(cls) -> "LocalLaneRoutingClient":
-        return cls(policy=None)
+    def compatibility(cls, policy=None) -> "LocalLaneRoutingClient":
+        return cls(policy=policy)
 
 
 class StubLaneRoutingClient:

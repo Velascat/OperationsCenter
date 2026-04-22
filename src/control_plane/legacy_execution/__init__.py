@@ -1,11 +1,16 @@
+"""Compatibility-only legacy execution runtime.
+
+This package is intentionally quarantined outside the supported ControlPlane
+runtime. Supported execution flows must use the canonical planning, policy,
+adapter, and observability path instead.
+"""
+
 from control_plane.legacy_execution.models import (
     LegacyExecutionRequest,
     LegacyExecutionResult,
 )
-from control_plane.legacy_execution.service import ExecutionService
 
 __all__ = [
-    "ExecutionService",
     "LegacyExecutionRequest",
     "LegacyExecutionResult",
 ]

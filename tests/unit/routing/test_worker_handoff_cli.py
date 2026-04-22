@@ -3,50 +3,21 @@ from __future__ import annotations
 import os
 import json
 import subprocess
-import sys
 from pathlib import Path
+
+from control_plane.routing.client import HttpLaneRoutingClient
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_worker_entrypoint_emits_proposal_and_decision_bundle() -> None:
-    cmd = [
-        sys.executable,
-        "-m",
-        "control_plane.entrypoints.worker.main",
-        "--goal",
-        "Refresh the architecture summary",
-        "--task-type",
-        "documentation",
-        "--repo-key",
-        "docs",
-        "--clone-url",
-        "https://example.invalid/docs.git",
-        "--project-id",
-        "cp-test",
-        "--task-id",
-        "TASK-1",
-    ]
-    env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(
-        [
-            str(REPO_ROOT / "src"),
-            str(REPO_ROOT.parent / "SwitchBoard" / "src"),
-        ]
-    )
-    result = subprocess.run(
-        cmd,
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert payload["proposal"]["task_id"] == "TASK-1"
-    assert payload["decision"]["proposal_id"] == payload["proposal"]["proposal_id"]
+def test_default_planning_client_is_http_boundary() -> None:
+    service_module = __import__("control_plane.routing.service", fromlist=["PlanningService"])
+    service = service_module.PlanningService.default()
+    try:
+        assert isinstance(service._client, HttpLaneRoutingClient)
+    finally:
+        service._client.close()
 
 
 def test_domain_no_longer_exports_competing_execution_contracts() -> None:
@@ -58,6 +29,14 @@ def test_domain_no_longer_exports_competing_execution_contracts() -> None:
 def test_legacy_execution_service_is_quarantined_outside_application_namespace() -> None:
     assert not (REPO_ROOT / "src" / "control_plane" / "application" / "service.py").exists()
     assert (REPO_ROOT / "src" / "control_plane" / "legacy_execution" / "service.py").exists()
+
+
+def test_worker_entrypoint_no_longer_injects_switchboard_source_tree() -> None:
+    worker_main = (
+        REPO_ROOT / "src" / "control_plane" / "entrypoints" / "worker" / "main.py"
+    ).read_text(encoding="utf-8")
+    assert "_SWITCHBOARD_SRC" not in worker_main
+    assert "sys.path.insert" not in worker_main
 
 
 def test_supported_execute_entrypoint_uses_canonical_boundary_not_legacy_runtime() -> None:
@@ -170,3 +149,13 @@ repos:
     assert payload["policy_decision"]["status"] in {"block", "require_review"}
     assert payload["executed"] is False
     assert payload["result"]["failure_category"] == "policy_blocked"
+
+
+def test_default_switchboard_url_targets_service_boundary(monkeypatch) -> None:
+    monkeypatch.delenv("CONTROL_PLANE_SWITCHBOARD_URL", raising=False)
+    monkeypatch.delenv("SWITCHBOARD_URL", raising=False)
+    client = HttpLaneRoutingClient.from_env()
+    try:
+        assert client.base_url == "http://localhost:20401"
+    finally:
+        client.close()
