@@ -52,6 +52,272 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 - **Not the operator shell.** OpenClaw (optional) provides the human-facing operator
   experience. ControlPlane is the autonomous engine that runs beneath it.
 
+## Canonical Contracts and Planning Pipeline (Phase 3–6)
+
+ControlPlane integrates with a canonical cross-repo contract layer that
+makes task proposals and routing decisions backend-agnostic.
+
+### Planning pipeline
+
+```
+PlanningContext  →  TaskProposal  →  LaneDecision  →  ProposalDecisionBundle
+   (internal)        (canonical)       (SwitchBoard)       (execution ready)
+```
+
+1. **`PlanningContext`** — frozen dataclass with raw task intent (goal text,
+   task type, repo coordinates, risk level, labels).
+2. **`build_proposal(ctx)`** — pure function in `planning/proposal_builder.py`;
+   translates context into a canonical `TaskProposal` with no backend knowledge.
+3. **`PlanningService.plan(ctx)`** — calls `build_proposal`, then routes through
+   `LaneRoutingClient` (SwitchBoard) to get a `LaneDecision`, then bundles both
+   into a `ProposalDecisionBundle`.
+
+```python
+from control_plane.planning.models import PlanningContext
+from control_plane.routing.service import PlanningService
+
+service = PlanningService.default()
+bundle = service.plan(PlanningContext(
+    goal_text="Fix all ruff lint errors in src/",
+    task_type="lint_fix",
+    repo_key="api-service",
+    clone_url="https://github.com/org/api-service.git",
+    risk_level="low",
+))
+# bundle.proposal  → TaskProposal
+# bundle.decision  → LaneDecision (from SwitchBoard)
+# bundle.run_summary → "proposal=... task=... lane=aider_local backend=kodo rule=..."
+```
+
+For full architecture and examples see:
+- `WorkStation/docs/architecture/controlplane-routing.md`
+- `WorkStation/docs/architecture/controlplane-routing-examples.md`
+
+### Canonical contract types
+
+All cross-repo contracts live in `src/control_plane/contracts/`:
+
+| Module | Types |
+|---|---|
+| `enums.py` | `TaskType`, `LaneName`, `BackendName`, `ExecutionMode`, `Priority`, `RiskLevel` |
+| `proposal.py` | `TaskProposal` |
+| `routing.py` | `LaneDecision` |
+| `execution.py` | `ExecutionRequest`, `ExecutionResult`, `ExecutionArtifact`, `RunTelemetry` |
+| `common.py` | `TaskTarget`, `ExecutionConstraints`, `ValidationProfile`, `BranchPolicy` |
+
+See `WorkStation/docs/architecture/contracts.md` for full documentation.
+
+### kodo Backend Adapter (Phase 5)
+
+`KodoBackendAdapter` wraps the kodo subprocess behind the canonical interface:
+
+```python
+from control_plane.backends.kodo import KodoBackendAdapter
+result = KodoBackendAdapter.from_settings().execute(request)  # ExecutionRequest → ExecutionResult
+```
+
+See `WorkStation/docs/architecture/kodo-adapter.md` for architecture and usage.
+
+### Archon Backend Adapter (Phase 8, optional)
+
+`ArchonBackendAdapter` is an optional, bounded second backend for workflow-oriented execution. Archon runs multi-step agentic workflows (plan → execute → validate) internally. It follows the same canonical interface as kodo but stays completely separate from it:
+
+```python
+from control_plane.backends.archon.adapter import ArchonBackendAdapter
+
+# Use the stub factory in tests
+adapter = ArchonBackendAdapter.with_stub(outcome="success", output_text="done")
+result = adapter.execute(request)  # ExecutionRequest → ExecutionResult
+
+# Or capture raw workflow events for observability
+result, capture = adapter.execute_and_capture(request)
+# capture.workflow_events — Archon-internal step trace, NOT in ExecutionResult
+```
+
+Key design constraints:
+- Archon is **not** a universal backend — `aider_local` lane runs stay on kodo
+- Archon-native types (`ArchonWorkflowConfig`, `ArchonRunCapture`, `workflow_events`) are confined to `backends/archon/`
+- `execute_and_capture()` exposes raw workflow events for `BackendDetailRef` retention without inlining them into canonical contracts
+- Unsupported requests return `POLICY_BLOCKED` before invocation; the capture is `None`
+
+See `WorkStation/docs/architecture/archon-adapter.md` for architecture and usage.
+
+### OpenClaw Backend Adapter (Phase 11, optional)
+
+`OpenClawBackendAdapter` makes OpenClaw available as an execution backend behind the canonical contracts. This is the **backend adapter role** — it is separate from the optional outer-shell role (Phase 10).
+
+```python
+from control_plane.backends.openclaw import OpenClawBackendAdapter
+
+adapter = OpenClawBackendAdapter.with_stub(outcome="success")
+result = adapter.execute(request)  # ExecutionRequest → ExecutionResult
+result, capture = adapter.execute_and_capture(request)
+# capture.events → raw OpenClaw events (NOT in ExecutionResult)
+# capture.changed_files_source → "git_diff" | "event_stream" | "unknown"
+```
+
+**Changed-file evidence** is explicit — three possible states:
+- `"git_diff"` — authoritative, from git diff on workspace
+- `"event_stream"` — inferred, from OpenClaw-reported files in event stream
+- `"unknown"` — no reliable source; `changed_files` will be empty
+
+The adapter never presents inferred or unknown changed files as authoritative.
+
+Subclass `OpenClawRunner` to provide a real implementation; `StubOpenClawRunner` and `OpenClawBackendAdapter.with_stub()` are available for tests and local dev.
+
+See `WorkStation/docs/architecture/openclaw-backend-adapter.md` for architecture and examples.
+
+### OpenClaw Outer Shell (Phase 10, optional)
+
+`OpenClawBridge` is an optional outer-shell integration layer. It provides an operator-facing surface for triggering runs, deriving status summaries, and inspecting retained records — without replacing or modifying the internal architecture.
+
+**The system runs fully without OpenClaw active.** The shell is enabled by setting `OPENCLAW_SHELL_ENABLED=1`.
+
+```python
+from control_plane.openclaw_shell.bridge import OpenClawBridge
+from control_plane.openclaw_shell.models import OperatorContext
+
+if OpenClawBridge.is_enabled():
+    bridge = OpenClawBridge.default()
+    ctx = OperatorContext(
+        goal_text="Fix all lint errors",
+        repo_key="svc",
+        clone_url="https://github.com/example/svc.git",
+    )
+    handle = bridge.trigger(ctx)
+    # handle.selected_lane, handle.selected_backend, handle.status == "planned"
+    summary = bridge.status_from_result(result, lane="claude_cli", backend="kodo")
+    inspection = bridge.inspect_from_record(record, trace)
+```
+
+Key design rules:
+- Nothing inside the core architecture (`contracts/`, `planning/`, `routing/`, `backends/`, `observability/`) imports from `openclaw_shell/`
+- Shell output types (`ShellRunHandle`, `ShellStatusSummary`, `ShellInspectionResult`) are derived from canonical internal data only — never from OpenClaw-native event streams
+- `wrap_action()` catches exceptions at the shell boundary so failures don't propagate outward
+
+See `WorkStation/docs/architecture/openclaw-outer-shell.md` for architecture and examples.
+
+### Execution Observability (Phase 7)
+
+`ExecutionObservabilityService` normalizes execution outcomes into retained records:
+
+```python
+from control_plane.observability.service import ExecutionObservabilityService
+
+svc = ExecutionObservabilityService.default()
+record, trace = svc.observe(result, backend="kodo", lane="claude_cli")
+# record → ExecutionRecord (retained; classified artifacts, changed-file evidence, backend detail refs)
+# trace  → ExecutionTrace (inspectable; headline, summary, warnings, key artifacts)
+```
+
+Key model distinctions:
+
+| Model | Purpose |
+|---|---|
+| `ExecutionResult` | Canonical outcome contract (unchanged) |
+| `ExecutionRecord` | Retained normalized record; wraps result + observability metadata |
+| `ExecutionTrace` | Inspectable report; generated from record on demand |
+| `BackendDetailRef` | Reference to raw backend output; kept separate from canonical data |
+| `ChangedFilesEvidence` | Changed-file knowledge with honest uncertainty (KNOWN/NONE/UNKNOWN/NOT_APPLICABLE) |
+
+See `WorkStation/docs/architecture/execution-observability.md` for architecture and examples.
+
+### Policy and Guardrails (Phase 12)
+
+`PolicyEngine` evaluates a `TaskProposal` + `LaneDecision` against configured guardrails and returns an inspectable `PolicyDecision`. Policy is a first-class system concern — it is not hidden inside a backend or shell.
+
+```python
+from control_plane.policy import PolicyEngine, explain
+
+engine = PolicyEngine.from_defaults()
+decision = engine.evaluate(proposal, lane_decision)
+
+if decision.is_blocked:
+    e = explain(decision)
+    # e.summary → "BLOCKED: Path '.ssh/id_rsa' is blocked by policy rule"
+elif decision.requires_review:
+    # gate on human approval
+elif decision.is_allowed:
+    # proceed (check decision.warnings if relevant)
+```
+
+**PolicyStatus values:**
+- `ALLOW` — no restrictions
+- `ALLOW_WITH_WARNINGS` — warnings present (e.g. missing branch prefix)
+- `REQUIRE_REVIEW` — human review gate (high-risk, sensitive path, task type)
+- `BLOCK` — hard stop (disabled repo, blocked path/tool, routing violation)
+
+**Default posture (conservative):**
+
+| Dimension | Default |
+|-----------|---------|
+| Branch | No direct commit; branch required |
+| Destructive actions | Blocked |
+| SSH / GPG key paths | Blocked |
+| High-risk tasks | Review required + strict validation enforced |
+| Feature/refactor | Review required |
+| Env / migration / workflow files | Review required |
+
+Config validation: `validate_config(config)` returns a list of error strings for contradictory configs before evaluation.
+
+See `WorkStation/docs/architecture/policy-guardrails.md` for full architecture and `policy-guardrails-examples.md` for usage examples.
+
+### Evidence-Driven Routing Strategy Tuning (Phase 13)
+
+`StrategyTuningService` analyzes retained `ExecutionRecord` evidence and produces routing/backend strategy comparisons, findings, and reviewable proposals.
+
+```python
+from control_plane.tuning import StrategyTuningService
+
+service = StrategyTuningService.default()
+report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisReport
+
+# report.comparison_summaries → one BackendComparisonSummary per (lane, backend)
+# report.findings             → bounded observations (reliability, change_evidence, etc.)
+# report.recommendations      → candidate changes (ALL require human review)
+# report.limitations          → honest statements about data gaps
+```
+
+**Design rules:**
+
+- Recommendations are proposals, not policy mutations — `requires_review=True` always
+- Sparse evidence (< 8 samples) produces only `sparse_data` findings and no recommendations
+- Contradictory signals (high success + poor change evidence) are surfaced explicitly
+- `StrategyAnalysisReport` is frozen and does not modify SwitchBoard routing policy
+
+**Three things always kept separate:**
+1. Current active routing policy (SwitchBoard)
+2. Observed historical evidence (retained ExecutionRecords)
+3. Proposed strategy changes (tuning proposals, subject to review)
+
+See [docs/architecture/routing-tuning.md](docs/architecture/routing-tuning.md) for architecture and [docs/architecture/routing-tuning-examples.md](docs/architecture/routing-tuning-examples.md) for examples.
+
+### Upstream Patch Evaluation (Phase 14)
+
+`UpstreamPatchEvaluator` evaluates whether recurring friction around external systems like `openclaw`, `archon`, or `kodo` actually justifies upstream patching or deeper native integration work.
+
+```python
+from control_plane.upstream_eval import UpstreamPatchEvaluator
+
+evaluator = UpstreamPatchEvaluator.default()
+report = evaluator.analyze(evidence)
+
+# report.friction_findings        → recurring, evidence-labeled integration issues
+# report.workaround_assessments   → adapter-first workaround cost/reliability summaries
+# report.recommendations          → review-only upstream patch proposals
+```
+
+Design rules:
+
+- Upstream modifications are evaluated late and from retained evidence
+- Adapter-first remains the default posture
+- Patch proposals are reviewable recommendations, not silent commitments
+- Maintenance burden and divergence risk are part of every serious recommendation
+
+See [docs/architecture/upstream-patch-evaluation.md](docs/architecture/upstream-patch-evaluation.md) and [docs/architecture/upstream-patch-evaluation-examples.md](docs/architecture/upstream-patch-evaluation-examples.md).
+
+---
+
 ## Repo-Aware Autonomy Loop
 
 ```text
