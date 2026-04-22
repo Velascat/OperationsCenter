@@ -8,17 +8,17 @@ from control_plane.backends import factory as backend_factory
 
 
 def test_canonical_registry_does_not_thread_switchboard_proxy_transport(monkeypatch) -> None:
-    captured: list[tuple[str, str]] = []
+    captured: list[tuple[str, object]] = []
 
     class FakeKodoAdapter:
         @classmethod
-        def from_settings(cls, *, settings, switchboard_url: str = "", kodo_mode: str = "goal"):
-            captured.append(("kodo", switchboard_url))
+        def from_settings(cls, *, settings, kodo_mode: str = "goal"):
+            captured.append(("kodo", settings))
             return object()
 
     class FakeDirectLocalAdapter:
-        def __init__(self, settings, switchboard_url: str = "") -> None:
-            captured.append(("direct_local", switchboard_url))
+        def __init__(self, settings) -> None:
+            captured.append(("direct_local", settings))
 
     monkeypatch.setattr(backend_factory, "KodoBackendAdapter", FakeKodoAdapter)
     monkeypatch.setattr(backend_factory, "DirectLocalBackendAdapter", FakeDirectLocalAdapter)
@@ -31,4 +31,4 @@ def test_canonical_registry_does_not_thread_switchboard_proxy_transport(monkeypa
 
     backend_factory.CanonicalBackendRegistry.from_settings(settings)
 
-    assert captured == [("kodo", ""), ("direct_local", "")]
+    assert captured == [("kodo", settings.kodo), ("direct_local", settings.aider)]

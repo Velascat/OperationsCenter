@@ -68,10 +68,9 @@ class ArchonBackendAdapter:
     def __init__(
         self,
         archon_adapter: ArchonAdapter,
-        switchboard_url: str = "",
         workflow_type: str = "goal",
     ) -> None:
-        self._invoker = ArchonBackendInvoker(archon_adapter, switchboard_url=switchboard_url)
+        self._invoker = ArchonBackendInvoker(archon_adapter)
         self._workflow_type = workflow_type
 
     def supports(self, request: ExecutionRequest) -> SupportCheck:

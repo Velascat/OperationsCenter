@@ -41,10 +41,10 @@ def _mock_kodo(exit_code: int = 0, stdout: str = "done", stderr: str = "") -> Ko
     return kodo
 
 
-def _adapter(kodo: KodoAdapter = None, switchboard_url: str = "") -> KodoBackendAdapter:
+def _adapter(kodo: KodoAdapter = None) -> KodoBackendAdapter:
     if kodo is None:
         kodo = _mock_kodo()
-    return KodoBackendAdapter(kodo, switchboard_url=switchboard_url)
+    return KodoBackendAdapter(kodo)
 
 
 # ---------------------------------------------------------------------------

@@ -23,12 +23,12 @@ ControlPlane proposes work
 
 ## Legacy / Quarantined
 
-- `control_plane.legacy_execution` still exists only as an explicitly gated compatibility path. It is disabled unless `CONTROL_PLANE_ENABLE_LEGACY_EXECUTION=1`.
+- `control_plane.legacy_execution` has been removed from the runtime architecture.
 - Supported entrypoints are the planning worker (`entrypoints/worker/main.py`) and the canonical execute entrypoint (`entrypoints/execute/main.py`).
 - ControlPlane routing now defaults to `HttpLaneRoutingClient`, which crosses the SwitchBoard `/route` service boundary instead of importing SwitchBoard internals in-process.
-- `switchboard_url` on backend invokers/adapters is compatibility-only. The canonical execution path does not route backend traffic through SwitchBoard as a transport proxy.
+- Backend invokers/adapters no longer accept execution proxy transport overrides.
 
 ## Deferred
 
 - Rich optional backends still require explicit runtime adapter configuration. Unsupported configured backends now fail loudly instead of being rewritten to `kodo`.
-- Historical `9router` references remain in ADR and migration material where clearly marked as historical context.
+- Historical provider-router references remain only in explicitly archival material.

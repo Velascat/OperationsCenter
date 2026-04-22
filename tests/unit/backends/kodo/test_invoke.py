@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -38,8 +38,8 @@ def _mock_kodo(exit_code: int = 0, stdout: str = "done", stderr: str = "") -> Ko
     return kodo
 
 
-def _invoker(kodo: KodoAdapter, switchboard_url: str = "") -> KodoBackendInvoker:
-    return KodoBackendInvoker(kodo, switchboard_url=switchboard_url)
+def _invoker(kodo: KodoAdapter) -> KodoBackendInvoker:
+    return KodoBackendInvoker(kodo)
 
 
 # ---------------------------------------------------------------------------
@@ -112,44 +112,22 @@ class TestInvocation:
         assert not goal_file.exists()
 
 
-# ---------------------------------------------------------------------------
-# SwitchBoard URL injection
-# ---------------------------------------------------------------------------
+def test_invoker_does_not_inject_openai_api_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+    kodo = _mock_kodo()
+    invoker = _invoker(kodo)
 
-class TestSwitchboardUrlInjection:
-    def test_openai_api_base_injected_in_legacy_compatibility_mode(self, tmp_path: Path):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        kodo = _mock_kodo()
-        with pytest.warns(DeprecationWarning, match="legacy compatibility-only"):
-            invoker = _invoker(kodo, switchboard_url="http://sb:20401")
+    captured_env = {}
 
-        captured_env = {}
+    def capture_env(goal_file, repo_path, env=None, kodo_mode="goal"):
+        captured_env.update(env or {})
+        return KodoRunResult(0, "", "", ["kodo"])
 
-        def capture_env(goal_file, repo_path, env=None, kodo_mode="goal"):
-            captured_env.update(env or {})
-            return KodoRunResult(0, "", "", ["kodo"])
-
-        kodo.run.side_effect = capture_env
-        invoker.invoke(_prepared(tmp_path))
-        assert captured_env.get("OPENAI_API_BASE") == "http://sb:20401/v1"
-
-    def test_no_injection_when_no_url(self, tmp_path: Path):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        kodo = _mock_kodo()
-        invoker = _invoker(kodo, switchboard_url="")
-
-        captured_env = {}
-
-        def capture_env(goal_file, repo_path, env=None, kodo_mode="goal"):
-            captured_env.update(env or {})
-            return KodoRunResult(0, "", "", ["kodo"])
-
-        kodo.run.side_effect = capture_env
-        invoker.invoke(_prepared(tmp_path))
-        # OPENAI_API_BASE may exist from environment; check it wasn't added by us
-        # We just verify the invoker didn't crash — env content test is env-dependent
+    kodo.run.side_effect = capture_env
+    invoker.invoke(_prepared(tmp_path))
+    assert "OPENAI_API_BASE" not in captured_env
 
 
 # ---------------------------------------------------------------------------

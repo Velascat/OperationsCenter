@@ -1,18 +1,17 @@
 """
 backends/direct_local/adapter.py — DirectLocalBackendAdapter.
 
-This adapter wraps the existing Aider CLI executor behind the canonical
+This adapter runs the Aider CLI behind the canonical
 ExecutionRequest -> ExecutionResult contract for the local execution lane.
 """
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
+import os
+import subprocess
 from typing import Optional
 
-from control_plane.adapters.executor.aider import AiderAdapter
-from control_plane.adapters.executor.protocol import ExecutorTask
 from control_plane.config.settings import AiderSettings
 from control_plane.contracts.common import ChangedFileRef, ValidationSummary
 from control_plane.contracts.enums import (
@@ -27,29 +26,19 @@ from control_plane.contracts.execution import ExecutionArtifact, ExecutionReques
 class DirectLocalBackendAdapter:
     """Canonical adapter for the local direct execution backend."""
 
-    def __init__(self, settings: AiderSettings, switchboard_url: str = "") -> None:
-        if switchboard_url:
-            warnings.warn(
-                "switchboard_url on DirectLocalBackendAdapter is a legacy compatibility-only "
-                "proxy override. The canonical execution path no longer depends on "
-                "SwitchBoard as execution transport.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self._executor = AiderAdapter(settings, switchboard_url=switchboard_url)
+    def __init__(self, settings: AiderSettings) -> None:
+        self._settings = settings
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
-        result = self._executor.execute(
-            ExecutorTask(
-                goal=request.goal_text,
-                repo_path=Path(request.workspace_path),
-                constraints=request.constraints_text or "",
-            )
+        repo_path = Path(request.workspace_path)
+        command, env = self._build_invocation(
+            repo_path=repo_path,
+            goal=request.goal_text,
+            constraints=request.constraints_text or "",
         )
+        result = self._run(command=command, repo_path=repo_path, env=env)
 
-        changed_files, changed_files_source, changed_files_confidence = _discover_changed_files(
-            Path(request.workspace_path)
-        )
+        changed_files, changed_files_source, changed_files_confidence = _discover_changed_files(repo_path)
         failure_category = _failure_category(result)
         failure_reason = None if result.success else (result.output or "direct_local execution failed")
 
@@ -80,6 +69,83 @@ class DirectLocalBackendAdapter:
             failure_reason=failure_reason,
             artifacts=artifacts,
         )
+
+    def _build_invocation(
+        self,
+        *,
+        repo_path: Path,
+        goal: str,
+        constraints: str,
+    ) -> tuple[list[str], dict[str, str]]:
+        model = f"{self._settings.model_prefix}/{self._settings.profile}"
+        message = goal
+        if constraints:
+            message = f"{goal}\n\n## Constraints\n{constraints}"
+
+        command = [
+            self._settings.binary,
+            "--model",
+            model,
+            "--message",
+            message,
+            "--yes",
+        ]
+        if self._settings.model_settings_file:
+            model_settings = Path(self._settings.model_settings_file)
+            if model_settings.exists():
+                command += ["--model-settings-file", str(model_settings)]
+        command += self._settings.extra_args
+
+        env = os.environ.copy()
+        if not env.get("OPENAI_API_KEY"):
+            env["OPENAI_API_KEY"] = "sk-local-direct"
+        return command, env
+
+    def _run(self, *, command: list[str], repo_path: Path, env: dict[str, str]) -> "_DirectLocalRunResult":
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=repo_path,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=self._settings.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired:
+            return _DirectLocalRunResult(
+                success=False,
+                output=f"[aider] Timed out after {self._settings.timeout_seconds}s",
+                metadata={"command": command, "timeout_hit": True},
+            )
+        except FileNotFoundError:
+            return _DirectLocalRunResult(
+                success=False,
+                output=f"[aider] Binary not found: {self._settings.binary}",
+                metadata={"command": command},
+            )
+
+        output = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        return _DirectLocalRunResult(
+            success=proc.returncode == 0,
+            output=output,
+            exit_code=proc.returncode,
+            metadata={"command": command, "model": command[2]},
+        )
+
+
+class _DirectLocalRunResult:
+    def __init__(
+        self,
+        *,
+        success: bool,
+        output: str,
+        exit_code: int | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        self.success = success
+        self.output = output
+        self.exit_code = exit_code
+        self.metadata = metadata or {}
 
 
 def _failure_status(result) -> ExecutionStatus:

@@ -43,7 +43,7 @@ class KodoBackendAdapter:
     Usage::
 
         kodo_raw = KodoAdapter(KodoSettings())
-        adapter = KodoBackendAdapter(kodo_raw, switchboard_url="http://sb:20401")
+        adapter = KodoBackendAdapter(kodo_raw)
 
         check = adapter.supports(request)
         if check.supported:
@@ -53,10 +53,9 @@ class KodoBackendAdapter:
     def __init__(
         self,
         kodo_adapter: KodoAdapter,
-        switchboard_url: str = "",
         kodo_mode: str = "goal",
     ) -> None:
-        self._invoker = KodoBackendInvoker(kodo_adapter, switchboard_url=switchboard_url)
+        self._invoker = KodoBackendInvoker(kodo_adapter)
         self._kodo_mode = kodo_mode
 
     def supports(self, request: ExecutionRequest) -> SupportCheck:
@@ -127,14 +126,12 @@ class KodoBackendAdapter:
     def from_settings(
         cls,
         settings: Optional[KodoSettings] = None,
-        switchboard_url: str = "",
         kodo_mode: str = "goal",
     ) -> "KodoBackendAdapter":
         """Convenience factory using KodoSettings."""
         kodo_settings = settings or KodoSettings()
         return cls(
             kodo_adapter=KodoAdapter(kodo_settings),
-            switchboard_url=switchboard_url,
             kodo_mode=kodo_mode,
         )
 

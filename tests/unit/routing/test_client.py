@@ -15,7 +15,6 @@ from control_plane.routing.client import (
     DEFAULT_SWITCHBOARD_URL,
     HttpLaneRoutingClient,
     LaneRoutingClient,
-    LocalLaneRoutingClient,
     StubLaneRoutingClient,
 )
 
@@ -95,7 +94,6 @@ def test_http_client_serializes_canonical_proposal() -> None:
 
 def test_http_client_from_env_prefers_control_plane_specific_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CONTROL_PLANE_SWITCHBOARD_URL", "http://sb.internal:20401")
-    monkeypatch.setenv("SWITCHBOARD_URL", "http://ignored:20401")
     client = HttpLaneRoutingClient.from_env()
     try:
         assert client.base_url == "http://sb.internal:20401"
@@ -105,19 +103,11 @@ def test_http_client_from_env_prefers_control_plane_specific_url(monkeypatch: py
 
 def test_http_client_from_env_falls_back_to_default_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CONTROL_PLANE_SWITCHBOARD_URL", raising=False)
-    monkeypatch.delenv("SWITCHBOARD_URL", raising=False)
     client = HttpLaneRoutingClient.from_env()
     try:
         assert client.base_url == DEFAULT_SWITCHBOARD_URL
     finally:
         client.close()
-
-
-def test_local_client_remains_available_for_compatibility() -> None:
-    client = LocalLaneRoutingClient.compatibility()
-    proposal = build_proposal(_ctx(task_type="lint_fix", risk_level="low"))
-    decision = client.select_lane(proposal)
-    assert decision.selected_lane == LaneName.AIDER_LOCAL
 
 
 def test_stub_returns_fixed_decision() -> None:

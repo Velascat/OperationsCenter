@@ -1,6 +1,7 @@
 """Tests for spec_director main loop — cycle ordering and single board fetch."""
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock, patch
 
 
@@ -90,3 +91,25 @@ def test_run_once_disabled_returns_early(tmp_path):
     run_once(settings, client)
 
     client.list_issues.assert_not_called()
+
+
+def test_run_once_does_not_set_switchboard_env(tmp_path, monkeypatch):
+    from control_plane.entrypoints.spec_director.main import run_once
+
+    settings = _make_settings(tmp_path)
+    settings.spec_director.switchboard_url = "http://sb-configured:20401"
+    client = MagicMock()
+    client.list_issues.return_value = []
+
+    with (
+        patch("control_plane.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
+        patch("control_plane.entrypoints.spec_director.main.RecoveryService"),
+    ):
+        mock_orch_inst = MagicMock()
+        mock_orch_inst.run.return_value = _make_orch_result()
+        mock_orch_cls.return_value = mock_orch_inst
+
+        monkeypatch.delenv("SWITCHBOARD_URL", raising=False)
+        run_once(settings, client)
+
+    assert "SWITCHBOARD_URL" not in os.environ

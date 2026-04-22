@@ -27,9 +27,9 @@ def test_domain_no_longer_exports_competing_execution_contracts() -> None:
     assert '"ExecutionResult"' not in domain_init
 
 
-def test_legacy_execution_service_is_quarantined_outside_application_namespace() -> None:
+def test_legacy_execution_runtime_is_removed() -> None:
     assert not (REPO_ROOT / "src" / "control_plane" / "application" / "service.py").exists()
-    assert (REPO_ROOT / "src" / "control_plane" / "legacy_execution" / "service.py").exists()
+    assert not (REPO_ROOT / "src" / "control_plane" / "legacy_execution").exists()
 
 
 def test_worker_entrypoint_no_longer_injects_switchboard_source_tree() -> None:
@@ -154,7 +154,6 @@ repos:
 
 def test_default_switchboard_url_targets_service_boundary(monkeypatch) -> None:
     monkeypatch.delenv("CONTROL_PLANE_SWITCHBOARD_URL", raising=False)
-    monkeypatch.delenv("SWITCHBOARD_URL", raising=False)
     client = HttpLaneRoutingClient.from_env()
     try:
         assert client.base_url == "http://localhost:20401"

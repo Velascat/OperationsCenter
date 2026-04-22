@@ -2,8 +2,7 @@
 routing/client.py — LaneRoutingClient protocol and concrete routing clients.
 
 ControlPlane's supported routing path crosses the SwitchBoard service boundary
-over HTTP. A compatibility-only in-process client remains available for local
-development and narrowly scoped tests, but it is not the default path.
+over HTTP.
 """
 
 from __future__ import annotations
@@ -23,9 +22,8 @@ DEFAULT_SWITCHBOARD_URL = "http://localhost:20401"
 class LaneRoutingClient(Protocol):
     """Boundary: TaskProposal in, LaneDecision out.
 
-    Implementations may call SwitchBoard over HTTP, invoke it locally via
-    Python import, or apply a test stub. The rest of ControlPlane sees only
-    this interface.
+    Implementations may call SwitchBoard over HTTP or apply a test stub.
+    The rest of ControlPlane sees only this interface.
     """
 
     def select_lane(self, proposal: TaskProposal) -> LaneDecision:
@@ -63,33 +61,8 @@ class HttpLaneRoutingClient:
 
     @classmethod
     def from_env(cls) -> "HttpLaneRoutingClient":
-        base_url = (
-            os.environ.get("CONTROL_PLANE_SWITCHBOARD_URL")
-            or os.environ.get("SWITCHBOARD_URL")
-            or DEFAULT_SWITCHBOARD_URL
-        )
+        base_url = os.environ.get("CONTROL_PLANE_SWITCHBOARD_URL") or DEFAULT_SWITCHBOARD_URL
         return cls(base_url=base_url)
-
-
-class LocalLaneRoutingClient:
-    """Compatibility-only in-process routing client.
-
-    This client imports SwitchBoard internals directly and therefore bypasses
-    the service boundary. Keep it limited to local development or tests that
-    intentionally exercise policy code in-process.
-    """
-
-    def __init__(self, policy=None) -> None:
-        from switchboard.lane.engine import LaneSelector
-
-        self._selector = LaneSelector(policy=policy)
-
-    def select_lane(self, proposal: TaskProposal) -> LaneDecision:
-        return self._selector.select(proposal)
-
-    @classmethod
-    def compatibility(cls, policy=None) -> "LocalLaneRoutingClient":
-        return cls(policy=policy)
 
 
 class StubLaneRoutingClient:

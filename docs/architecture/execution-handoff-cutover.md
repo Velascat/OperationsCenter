@@ -41,10 +41,10 @@ Changed-file certainty is preserved from the adapter result into observability.
 Non-empty `changed_files` lists do not become authoritative unless the source is
 authoritative (`git_diff`, `backend_manifest`, or equivalent explicit evidence).
 
-SwitchBoard remains selector-only in the canonical path. Any remaining
-`switchboard_url` execution transport override is compatibility-only and is
-outside the supported mainline execution flow.
+SwitchBoard remains selector-only in the canonical path. Execution transport
+proxy overrides have been removed from backend adapters and invokers.
 
 ## Legacy Status
 
-`LegacyExecutionRequest` remains only inside `control_plane.legacy_execution`. It is not the supported mainline execution request model.
+The legacy execution runtime has been removed. `execution/coordinator.py` is
+the only supported execution boundary.

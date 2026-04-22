@@ -6,7 +6,6 @@ from typing import Any
 import argparse
 import json
 import logging
-import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -43,11 +42,6 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     sd = settings.spec_director
     if not sd.enabled:
         return
-
-    # Phase 5: if switchboard_url is set in config, ensure it is visible to call_claude().
-    # The env var takes precedence if both are set (operators can override via shell).
-    if isinstance(sd.switchboard_url, str) and sd.switchboard_url and not os.environ.get("SWITCHBOARD_URL"):
-        os.environ["SWITCHBOARD_URL"] = sd.switchboard_url
 
     logger.info(json.dumps({"event": "spec_cycle_start"}))
 
