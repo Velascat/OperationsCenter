@@ -1,0 +1,11 @@
+{
+  "_description": "ArchonRunResult for a workflow run that exceeded the timeout.",
+  "outcome": "timeout",
+  "exit_code": 1,
+  "output_text": "archon: planning complete\narchon: executing changes",
+  "error_text": "[timeout: process killed after 300s]",
+  "workflow_events": [
+    {"step": "plan", "status": "ok", "duration_ms": 1100},
+    {"step": "execute", "status": "timeout", "duration_ms": 298900}
+  ]
+}

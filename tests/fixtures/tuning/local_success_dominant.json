@@ -1,0 +1,23 @@
+{
+  "description": "Low-risk local lane with dominant success rate across bounded tasks",
+  "scenario": "aider_local backend running bug_fix tasks — high success, fast latency, strong change evidence",
+  "records": [
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 18000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 22000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 15000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 19000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 12000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 21000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 16000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 14000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "failure", "duration_ms": 25000},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "bug_fix", "risk_level": "low", "outcome": "success", "duration_ms": 17000}
+  ],
+  "expected": {
+    "success_rate": 0.9,
+    "evidence_strength": "moderate",
+    "reliability_class": "high",
+    "latency_class": "fast",
+    "finding_categories": ["reliability"]
+  }
+}

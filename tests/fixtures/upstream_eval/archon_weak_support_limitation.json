@@ -1,0 +1,19 @@
+{
+  "description": "Archon support limitation that is still too weak to justify patching",
+  "evidence": [
+    {
+      "upstream_target": "archon",
+      "issue_key": "provider_surface_gap",
+      "category": "capability_enabling",
+      "source_type": "support_check_failure",
+      "summary": "One workflow-shaped task could not use the intended provider surface.",
+      "severity_hint": "medium",
+      "architectural_impact_hint": "moderate",
+      "workaround_complexity_hint": "moderate",
+      "workaround_reliability_hint": "mixed",
+      "divergence_risk_hint": "medium",
+      "sample_size": 1,
+      "occurrence_count": 1
+    }
+  ]
+}

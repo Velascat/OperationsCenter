@@ -1,0 +1,64 @@
+{
+  "description": "Successful run with known changed files, validation passed, diff artifact.",
+  "result": {
+    "run_id": "run-rich-01",
+    "proposal_id": "prop-0001",
+    "decision_id": "dec-0001",
+    "status": "success",
+    "success": true,
+    "changed_files": [
+      {"path": "src/main.py", "change_type": "modified", "lines_added": null, "lines_removed": null},
+      {"path": "src/utils.py", "change_type": "modified", "lines_added": null, "lines_removed": null}
+    ],
+    "diff_stat_excerpt": "2 files changed, 14 insertions(+), 3 deletions(-)",
+    "validation": {
+      "status": "passed",
+      "commands_run": 2,
+      "commands_passed": 2,
+      "commands_failed": 0,
+      "failure_excerpt": null,
+      "duration_ms": 840
+    },
+    "branch_pushed": false,
+    "branch_name": "auto/lint-fix-abc123",
+    "pull_request_url": null,
+    "failure_category": null,
+    "failure_reason": null,
+    "artifacts": [
+      {
+        "artifact_type": "diff",
+        "label": "pre-merge diff",
+        "content": "--- a/src/main.py\n+++ b/src/main.py\n@@ -1,3 +1,3 @@\n-foo\n+bar"
+      },
+      {
+        "artifact_type": "validation_report",
+        "label": "ruff output",
+        "content": "All checks passed."
+      },
+      {
+        "artifact_type": "log_excerpt",
+        "label": "kodo run log",
+        "content": "kodo: 2 files fixed\nkodo: done"
+      }
+    ]
+  },
+  "expected_record": {
+    "changed_files_evidence": {
+      "status": "known",
+      "source": "backend_manifest",
+      "file_count": 2
+    },
+    "validation_evidence": {
+      "status": "passed",
+      "checks_run": 2,
+      "checks_passed": 2
+    },
+    "artifact_index": {
+      "primary_count": 2,
+      "supplemental_count": 1,
+      "primary_types": ["diff", "validation_report"],
+      "supplemental_types": ["log_excerpt"]
+    },
+    "warnings": []
+  }
+}

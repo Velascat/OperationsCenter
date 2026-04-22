@@ -1,0 +1,15 @@
+{
+  "description": "Very few runs — recommendation should be flagged as weak evidence",
+  "scenario": "New backend with only 3 runs, all successful — insufficient for confident recommendation",
+  "records": [
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "bug_fix", "outcome": "success"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "bug_fix", "outcome": "success"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "bug_fix", "outcome": "success"}
+  ],
+  "expected": {
+    "evidence_strength": "weak",
+    "finding_categories": ["sparse_data"],
+    "recommendation_count": 0
+  },
+  "notes": "3 runs is below the 8-sample floor for moderate evidence. No recommendations should be generated."
+}

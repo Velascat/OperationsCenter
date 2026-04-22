@@ -1,0 +1,33 @@
+{
+  "description": "Recurring OpenClaw changed-file uncertainty with strong retained evidence",
+  "evidence": [
+    {
+      "upstream_target": "openclaw",
+      "issue_key": "changed_file_uncertainty",
+      "category": "observability_improving",
+      "source_type": "execution_record",
+      "summary": "Changed-file evidence is frequently unknown in runs that otherwise succeed.",
+      "severity_hint": "high",
+      "architectural_impact_hint": "major",
+      "workaround_complexity_hint": "high",
+      "workaround_reliability_hint": "brittle",
+      "divergence_risk_hint": "medium",
+      "sample_size": 8,
+      "occurrence_count": 4
+    },
+    {
+      "upstream_target": "openclaw",
+      "issue_key": "changed_file_uncertainty",
+      "category": "observability_improving",
+      "source_type": "routing_finding",
+      "summary": "Tuning data keeps flagging weak change evidence for audit-sensitive tasks.",
+      "severity_hint": "high",
+      "architectural_impact_hint": "major",
+      "workaround_complexity_hint": "high",
+      "workaround_reliability_hint": "brittle",
+      "divergence_risk_hint": "medium",
+      "sample_size": 8,
+      "occurrence_count": 4
+    }
+  ]
+}

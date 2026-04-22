@@ -1,0 +1,29 @@
+{
+  "description": "High-complexity tasks where premium (archon) backend outperforms local (kodo @ aider_local)",
+  "scenario": "refactor + feature tasks — archon shows higher success; local shows lower success for same tasks",
+  "records": [
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "archon", "lane": "claude_cli", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "success"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"},
+    {"backend": "kodo", "lane": "aider_local", "task_type": "refactor", "risk_level": "medium", "outcome": "failure"}
+  ],
+  "expected": {
+    "archon_success_rate": 0.875,
+    "kodo_success_rate": 0.125,
+    "archon_reliability_class": "high",
+    "kodo_reliability_class": "low",
+    "finding_categories": ["reliability"]
+  }
+}

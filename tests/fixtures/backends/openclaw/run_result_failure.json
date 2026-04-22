@@ -1,0 +1,26 @@
+{
+  "scenario": "failure_backend_error",
+  "description": "OpenClaw run that failed; tool call crashed; no changed files.",
+  "capture": {
+    "run_id": "run-oc-fail-01",
+    "outcome": "failure",
+    "exit_code": 1,
+    "output_text": "",
+    "error_text": "openclaw failed: tool call raised an unhandled exception",
+    "events": [
+      {"type": "tool_use",    "name": "write_file", "path": "src/broken.py"},
+      {"type": "tool_result", "content": "error: file not writable"}
+    ],
+    "reported_changed_files": [],
+    "changed_files_source": "unknown",
+    "duration_ms": 1800,
+    "timeout_hit": false
+  },
+  "expected": {
+    "status": "failed",
+    "success": false,
+    "changed_files_source_after_normalize": "unknown",
+    "failure_category": "backend_error",
+    "changed_files_count": 0
+  }
+}

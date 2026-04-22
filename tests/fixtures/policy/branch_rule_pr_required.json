@@ -1,0 +1,32 @@
+{
+  "description": "Policy requires PR but proposal branch_policy.open_pr=False → require_review",
+  "policy_overrides": {
+    "branch_guardrail": {
+      "require_pr": true,
+      "allow_direct_commit": false,
+      "require_branch": true
+    }
+  },
+  "proposal": {
+    "task_id": "TASK-004",
+    "project_id": "proj-gamma",
+    "task_type": "bug_fix",
+    "execution_mode": "goal",
+    "goal_text": "Fix the null pointer in auth middleware",
+    "target": {
+      "repo_key": "auth-service",
+      "clone_url": "git@github.com:org/auth-service.git",
+      "base_branch": "main",
+      "allowed_paths": ["src/auth/middleware.py"]
+    },
+    "risk_level": "low",
+    "branch_policy": {
+      "branch_prefix": "auto/",
+      "push_on_success": true,
+      "open_pr": false
+    },
+    "labels": []
+  },
+  "expected_status": "require_review",
+  "notes": "require_pr=True but open_pr=False → branch.pr_required (non-blocking) → REQUIRE_REVIEW"
+}

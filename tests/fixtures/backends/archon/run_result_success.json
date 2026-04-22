@@ -1,0 +1,12 @@
+{
+  "_description": "ArchonRunResult for a successful workflow run.",
+  "outcome": "success",
+  "exit_code": 0,
+  "output_text": "archon: planning complete\narchon: executing changes\narchon: 3 files modified\narchon: workflow complete",
+  "error_text": "",
+  "workflow_events": [
+    {"step": "plan", "status": "ok", "duration_ms": 1200},
+    {"step": "execute", "status": "ok", "duration_ms": 8400},
+    {"step": "validate", "status": "ok", "duration_ms": 900}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "_description": "Typical ArchonWorkflowConfig produced by map_request() for a goal-type run.",
+  "run_id": "run-abc123",
+  "goal_text": "Refactor the login module to use the new auth library",
+  "constraints_text": "Only touch src/auth/",
+  "repo_path": "/tmp/workspace/auth-service",
+  "task_branch": "auto/refactor-login-abc123",
+  "workflow_type": "goal",
+  "timeout_seconds": 300,
+  "validation_commands": ["ruff check src/", "mypy src/"],
+  "metadata": {
+    "proposal_id": "prop-001",
+    "decision_id": "dec-001",
+    "task_branch": "auto/refactor-login-abc123",
+    "base_branch": "main",
+    "clone_url": "https://git.example.com/auth.git"
+  },
+  "env_overrides": {}
+}

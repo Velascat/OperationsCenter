@@ -1,0 +1,19 @@
+{
+  "description": "Moderate kodo ergonomic issue that should stay in the adapter layer",
+  "evidence": [
+    {
+      "upstream_target": "kodo",
+      "issue_key": "wrapper_complexity",
+      "category": "ergonomic_simplification",
+      "source_type": "wrapper_complexity",
+      "summary": "The wrapper needs extra goal-file and mode handling but remains stable.",
+      "severity_hint": "medium",
+      "architectural_impact_hint": "minor",
+      "workaround_complexity_hint": "moderate",
+      "workaround_reliability_hint": "stable",
+      "divergence_risk_hint": "medium",
+      "sample_size": 4,
+      "occurrence_count": 4
+    }
+  ]
+}

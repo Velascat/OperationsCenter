@@ -1,0 +1,24 @@
+{
+  "description": "local_only label with remote lane candidate — should BLOCK",
+  "proposal": {
+    "task_id": "TASK-003",
+    "project_id": "proj-beta",
+    "task_type": "simple_edit",
+    "execution_mode": "goal",
+    "goal_text": "Update the README with build instructions",
+    "target": {
+      "repo_key": "docs-service",
+      "clone_url": "git@github.com:org/docs-service.git",
+      "base_branch": "main",
+      "allowed_paths": ["README.md"]
+    },
+    "risk_level": "low",
+    "labels": ["local_only"]
+  },
+  "routing": {
+    "selected_lane": "claude_cli",
+    "selected_backend": "openclaw"
+  },
+  "expected_status": "block",
+  "notes": "local_only label with remote lane (claude_cli) → routing.local_only_violated → BLOCK"
+}

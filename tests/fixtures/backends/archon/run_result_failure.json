@@ -1,0 +1,12 @@
+{
+  "_description": "ArchonRunResult for a failed workflow run (validation errors).",
+  "outcome": "failure",
+  "exit_code": 1,
+  "output_text": "archon: planning complete\narchon: executing changes\narchon: validation failed",
+  "error_text": "validation failed: ruff found 3 errors in src/auth/login.py",
+  "workflow_events": [
+    {"step": "plan", "status": "ok", "duration_ms": 1100},
+    {"step": "execute", "status": "ok", "duration_ms": 7200},
+    {"step": "validate", "status": "failed", "duration_ms": 800, "detail": "ruff: 3 errors"}
+  ]
+}

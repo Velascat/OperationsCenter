@@ -1,0 +1,20 @@
+{
+  "description": "Proposal labeled rm_rf triggers destructive action block → BLOCK",
+  "proposal": {
+    "task_id": "TASK-005",
+    "project_id": "proj-delta",
+    "task_type": "simple_edit",
+    "execution_mode": "goal",
+    "goal_text": "Clean up the build artifacts directory",
+    "target": {
+      "repo_key": "build-service",
+      "clone_url": "git@github.com:org/build-service.git",
+      "base_branch": "main",
+      "allowed_paths": ["build/"]
+    },
+    "risk_level": "medium",
+    "labels": ["rm_rf"]
+  },
+  "expected_status": "block",
+  "notes": "rm_rf label with allow_destructive_actions=False → tool.destructive_blocked → BLOCK"
+}

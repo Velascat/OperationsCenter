@@ -1,0 +1,28 @@
+{
+  "scenario": "success_with_known_changed_files",
+  "description": "OpenClaw run that succeeded; git diff available; changed files known.",
+  "capture": {
+    "run_id": "run-oc-success-01",
+    "outcome": "success",
+    "exit_code": 0,
+    "output_text": "openclaw: fixed 3 lint errors in src/\nopenclaw: done",
+    "error_text": "",
+    "events": [
+      {"type": "tool_use",    "name": "read_file",  "path": "src/main.py"},
+      {"type": "tool_use",    "name": "write_file", "path": "src/main.py"},
+      {"type": "tool_result", "content": "ok"},
+      {"type": "message",     "text": "Lint errors fixed"}
+    ],
+    "reported_changed_files": [],
+    "changed_files_source": "unknown",
+    "duration_ms": 4200,
+    "timeout_hit": false
+  },
+  "expected": {
+    "status": "success",
+    "success": true,
+    "changed_files_source_after_normalize": "git_diff",
+    "failure_category": null,
+    "validation_status": "skipped"
+  }
+}

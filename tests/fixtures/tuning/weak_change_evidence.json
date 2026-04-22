@@ -1,0 +1,23 @@
+{
+  "description": "Backend with acceptable outcome quality but poor changed-file evidence",
+  "scenario": "openclaw backend succeeds often but does not reliably report which files changed",
+  "records": [
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "success_no_changed_files"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "failure"},
+    {"backend": "openclaw", "lane": "claude_cli", "task_type": "simple_edit", "outcome": "failure"}
+  ],
+  "expected": {
+    "success_rate": 0.8,
+    "change_evidence_class": "poor",
+    "finding_categories": ["reliability", "change_evidence", "contradictory"],
+    "recommendation_areas": ["backend_preference"]
+  },
+  "notes": "High success_rate + poor change evidence → contradictory finding → restrict to non-audit workflows"
+}

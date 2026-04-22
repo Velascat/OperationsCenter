@@ -1,0 +1,62 @@
+{
+  "description": "Run with partial validation evidence: some commands passed, one failed.",
+  "result": {
+    "run_id": "run-partial-val-01",
+    "proposal_id": "prop-0004",
+    "decision_id": "dec-0004",
+    "status": "failed",
+    "success": false,
+    "changed_files": [
+      {"path": "src/api.py", "change_type": "modified", "lines_added": null, "lines_removed": null}
+    ],
+    "diff_stat_excerpt": "1 file changed, 5 insertions(+)",
+    "validation": {
+      "status": "failed",
+      "commands_run": 3,
+      "commands_passed": 2,
+      "commands_failed": 1,
+      "failure_excerpt": "mypy: error: Argument 1 has incompatible type",
+      "duration_ms": 1240
+    },
+    "branch_pushed": false,
+    "branch_name": "auto/refactor-abc123",
+    "pull_request_url": null,
+    "failure_category": "validation_failed",
+    "failure_reason": "validation failed: mypy errors detected",
+    "artifacts": [
+      {
+        "artifact_type": "validation_report",
+        "label": "mypy output",
+        "content": "mypy: error: Argument 1 has incompatible type\nFound 1 error in 1 file"
+      },
+      {
+        "artifact_type": "log_excerpt",
+        "label": "kodo run log",
+        "content": "kodo: validation failed"
+      }
+    ]
+  },
+  "expected_record": {
+    "changed_files_evidence": {
+      "status": "known",
+      "source": "backend_manifest",
+      "file_count": 1
+    },
+    "validation_evidence": {
+      "status": "failed",
+      "checks_run": 3,
+      "checks_passed": 2,
+      "checks_failed": 1,
+      "summary": "mypy: error: Argument 1 has incompatible type"
+    },
+    "artifact_index": {
+      "primary_count": 1,
+      "supplemental_count": 1,
+      "primary_types": ["validation_report"]
+    },
+    "warnings": [
+      "validation was skipped"
+    ]
+  },
+  "note": "Validation failed but changed files ARE known. Backend ran to completion then failed validation."
+}

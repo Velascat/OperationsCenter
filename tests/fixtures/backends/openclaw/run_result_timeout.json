@@ -1,0 +1,23 @@
+{
+  "scenario": "timeout",
+  "description": "OpenClaw run that timed out; no changed files; no artifacts.",
+  "capture": {
+    "run_id": "run-oc-timeout-01",
+    "outcome": "timeout",
+    "exit_code": -1,
+    "output_text": "",
+    "error_text": "[timeout: process group killed after 300s]",
+    "events": [],
+    "reported_changed_files": [],
+    "changed_files_source": "unknown",
+    "duration_ms": 300000,
+    "timeout_hit": true
+  },
+  "expected": {
+    "status": "timeout",
+    "success": false,
+    "changed_files_source_after_normalize": "unknown",
+    "failure_category": "timeout",
+    "changed_files_count": 0
+  }
+}

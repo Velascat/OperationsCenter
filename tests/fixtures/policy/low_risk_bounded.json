@@ -1,0 +1,20 @@
+{
+  "description": "Low-risk bounded task: bug_fix, risk=low, paths restricted to src/",
+  "proposal": {
+    "task_id": "TASK-001",
+    "project_id": "proj-alpha",
+    "task_type": "bug_fix",
+    "execution_mode": "goal",
+    "goal_text": "Fix the off-by-one error in the pagination helper",
+    "target": {
+      "repo_key": "api-service",
+      "clone_url": "git@github.com:org/api-service.git",
+      "base_branch": "main",
+      "allowed_paths": ["src/pagination.py", "tests/test_pagination.py"]
+    },
+    "risk_level": "low",
+    "labels": []
+  },
+  "expected_status": "allow",
+  "notes": "Low risk, clean paths, no sensitive patterns — should be ALLOW"
+}

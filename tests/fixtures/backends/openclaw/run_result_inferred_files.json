@@ -1,0 +1,30 @@
+{
+  "scenario": "success_with_inferred_changed_files",
+  "description": "OpenClaw run that succeeded; git diff unavailable; changed files inferred from event stream.",
+  "capture": {
+    "run_id": "run-oc-inferred-01",
+    "outcome": "success",
+    "exit_code": 0,
+    "output_text": "openclaw: refactored auth module",
+    "error_text": "",
+    "events": [
+      {"type": "tool_use",    "name": "write_file", "path": "src/auth.py"},
+      {"type": "tool_result", "content": "written"}
+    ],
+    "reported_changed_files": [
+      {"path": "src/auth.py",      "change_type": "modified"},
+      {"path": "tests/test_auth.py", "change_type": "modified"}
+    ],
+    "changed_files_source": "event_stream",
+    "duration_ms": 6100,
+    "timeout_hit": false
+  },
+  "expected": {
+    "status": "success",
+    "success": true,
+    "changed_files_source_after_normalize": "event_stream",
+    "changed_files_count": 2,
+    "failure_category": null
+  },
+  "note": "git diff is unavailable (no workspace) so inferred files from event stream are used. Observability layer sees changed_files_source='event_stream' and represents evidence honestly."
+}

@@ -1,0 +1,37 @@
+{
+  "description": "Run where the backend did not report changed files (UNKNOWN status).",
+  "result": {
+    "run_id": "run-unknown-cf-01",
+    "proposal_id": "prop-0003",
+    "decision_id": "dec-0003",
+    "status": "success",
+    "success": true,
+    "changed_files": [],
+    "diff_stat_excerpt": null,
+    "validation": {
+      "status": "skipped",
+      "commands_run": 0,
+      "commands_passed": 0,
+      "commands_failed": 0,
+      "failure_excerpt": null,
+      "duration_ms": null
+    },
+    "branch_pushed": false,
+    "branch_name": "auto/doc-update-abc123",
+    "pull_request_url": null,
+    "failure_category": null,
+    "failure_reason": null,
+    "artifacts": []
+  },
+  "expected_record": {
+    "changed_files_evidence": {
+      "status": "unknown",
+      "source": "none",
+      "confidence": 0.0,
+      "file_count": 0
+    },
+    "warnings": [
+      "changed-file manifest unavailable"
+    ]
+  }
+}

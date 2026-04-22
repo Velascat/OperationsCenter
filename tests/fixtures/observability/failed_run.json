@@ -1,0 +1,53 @@
+{
+  "description": "Failed run: backend error, log artifact only, no changed files reported.",
+  "result": {
+    "run_id": "run-fail-01",
+    "proposal_id": "prop-0002",
+    "decision_id": "dec-0002",
+    "status": "failed",
+    "success": false,
+    "changed_files": [],
+    "diff_stat_excerpt": null,
+    "validation": {
+      "status": "skipped",
+      "commands_run": 0,
+      "commands_passed": 0,
+      "commands_failed": 0,
+      "failure_excerpt": null,
+      "duration_ms": null
+    },
+    "branch_pushed": false,
+    "branch_name": "auto/lint-fix-abc123",
+    "pull_request_url": null,
+    "failure_category": "backend_error",
+    "failure_reason": "kodo exited 1: tool call failed",
+    "artifacts": [
+      {
+        "artifact_type": "log_excerpt",
+        "label": "kodo run log",
+        "content": "kodo: exit 1"
+      }
+    ]
+  },
+  "expected_record": {
+    "changed_files_evidence": {
+      "status": "unknown",
+      "source": "none",
+      "file_count": 0
+    },
+    "validation_evidence": {
+      "status": "skipped",
+      "checks_run": 0
+    },
+    "artifact_index": {
+      "primary_count": 0,
+      "supplemental_count": 1,
+      "supplemental_types": ["log_excerpt"]
+    },
+    "warnings": [
+      "changed-file manifest unavailable",
+      "validation was skipped",
+      "no primary artifacts"
+    ]
+  }
+}

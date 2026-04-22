@@ -1,0 +1,33 @@
+{
+  "description": "High-value patch candidate with explicit high divergence risk",
+  "evidence": [
+    {
+      "upstream_target": "openclaw",
+      "issue_key": "structured_result_surface",
+      "category": "reliability_improving",
+      "source_type": "raw_detail_parsing",
+      "summary": "Structured result parsing remains brittle across many runs.",
+      "severity_hint": "critical",
+      "architectural_impact_hint": "major",
+      "workaround_complexity_hint": "high",
+      "workaround_reliability_hint": "brittle",
+      "divergence_risk_hint": "high",
+      "sample_size": 8,
+      "occurrence_count": 4
+    },
+    {
+      "upstream_target": "openclaw",
+      "issue_key": "structured_result_surface",
+      "category": "reliability_improving",
+      "source_type": "operator_pain",
+      "summary": "Operators repeatedly need to inspect raw blobs because stable summaries are missing.",
+      "severity_hint": "high",
+      "architectural_impact_hint": "major",
+      "workaround_complexity_hint": "high",
+      "workaround_reliability_hint": "brittle",
+      "divergence_risk_hint": "high",
+      "sample_size": 8,
+      "occurrence_count": 4
+    }
+  ]
+}
