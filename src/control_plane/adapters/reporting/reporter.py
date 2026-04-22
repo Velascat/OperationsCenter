@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.domain import ExecutionRequest, ExecutionResult
+from control_plane.domain import LegacyExecutionRequest, LegacyExecutionResult
 
 
 class Reporter:
@@ -32,7 +32,7 @@ class Reporter:
         )
         return str(path)
 
-    def write_request(self, run_dir: Path, req: ExecutionRequest) -> str:
+    def write_request(self, run_dir: Path, req: LegacyExecutionRequest) -> str:
         path = run_dir / "request.json"
         path.write_text(req.model_dump_json(indent=2, exclude={"workspace_path", "goal_file_path"}))
         return str(path)
@@ -120,7 +120,7 @@ class Reporter:
         )
         return str(path)
 
-    def write_summary(self, run_dir: Path, result: ExecutionResult) -> str:
+    def write_summary(self, run_dir: Path, result: LegacyExecutionResult) -> str:
         path = run_dir / "result_summary.md"
         lines = [
             "# Execution Result",

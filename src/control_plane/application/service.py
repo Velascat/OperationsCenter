@@ -18,7 +18,13 @@ from control_plane.adapters.workspace import RepoEnvironmentBootstrapper, Worksp
 from control_plane.application.scope_policy import ChangedFilePolicyChecker
 from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
-from control_plane.domain import BoardTask, ExecutionRequest, ExecutionResult, RepoTarget, ValidationResult
+from control_plane.domain import (
+    BoardTask,
+    LegacyExecutionRequest,
+    LegacyExecutionResult,
+    RepoTarget,
+    ValidationResult,
+)
 from control_plane.execution import UsageStore
 
 
@@ -135,7 +141,7 @@ class ExecutionService:
         *,
         worker_role: str = "goal",
         preauthorized: bool = False,
-    ) -> ExecutionResult:
+    ) -> LegacyExecutionResult:
         run_id = uuid.uuid4().hex[:12]
         workspace_path = self.workspace.create()
         run_dir = self.reporter.create_run_dir(task_id, run_id)
@@ -177,7 +183,7 @@ class ExecutionService:
                     fix_task_id=fix_task_id,
                     repo_key=task.repo_key,
                 )
-                result = ExecutionResult(
+                result = LegacyExecutionResult(
                     run_id=run_id,
                     worker_role=worker_role,
                     task_kind=task.execution_mode,
@@ -215,7 +221,7 @@ class ExecutionService:
                     run_id,
                     repo_key=task.repo_key,
                 )
-                result = ExecutionResult(
+                result = LegacyExecutionResult(
                     run_id=run_id,
                     worker_role=worker_role,
                     task_kind=task.execution_mode,
@@ -256,7 +262,7 @@ class ExecutionService:
                         detail=noop.detail,
                         now=datetime.now(UTC),
                     )
-                    result = ExecutionResult(
+                    result = LegacyExecutionResult(
                         run_id=run_id,
                         worker_role=worker_role,
                         task_kind=task.execution_mode,
@@ -293,7 +299,7 @@ class ExecutionService:
                         limit=retry.limit,
                     )
                     plane_client.transition_issue(task.task_id, "Blocked")
-                    result = ExecutionResult(
+                    result = LegacyExecutionResult(
                         run_id=run_id,
                         worker_role=worker_role,
                         task_kind=task.execution_mode,
@@ -333,7 +339,7 @@ class ExecutionService:
                         now=datetime.now(UTC),
                         evidence={"limit": budget.limit, "current": budget.current},
                     )
-                    result = ExecutionResult(
+                    result = LegacyExecutionResult(
                         run_id=run_id,
                         worker_role=worker_role,
                         task_kind=task.execution_mode,
@@ -452,7 +458,7 @@ class ExecutionService:
                 ) + assembled_goal_text
             self.kodo.write_goal_file(goal_file, assembled_goal_text, task.constraints_text)
 
-            req = ExecutionRequest(
+            req = LegacyExecutionRequest(
                 run_id=run_id,
                 task=task,
                 repo_target=repo_target,
@@ -518,7 +524,7 @@ class ExecutionService:
                     "- result_status: ready_for_ai\n"
                     "- next_action: task reset to Ready for AI; will be retried on next poll",
                 )
-                return ExecutionResult(
+                return LegacyExecutionResult(
                     run_id=run_id,
                     worker_role=worker_role,
                     task_kind=task.execution_mode,
@@ -815,7 +821,7 @@ class ExecutionService:
                 else:
                     status = "Review"
 
-            result = ExecutionResult(
+            result = LegacyExecutionResult(
                 run_id=run_id,
                 worker_role=worker_role,
                 task_kind=task.execution_mode,
@@ -978,7 +984,7 @@ class ExecutionService:
         self.logger.info(json.dumps(payload, sort_keys=True, default=str))
 
     @staticmethod
-    def _comment_markdown(task: BoardTask, result: ExecutionResult, *, worker_role: str = "goal") -> str:
+    def _comment_markdown(task: BoardTask, result: LegacyExecutionResult, *, worker_role: str = "goal") -> str:
         task_kind = getattr(task, "execution_mode", result.task_kind or "goal")
         lines = [
             f"[{worker_role.capitalize()}] Execution result",
@@ -1298,7 +1304,7 @@ class ExecutionService:
 
     _PR_REVIEW_STATE_DIR = Path("state/pr_reviews")
 
-    def run_fix_pr_task(self, plane_client: "PlaneClient", task_id: str) -> "ExecutionResult":
+    def run_fix_pr_task(self, plane_client: "PlaneClient", task_id: str) -> "LegacyExecutionResult":
         """Execute a fix_pr task: checkout the existing PR branch, run kodo to fix CI failures, push.
 
         Uses run_review_pass internally so the PR branch is patched in-place without
@@ -1343,7 +1349,7 @@ class ExecutionService:
                 )
                 outcome_status = "no_changes"
 
-            return ExecutionResult(
+            return LegacyExecutionResult(
                 run_id=run_id,
                 worker_role="improve",
                 task_kind="fix_pr",
@@ -1361,7 +1367,7 @@ class ExecutionService:
                 plane_client.transition_issue(task_id, "Blocked")
             except Exception:
                 pass
-            return ExecutionResult(
+            return LegacyExecutionResult(
                 run_id=run_id,
                 worker_role="improve",
                 task_kind="fix_pr",

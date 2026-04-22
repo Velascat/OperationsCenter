@@ -1,15 +1,15 @@
 # Control Plane
 
-Local autonomous coding workflow system that uses **Plane** as the board, **Control Plane** as the worker wrapper, and **Kodo** as the single-run coding engine.
+Local planning, policy, and evidence service for the coding platform. ControlPlane turns work context into canonical proposals, routes them through SwitchBoard, and retains evidence around what happened later.
 
 ## Primary Operator Model
 
-Control Plane is operated through **Plane + CLI**:
+ControlPlane is operated through **planning + routing handoff**:
 
-1. Create and label work items in the Plane board.
-2. Use `./scripts/control-plane.sh dev-up` to start the local stack.
-3. Watchers poll the board and execute tasks automatically.
-4. Results are written back to Plane as comments and state transitions.
+1. Gather or derive work intent.
+2. Build a canonical `TaskProposal`.
+3. Route it through SwitchBoard to get a `LaneDecision`.
+4. Hand the proposal/decision bundle to a separate execution boundary.
 
 For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it as a validation ritual after any significant config or threshold change.
 
@@ -18,8 +18,8 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 ## What This System Is
 
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
-- **Control Plane** is the local autonomous wrapper that watches the board, prepares isolated workspaces, runs tasks, and writes results back.
-- **Kodo** is the execution engine used inside a single task run.
+- **ControlPlane** is the planning, policy, and evidence layer.
+- **Execution backends** live behind canonical adapters outside ControlPlane's runtime ownership.
 - **goal**, **test**, **improve**, **propose**, and **review** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
@@ -34,9 +34,8 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 
 ## What ControlPlane Is Not
 
-- **Not the execution runner.** ControlPlane decides what to work on and dispatches
-  the task. kodo performs the coding. Archon (if present) enforces workflow discipline.
-  ControlPlane does not edit files.
+- **Not the execution runner.** ControlPlane stops at proposal generation and routing handoff.
+  Backend adapters consume `ExecutionRequest` elsewhere.
 
 - **Not the lane selector.** ControlPlane may supply lane hints, but SwitchBoard
   makes the final lane selection. ControlPlane does not know which execution lane
@@ -107,7 +106,7 @@ All cross-repo contracts live in `src/control_plane/contracts/`:
 
 See `WorkStation/docs/architecture/contracts.md` for full documentation.
 
-### kodo Backend Adapter (Phase 5)
+### Backend adapters (outside ControlPlane runtime ownership)
 
 `KodoBackendAdapter` wraps the kodo subprocess behind the canonical interface:
 
@@ -116,7 +115,7 @@ from control_plane.backends.kodo import KodoBackendAdapter
 result = KodoBackendAdapter.from_settings().execute(request)  # ExecutionRequest → ExecutionResult
 ```
 
-See `WorkStation/docs/architecture/kodo-adapter.md` for architecture and usage.
+These adapters still live in the repo as contract-aligned integration modules, but the default ControlPlane runtime no longer invokes them directly.
 
 ### Archon Backend Adapter (Phase 8, optional)
 

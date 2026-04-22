@@ -6,11 +6,10 @@ and converts :class:`KodoRunResult` → :class:`ExecutorResult`.
 
 When ``switchboard_url`` is set, ``OPENAI_API_BASE`` is injected into the Kodo
 subprocess environment so that any OpenAI-compatible worker agents Kodo spawns
-(team ``full`` codex workers) route their model calls through SwitchBoard.
+(team ``full`` codex workers) can still use SwitchBoard as a selector-adjacent
+endpoint if that execution environment expects one.
 
-Note: Kodo's *orchestrator* (Claude Code CLI) does not use ``OPENAI_API_BASE``
-and does not route through SwitchBoard.  Only worker agents using the OpenAI
-backend are affected.  This limitation is documented in ``docs/phase6.md``.
+Note: Kodo's *orchestrator* (Claude Code CLI) does not use ``OPENAI_API_BASE``.
 """
 from __future__ import annotations
 

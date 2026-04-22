@@ -1,7 +1,7 @@
 from control_plane.domain.models import (
     BoardTask,
-    ExecutionRequest,
-    ExecutionResult,
+    LegacyExecutionRequest,
+    LegacyExecutionResult,
     ParsedTaskBody,
     RepoTarget,
     ValidationResult,
@@ -9,8 +9,8 @@ from control_plane.domain.models import (
 
 __all__ = [
     "BoardTask",
-    "ExecutionRequest",
-    "ExecutionResult",
+    "LegacyExecutionRequest",
+    "LegacyExecutionResult",
     "ParsedTaskBody",
     "RepoTarget",
     "ValidationResult",

@@ -47,7 +47,7 @@ class RepoTarget(BaseModel):
     skip_baseline_validation: bool = False
 
 
-class ExecutionRequest(BaseModel):
+class LegacyExecutionRequest(BaseModel):
     run_id: str
     task: BoardTask
     repo_target: RepoTarget
@@ -64,7 +64,7 @@ class ValidationResult(BaseModel):
     duration_ms: int
 
 
-class ExecutionResult(BaseModel):
+class LegacyExecutionResult(BaseModel):
     run_id: str
     worker_role: str | None = None
     task_kind: str | None = None
