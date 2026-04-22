@@ -188,7 +188,7 @@ def test_credential_expiry_escalates_when_one_day_left(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 from control_plane.entrypoints.worker.main import classify_execution_result  # noqa: E402
-from control_plane.domain.models import ExecutionResult  # noqa: E402
+from control_plane.contracts.execution import ExecutionResult  # noqa: E402
 
 
 def _make_result(**kwargs) -> ExecutionResult:

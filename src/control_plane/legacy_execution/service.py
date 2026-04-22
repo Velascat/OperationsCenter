@@ -20,12 +20,14 @@ from control_plane.application.validation import ValidationRunner
 from control_plane.config import Settings
 from control_plane.domain import (
     BoardTask,
-    LegacyExecutionRequest,
-    LegacyExecutionResult,
     RepoTarget,
     ValidationResult,
 )
 from control_plane.execution import UsageStore
+from control_plane.legacy_execution.models import (
+    LegacyExecutionRequest,
+    LegacyExecutionResult,
+)
 
 
 class TaskContractError(ValueError):

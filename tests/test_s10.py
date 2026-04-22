@@ -128,7 +128,7 @@ def test_build_proposal_description_no_patterns_skips_section() -> None:
 
 def test_classify_awaiting_input_from_summary() -> None:
     from control_plane.entrypoints.worker.main import classify_execution_result
-    from control_plane.domain.models import ExecutionResult
+    from control_plane.contracts.execution import ExecutionResult
 
     result = ExecutionResult(
         run_id="r1",
@@ -141,7 +141,7 @@ def test_classify_awaiting_input_from_summary() -> None:
 
 def test_classify_awaiting_input_from_stderr() -> None:
     from control_plane.entrypoints.worker.main import classify_execution_result
-    from control_plane.domain.models import ExecutionResult
+    from control_plane.contracts.execution import ExecutionResult
 
     result = ExecutionResult(
         run_id="r2",
@@ -155,7 +155,7 @@ def test_classify_awaiting_input_from_stderr() -> None:
 
 def test_classify_no_question_marker_returns_other() -> None:
     from control_plane.entrypoints.worker.main import classify_execution_result
-    from control_plane.domain.models import ExecutionResult
+    from control_plane.contracts.execution import ExecutionResult
 
     result = ExecutionResult(
         run_id="r3",
@@ -169,7 +169,7 @@ def test_classify_no_question_marker_returns_other() -> None:
 
 def test_extract_cp_question_from_summary() -> None:
     from control_plane.entrypoints.worker.main import extract_cp_question
-    from control_plane.domain.models import ExecutionResult
+    from control_plane.contracts.execution import ExecutionResult
 
     result = ExecutionResult(
         run_id="r4",

@@ -53,3 +53,8 @@ def test_domain_no_longer_exports_competing_execution_contracts() -> None:
     domain_init = (REPO_ROOT / "src" / "control_plane" / "domain" / "__init__.py").read_text(encoding="utf-8")
     assert '"ExecutionRequest"' not in domain_init
     assert '"ExecutionResult"' not in domain_init
+
+
+def test_legacy_execution_service_is_quarantined_outside_application_namespace() -> None:
+    assert not (REPO_ROOT / "src" / "control_plane" / "application" / "service.py").exists()
+    assert (REPO_ROOT / "src" / "control_plane" / "legacy_execution" / "service.py").exists()

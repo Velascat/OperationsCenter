@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.domain import LegacyExecutionRequest, LegacyExecutionResult
+from control_plane.legacy_execution.models import LegacyExecutionRequest, LegacyExecutionResult
 
 
 class Reporter:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from control_plane.application.service import ExecutionService, _SelfReviewVerdict
+from control_plane.legacy_execution.service import ExecutionService, _SelfReviewVerdict
 
 
 # ---------------------------------------------------------------------------

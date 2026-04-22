@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-from control_plane.application.service import ExecutionService
+from control_plane.legacy_execution.service import ExecutionService
 from control_plane.config.settings import Settings
 from control_plane.domain.models import BoardTask, ValidationResult
 from control_plane.execution.models import NoOpDecision, RetryDecision

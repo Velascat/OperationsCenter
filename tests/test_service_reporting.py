@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.application.service import ExecutionService
+from control_plane.contracts.execution import ExecutionResult
+from control_plane.legacy_execution.service import ExecutionService
 from control_plane.config.settings import Settings
-from control_plane.domain.models import ExecutionResult, ValidationResult
+from control_plane.domain.models import ValidationResult
 
 
 class FailingParsePlaneClient:

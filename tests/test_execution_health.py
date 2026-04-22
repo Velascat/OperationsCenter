@@ -503,7 +503,7 @@ def _make_service_with_report_root(report_root: Path):
     """Create an ExecutionService with only settings.report_root wired up."""
     from unittest.mock import MagicMock, patch
 
-    from control_plane.application.service import ExecutionService
+    from control_plane.legacy_execution.service import ExecutionService
 
     mock_settings = MagicMock()
     mock_settings.report_root = report_root
@@ -546,8 +546,9 @@ def test_service_skip_produces_correct_result_fields(tmp_path: Path) -> None:
     the returned ExecutionResult must have the expected fields."""
     from unittest.mock import MagicMock, patch
 
-    from control_plane.application.service import ExecutionService
-    from control_plane.domain import BoardTask, ExecutionResult
+    from control_plane.contracts.execution import ExecutionResult
+    from control_plane.domain import BoardTask
+    from control_plane.legacy_execution.service import ExecutionService
 
     root = tmp_path / "kodo_plane"
     root.mkdir()

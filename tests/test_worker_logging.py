@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.application.service import ExecutionService
+from control_plane.legacy_execution.service import ExecutionService
 from control_plane.config.settings import Settings
 
 

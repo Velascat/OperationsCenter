@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from control_plane.application.service import ExecutionService, _BaselineResult
+from control_plane.legacy_execution.service import ExecutionService, _BaselineResult
 from control_plane.domain.models import ValidationResult
 
 
