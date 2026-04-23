@@ -129,11 +129,11 @@ def test_execute_timeout_status(tmp_path):
     assert result.status == ExecutionStatus.TIMEOUT
 
 
-def test_execute_unsupported_request_returns_policy_blocked(tmp_path):
+def test_execute_unsupported_request_returns_unsupported_request(tmp_path):
     adapter = OpenClawBackendAdapter.with_stub()
     result = adapter.execute(_req(tmp_path, goal_text=""))
     assert result.status == ExecutionStatus.FAILED
-    assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+    assert result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST
 
 
 def test_execute_unsupported_reason_mentions_openclaw(tmp_path):
@@ -157,7 +157,7 @@ def test_execute_and_capture_returns_tuple(tmp_path):
 def test_execute_and_capture_unsupported_returns_none_capture(tmp_path):
     adapter = OpenClawBackendAdapter.with_stub()
     result, capture = adapter.execute_and_capture(_req(tmp_path, goal_text=""))
-    assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+    assert result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST
     assert capture is None
 
 

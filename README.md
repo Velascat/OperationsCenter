@@ -176,7 +176,7 @@ Key design constraints:
 - Archon is **not** a universal backend — `aider_local` lane runs stay on kodo
 - Archon-native types (`ArchonWorkflowConfig`, `ArchonRunCapture`, `workflow_events`) are confined to `backends/archon/`
 - `execute_and_capture()` exposes raw workflow events for `BackendDetailRef` retention without inlining them into canonical contracts
-- Unsupported requests return `POLICY_BLOCKED` before invocation; the capture is `None`
+- Unsupported requests return `UNSUPPORTED_REQUEST` before invocation; the capture is `None`
 
 See `WorkStation/docs/architecture/archon-adapter.md` for architecture and usage.
 

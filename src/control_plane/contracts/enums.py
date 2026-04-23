@@ -96,6 +96,7 @@ class FailureReasonCategory(str, Enum):
     """Coarse failure category for routing and retry decisions."""
     VALIDATION_FAILED = "validation_failed"
     BACKEND_ERROR = "backend_error"
+    UNSUPPORTED_REQUEST = "unsupported_request"
     TIMEOUT = "timeout"
     NO_CHANGES = "no_changes"
     CONFLICT = "conflict"

@@ -6,7 +6,7 @@ Three states are supported:
   INFERRED       — files present but provenance is indirect / lower-confidence
   NONE           — backend confirmed no files changed (e.g. NO_CHANGES outcome)
   UNKNOWN        — backend did not report; could not determine
-  NOT_APPLICABLE — execution never ran (e.g. policy_blocked)
+  NOT_APPLICABLE — execution never ran (e.g. policy_blocked, unsupported_request)
 
 Do not coerce UNKNOWN or INFERRED into KNOWN. Downstream code must handle uncertainty.
 """
@@ -42,7 +42,7 @@ class ChangedFilesEvidence(BaseModel):
     source: str = Field(
         default="",
         description="How changed-file data was obtained: backend_manifest, git_diff, "
-                    "backend_confirmed_empty, policy_blocked, or none.",
+                    "backend_confirmed_empty, policy_blocked, adapter_unsupported, or none.",
     )
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     notes: Optional[str] = None
@@ -61,6 +61,14 @@ def normalize_changed_files(result: ExecutionResult) -> ChangedFilesEvidence:
             source="policy_blocked",
             confidence=1.0,
             notes="Execution was blocked by policy; no files were changed.",
+        )
+
+    if result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST:
+        return ChangedFilesEvidence(
+            status=ChangedFilesStatus.NOT_APPLICABLE,
+            source="adapter_unsupported",
+            confidence=1.0,
+            notes="Execution did not run because the selected adapter could not support the request.",
         )
 
     if result.failure_category == FailureReasonCategory.NO_CHANGES:

@@ -131,6 +131,29 @@ def test_policy_blocked_source_is_policy_blocked():
     assert ev.source == "policy_blocked"
 
 
+def test_unsupported_request_status_is_not_applicable():
+    result = make_result(
+        status=ExecutionStatus.FAILED,
+        success=False,
+        failure_category=FailureReasonCategory.UNSUPPORTED_REQUEST,
+    )
+    ev = normalize_changed_files(result)
+    assert ev.status == ChangedFilesStatus.NOT_APPLICABLE
+
+
+def test_unsupported_request_source_is_adapter_unsupported():
+    result = make_result(failure_category=FailureReasonCategory.UNSUPPORTED_REQUEST)
+    ev = normalize_changed_files(result)
+    assert ev.source == "adapter_unsupported"
+
+
+def test_unsupported_request_notes_do_not_blame_policy():
+    result = make_result(failure_category=FailureReasonCategory.UNSUPPORTED_REQUEST)
+    ev = normalize_changed_files(result)
+    assert ev.notes is not None
+    assert "policy" not in ev.notes.lower()
+
+
 # ---------------------------------------------------------------------------
 # UNKNOWN: backend did not report
 # ---------------------------------------------------------------------------
@@ -194,6 +217,16 @@ def test_policy_blocked_takes_precedence_over_changed_files():
     )
     ev = normalize_changed_files(result)
     assert ev.status == ChangedFilesStatus.NOT_APPLICABLE
+
+
+def test_unsupported_request_takes_precedence_over_changed_files():
+    result = make_result(
+        failure_category=FailureReasonCategory.UNSUPPORTED_REQUEST,
+        changed_files=[make_changed_file()],
+    )
+    ev = normalize_changed_files(result)
+    assert ev.status == ChangedFilesStatus.NOT_APPLICABLE
+    assert ev.source == "adapter_unsupported"
 
 
 # ---------------------------------------------------------------------------

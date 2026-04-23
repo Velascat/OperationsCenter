@@ -236,7 +236,7 @@ def _unsupported_result(request: ExecutionRequest, check: SupportCheck) -> Execu
         decision_id=request.decision_id,
         status=ExecutionStatus.FAILED,
         success=False,
-        failure_category=FailureReasonCategory.POLICY_BLOCKED,
+        failure_category=FailureReasonCategory.UNSUPPORTED_REQUEST,
         failure_reason=f"Request not supported by Archon adapter: {check.reason}",
     )
 

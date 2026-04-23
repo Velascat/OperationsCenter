@@ -115,7 +115,7 @@ class TestExecuteAndCapture:
 
     def test_unsupported_request_returns_none_capture(self, tmp_path):
         result, capture = _adapter(_mock_kodo()).execute_and_capture(_request(tmp_path, goal_text=""))
-        assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+        assert result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST
         assert capture is None
 
     def test_capture_does_not_leak_into_canonical_result(self, tmp_path):
@@ -182,11 +182,11 @@ class TestExecuteFailure:
 # ---------------------------------------------------------------------------
 
 class TestUnsupportedRequest:
-    def test_unsupported_returns_policy_blocked(self, tmp_path):
+    def test_unsupported_returns_unsupported_request(self, tmp_path):
         adapter = _adapter()
         result = adapter.execute(_request(tmp_path, goal_text=""))
         assert result.success is False
-        assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+        assert result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST
 
     def test_unsupported_does_not_invoke_kodo(self, tmp_path):
         kodo = _mock_kodo()

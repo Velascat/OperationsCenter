@@ -103,10 +103,10 @@ def test_result_has_proposal_id(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_unsupported_request_returns_policy_blocked(tmp_path):
+def test_unsupported_request_returns_unsupported_request(tmp_path):
     result = _adapter().execute(_req(tmp_path, goal_text=""))
     assert result.status == ExecutionStatus.FAILED
-    assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+    assert result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST
 
 
 def test_backend_failure_returns_failed_status(tmp_path):
@@ -153,7 +153,7 @@ def test_execute_and_capture_capture_has_workflow_events(tmp_path):
 
 def test_execute_and_capture_returns_none_capture_when_unsupported(tmp_path):
     result, capture = _adapter().execute_and_capture(_req(tmp_path, goal_text=""))
-    assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+    assert result.failure_category == FailureReasonCategory.UNSUPPORTED_REQUEST
     assert capture is None
 
 

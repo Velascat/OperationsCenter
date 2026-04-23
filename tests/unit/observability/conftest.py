@@ -165,7 +165,7 @@ def policy_blocked_result() -> ExecutionResult:
         status=ExecutionStatus.FAILED,
         success=False,
         failure_category=FailureReasonCategory.POLICY_BLOCKED,
-        failure_reason="Request not supported by kodo adapter: goal_text is empty",
+        failure_reason="execution blocked by policy: repository requires human review",
         artifacts=[],
     )
 

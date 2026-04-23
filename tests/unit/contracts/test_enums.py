@@ -87,6 +87,7 @@ class TestFailureReasonCategory:
         values = {m.value for m in FailureReasonCategory}
         assert "validation_failed" in values
         assert "backend_error" in values
+        assert "unsupported_request" in values
         assert "timeout" in values
         assert "no_changes" in values
         assert "conflict" in values
