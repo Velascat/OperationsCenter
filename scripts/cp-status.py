@@ -284,6 +284,111 @@ def _render(repo_filter: list[str] | None, width: int = 78) -> str:
     return "\n".join(sections)
 
 
+def _render_rich(repo_filter: list[str] | None, console) -> None:
+    """Render using Rich panels — mirrors VideoFoundry audit status style."""
+    from rich import box
+    from rich.columns import Columns
+    from rich.console import Group
+    from rich.panel import Panel
+    from rich.text import Text
+
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    # ── watcher panels — one per role ────────────────────────────────────────
+    watcher_panels: list[Panel] = []
+    for role in ROLES:
+        pid_path = WATCH_DIR / f"{role}.pid"
+        status_path = WATCH_DIR / f"{role}.status.json"
+        pid = _read_pid(pid_path)
+        alive = pid is not None and _pid_alive(pid)
+        status = _read_json(status_path) or {}
+        state = status.get("state", "-")
+        cycle = status.get("cycle", "-")
+        last_action = (status.get("last_action") or "-")[:22]
+        age = _elapsed(status.get("updated_at"))
+
+        text = Text()
+        if state not in ("-", "idle", "waiting"):
+            text.append(f"{state}\n", style="bold yellow")
+        else:
+            text.append(f"{state}\n", style="dim")
+        text.append("cycle ", style="dim")
+        text.append(f"{cycle}\n", style="white")
+        text.append(f"{last_action}\n", style="dim")
+        text.append(age, style="dim")
+
+        border = "green" if alive else "red"
+        watcher_panels.append(Panel(
+            text,
+            title=f"[bold]{role}[/bold]",
+            border_style=border,
+            box=box.ROUNDED,
+            expand=True,
+        ))
+
+    # watchdog indicator
+    wd_pid = _read_pid(WATCH_DIR / "watchdog.pid")
+    wd_alive = wd_pid is not None and _pid_alive(wd_pid)
+    wd_text = Text()
+    wd_text.append("watchdog ", style="dim")
+    wd_text.append("running" if wd_alive else "stopped",
+                   style="green" if wd_alive else "bold red")
+
+    # ── active kodo panel ────────────────────────────────────────────────────
+    kodo_lines = _kodo_rows(repo_filter)
+    kodo_panel = Panel(
+        Text.from_ansi("\n".join(kodo_lines)),
+        title="[bold]Active Kodo[/bold]",
+        border_style="blue",
+        box=box.ROUNDED,
+        expand=True,
+    )
+
+    # ── board panel ──────────────────────────────────────────────────────────
+    board_lines = _board_rows(repo_filter)
+    board_panel = Panel(
+        Text.from_ansi("\n".join(board_lines)),
+        title="[bold]Board[/bold]",
+        border_style="blue",
+        box=box.ROUNDED,
+        expand=True,
+    )
+
+    # ── circuit breaker + memory panels ──────────────────────────────────────
+    cb_text = Text.from_ansi(_cb_row().strip())
+    cb_panel = Panel(
+        cb_text,
+        title="[bold]Circuit Breaker[/bold]",
+        border_style="cyan",
+        box=box.ROUNDED,
+        expand=True,
+    )
+
+    mem_text = Text.from_ansi(_memory_row().strip())
+    mem_panel = Panel(
+        mem_text,
+        title="[bold]Memory[/bold]",
+        border_style="cyan",
+        box=box.ROUNDED,
+        expand=True,
+    )
+
+    content = Group(
+        Columns(watcher_panels, equal=True, expand=True),
+        Columns([kodo_panel, board_panel], equal=True, expand=True),
+        Columns([cb_panel, mem_panel], equal=True, expand=True),
+        wd_text,
+    )
+
+    console.print(Panel(
+        content,
+        title=f"[bold cyan]ControlPlane Status[/bold cyan]  [dim]{now_str}[/dim]",
+        subtitle="[dim]Ctrl+C to exit · refresh 2s[/dim]",
+        border_style="cyan",
+        box=box.HEAVY,
+    ))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="ControlPlane live status dashboard")
     parser.add_argument(
@@ -297,24 +402,36 @@ def main() -> None:
         repo_filter = [r.strip() for r in args.repo.split(",") if r.strip()]
 
     try:
-        while True:
-            cols, rows = shutil.get_terminal_size(fallback=(78, 24))
-            output = _render(repo_filter, width=cols)
-            lines = output.split("\n")
-            # Truncate to terminal height so content never overflows into scrollback
-            if len(lines) > rows - 1:
-                lines = lines[:rows - 1]
-            # Overwrite in place using direct row addressing — never writes \n so
-            # the terminal cannot scroll, avoiding scrollback growth.
-            # \033[?7l disables auto-wrap so long lines clip rather than wrap.
-            sys.stdout.write("\033[?7l")
-            for i, line in enumerate(lines, 1):
-                sys.stdout.write(f"\033[{i};1H{line}\033[K")
-            sys.stdout.write(f"\033[{len(lines) + 1};1H\033[J\033[?7h")
-            sys.stdout.flush()
-            time.sleep(2)
+        from rich.console import Console
+        _use_rich = True
+    except ImportError:
+        _use_rich = False
+
+    try:
+        if _use_rich:
+            console = Console()
+            while True:
+                console.clear()
+                _render_rich(repo_filter, console)
+                time.sleep(2)
+        else:
+            while True:
+                cols, rows = shutil.get_terminal_size(fallback=(78, 24))
+                output = _render(repo_filter, width=cols)
+                lines = output.split("\n")
+                if len(lines) > rows - 1:
+                    lines = lines[:rows - 1]
+                sys.stdout.write("\033[?7l")
+                for i, line in enumerate(lines, 1):
+                    sys.stdout.write(f"\033[{i};1H{line}\033[K")
+                sys.stdout.write(f"\033[{len(lines) + 1};1H\033[J\033[?7h")
+                sys.stdout.flush()
+                time.sleep(2)
     except KeyboardInterrupt:
-        sys.stdout.write("\033[J\033[?7h\nStopped.\n")
+        if _use_rich:
+            print("\nStopped.")
+        else:
+            sys.stdout.write("\033[J\033[?7h\nStopped.\n")
 
 
 if __name__ == "__main__":
