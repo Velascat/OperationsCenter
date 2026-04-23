@@ -81,7 +81,9 @@ def _bundle_json(bundle) -> dict[str, Any]:
 def main() -> int:
     args = _build_parser().parse_args()
     context = _context_from_args(args)
-    bundle = PlanningService.default().plan(context)
+    service = PlanningService.default()
+    proposal = service.build_proposal(context)
+    bundle = service.route_proposal(proposal, context=context)
     payload = _bundle_json(bundle)
     rendered = json.dumps(payload, indent=2, sort_keys=True)
     if args.output:

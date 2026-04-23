@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from control_plane.contracts.enums import BackendName, LaneName
+from control_plane.contracts.proposal import TaskProposal
 from control_plane.contracts.routing import LaneDecision
 from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
 from control_plane.routing.client import HttpLaneRoutingClient, StubLaneRoutingClient
@@ -48,6 +49,20 @@ def test_plan_returns_bundle():
     assert isinstance(bundle, ProposalDecisionBundle)
 
 
+def test_build_proposal_returns_task_proposal():
+    service = _stub_service()
+    proposal = service.build_proposal(_ctx())
+    assert isinstance(proposal, TaskProposal)
+
+
+def test_route_proposal_returns_bundle():
+    service = _stub_service()
+    ctx = _ctx()
+    proposal = service.build_proposal(ctx)
+    bundle = service.route_proposal(proposal, context=ctx)
+    assert isinstance(bundle, ProposalDecisionBundle)
+
+
 def test_bundle_has_proposal():
     service = _stub_service()
     ctx = _ctx(goal_text="Refactor login module")
@@ -72,6 +87,20 @@ def test_bundle_timestamp_set():
     service = _stub_service()
     bundle = service.plan(_ctx())
     assert bundle.bundled_at is not None
+
+
+def test_plan_is_equivalent_to_build_then_route():
+    service = _stub_service()
+    ctx = _ctx(goal_text="Refactor login module")
+    proposal = service.build_proposal(ctx)
+    routed = service.route_proposal(proposal, context=ctx, trace_notes="note")
+    planned = service.plan(ctx, trace_notes="note")
+    assert planned.proposal.goal_text == routed.proposal.goal_text
+    assert planned.proposal.task_type == routed.proposal.task_type
+    assert planned.proposal.target.repo_key == routed.proposal.target.repo_key
+    assert planned.decision == routed.decision
+    assert planned.context is ctx
+    assert planned.trace_notes == "note"
 
 
 # ---------------------------------------------------------------------------

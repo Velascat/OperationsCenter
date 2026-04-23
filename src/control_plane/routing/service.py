@@ -1,22 +1,22 @@
 """
-routing/service.py — PlanningService: PlanningContext → ProposalDecisionBundle.
+routing/service.py — explicit proposal-build and routing surfaces.
 
-PlanningService is the single entry point for ControlPlane's planning and
-routing pipeline. It:
+PlanningService exposes the two real stages in ControlPlane's planning and
+routing pipeline:
 
-  1. Validates and translates PlanningContext into a canonical TaskProposal
-     (via ProposalBuilder).
-  2. Routes the proposal through SwitchBoard (via LaneRoutingClient) to get a
-     LaneDecision.
-  3. Bundles both into a ProposalDecisionBundle for downstream execution.
+  1. build_proposal(context) -> TaskProposal
+  2. route_proposal(proposal) -> ProposalDecisionBundle
 
-The service owns no routing logic — all policy lives in SwitchBoard.
+plan() remains as a thin convenience wrapper for callers that want both steps
+in one call. The service owns no routing logic — all policy lives in
+SwitchBoard.
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
+from control_plane.contracts.proposal import TaskProposal
 from control_plane.planning.models import (
     PlanningContext,
     ProposalDecisionBundle,
@@ -32,7 +32,8 @@ class PlanningService:
     Typical usage:
 
         service = PlanningService.default()
-        bundle = service.plan(context)
+        proposal = service.build_proposal(context)
+        bundle = service.route_proposal(proposal, context=context)
         # bundle.proposal  → TaskProposal
         # bundle.decision  → LaneDecision
         # bundle.run_summary → trace string
@@ -41,17 +42,18 @@ class PlanningService:
     def __init__(self, routing_client: LaneRoutingClient) -> None:
         self._client = routing_client
 
-    def plan(
+    def build_proposal(self, context: PlanningContext) -> TaskProposal:
+        """Build a canonical TaskProposal from PlanningContext."""
+        return build_proposal(context)
+
+    def route_proposal(
         self,
-        context: PlanningContext,
+        proposal: TaskProposal,
+        *,
+        context: Optional[PlanningContext] = None,
         trace_notes: str = "",
     ) -> ProposalDecisionBundle:
-        """Build a TaskProposal from context and route it to get a LaneDecision.
-
-        Raises:
-            ValueError: if context validation fails (propagated from build_proposal).
-        """
-        proposal = build_proposal(context)
+        """Route a TaskProposal across the SwitchBoard service boundary."""
         decision = self._client.select_lane(proposal)
         return ProposalDecisionBundle(
             proposal=proposal,
@@ -59,6 +61,19 @@ class PlanningService:
             context=context,
             trace_notes=trace_notes,
         )
+
+    def plan(
+        self,
+        context: PlanningContext,
+        trace_notes: str = "",
+    ) -> ProposalDecisionBundle:
+        """Convenience wrapper: build a proposal, then route that proposal.
+
+        Raises:
+            ValueError: if context validation fails (propagated from build_proposal).
+        """
+        proposal = self.build_proposal(context)
+        return self.route_proposal(proposal, context=context, trace_notes=trace_notes)
 
     @classmethod
     def default(cls) -> "PlanningService":
