@@ -31,6 +31,7 @@ def make_result(
     failure_category: FailureReasonCategory | None = None,
     validation_status: ValidationStatus = ValidationStatus.SKIPPED,
     changed_files: list[ChangedFileRef] | None = None,
+    changed_files_source: str | None = None,
 ) -> ExecutionResult:
     return ExecutionResult(
         run_id=run_id,
@@ -39,6 +40,7 @@ def make_result(
         status=status,
         success=success,
         changed_files=changed_files or [],
+        changed_files_source=changed_files_source,
         failure_category=failure_category,
         validation=ValidationSummary(
             status=validation_status,
@@ -71,6 +73,7 @@ def make_record(
         success=success,
         failure_category=failure_category,
         validation_status=validation_status,
+        changed_files_source=changed_files_source,
         changed_files=changed_files or (
             [ChangedFileRef(path="src/main.py", change_type="modified")]
             if success and changed_files is None
@@ -144,6 +147,7 @@ def make_unknown_changed_files(
 ) -> ExecutionRecord:
     """Successful run but no changed-file info (backend didn't report)."""
     result = make_result(
+        run_id=kw.pop("run_id", "run-0001"),
         status=ExecutionStatus.SUCCESS,
         success=True,
         changed_files=[],  # empty → normalize_changed_files returns UNKNOWN
