@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from control_plane.backends.kodo.adapter import KodoBackendAdapter
 from control_plane.contracts.common import ChangedFileRef, ValidationSummary
 from control_plane.contracts.enums import (
     BackendName,
@@ -176,6 +178,8 @@ def test_allowed_policy_invokes_adapter_with_canonical_request() -> None:
     assert adapter.last_request.allowed_paths == ["src/**"]
     assert outcome.executed is True
     assert outcome.record.metadata["policy"]["status"] == "allow"
+    assert outcome.record.metadata["task_type"] == "lint_fix"
+    assert outcome.record.metadata["risk_level"] == "low"
 
 
 def test_capture_capable_adapter_populates_backend_detail_refs() -> None:
@@ -249,3 +253,54 @@ def test_policy_blocked_run_has_no_backend_detail_refs() -> None:
     assert outcome.executed is False
     assert outcome.record.backend_detail_refs == []
     assert outcome.record.result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+    assert outcome.record.metadata["task_type"] == "lint_fix"
+    assert outcome.record.metadata["risk_level"] == "low"
+    assert "duration_ms" not in outcome.record.metadata
+
+
+def test_capture_capable_adapter_persists_runtime_duration_metadata() -> None:
+    bundle = _bundle()
+    capture = type("Capture", (), {"duration_ms": 1234})()
+    adapter = _CaptureAdapter(_success_result(bundle), capture=capture)
+    coordinator = ExecutionCoordinator(
+        adapter_registry=_Registry(adapter),
+        policy_engine=_StubPolicyEngine(PolicyDecision(status=PolicyStatus.ALLOW)),
+    )
+
+    outcome = coordinator.execute(bundle, _runtime())
+
+    assert outcome.record.metadata["duration_ms"] == 1234
+
+
+def test_kodo_adapter_retains_backend_detail_refs_and_duration_metadata(tmp_path: Path) -> None:
+    bundle = _bundle()
+    repo = tmp_path / "workspace"
+    repo.mkdir()
+
+    kodo = KodoAdapter.__new__(KodoAdapter)
+    kodo.write_goal_file = lambda path, goal_text, constraints_text=None: path.write_text(goal_text, encoding="utf-8")
+    kodo.run = lambda goal_file_path, repo_path, env=None, kodo_mode="goal": KodoRunResult(
+        exit_code=0,
+        stdout="kodo stdout",
+        stderr="",
+        command=["kodo", "run"],
+    )
+    KodoAdapter.is_orchestrator_rate_limited = staticmethod(lambda r: False)
+    KodoAdapter.is_quota_exhausted = staticmethod(lambda r: False)
+
+    coordinator = ExecutionCoordinator(
+        adapter_registry=_Registry(KodoBackendAdapter(kodo)),
+        policy_engine=_StubPolicyEngine(PolicyDecision(status=PolicyStatus.ALLOW)),
+    )
+
+    outcome = coordinator.execute(
+        bundle,
+        ExecutionRuntimeContext(workspace_path=repo, task_branch="auto/lint-fix", goal_file_path=repo / ".goal.md"),
+    )
+
+    assert outcome.executed is True
+    assert outcome.record.metadata["duration_ms"] >= 0
+    assert outcome.record.metadata["task_type"] == "lint_fix"
+    assert outcome.record.metadata["risk_level"] == "low"
+    assert any(ref.detail_type == "stdout_log" for ref in outcome.record.backend_detail_refs)
+    assert any(ref.detail_type == "structured_result" for ref in outcome.record.backend_detail_refs)

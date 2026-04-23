@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 
 from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
 from control_plane.backends.kodo.adapter import KodoBackendAdapter
+from control_plane.backends.kodo.models import KodoRunCapture
 from control_plane.contracts.execution import ExecutionRequest
 from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
 
@@ -101,6 +103,50 @@ class TestExecuteSuccess:
         repo.mkdir()
         result = _adapter(_mock_kodo()).execute(_request(tmp_path))
         assert result.proposal_id == "prop-1"
+
+
+class TestExecuteAndCapture:
+    def test_returns_result_and_capture(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        result, capture = _adapter(_mock_kodo()).execute_and_capture(_request(tmp_path))
+        assert result.run_id is not None
+        assert isinstance(capture, KodoRunCapture)
+
+    def test_unsupported_request_returns_none_capture(self, tmp_path):
+        result, capture = _adapter(_mock_kodo()).execute_and_capture(_request(tmp_path, goal_text=""))
+        assert result.failure_category == FailureReasonCategory.POLICY_BLOCKED
+        assert capture is None
+
+    def test_capture_does_not_leak_into_canonical_result(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        result, _ = _adapter(_mock_kodo()).execute_and_capture(_request(tmp_path))
+        assert not hasattr(result, "stdout")
+        assert not hasattr(result, "stderr")
+
+
+class TestBackendDetailRefs:
+    def test_build_backend_detail_refs_retains_raw_kodo_details_by_reference(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        req = _request(tmp_path)
+        adapter = _adapter(_mock_kodo(stdout="hello", stderr="warn"))
+
+        _, capture = adapter.execute_and_capture(req)
+
+        refs = adapter.build_backend_detail_refs(req, capture)
+
+        assert {ref.detail_type for ref in refs} == {"stdout_log", "stderr_log", "structured_result"}
+        for ref in refs:
+            assert ref.path is not None
+            assert Path(ref.path).is_file()
+
+        structured_ref = next(ref for ref in refs if ref.detail_type == "structured_result")
+        payload = json.loads(Path(structured_ref.path).read_text(encoding="utf-8"))
+        assert payload["run_id"] == req.run_id
+        assert payload["duration_ms"] >= 0
+        assert payload["command"] == ["kodo"]
 
 
 # ---------------------------------------------------------------------------

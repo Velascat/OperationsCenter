@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+from typing import Any
 from typing import Protocol, runtime_checkable
 
 from control_plane.backends.factory import CanonicalBackendRegistry
@@ -94,8 +95,14 @@ class ExecutionCoordinator:
 
         request = self._builder.build(bundle, runtime, policy_decision)
         adapter = self._registry.for_backend(bundle.decision.selected_backend)
-        result, raw_detail_refs = self._execute_adapter(adapter, request)
-        record, trace = self._observe(bundle, result, policy_decision, raw_detail_refs=raw_detail_refs)
+        result, raw_detail_refs, runtime_metadata = self._execute_adapter(adapter, request)
+        record, trace = self._observe(
+            bundle,
+            result,
+            policy_decision,
+            raw_detail_refs=raw_detail_refs,
+            runtime_metadata=runtime_metadata,
+        )
         return ExecutionRunOutcome(
             request=request,
             policy_decision=policy_decision,
@@ -111,24 +118,30 @@ class ExecutionCoordinator:
         result: ExecutionResult,
         policy_decision: PolicyDecision,
         raw_detail_refs: list[BackendDetailRef] | None = None,
+        runtime_metadata: dict[str, Any] | None = None,
     ) -> tuple[ExecutionRecord, ExecutionTrace]:
+        metadata: dict[str, Any] = {
+            "policy": policy_decision.model_dump(mode="json"),
+            "task_type": bundle.proposal.task_type.value,
+            "risk_level": bundle.proposal.risk_level.value,
+        }
+        if runtime_metadata:
+            metadata.update(runtime_metadata)
         return self._observability.observe(
             result,
             backend=bundle.decision.selected_backend.value,
             lane=bundle.decision.selected_lane.value,
             raw_detail_refs=raw_detail_refs,
             notes=policy_decision.notes,
-            metadata={
-                "policy": policy_decision.model_dump(mode="json"),
-            },
+            metadata=metadata,
         )
 
-    def _execute_adapter(self, adapter, request) -> tuple[ExecutionResult, list[BackendDetailRef]]:
+    def _execute_adapter(self, adapter, request) -> tuple[ExecutionResult, list[BackendDetailRef], dict[str, Any]]:
         if isinstance(adapter, _CaptureCapableAdapter):
             result, capture = adapter.execute_and_capture(request)
             refs = self._build_detail_refs(adapter, request, capture)
-            return result, refs
-        return adapter.execute(request), []
+            return result, refs, _runtime_metadata_from_capture(capture)
+        return adapter.execute(request), [], {}
 
     def _build_detail_refs(self, adapter, request, capture) -> list[BackendDetailRef]:
         if capture is None:
@@ -157,3 +170,17 @@ def _policy_blocked_result(request, policy_decision: PolicyDecision) -> Executio
         failure_category=FailureReasonCategory.POLICY_BLOCKED,
         failure_reason=f"{reason}: {policy_decision.notes}",
     )
+
+
+def _runtime_metadata_from_capture(capture: object | None) -> dict[str, Any]:
+    if capture is None:
+        return {}
+
+    duration_ms = getattr(capture, "duration_ms", None)
+    if duration_ms is None:
+        return {}
+
+    try:
+        return {"duration_ms": int(duration_ms)}
+    except (TypeError, ValueError):
+        return {}
