@@ -1,12 +1,13 @@
 """Planning-only worker entrypoint.
 
-This entrypoint exists after the legacy execution cutover to prove the
-ControlPlane boundary:
+This entrypoint exists to prove the split between ControlPlane's planning
+surface and its execution surface:
 
     PlanningContext -> TaskProposal -> LaneDecision -> ProposalDecisionBundle
 
 It intentionally does not construct backend adapters, create workspaces, or run
-execution backends. Execution ownership lives outside ControlPlane.
+execution backends. Live execution remains a separate ControlPlane boundary
+owned by ``control_plane.execution.coordinator.ExecutionCoordinator``.
 """
 
 from __future__ import annotations

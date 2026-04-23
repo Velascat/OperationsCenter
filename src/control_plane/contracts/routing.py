@@ -29,9 +29,9 @@ class LaneDecision(BaseModel):
     """
     SwitchBoard's routing decision for a TaskProposal.
 
-    Consumed by the lane runner (e.g. kodo) to know which backend to invoke
-    and with which configuration. SwitchBoard does not embed execution logic;
-    this is pure routing metadata.
+    Consumed by ControlPlane's execution boundary to know which backend to
+    invoke and with which configuration. SwitchBoard does not embed execution
+    logic; this is pure routing metadata.
     """
 
     # Identity

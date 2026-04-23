@@ -2,9 +2,10 @@
 proposal.py — TaskProposal: the canonical proposal emitted by ControlPlane.
 
 A TaskProposal is the decision that a task is worth attempting. It carries
-everything needed to route the task (via SwitchBoard) and execute it (via
-the selected lane runner). It does not contain execution-layer internals
-(workspace paths, branch names) — those are resolved at execution time.
+everything needed to route the task (via SwitchBoard) and execute it through
+ControlPlane's execution boundary. It does not contain execution-layer
+internals (workspace paths, branch names) — those are resolved at execution
+time.
 """
 
 from __future__ import annotations
@@ -31,9 +32,9 @@ class TaskProposal(BaseModel):
     """
     A task proposed by ControlPlane for execution.
 
-    SwitchBoard consumes this to select a lane. The lane runner consumes it
-    to understand what to do. Neither component should need to reach back into
-    ControlPlane internals to execute the task.
+    SwitchBoard consumes this to select a lane. ControlPlane's execution
+    boundary consumes it to understand what to do. Neither component should
+    need to reach back into planning internals to execute the task.
     """
 
     # Identity

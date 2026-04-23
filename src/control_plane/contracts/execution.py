@@ -1,12 +1,12 @@
 """
 execution.py — ExecutionRequest, ExecutionArtifact, RunTelemetry, ExecutionResult.
 
-These are the contracts passed between the routing layer and the backend
-execution layer, and returned from the backend to the platform.
+These are the contracts passed between the routing layer and ControlPlane's
+execution boundary, and returned from the backend to the platform.
 
 Flow:
   TaskProposal → (SwitchBoard) → LaneDecision
-  TaskProposal + LaneDecision → (lane runner) → ExecutionRequest
+  TaskProposal + LaneDecision → (ExecutionCoordinator boundary) → ExecutionRequest
   ExecutionRequest → (backend adapter) → ExecutionResult + RunTelemetry
 """
 
@@ -39,9 +39,9 @@ class ExecutionRequest(BaseModel):
     """
     Everything a backend adapter needs to carry out the work.
 
-    Produced by the lane runner after receiving a TaskProposal + LaneDecision.
-    The lane runner resolves execution-layer details (workspace, branch names)
-    that are not present in the proposal.
+    Produced by the ControlPlane execution boundary after receiving a
+    TaskProposal + LaneDecision. That boundary resolves execution-layer
+    details (workspace, branch names) that are not present in the proposal.
     """
 
     run_id: str = Field(default_factory=_new_id)
@@ -147,9 +147,9 @@ class ExecutionResult(BaseModel):
     """
     The canonical outcome of an execution run.
 
-    Produced by the backend adapter and returned to the lane runner / platform.
-    This is backend-agnostic: a kodo adapter, Archon adapter, and any future
-    adapter all return this same shape.
+    Produced by the backend adapter and returned to the ControlPlane execution
+    boundary / platform. This is backend-agnostic: a kodo adapter, Archon
+    adapter, and any future adapter all return this same shape.
     """
 
     run_id: str

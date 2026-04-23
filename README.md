@@ -1,16 +1,16 @@
 # Control Plane
 
-Local planning, policy, and evidence service for the coding platform. ControlPlane turns work context into canonical proposals, routes them through SwitchBoard, and retains evidence around what happened later.
+Local planning, execution, policy, and evidence service for the coding platform. ControlPlane turns work context into canonical proposals, routes them through SwitchBoard, executes routed work through bounded adapters, and retains evidence around what happened later.
 
 ## Primary Operator Model
 
-ControlPlane is operated through **planning + routing handoff**:
+ControlPlane is operated through a **planning -> routing -> execution** flow:
 
 1. Gather or derive work intent.
 2. Build a canonical `TaskProposal`.
 3. Route it through SwitchBoard to get a `LaneDecision`.
-4. Hand the proposal/decision bundle to the canonical execution boundary.
-5. The execution boundary builds `ExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
+4. Hand the proposal/decision bundle to ControlPlane's canonical execution boundary.
+5. `ExecutionCoordinator` builds `ExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
 
 For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it as a validation ritual after any significant config or threshold change.
 
@@ -19,8 +19,8 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 ## What This System Is
 
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
-- **ControlPlane** is the planning, policy, and evidence layer.
-- **Execution backends** live behind canonical adapters outside ControlPlane's runtime ownership.
+- **ControlPlane** is the planning, execution, policy, and evidence layer.
+- **Execution backends** live behind canonical adapters owned by ControlPlane's execution boundary.
 - **goal**, **test**, **improve**, **propose**, and **review** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
@@ -34,9 +34,6 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 - Repo-aware autonomy stages remain explicit and inspectable for now.
 
 ## What ControlPlane Is Not
-
-- **Not the execution runner.** ControlPlane stops at proposal generation and routing handoff.
-  Backend adapters consume `ExecutionRequest` elsewhere.
 
 - **Not the lane selector.** ControlPlane may supply lane hints, but SwitchBoard
   makes the final lane selection. ControlPlane does not know which execution lane
@@ -107,7 +104,7 @@ All cross-repo contracts live in `src/control_plane/contracts/`:
 
 See `WorkStation/docs/architecture/contracts.md` for full documentation.
 
-### Backend adapters (outside ControlPlane runtime ownership)
+### Backend adapters (inside ControlPlane's execution boundary)
 
 The supported live execution path is:
 
@@ -156,9 +153,8 @@ from control_plane.backends.kodo import KodoBackendAdapter
 result = KodoBackendAdapter.from_settings().execute(request)  # ExecutionRequest → ExecutionResult
 ```
 
-These adapters still live in the repo as contract-aligned integration modules, but
-they are reached through the canonical execution boundary rather than legacy worker
-runtime code.
+These adapters are ControlPlane-owned integration modules reached through the
+canonical execution boundary rather than legacy worker runtime code.
 
 ### Archon Backend Adapter (Phase 8, optional)
 
