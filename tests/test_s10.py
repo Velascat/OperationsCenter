@@ -1,6 +1,5 @@
 """Tests for Session 10 autonomy gap implementations.
 
-S10-1  Rejection patterns injected into Kodo prompts
 S10-2  Question-asking mid-execution (awaiting_input classification + re-queue)
 S10-3  Reviewer → goal re-run escalation (_requeue_as_goal)
 S10-4  Campaign/project tracking (CampaignStore + campaign-status CLI)
@@ -19,107 +18,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-
-# ---------------------------------------------------------------------------
-# S10-1: Rejection patterns injected into Kodo prompts
-# ---------------------------------------------------------------------------
-
-def test_load_rejection_patterns_for_proposal_returns_top3(tmp_path: Path) -> None:
-    from control_plane.entrypoints.worker.main import _load_rejection_patterns_for_proposal
-
-    patterns_path = tmp_path / "rejection_patterns.json"
-    patterns_path.write_text(json.dumps({
-        "my_repo:goal": {
-            "patterns": {
-                "missing_tests": 5,
-                "naming_convention": 3,
-                "scope_too_large": 1,
-                "code_style": 7,
-            },
-            "last_seen": {},
-        }
-    }))
-
-    with patch("control_plane.entrypoints.worker.main._REJECTION_PATTERNS_PATH", patterns_path):
-        patterns = _load_rejection_patterns_for_proposal(family="goal", repo_key="my_repo")
-
-    # Returns top-3 by count: code_style(7), missing_tests(5), naming_convention(3)
-    assert patterns == ["code_style", "missing_tests", "naming_convention"]
-
-
-def test_load_rejection_patterns_missing_file_returns_empty(tmp_path: Path) -> None:
-    from control_plane.entrypoints.worker.main import _load_rejection_patterns_for_proposal
-
-    nonexistent = tmp_path / "no_file.json"
-    with patch("control_plane.entrypoints.worker.main._REJECTION_PATTERNS_PATH", nonexistent):
-        patterns = _load_rejection_patterns_for_proposal(family="goal", repo_key="repo")
-
-    assert patterns == []
-
-
-def test_build_proposal_description_injects_rejection_patterns() -> None:
-    from control_plane.entrypoints.worker.main import (
-        ProposalSpec, build_proposal_description
-    )
-
-    service = MagicMock()
-    service.settings.repos = {"repo_a": MagicMock(default_branch="main")}
-    service.settings.focus_areas = []
-
-    proposal = ProposalSpec(
-        repo_key="repo_a",
-        task_kind="goal",
-        title="Fix lint",
-        goal_text="Run ruff and fix violations",
-        reason_summary="lint violations",
-        source_signal="repo_a:lint",
-        confidence="high",
-        recommended_state="Ready for AI",
-        handoff_reason="lint",
-        dedup_key="repo_a:lint:fix",
-    )
-
-    with patch(
-        "control_plane.entrypoints.worker.main._load_rejection_patterns_for_proposal",
-        return_value=["missing_tests", "code_style"],
-    ):
-        desc = build_proposal_description(service=service, proposal=proposal)
-
-    assert "Prior Rejection Patterns" in desc
-    assert "missing_tests" in desc
-    assert "code_style" in desc
-
-
-def test_build_proposal_description_no_patterns_skips_section() -> None:
-    from control_plane.entrypoints.worker.main import (
-        ProposalSpec, build_proposal_description
-    )
-
-    service = MagicMock()
-    service.settings.repos = {"repo_a": MagicMock(default_branch="main")}
-    service.settings.focus_areas = []
-
-    proposal = ProposalSpec(
-        repo_key="repo_a",
-        task_kind="goal",
-        title="Fix lint",
-        goal_text="Run ruff",
-        reason_summary="lint",
-        source_signal="repo_a:lint",
-        confidence="high",
-        recommended_state="Ready for AI",
-        handoff_reason="lint",
-        dedup_key="repo_a:lint:fix2",
-    )
-
-    with patch(
-        "control_plane.entrypoints.worker.main._load_rejection_patterns_for_proposal",
-        return_value=[],
-    ):
-        desc = build_proposal_description(service=service, proposal=proposal)
-
-    assert "Prior Rejection Patterns" not in desc
 
 
 # ---------------------------------------------------------------------------

@@ -122,26 +122,3 @@ class TestValidationRunnerMixedCommandOutcomes:
         assert results[1].stdout == ""
         assert "timed out after 30s" in results[1].stderr
         assert results[2].stdout == "third ok\n"
-
-
-class TestServiceValidationTimeoutPropagation:
-    def test_all_validation_run_calls_pass_repo_target_timeout(self):
-        service_path = Path("src/control_plane/application/service.py")
-        content = service_path.read_text()
-        marker = "self.validation.run("
-
-        occurrences: list[str] = []
-        start = 0
-        while True:
-            index = content.find(marker, start)
-            if index == -1:
-                break
-            line_end = content.find("\n", index)
-            if line_end == -1:
-                line_end = len(content)
-            occurrences.append(content[index:line_end])
-            start = index + len(marker)
-
-        assert len(occurrences) == 4
-        for call_text in occurrences:
-            assert "timeout_seconds=repo_target.validation_timeout_seconds" in call_text

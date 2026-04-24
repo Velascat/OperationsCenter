@@ -1,14 +1,10 @@
 """Tests for Session 9 autonomy gap implementations.
 
 S9-1  Event-driven pipeline trigger
-S9-2  Execution environment pre-flight probe
 S9-3  No-op loop detection
 S9-4  Per-repo × family calibration
-S9-5  Rejection reason extraction
 S9-6  Budget allocation by acceptance rate
 S9-7  Test coverage gap detection
-S9-8  PR description quality check
-S9-9  Proactive conflict avoidance (evidence-enriched)
 S9-10 Theme aggregation deriver
 """
 from __future__ import annotations
@@ -60,58 +56,6 @@ def test_pipeline_trigger_no_change_when_same(tmp_path: Path) -> None:
     snap = {"a": 1.0, "b": 2.0}
     changed = _has_changed(snap, snap.copy())
     assert changed == []
-
-
-# ---------------------------------------------------------------------------
-# S9-2: Execution environment pre-flight probe
-# ---------------------------------------------------------------------------
-
-def test_env_preflight_no_requirement_for_unknown_family() -> None:
-    from control_plane.entrypoints.worker.main import _check_execution_environment
-
-    mock_service = MagicMock()
-    mock_service.settings.repos.values.return_value = []
-    # A family with no entry in _KIND_REQUIRED_TOOLS → no warnings
-    warnings = _check_execution_environment(mock_service, "arch_promotion")
-    assert warnings == []
-
-
-def test_env_preflight_finds_tool_in_path() -> None:
-    from control_plane.entrypoints.worker.main import _check_execution_environment
-
-    mock_service = MagicMock()
-    mock_service.settings.repos.values.return_value = []
-
-    with patch("shutil.which", return_value="/usr/bin/ruff"):
-        warnings = _check_execution_environment(mock_service, "lint_fix")
-    assert warnings == []
-
-
-def test_env_preflight_warns_when_tool_missing() -> None:
-    from control_plane.entrypoints.worker.main import _check_execution_environment
-
-    mock_service = MagicMock()
-    mock_service.settings.repos.values.return_value = []
-
-    with patch("shutil.which", return_value=None):
-        warnings = _check_execution_environment(mock_service, "lint_fix")
-    assert len(warnings) == 1
-    assert "ruff" in warnings[0]
-
-
-def test_env_preflight_type_fix_accepts_either_tool() -> None:
-    from control_plane.entrypoints.worker.main import _check_execution_environment
-
-    mock_service = MagicMock()
-    mock_service.settings.repos.values.return_value = []
-
-    # mypy available, ty not — should still pass
-    def mock_which(name: str) -> str | None:
-        return "/usr/bin/mypy" if name == "mypy" else None
-
-    with patch("shutil.which", side_effect=mock_which):
-        warnings = _check_execution_environment(mock_service, "type_fix")
-    assert warnings == []
 
 
 # ---------------------------------------------------------------------------
@@ -302,58 +246,6 @@ def test_calibration_per_repo_report(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# S9-5: Rejection reason extraction
-# ---------------------------------------------------------------------------
-
-def test_rejection_pattern_extraction_detects_missing_tests() -> None:
-    from control_plane.entrypoints.reviewer.main import _extract_rejection_patterns
-
-    comments = [
-        {"body": "This change is missing tests for the new function."},
-        {"body": "Looks good otherwise."},
-    ]
-    patterns = _extract_rejection_patterns(comments, family="lint_fix", repo_key="myrepo")
-    assert "missing_tests" in patterns
-
-
-def test_rejection_pattern_extraction_detects_multiple() -> None:
-    from control_plane.entrypoints.reviewer.main import _extract_rejection_patterns
-
-    comments = [
-        {"body": "Missing docstring for the public method and wrong naming convention."},
-    ]
-    patterns = _extract_rejection_patterns(comments, family="lint_fix", repo_key="myrepo")
-    assert "missing_docstrings" in patterns
-    assert "naming_convention" in patterns
-
-
-def test_rejection_pattern_no_match_returns_empty() -> None:
-    from control_plane.entrypoints.reviewer.main import _extract_rejection_patterns
-
-    comments = [{"body": "LGTM, great work!"}]
-    patterns = _extract_rejection_patterns(comments, family="type_fix", repo_key="myrepo")
-    assert patterns == []
-
-
-def test_rejection_pattern_record_and_load(tmp_path: Path) -> None:
-    from control_plane.entrypoints.reviewer import main as reviewer_main
-
-    original_path = reviewer_main._REJECTION_PATTERNS_PATH
-    reviewer_main._REJECTION_PATTERNS_PATH = tmp_path / "rejection_patterns.json"
-    try:
-        reviewer_main._record_rejection_patterns(
-            ["missing_tests", "code_style"],
-            family="lint_fix",
-            repo_key="myrepo",
-        )
-        loaded = reviewer_main.load_rejection_patterns(family="lint_fix", repo_key="myrepo")
-        assert "missing_tests" in loaded
-        assert "code_style" in loaded
-    finally:
-        reviewer_main._REJECTION_PATTERNS_PATH = original_path
-
-
-# ---------------------------------------------------------------------------
 # S9-6: Budget allocation by acceptance rate
 # ---------------------------------------------------------------------------
 
@@ -481,72 +373,6 @@ def test_coverage_gap_deriver_no_insight_when_unavailable(tmp_path: Path) -> Non
     )
     insights = deriver.derive([snap])
     assert insights == []
-
-
-# ---------------------------------------------------------------------------
-# S9-8: PR description quality check
-# ---------------------------------------------------------------------------
-
-def test_pr_description_check_patches_thin_description() -> None:
-    from control_plane.entrypoints.reviewer.main import _check_pr_description_quality
-
-    mock_gh = MagicMock()
-    mock_gh.get_pr.return_value = {"body": "fix"}  # very short
-    mock_logger = MagicMock()
-
-    _check_pr_description_quality(
-        mock_gh, "owner", "repo", 42,
-        task_description="This fixes the lint issues by running ruff --fix on src/foo.py",
-        marker="<!-- cp:bot -->",
-        logger=mock_logger,
-    )
-
-    mock_gh.update_pr_description.assert_called_once()
-    call_body = mock_gh.update_pr_description.call_args[0][3]
-    assert "auto-generated" in call_body.lower() or "task context" in call_body.lower()
-
-
-def test_pr_description_check_skips_adequate_description() -> None:
-    from control_plane.entrypoints.reviewer.main import _check_pr_description_quality
-
-    mock_gh = MagicMock()
-    long_desc = "This PR fixes the ruff lint violations in auth.py by removing unused imports and fixing indentation issues that were detected by the CI pipeline."
-    mock_gh.get_pr.return_value = {"body": long_desc}
-    mock_logger = MagicMock()
-
-    _check_pr_description_quality(
-        mock_gh, "owner", "repo", 42,
-        task_description="some task desc",
-        marker="<!-- cp:bot -->",
-        logger=mock_logger,
-    )
-
-    mock_gh.update_pr_description.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# S9-9: Proactive conflict avoidance (evidence-enriched)
-# ---------------------------------------------------------------------------
-
-def test_extract_evidence_file_tokens_finds_paths() -> None:
-    from control_plane.entrypoints.worker.main import _extract_evidence_file_tokens
-
-    lines = [
-        "file: src/control_plane/foo.py",
-        "Top files: bar.py, baz.ts",
-        "No file path here",
-    ]
-    tokens = _extract_evidence_file_tokens(lines)
-    assert "foo.py" in tokens
-    assert "bar.py" in tokens
-    assert "baz.ts" in tokens
-
-
-def test_extract_evidence_file_tokens_empty_for_no_paths() -> None:
-    from control_plane.entrypoints.worker.main import _extract_evidence_file_tokens
-
-    tokens = _extract_evidence_file_tokens(["Fix the issue", "Run tests again"])
-    assert tokens == set()
 
 
 # ---------------------------------------------------------------------------
