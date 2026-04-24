@@ -137,11 +137,15 @@ class ExecutionCoordinator:
         )
 
     def _execute_adapter(self, adapter, request) -> tuple[ExecutionResult, list[BackendDetailRef], dict[str, Any]]:
-        if isinstance(adapter, _CaptureCapableAdapter):
-            result, capture = adapter.execute_and_capture(request)
-            refs = self._build_detail_refs(adapter, request, capture)
-            return result, refs, _runtime_metadata_from_capture(capture)
-        return adapter.execute(request), [], {}
+        try:
+            if isinstance(adapter, _CaptureCapableAdapter):
+                result, capture = adapter.execute_and_capture(request)
+                refs = self._build_detail_refs(adapter, request, capture)
+                return result, refs, _runtime_metadata_from_capture(capture)
+            return adapter.execute(request), [], {}
+        except Exception as exc:
+            logger.error("Adapter raised unexpected exception for run %s: %s", request.run_id, exc)
+            return _adapter_crash_result(request, exc), [], {}
 
     def _build_detail_refs(self, adapter, request, capture) -> list[BackendDetailRef]:
         if capture is None:
@@ -152,6 +156,21 @@ class ExecutionCoordinator:
             except Exception as exc:
                 logger.warning("Failed to retain backend detail refs for run %s: %s", request.run_id, exc)
         return []
+
+
+def _adapter_crash_result(request, exc: Exception) -> ExecutionResult:
+    from control_plane.contracts.common import ValidationSummary
+    from control_plane.contracts.enums import ValidationStatus
+    return ExecutionResult(
+        run_id=request.run_id,
+        proposal_id=request.proposal_id,
+        decision_id=request.decision_id,
+        status=ExecutionStatus.FAILED,
+        success=False,
+        validation=ValidationSummary(status=ValidationStatus.SKIPPED),
+        failure_category=FailureReasonCategory.BACKEND_ERROR,
+        failure_reason=f"Adapter raised unexpected exception: {exc}",
+    )
 
 
 def _policy_blocked_result(request, policy_decision: PolicyDecision) -> ExecutionResult:

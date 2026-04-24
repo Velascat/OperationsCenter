@@ -3,12 +3,17 @@
 Consumes a proposal/decision bundle, constructs a canonical ExecutionRequest,
 runs the mandatory policy gate, and then invokes the selected canonical
 backend adapter when execution is allowed.
+
+Failure handling:
+- Unexpected coordinator exception: writes partial artifacts (proposal +
+  decision), emits structured error JSON to --output or stdout, exits 1.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from pathlib import Path
 
 from control_plane.backends.factory import CanonicalBackendRegistry
@@ -43,6 +48,14 @@ def _load_bundle(path: Path) -> ProposalDecisionBundle:
     )
 
 
+def _emit(payload: dict, output: Path | None) -> None:
+    rendered = json.dumps(payload, indent=2, sort_keys=True)
+    if output:
+        output.write_text(rendered + "\n", encoding="utf-8")
+    else:
+        print(rendered)
+
+
 def main() -> int:
     args = _build_parser().parse_args()
     settings = load_settings(args.config)
@@ -55,7 +68,30 @@ def main() -> int:
     coordinator = ExecutionCoordinator(
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),
     )
-    outcome = coordinator.execute(bundle, runtime)
+
+    try:
+        outcome = coordinator.execute(bundle, runtime)
+    except Exception as exc:
+        partial_run_id = f"partial-{uuid.uuid4().hex[:8]}"
+        if not args.no_artifacts:
+            try:
+                RunArtifactWriter().write_partial(
+                    run_id=partial_run_id,
+                    proposal=bundle.proposal,
+                    decision=bundle.decision,
+                    reason=f"Coordinator raised unexpected exception: {exc}",
+                )
+            except Exception:
+                pass  # best-effort
+
+        error_payload = {
+            "error": "coordinator_failure",
+            "error_type": "backend_error",
+            "message": str(exc),
+            "partial_run_id": partial_run_id,
+        }
+        _emit(error_payload, args.output)
+        return 1
 
     if not args.no_artifacts:
         RunArtifactWriter().write_run(
@@ -74,11 +110,7 @@ def main() -> int:
         "trace": outcome.trace.model_dump(mode="json"),
         "executed": outcome.executed,
     }
-    rendered = json.dumps(payload, indent=2, sort_keys=True)
-    if args.output:
-        args.output.write_text(rendered + "\n", encoding="utf-8")
-    else:
-        print(rendered)
+    _emit(payload, args.output)
     return 0
 
 

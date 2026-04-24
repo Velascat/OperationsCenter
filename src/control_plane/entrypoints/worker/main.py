@@ -8,17 +8,23 @@ surface and its execution surface:
 It intentionally does not construct backend adapters, create workspaces, or run
 execution backends. Live execution remains a separate ControlPlane boundary
 owned by ``control_plane.execution.coordinator.ExecutionCoordinator``.
+
+Failure handling:
+- SwitchBoardUnavailableError: writes partial artifact (proposal only),
+  prints structured JSON error to stdout, exits 1.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from control_plane.planning.models import PlanningContext
+from control_plane.routing.client import SwitchBoardUnavailableError
 from control_plane.routing.service import PlanningService
 
 
@@ -78,12 +84,48 @@ def _bundle_json(bundle) -> dict[str, Any]:
     }
 
 
-def main() -> int:
+def _routing_failure_json(proposal, partial_run_id: str, message: str) -> dict[str, Any]:
+    """Structured error envelope emitted to stdout on SwitchBoard failure."""
+    return {
+        "error": "routing_failure",
+        "error_type": "routing_error",
+        "message": message,
+        "proposal_id": proposal.proposal_id,
+        "partial_run_id": partial_run_id,
+    }
+
+
+def main(service: PlanningService | None = None) -> int:
     args = _build_parser().parse_args()
     context = _context_from_args(args)
-    service = PlanningService.default()
+
+    if service is None:
+        service = PlanningService.default()
+
     proposal = service.build_proposal(context)
-    bundle = service.route_proposal(proposal, context=context)
+
+    try:
+        bundle = service.route_proposal(proposal, context=context)
+    except SwitchBoardUnavailableError as exc:
+        partial_run_id = f"partial-{uuid.uuid4().hex[:8]}"
+        try:
+            from control_plane.execution.artifact_writer import RunArtifactWriter
+            RunArtifactWriter().write_partial(
+                run_id=partial_run_id,
+                proposal=proposal,
+                reason=str(exc),
+            )
+        except Exception:
+            pass  # best-effort; never mask the original error
+
+        error_payload = _routing_failure_json(proposal, partial_run_id, str(exc))
+        rendered = json.dumps(error_payload, indent=2)
+        if args.output:
+            args.output.write_text(rendered + "\n", encoding="utf-8")
+        else:
+            print(rendered)
+        return 1
+
     payload = _bundle_json(bundle)
     rendered = json.dumps(payload, indent=2, sort_keys=True)
     if args.output:
