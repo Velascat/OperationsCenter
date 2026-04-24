@@ -10,7 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from control_plane.contracts.proposal import TaskProposal
+    from control_plane.contracts.routing import LaneDecision
 
 
 def _utcnow() -> datetime:
@@ -64,8 +68,6 @@ class PlanningContext:
 class ProposalBuildResult:
     """Outcome of building a TaskProposal from a PlanningContext."""
 
-    from control_plane.contracts.proposal import TaskProposal
-
     proposal: "TaskProposal"
     context: PlanningContext
     built_at: datetime = field(default_factory=_utcnow)
@@ -79,9 +81,6 @@ class ProposalDecisionBundle:
     Downstream execution phases use this bundle to construct ExecutionRequest
     without needing to re-derive context or re-query SwitchBoard.
     """
-
-    from control_plane.contracts.proposal import TaskProposal
-    from control_plane.contracts.routing import LaneDecision
 
     proposal: "TaskProposal"
     decision: "LaneDecision"
