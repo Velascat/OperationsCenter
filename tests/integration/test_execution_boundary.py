@@ -30,6 +30,7 @@ from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
 from control_plane.contracts.execution import ExecutionResult
 from control_plane.contracts.routing import LaneDecision
 from control_plane.contracts.enums import BackendName, LaneName
+from control_plane.execution.artifact_writer import RunArtifactWriter
 from control_plane.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
 from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
 from control_plane.planning.proposal_builder import build_proposal
@@ -171,3 +172,39 @@ def test_aider_adapter_returns_result_for_trivial_goal(tmp_path: Path, aider_bin
     assert result.proposal_id == bundle.proposal.proposal_id
     # Status may be SUCCESS or FAILED depending on aider's result — both are valid
     assert result.status in {ExecutionStatus.SUCCESS, ExecutionStatus.FAILED}
+
+
+# ---------------------------------------------------------------------------
+# Artifact writer integration: all five files present after a full run
+# ---------------------------------------------------------------------------
+
+
+def test_artifact_writer_produces_all_files(tmp_path: Path) -> None:
+    """RunArtifactWriter writes all five canonical contract files for a completed run."""
+    bundle = _make_bundle()
+    runtime = ExecutionRuntimeContext(
+        workspace_path=tmp_path / "workspace",
+        task_branch="auto/lint-abc",
+    )
+    request = ExecutionRequestBuilder().build(bundle, runtime)
+    result = _make_adapter().execute(request)
+
+    writer = RunArtifactWriter(root=tmp_path / "runs")
+    written = writer.write_run(
+        proposal=bundle.proposal,
+        decision=bundle.decision,
+        request=request,
+        result=result,
+        executed=True,
+    )
+
+    assert len(written) == 5
+    run_dir = tmp_path / "runs" / result.run_id
+    for name in ("proposal.json", "decision.json", "execution_request.json", "result.json", "run_metadata.json"):
+        assert (run_dir / name).exists(), f"{name} missing from run artifacts"
+
+    import json
+    metadata = json.loads((run_dir / "run_metadata.json").read_text())
+    assert metadata["run_id"] == result.run_id
+    assert metadata["proposal_id"] == bundle.proposal.proposal_id
+    assert metadata["decision_id"] == bundle.decision.decision_id

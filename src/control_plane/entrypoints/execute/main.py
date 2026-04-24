@@ -15,6 +15,7 @@ from control_plane.backends.factory import CanonicalBackendRegistry
 from control_plane.config.settings import load_settings
 from control_plane.contracts.proposal import TaskProposal
 from control_plane.contracts.routing import LaneDecision
+from control_plane.execution.artifact_writer import RunArtifactWriter
 from control_plane.execution.coordinator import ExecutionCoordinator
 from control_plane.execution.handoff import ExecutionRuntimeContext
 from control_plane.planning.models import ProposalDecisionBundle
@@ -30,6 +31,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task-branch", required=True)
     parser.add_argument("--goal-file-path", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--no-artifacts", action="store_true", help="Skip writing run artifacts to disk")
     return parser
 
 
@@ -54,6 +56,16 @@ def main() -> int:
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),
     )
     outcome = coordinator.execute(bundle, runtime)
+
+    if not args.no_artifacts:
+        RunArtifactWriter().write_run(
+            proposal=bundle.proposal,
+            decision=bundle.decision,
+            request=outcome.request,
+            result=outcome.result,
+            executed=outcome.executed,
+        )
+
     payload = {
         "request": outcome.request.model_dump(mode="json"),
         "policy_decision": outcome.policy_decision.model_dump(mode="json"),
