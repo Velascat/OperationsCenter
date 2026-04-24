@@ -37,6 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--goal-file-path", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--no-artifacts", action="store_true", help="Skip writing run artifacts to disk")
+    parser.add_argument("--source", default="", help="Run source tag written to run_metadata.json (e.g. manual, auto_once)")
     return parser
 
 
@@ -56,8 +57,24 @@ def _emit(payload: dict, output: Path | None) -> None:
         print(rendered)
 
 
+def _artifacts_suppressed(args) -> bool:
+    """Return True when artifact writing must be skipped.
+
+    Suppressed when --no-artifacts is passed, or when running under pytest
+    (PYTEST_CURRENT_TEST env var set) without an explicit --source flag,
+    or when FOB_DISABLE_ARTIFACTS=1.
+    """
+    import os
+    if args.no_artifacts:
+        return True
+    if os.environ.get("FOB_DISABLE_ARTIFACTS") == "1":
+        return True
+    return False
+
+
 def main() -> int:
     args = _build_parser().parse_args()
+    no_artifacts = _artifacts_suppressed(args)
     settings = load_settings(args.config)
     bundle = _load_bundle(args.bundle)
     runtime = ExecutionRuntimeContext(
@@ -73,7 +90,7 @@ def main() -> int:
         outcome = coordinator.execute(bundle, runtime)
     except Exception as exc:
         partial_run_id = f"partial-{uuid.uuid4().hex[:8]}"
-        if not args.no_artifacts:
+        if not no_artifacts:
             try:
                 RunArtifactWriter().write_partial(
                     run_id=partial_run_id,
@@ -93,13 +110,17 @@ def main() -> int:
         _emit(error_payload, args.output)
         return 1
 
-    if not args.no_artifacts:
+    if not no_artifacts:
+        extra: dict = {}
+        if args.source:
+            extra["source"] = args.source
         RunArtifactWriter().write_run(
             proposal=bundle.proposal,
             decision=bundle.decision,
             request=outcome.request,
             result=outcome.result,
             executed=outcome.executed,
+            extra_metadata=extra or None,
         )
 
     payload = {

@@ -132,6 +132,7 @@ repos:
         str(workspace),
         "--task-branch",
         "auto/task-2",
+        "--no-artifacts",
     ]
     env = dict(os.environ)
     env["PYTHONPATH"] = str(REPO_ROOT / "src")
