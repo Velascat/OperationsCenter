@@ -18,6 +18,13 @@ from control_plane.contracts.routing import LaneDecision
 DEFAULT_SWITCHBOARD_URL = "http://localhost:20401"
 
 
+class SwitchBoardUnavailableError(RuntimeError):
+    """Raised when the SwitchBoard service cannot be reached or times out.
+
+    Set CONTROL_PLANE_SWITCHBOARD_URL and ensure SwitchBoard is running.
+    """
+
+
 @runtime_checkable
 class LaneRoutingClient(Protocol):
     """Boundary: TaskProposal in, LaneDecision out.
@@ -52,8 +59,20 @@ class HttpLaneRoutingClient:
         )
 
     def select_lane(self, proposal: TaskProposal) -> LaneDecision:
-        response = self._client.post("/route", json=proposal.model_dump(mode="json"))
-        response.raise_for_status()
+        try:
+            response = self._client.post("/route", json=proposal.model_dump(mode="json"))
+            response.raise_for_status()
+        except httpx.ConnectError as exc:
+            raise SwitchBoardUnavailableError(
+                f"SwitchBoard unreachable at {self.base_url}. "
+                f"Set CONTROL_PLANE_SWITCHBOARD_URL or start the SwitchBoard service. "
+                f"Cause: {exc}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise SwitchBoardUnavailableError(
+                f"SwitchBoard request timed out at {self.base_url}. "
+                f"Cause: {exc}"
+            ) from exc
         return LaneDecision.model_validate(response.json())
 
     def close(self) -> None:

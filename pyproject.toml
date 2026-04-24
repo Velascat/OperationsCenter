@@ -34,6 +34,9 @@ testpaths = ["tests"]
 filterwarnings = [
   "ignore:cannot collect test class:pytest.PytestCollectionWarning",
 ]
+markers = [
+  "integration: tests that require a live external service (run with: pytest tests/integration/ -v)",
+]
 
 [tool.ruff]
 line-length = 100

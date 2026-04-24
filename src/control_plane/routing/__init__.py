@@ -8,12 +8,18 @@ Public API:
     PlanningService     — build_proposal(context), route_proposal(proposal), and plan(context)
 """
 
-from .client import HttpLaneRoutingClient, LaneRoutingClient, StubLaneRoutingClient
+from .client import (
+    HttpLaneRoutingClient,
+    LaneRoutingClient,
+    StubLaneRoutingClient,
+    SwitchBoardUnavailableError,
+)
 from .service import PlanningService
 
 __all__ = [
     "HttpLaneRoutingClient",
     "LaneRoutingClient",
     "StubLaneRoutingClient",
+    "SwitchBoardUnavailableError",
     "PlanningService",
 ]

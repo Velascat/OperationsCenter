@@ -16,6 +16,7 @@ from control_plane.routing.client import (
     HttpLaneRoutingClient,
     LaneRoutingClient,
     StubLaneRoutingClient,
+    SwitchBoardUnavailableError,
 )
 
 
@@ -116,3 +117,64 @@ def test_stub_returns_fixed_decision() -> None:
     proposal = build_proposal(_ctx())
     result = stub.select_lane(proposal)
     assert result is decision
+
+
+# ---------------------------------------------------------------------------
+# Error handling — SwitchBoard unavailable
+# ---------------------------------------------------------------------------
+
+
+def test_connect_error_raises_switchboard_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("Connection refused")
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    proposal = build_proposal(_ctx())
+    try:
+        with pytest.raises(SwitchBoardUnavailableError, match="unreachable"):
+            client.select_lane(proposal)
+    finally:
+        client.close()
+
+
+def test_timeout_raises_switchboard_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("Request timed out")
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    proposal = build_proposal(_ctx())
+    try:
+        with pytest.raises(SwitchBoardUnavailableError, match="timed out"):
+            client.select_lane(proposal)
+    finally:
+        client.close()
+
+
+def test_http_4xx_raises_http_status_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(422, json={"detail": "validation error"})
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    proposal = build_proposal(_ctx())
+    try:
+        with pytest.raises(httpx.HTTPStatusError):
+            client.select_lane(proposal)
+    finally:
+        client.close()
+
+
+def test_switchboard_unavailable_error_wraps_cause() -> None:
+    cause = httpx.ConnectError("ECONNREFUSED")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise cause
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    proposal = build_proposal(_ctx())
+    try:
+        with pytest.raises(SwitchBoardUnavailableError) as exc_info:
+            client.select_lane(proposal)
+    finally:
+        client.close()
+
+    assert exc_info.value.__cause__ is cause
