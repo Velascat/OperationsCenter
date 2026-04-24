@@ -31,6 +31,7 @@ import fnmatch
 import logging
 from typing import Optional
 
+from control_plane.contracts.enums import LaneName
 from control_plane.contracts.execution import ExecutionRequest
 from control_plane.contracts.proposal import TaskProposal
 from control_plane.contracts.routing import LaneDecision
@@ -50,7 +51,7 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 # Lane names that are considered "local" execution.
-_LOCAL_LANES = frozenset({"aider_local"})
+_LOCAL_LANES = frozenset({LaneName.AIDER_LOCAL.value})
 
 # Labels on a proposal that restrict to local execution only.
 _LOCAL_ONLY_LABELS = frozenset({"local_only", "no_remote"})
