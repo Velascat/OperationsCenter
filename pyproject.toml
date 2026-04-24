@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-control-plane-setup = "control_plane.entrypoints.setup.main:main"
+control-plane-setup = "control_plane.entrypoints.setup.main:app"
 
 [project.optional-dependencies]
 dev = [

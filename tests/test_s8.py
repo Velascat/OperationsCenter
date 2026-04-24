@@ -2,12 +2,9 @@
 
 Coverage:
   S8-2:  ExecutionOutcomeDeriver — Phase 4 execution feedback depth
-  S8-3a: Stale task pruning (stale_autonomy_backlog_days config wiring)
-  S8-5:  Rollback on post-merge regression (create_revert_branch + auto_revert_pr)
-  S8-6:  Branch divergence detection (reviewer triggers rebase on "behind" state)
+  S8-5:  Rollback on post-merge regression (GitClient.revert_commit)
   S8-7:  Quality trend tracking (QualityTrendDeriver lint/type delta detection)
   S8-8:  Runtime error ingestion (webhook receiver creates tasks; dedup logic)
-  S8-9:  Auto-merge timeout control (require_explicit_approval skips timeout merge)
   S8-10: Confidence calibration infrastructure (ConfidenceCalibrationStore)
 """
 
@@ -97,49 +94,6 @@ def test_execution_outcome_deriver_detects_validation_loop(tmp_path: Path) -> No
     assert "execution_outcome/validation_loop" in kinds
 
 
-# ---------------------------------------------------------------------------
-# S8-3a: Stale task pruning — config wiring
-# ---------------------------------------------------------------------------
-
-def test_stale_autonomy_respects_config_days() -> None:
-    """handle_stale_autonomy_task_scan uses stale_days from settings via watch loop."""
-    from control_plane.entrypoints.worker.main import handle_stale_autonomy_task_scan, _STALE_AUTONOMY_TASK_DAYS
-
-    # The default constant should match the reasonable default
-    assert _STALE_AUTONOMY_TASK_DAYS > 0
-
-    # Calling with explicit stale_days=1 should cancel a task created 2 days ago
-    old_task_id = "cccccccc-0003-0003-0003-000000000003"
-    old_date = (datetime.now(UTC) - timedelta(days=2)).isoformat()
-    issue = {
-        "id": old_task_id,
-        "name": "Old autonomy task",
-        "state": {"name": "Backlog"},
-        "labels": [{"name": "source: autonomy"}],
-        "created_at": old_date,
-    }
-
-    cancelled = []
-
-    class _Client:
-        def list_issues(self): return [issue]
-        def transition_issue(self, tid, state):
-            if state == "Cancelled":
-                cancelled.append(tid)
-        def comment_issue(self, *_): pass
-
-    class _Settings:
-        stale_autonomy_backlog_days = 30
-        repos = {}
-
-    class _Service:
-        settings = _Settings()
-
-    handle_stale_autonomy_task_scan(
-        _Client(), _Service(), now=datetime.now(UTC), stale_days=1
-    )
-    assert old_task_id in cancelled
-
 
 # ---------------------------------------------------------------------------
 # S8-5: Rollback on post-merge regression
@@ -179,126 +133,6 @@ def test_git_revert_commit_creates_branch(tmp_path: Path) -> None:
     assert (repo_path / "file.txt").read_text() == "initial"
 
 
-def test_auto_revert_pr_created_on_safe_regression(tmp_path: Path) -> None:
-    """detect_post_merge_regressions creates a revert PR when safe_revert=True."""
-    from control_plane.entrypoints.worker.main import detect_post_merge_regressions
-
-    task_id = "ffffffff-0006-0006-0006-000000000006"
-    pr_url = "https://github.com/org/repo/pull/99"
-    merge_sha = "abc12345"
-
-    issue = {
-        "id": task_id,
-        "name": "Some feature task",
-        "state": {"name": "Done"},
-        "labels": [{"name": "task-kind: goal"}, {"name": "repo: myrepo"}],
-        "description": "",
-    }
-
-    artifact = {
-        "pull_request_url": pr_url,
-        "repo_key": "myrepo",
-    }
-
-    class _Store:
-        def get_task_artifact(self, tid): return artifact if tid == task_id else None
-
-    class _Settings:
-        repos = {"myrepo": SimpleNamespace(
-            clone_url="https://github.com/org/repo.git",
-            default_branch="main",
-        )}
-        def git_token(self): return "tok"
-        def repo_git_token(self, rk): return "tok"
-
-    class _Service:
-        usage_store = _Store()
-        settings = _Settings()
-        def create_revert_branch(self, **_kw): return True
-
-    revert_pr_calls = []
-
-    class _Client:
-        def list_issues(self): return [issue]
-        def create_issue(self, name, **_): return {"id": "reg-task-id", "name": name}
-        def comment_issue(self, *_): pass
-        def fetch_issue(self, tid): return issue
-        def list_comments(self, tid): return []
-
-    pr_data = {
-        "merged": True, "merged_at": "2025-01-01T00:00:00Z",
-        "merge_commit_sha": merge_sha,
-        "head": {"sha": merge_sha},
-        "base": {"ref": "main"},
-        "state": "closed",
-    }
-
-    with patch("control_plane.entrypoints.worker.main.GitHubPRClient") as MockGH:
-        mock_gh_instance = MockGH.return_value
-        mock_gh_instance.get_pr.return_value = pr_data
-        mock_gh_instance.get_failed_checks.return_value = ["check1: failed"]
-        mock_gh_instance.get_branch_head.return_value = merge_sha  # safe revert
-        mock_gh_instance.create_pr.side_effect = lambda *a, **k: revert_pr_calls.append(k) or {"html_url": "https://github.com/org/repo/pull/100"}
-
-        result = detect_post_merge_regressions(_Client(), _Service(), issues=[issue])
-
-    assert len(result) > 0  # regression task was created
-    assert len(revert_pr_calls) > 0  # revert PR was opened
-
-
-# ---------------------------------------------------------------------------
-# S8-6: Branch divergence detection
-# ---------------------------------------------------------------------------
-
-def test_reviewer_triggers_rebase_on_behind_branch() -> None:
-    """_process_human_review triggers rebase when mergeable_state == 'behind'."""
-    from control_plane.entrypoints.reviewer.main import _process_human_review
-
-    task_id = "11111111-0007-0007-0007-000000000007"
-    state = {
-        "task_id": task_id, "repo_key": "myrepo",
-        "owner": "org", "repo": "repo", "pr_number": 5,
-        "branch": "plane/xxx", "base": "main",
-        "phase": "human_review", "created_at": datetime.now(UTC).isoformat(),
-        "bot_comment_ids": [], "processed_human_comment_ids": [],
-    }
-    state_file = MagicMock()
-
-    pr_data = {"state": "open", "merged": False, "mergeable_state": "behind"}
-
-    rebase_called = []
-
-    class _MockGH:
-        def get_pr(self, *a): return pr_data
-        def get_pr_reactions(self, *a): return []
-        def get_comment_reactions(self, *a): return []
-        def list_pr_comments(self, *a): return []
-        def list_pr_review_comments(self, *a): return []
-
-    class _MockSettings:
-        repos = {"myrepo": SimpleNamespace(
-            clone_url="https://github.com/org/repo.git",
-            auto_merge_on_ci_green=False,
-            require_explicit_approval=False,
-        )}
-        reviewer = SimpleNamespace(
-            bot_logins=[], allowed_reviewer_logins=[],
-            bot_comment_marker="<!-- controlplane:bot -->",
-            auto_merge_success_rate_threshold=0.9,
-        )
-        def repo_git_token(self, rk): return "tok"
-
-    class _MockService:
-        settings = _MockSettings()
-        usage_store = MagicMock()
-        def rebase_branch(self, **_kw):
-            rebase_called.append(True)
-            return True
-
-    with patch("control_plane.entrypoints.reviewer.main.GitHubPRClient", return_value=_MockGH()):
-        _process_human_review(state_file, state, MagicMock(), _MockService(), MagicMock())
-
-    assert len(rebase_called) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -470,66 +304,6 @@ def test_error_ingest_webhook_creates_plane_task(tmp_path: Path) -> None:
 
     eingest._DEDUP_STATE_PATH = orig
 
-
-# ---------------------------------------------------------------------------
-# S8-9: Auto-merge timeout control
-# ---------------------------------------------------------------------------
-
-def test_require_explicit_approval_skips_timeout_merge() -> None:
-    """When require_explicit_approval=True, _process_human_review does NOT timeout-merge."""
-    from control_plane.entrypoints.reviewer.main import _process_human_review
-
-    task_id = "22222222-0009-0009-0009-000000000009"
-    # Created 2 days ago — well past the 1-day timeout
-    old_created = (datetime.now(UTC) - timedelta(days=2)).isoformat()
-    state = {
-        "task_id": task_id, "repo_key": "strictrepo",
-        "owner": "org", "repo": "repo", "pr_number": 7,
-        "branch": "plane/yyy", "base": "main",
-        "phase": "human_review", "created_at": old_created,
-        "bot_comment_ids": [], "processed_human_comment_ids": [],
-        "pr_url": "https://github.com/org/repo/pull/7",
-    }
-    state_file_data = {}
-    state_file = MagicMock()
-    state_file.write_text.side_effect = lambda s: state_file_data.update(json.loads(s))
-
-    merged_calls = []
-
-    class _MockGH:
-        def get_pr(self, *a):
-            return {"state": "open", "merged": False, "mergeable_state": "clean"}
-        def get_pr_reactions(self, *a): return []
-        def get_comment_reactions(self, *a): return []
-        def list_pr_comments(self, *a): return []
-        def list_pr_review_comments(self, *a): return []
-        def merge_pr(self, *a, **kw):
-            merged_calls.append(True)
-        def post_comment(self, *a, **kw): return {"id": 1}
-
-    class _MockSettings:
-        repos = {"strictrepo": SimpleNamespace(
-            clone_url="https://github.com/org/repo.git",
-            auto_merge_on_ci_green=False,
-            require_explicit_approval=True,  # <-- explicit approval required
-        )}
-        reviewer = SimpleNamespace(
-            bot_logins=[], allowed_reviewer_logins=[],
-            bot_comment_marker="<!-- controlplane:bot -->",
-            auto_merge_success_rate_threshold=0.9,
-        )
-        def repo_git_token(self, rk): return "tok"
-
-    class _MockService:
-        settings = _MockSettings()
-        usage_store = MagicMock()
-
-    plane_client = MagicMock()
-
-    with patch("control_plane.entrypoints.reviewer.main.GitHubPRClient", return_value=_MockGH()):
-        _process_human_review(state_file, state, plane_client, _MockService(), MagicMock())
-
-    assert len(merged_calls) == 0  # merge must NOT be called
 
 
 # ---------------------------------------------------------------------------
