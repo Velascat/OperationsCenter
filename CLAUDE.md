@@ -5,7 +5,7 @@ At the start of each session, read the compiled briefing before acting:
 
 - `.console/.context` — compiled startup context (generated fresh each launch)
 
-The briefing contains your mission, standing orders, objectives, recent log, and runtime context.
+The context file contains your current task, guidelines, backlog, log, and runtime context.
 
 **Source files** (editable truth — update these, not the briefing):
 
