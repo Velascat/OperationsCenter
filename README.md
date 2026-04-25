@@ -87,8 +87,8 @@ bundle = service.plan(PlanningContext(
 ```
 
 For full architecture and examples see:
-- `WorkStation/docs/architecture/controlplane-routing.md`
-- `WorkStation/docs/architecture/controlplane-routing-examples.md`
+- `WorkStation/docs/architecture/operations-center-routing.md`
+- `WorkStation/docs/architecture/operations-center-routing-examples.md`
 
 ### Canonical contract types
 
@@ -466,7 +466,7 @@ The naming is intentionally close because the second is the board adapter for th
   - No action after 1 day → merge automatically (timeout fallback).
 
 **Bot safety contract:**
-  - All bot-posted comments carry a `<!-- controlplane:bot -->` marker so they are never mistaken for human review requests.
+  - All bot-posted comments carry a `<!-- operations-center:bot -->` marker so they are never mistaken for human review requests.
   - `reviewer.bot_logins` in config lists GitHub accounts whose comments are always ignored.
   - `reviewer.allowed_reviewer_logins` optionally restricts human-phase revisions to a whitelist of logins.
 

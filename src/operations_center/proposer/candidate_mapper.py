@@ -147,7 +147,7 @@ class ProposalCandidateMapper:
 
     @staticmethod
     def _allowed_paths(repo_key: str) -> list[str]:
-        if repo_key.strip().lower() in {"controlplane", "operations-center"}:
+        if repo_key.strip().lower() in {"operations-center", "operations_center"}:
             return ["src/", "tests/", "docs/"]
         return []
 

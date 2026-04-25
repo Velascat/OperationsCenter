@@ -29,7 +29,7 @@ The `review` watcher polls tracked PRs every 60 seconds (configurable via `OPERA
 5. This loop repeats up to `max_self_review_loops` times (default: 2).
 6. If still unresolved after all loops → escalates to Phase 2.
 
-The self-review verdict is posted as a PR comment with the `<!-- controlplane:bot -->` marker so it is never mistaken for human input.
+The self-review verdict is posted as a PR comment with the `<!-- operations-center:bot -->` marker so it is never mistaken for human input.
 
 ## Phase 2 — Human Review (Escalated)
 
@@ -55,7 +55,7 @@ No other config is required for basic operation.
 
 ## Bot Safety Contract
 
-All bot-posted comments carry the `<!-- controlplane:bot -->` HTML marker. This ensures:
+All bot-posted comments carry the `<!-- operations-center:bot -->` HTML marker. This ensures:
 
 - The bot never responds to its own comments as if they were human review requests.
 - The bot never triggers another revision loop from its own output.
@@ -65,7 +65,7 @@ All bot-posted comments carry the `<!-- controlplane:bot -->` HTML marker. This 
 ```yaml
 reviewer:
   bot_logins:
-    - controlplane-bot
+    - operations-center-bot
     - your-github-bot-account
 ```
 
@@ -87,7 +87,7 @@ When set, only comments from listed logins trigger revision passes in Phase 2. A
 Before enabling `await_review: true` for a new repo, verify:
 
 - [ ] `reviewer.bot_logins` includes every GitHub account the bot posts as.
-- [ ] `<!-- controlplane:bot -->` marker is being appended to all bot comments (check any existing PR comment in `state/pr_reviews/`).
+- [ ] `<!-- operations-center:bot -->` marker is being appended to all bot comments (check any existing PR comment in `state/pr_reviews/`).
 - [ ] Branch protection rules on GitHub do not require status checks that the bot cannot satisfy — otherwise auto-merge will be blocked.
 - [ ] `max_self_review_loops` is set to a reasonable value (default 2 is conservative; raise to 3 only if the first revision reliably resolves concerns).
 - [ ] `OPERATIONS_CENTER_PR_DRY_RUN=1` is NOT set in production unless you intend to prevent all PR actions.
@@ -151,7 +151,7 @@ OPERATIONS_CENTER_PR_DRY_RUN=1 ./scripts/operations-center.sh watch --role revie
 ### Bot is responding to its own comments
 
 1. Confirm `reviewer.bot_logins` includes the bot's GitHub login.
-2. Confirm the bot comment includes `<!-- controlplane:bot -->`. Check `state/pr_reviews/` and the actual PR comment on GitHub.
+2. Confirm the bot comment includes `<!-- operations-center:bot -->`. Check `state/pr_reviews/` and the actual PR comment on GitHub.
 
 ### PR was merged manually before the bot reached it
 
@@ -161,7 +161,7 @@ This is safe. The review watcher checks merge status before every action. If it 
 
 1. Confirm the human's GitHub login is in `allowed_reviewer_logins` if that config key is set. An empty or missing `allowed_reviewer_logins` means all logins are allowed.
 2. Confirm the human commented on the PR itself, not on a commit or on the Plane task.
-3. Check that the comment does not carry the `<!-- controlplane:bot -->` marker — if it does, the watcher will skip it.
+3. Check that the comment does not carry the `<!-- operations-center:bot -->` marker — if it does, the watcher will skip it.
 
 ## Requeue-as-Goal on Stalled Revision Loops
 
@@ -170,7 +170,7 @@ When a PR in Phase 2 (human review) receives repeated human comments but Kodo pr
 **Trigger condition:** `REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD` consecutive zero-change revision passes (default: 2). A "zero-change pass" is detected when the revision diff between the old and new head commits is empty — Kodo acknowledged the comment but produced no code changes.
 
 **What happens:**
-1. The PR is closed with a `<!-- controlplane:bot -->` comment explaining the requeue.
+1. The PR is closed with a `<!-- operations-center:bot -->` comment explaining the requeue.
 2. A fresh `task-kind: goal` task is created in `Backlog` with the original goal text and a note that the previous PR stalled.
 3. The original Plane task is marked Done.
 

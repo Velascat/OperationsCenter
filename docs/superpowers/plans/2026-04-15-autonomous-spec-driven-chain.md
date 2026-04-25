@@ -2456,7 +2456,7 @@ Before it, insert:
             return 1
         elif _compliance_verdict == "FAIL":
             gh.post_comment(owner, repo, pr_number,
-                            f"<!-- controlplane:bot -->\n**Spec compliance: FAIL**\n"
+                            f"<!-- operations-center:bot -->\n**Spec compliance: FAIL**\n"
                             f"This diff does not meet the spec requirements. "
                             f"Task has been re-queued.\n{marker}")
             try:
@@ -2467,7 +2467,7 @@ Before it, insert:
             return 1
         else:  # CONCERNS
             gh.post_comment(owner, repo, pr_number,
-                            f"<!-- controlplane:bot -->\n**Spec compliance: CONCERNS**\n"
+                            f"<!-- operations-center:bot -->\n**Spec compliance: CONCERNS**\n"
                             f"Partial spec coverage or minor issues found. "
                             f"Human review required.\n{marker}")
             state["phase"] = "human_review"

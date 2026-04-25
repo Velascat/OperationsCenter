@@ -1186,7 +1186,7 @@ error_ingest:
 
 **Problem:** Repos that require human sign-off before any merge had no mechanism to prevent the reviewer watcher from timing out and auto-merging. The `auto_merge_on_ci_green` flag controlled automatic CI-green merges but not the 1-day timeout-merge path.
 
-**Fix:** New `RepoSettings.require_explicit_approval: bool = False`. When `True`, the reviewer watcher never executes timeout-based merges. Instead, it posts a reminder comment on the PR (at most once per day) asking for explicit human approval. The comment carries `<!-- controlplane:bot -->` so it is not re-processed.
+**Fix:** New `RepoSettings.require_explicit_approval: bool = False`. When `True`, the reviewer watcher never executes timeout-based merges. Instead, it posts a reminder comment on the PR (at most once per day) asking for explicit human approval. The comment carries `<!-- operations-center:bot -->` so it is not re-processed.
 
 **Config:**
 ```yaml

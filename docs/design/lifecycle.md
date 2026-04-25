@@ -75,7 +75,7 @@ Blocked-task handling lives inside `improve`, not in a separate `unblocker` lane
 - Operates as a two-phase state machine per PR, tracked in `state/pr_reviews/<task_id>.json`:
   - **Phase 1 — self-review**: kodo reads the diff against the base branch and writes a verdict file (`LGTM` or `CONCERNS`). LGTM triggers merge. CONCERNS triggers a kodo revision pass followed by another self-review cycle (up to `reviewer.max_self_review_loops` times).
   - **Phase 2 — human review**: if self-review cannot resolve its concerns, the watcher posts an escalation comment and waits for human input. Human 👍 on the PR or bot reply triggers merge. Human comment triggers a kodo revision pass; bot replies when done (max 3 loops). Timeout of 1 day triggers auto-merge.
-- All bot-posted comments carry a `<!-- controlplane:bot -->` marker. The watcher never re-processes its own comments.
+- All bot-posted comments carry a `<!-- operations-center:bot -->` marker. The watcher never re-processes its own comments.
 - `reviewer.bot_logins` in config lists accounts whose comments are always ignored.
 - `reviewer.allowed_reviewer_logins` optionally restricts human-phase revision triggers to a whitelist.
 - On startup, the watcher backfills state files for any open PRs that pre-date it.

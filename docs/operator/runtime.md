@@ -62,7 +62,7 @@ This repo runs as a local polling workflow.
 - drives the two-phase review loop:
   - **self-review phase**: kodo evaluates its own diff and either merges (LGTM) or revises and retries
   - **human review phase**: responds to human comments with kodo revision passes; merges on 👍 or 1-day timeout
-- ignores comments from accounts listed in `reviewer.bot_logins` and comments carrying the `<!-- controlplane:bot -->` marker
+- ignores comments from accounts listed in `reviewer.bot_logins` and comments carrying the `<!-- operations-center:bot -->` marker
 - on startup, backfills state files for any open PRs that pre-date the watcher
 - auto-merges autonomy PRs when every failing CI check matches a `ci_ignored_checks` pattern (pre-existing failures, not caused by the PR)
 - auto-resolves pip dependency conflicts in `requirements*.txt` / `pyproject.toml` without human review

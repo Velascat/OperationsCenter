@@ -113,7 +113,7 @@ repos:
 #   # Max kodo self-review + revision cycles before escalating to human review (default: 2).
 #   max_self_review_loops: 2
 #   # HTML marker appended to every bot-posted comment — prevents re-processing own comments.
-#   bot_comment_marker: "<!-- controlplane:bot -->"
+#   bot_comment_marker: "<!-- operations-center:bot -->"
 
 # ---------------------------------------------------------------------------
 # Artifact storage root

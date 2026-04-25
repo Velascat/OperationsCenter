@@ -132,7 +132,7 @@ class ReviewerSettings(BaseModel):
     # Max kodo self-review+revision cycles before escalating to human
     max_self_review_loops: int = 2
     # HTML marker appended to every bot-posted comment — belt-and-suspenders filter
-    bot_comment_marker: str = "<!-- controlplane:bot -->"
+    bot_comment_marker: str = "<!-- operations-center:bot -->"
     # When True, autonomy-sourced PRs are merged automatically once CI is green
     # without waiting for a human 👍.  Only applies to tasks labelled
     # "source: autonomy".  Requires repo-level auto_merge_on_ci_green = True too.
