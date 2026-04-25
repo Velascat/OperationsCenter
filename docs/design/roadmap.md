@@ -6,23 +6,23 @@ This document tracks what is deferred, what is partially done, and what must be 
 
 ## Status summary
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Passive observation and reporting | ✓ complete |
-| 2 | Proposal generation (dry-run) | ✓ complete |
-| 3 | Bounded automatic proposal creation | ✓ complete |
-| 4 | Validation profiles + execution feedback depth | ✓ complete (S8) |
-| 5 | Richer signal depth (architecture, benchmark, security) | ✓ complete |
-| 5.1 | Learning and feedback loop hardening (S10) | ✓ complete |
-| S12 | Autonomous spec-driven campaign chain | ✓ complete |
-| 6 | Cross-run confidence calibration | deferred |
-| 7 | Bounded experiment mode | deferred — guarded |
+| Milestone | Description | Status |
+|-----------|-------------|--------|
+| Observation | Passive observation and reporting | ✓ complete |
+| Proposals | Proposal generation (dry-run) | ✓ complete |
+| Auto-proposals | Bounded automatic proposal creation | ✓ complete |
+| Validation | Validation profiles + execution feedback depth | ✓ complete |
+| Signal depth | Richer signal depth (architecture, benchmark, security) | ✓ complete |
+| Feedback hardening | Learning and feedback loop hardening | ✓ complete |
+| Spec-director | Autonomous spec-driven campaign chain | ✓ complete |
+| Calibration | Cross-run confidence calibration | deferred |
+| Experiment mode | Bounded experiment mode | deferred — guarded |
 
 ---
 
-## Phase 4 — Validation profiles + execution feedback depth
+## Validation profiles + execution feedback depth
 
-Phase 4 has two halves. The first is complete; the second is TODO'd.
+This milestone has two halves. The first is complete; the second is TODO'd.
 
 ### ✓ Done
 
@@ -41,9 +41,9 @@ Per-task validation profile tracking and cycle report profile fields remain as o
 
 ---
 
-## Phase 5 — Richer signal depth ✓ Complete
+## Richer signal depth ✓ Complete
 
-All three Phase 5 collectors and derivers are implemented and wired into the pipeline. The observer now collects 15 signals; the insight engine runs 22 derivers (including additions from S8 and S9).
+All three collectors and derivers are implemented and wired into the pipeline. The observer now collects 15 signals; the insight engine runs 22 derivers (including additions from S8 and S9).
 
 ### ✓ ArchitectureSignalCollector
 
@@ -74,7 +74,7 @@ All three signals default to `status="unavailable"` when the tool output files a
 
 ---
 
-## S12 — Autonomous Spec-Driven Campaign Chain ✓ Complete
+## Autonomous Spec-Driven Campaign Chain ✓ Complete
 
 A fully autonomous spec-driven development chain giving OperationsCenter a sixth watcher role (`spec`).
 
@@ -102,7 +102,7 @@ A fully autonomous spec-driven development chain giving OperationsCenter a sixth
 
 ---
 
-## Phase 6 — Confidence calibration
+## Confidence calibration — Deferred
 
 **Why deferred:** Requires a minimum of 3 months of feedback data and ≥20 feedback records per family to produce statistically meaningful calibration. Implementing earlier produces noise.
 
@@ -113,7 +113,7 @@ A fully autonomous spec-driven development chain giving OperationsCenter a sixth
 **Where it plugs in:**
 - New module: `src/operations_center/tuning/calibration.py` — `ConfidenceCalibrationStore` (TODO comment in `metrics.py`)
 - `DecisionContext.min_confidence` becomes per-family once calibration data is available
-- Calibration report added to `src/operations_center/entrypoints/tune_autonomy/main.py` output
+- Calibration report added to `tune-autonomy` output
 
 **Design sketch** (in `src/operations_center/tuning/metrics.py` TODO comment):
 ```python
@@ -125,14 +125,14 @@ class ConfidenceCalibrationStore:
 
 ---
 
-## Phase 7 — Bounded experiment mode
+## Bounded experiment mode — Deferred (guarded)
 
 **Why deferred:** This is the highest-autonomy mode in the system. It must only be enabled after the feedback loop has demonstrated reliable proposal quality for the specific families involved.
 
 **Unlock condition (all must be true):**
 - lint_fix has ≥30 feedback records at ≥80% acceptance rate
 - type_fix has ≥30 feedback records at ≥80% acceptance rate
-- Phase 4 and Phase 5 are stable
+- Validation profiles and signal depth are stable
 - The operator has reviewed a dry-run of the experiment path end-to-end
 - A hard rollback procedure is defined and documented
 
@@ -154,7 +154,7 @@ class ConfidenceCalibrationStore:
 - Requires explicit env var: `OPERATIONS_CENTER_EXPERIMENT_MODE=1`
 - Validation profile check runs before PR creation; failure abandons the branch silently
 
-**This is the only phase that resembles autoresearch behavior, and it is explicitly bounded to the narrowest possible case.**
+**This is the only mode that resembles autoresearch behavior, and it is explicitly bounded to the narrowest possible case.**
 
 ---
 

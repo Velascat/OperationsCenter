@@ -2,10 +2,9 @@
 
 ## Purpose
 
-Phase 13 adds an evidence-driven tuning layer for routing and backend strategy.
-It exists to improve routing defaults from retained execution outcomes rather
-than static assumptions, while staying bounded, inspectable, and subordinate to
-explicit policy.
+This evidence-driven tuning layer improves routing defaults from retained execution
+outcomes rather than static assumptions, while staying bounded, inspectable, and
+subordinate to explicit policy.
 
 This layer does not execute work, does not replace canonical execution truth,
 and does not silently mutate active SwitchBoard policy.
@@ -103,8 +102,7 @@ Examples:
 - slow latency
 - contradictory signals such as high success with weak change evidence
 
-`RoutingTuningProposal` is review-only and cannot auto-approve changes in this
-phase. Each proposal includes:
+`RoutingTuningProposal` is review-only and cannot auto-approve changes. Each proposal includes:
 
 - explicit evidence strength
 - source finding ids

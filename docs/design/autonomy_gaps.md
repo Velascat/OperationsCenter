@@ -431,7 +431,7 @@ cost_per_execution_usd: 0.15   # operator estimate; 0.0 disables recording
 
 **Problem:** Each watcher lane handled one task at a time. With 10 lint_fix tasks ready,
 they executed one per poll cycle with sleeping intervals between them. This was the primary
-throughput bottleneck when heading toward higher-autonomy Phase 7 operation.
+throughput bottleneck when heading toward higher-autonomy operation.
 
 **Fix:** `run_parallel_watch_loop()` launches N threads, each running an independent
 `run_watch_loop`. Slot 0 is the primary slot and owns all periodic scans (heartbeat,
@@ -1075,7 +1075,7 @@ repos:
 
 ## Session 8 — 10 execution depth and calibration improvements
 
-These improvements completed Phase 4 (execution feedback depth), added confidence calibration, quality trend tracking, runtime error ingestion, and several robustness fixes.
+These improvements completed execution feedback depth work, added confidence calibration, quality trend tracking, runtime error ingestion, and several robustness fixes.
 
 ### S8-1. Feedback Loop Config Wiring
 
@@ -1087,9 +1087,9 @@ These improvements completed Phase 4 (execution feedback depth), added confidenc
 
 ---
 
-### S8-2. ExecutionOutcomeDeriver (Phase 4 Complete)
+### S8-2. ExecutionOutcomeDeriver
 
-**Problem:** The Phase 4 execution feedback depth feature was deferred — a `# Deferred: Phase 4 — ExecutionOutcomeDeriver` comment existed in `autonomy_cycle/main.py` but no deriver was implemented.
+**Problem:** The execution feedback depth feature was deferred — a `# Deferred: ExecutionOutcomeDeriver` comment existed in `autonomy_cycle/main.py` but no deriver was implemented.
 
 **Fix:** New `ExecutionOutcomeDeriver` in `insights/derivers/execution_outcome.py`. Reads retained `control_outcome.json` and `stderr.txt` artifacts from `tools/report/kodo_plane/`. Classifies three failure modes:
 - `timeout_pattern` — ≥2 timeout failures across retained runs

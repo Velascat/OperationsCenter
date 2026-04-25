@@ -7,18 +7,18 @@ The PR review loop is a two-phase automated review process. This guide covers ho
 When a task completes with a branch push and `await_review: true` is set for the repo:
 
 ```text
-[Task executes] -> [Branch pushed] -> [PR opened] -> [Phase 1: Self-review]
+[Task executes] -> [Branch pushed] -> [PR opened] -> [Stage 1: Self-review]
                                                               ↓ LGTM
                                                     [Squash-merge + Done]
                                                               ↓ CONCERNS
                                                [Revision pass, re-review, repeat]
                                                               ↓ unresolved
-                                                    [Phase 2: Human review]
+                                                    [Stage 2: Human review]
                                                               ↓ 👍 or timeout
                                                     [Squash-merge + Done]
 ```
 
-## Phase 1 — Self-Review (Automatic)
+## Stage 1 — Self-Review (Automatic)
 
 The `review` watcher polls tracked PRs every 60 seconds (configurable via `OPERATIONS_CENTER_WATCH_INTERVAL_REVIEW_SECONDS`).
 
@@ -27,11 +27,11 @@ The `review` watcher polls tracked PRs every 60 seconds (configurable via `OPERA
 3. **`LGTM`** → squash-merge, delete branch, task marked Done.
 4. **`CONCERNS`** → kodo runs a revision pass on the branch, then re-reviews.
 5. This loop repeats up to `max_self_review_loops` times (default: 2).
-6. If still unresolved after all loops → escalates to Phase 2.
+6. If still unresolved after all loops → escalates to Stage 2.
 
 The self-review verdict is posted as a PR comment with the `<!-- operations-center:bot -->` marker so it is never mistaken for human input.
 
-## Phase 2 — Human Review (Escalated)
+## Stage 2 — Human Review (Escalated)
 
 1. Watcher posts a comment on the PR explaining what it couldn't resolve automatically.
 2. A human can then:
@@ -80,7 +80,7 @@ reviewer:
     - trusted-collaborator
 ```
 
-When set, only comments from listed logins trigger revision passes in Phase 2. All other human comments are ignored.
+When set, only comments from listed logins trigger revision passes in Stage 2. All other human comments are ignored.
 
 ## Guardrail Checklist
 
@@ -145,7 +145,7 @@ OPERATIONS_CENTER_PR_DRY_RUN=1 ./scripts/operations-center.sh watch --role revie
 ### Self-review loop is stuck
 
 1. Check the loop count in the PR state file (`self_review_loop_count`).
-2. If the count is at `max_self_review_loops`, the watcher should have escalated. Check for a Phase 2 comment on the PR.
+2. If the count is at `max_self_review_loops`, the watcher should have escalated. Check for a Stage 2 comment on the PR.
 3. If the PR has no escalation comment, check the review watcher log for errors around the `pr_self_review_escalate` event.
 
 ### Bot is responding to its own comments
@@ -165,7 +165,7 @@ This is safe. The review watcher checks merge status before every action. If it 
 
 ## Requeue-as-Goal on Stalled Revision Loops
 
-When a PR in Phase 2 (human review) receives repeated human comments but Kodo produces zero-change revision passes each time, the reviewer watcher will eventually close the PR and create a fresh `goal` task rather than looping indefinitely.
+When a PR in Stage 2 (human review) receives repeated human comments but Kodo produces zero-change revision passes each time, the reviewer watcher will eventually close the PR and create a fresh `goal` task rather than looping indefinitely.
 
 **Trigger condition:** `REQUEUE_AS_GOAL_ZERO_CHANGE_THRESHOLD` consecutive zero-change revision passes (default: 2). A "zero-change pass" is detected when the revision diff between the old and new head commits is empty — Kodo acknowledged the comment but produced no code changes.
 
@@ -182,8 +182,8 @@ The fresh goal task allows a human to review the scope and promote it when ready
 
 Run these scenarios against a controlled test repo to validate the loop before enabling it in production:
 
-1. **Happy path (LGTM)**: Create a task with a simple goal, let it complete, verify Phase 1 merges the PR automatically.
+1. **Happy path (LGTM)**: Create a task with a simple goal, let it complete, verify Stage 1 merges the PR automatically.
 2. **Revision loop (CONCERNS)**: Make the diff produce a CONCERNS verdict (e.g. remove a test), verify kodo revises and re-reviews.
-3. **Human escalation**: Let max_self_review_loops run out, verify Phase 2 escalation comment appears, verify 👍 triggers a merge.
+3. **Human escalation**: Let max_self_review_loops run out, verify Stage 2 escalation comment appears, verify 👍 triggers a merge.
 4. **Bot loop prevention**: Post a comment from a bot login listed in `bot_logins`, verify no revision is triggered.
 5. **Dry-run**: Set `PR_DRY_RUN=1`, run a full cycle, verify no GitHub writes but full log output.

@@ -1,6 +1,6 @@
 # Backlog — Post-Hardening: Tuning, Trust, and Public Packaging
 
-The hardening phase is complete. The system is running with two active repos (OperationsCenter and ExternalRepo), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
+The hardening work is complete. The system is running with two active repos (OperationsCenter and ExternalRepo), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. Current focus is on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
 
 ## Active
 
@@ -39,7 +39,7 @@ Tracked: [#21](https://github.com/Velascat/OperationsCenter/issues/21)
 
 ---
 
-## Completed (Hardening Phase)
+## Completed (Hardening)
 
 ### ci — Add GitHub Actions CI workflow
 **Status**: done (`.github/workflows/ci.yml`)
@@ -115,7 +115,7 @@ New sixth watcher role `spec` that closes the direction gap in the reactive prop
 
 ---
 
-## Completed (Phase 4 — Validation Profiles + Evidence Bundles)
+## Completed (Validation Profiles + Evidence Bundles)
 
 ### autonomy — Validation profiles per candidate family
 **Status**: done

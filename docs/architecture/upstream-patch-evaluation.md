@@ -2,20 +2,19 @@
 
 ## Purpose
 
-Phase 14 adds a disciplined process for evaluating whether any upstream patch,
+This layer provides a disciplined process for evaluating whether any upstream patch,
 fork, or deeper native integration work is justified for external systems such
 as `archon`, `openclaw`, and `kodo`.
 
-This happens late on purpose. Adapter-first remains the default integration
-posture until retained evidence shows that recurring friction is costly enough
-to justify evaluating upstream work.
+Adapter-first remains the default integration posture until retained evidence shows
+that recurring friction is costly enough to justify evaluating upstream work.
 
-## Why This Happens Late
+## Why Upstream Work Happens Late
 
 The architecture was intentionally designed to move forward without early
 upstream modification assumptions.
 
-By Phase 14 the system has enough retained evidence to ask better questions:
+With enough retained evidence the system can ask better questions:
 
 - is the issue recurring or just annoying?
 - does it materially harm execution truth, observability, or reliability?
