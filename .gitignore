@@ -1,5 +1,5 @@
-.fob/
-!.fob/*.example*
+.console/
+!.console/*.example*
 __pycache__/
 *.pyc
 *.pyo
