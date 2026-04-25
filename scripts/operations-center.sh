@@ -631,7 +631,7 @@ PYEOF
   status)
     ensure_venv
     load_env_file
-    "${VENV_DIR}/bin/python" "${ROOT_DIR}/scripts/cp-status.py" "${@}"
+    "${VENV_DIR}/bin/python" "${ROOT_DIR}/scripts/oc-status.py" "${@}"
     ;;
   worker)
     ensure_venv

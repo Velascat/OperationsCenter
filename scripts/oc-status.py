@@ -125,7 +125,7 @@ def _watcher_rows(repo_filter: list[str] | None) -> list[str]:
 def _kodo_rows(repo_filter: list[str] | None) -> list[str]:
     lines = []
     try:
-        workspaces = list(Path("/tmp").glob("cp-task-*"))
+        workspaces = list(Path("/tmp").glob("oc-task-*"))
     except Exception:
         return ["  unavailable"]
     if not workspaces:

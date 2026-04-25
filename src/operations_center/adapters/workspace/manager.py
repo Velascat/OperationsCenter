@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 class WorkspaceManager:
-    def __init__(self, prefix: str = "cp-task-") -> None:
+    def __init__(self, prefix: str = "oc-task-") -> None:
         self.prefix = prefix
 
     def create(self) -> Path:
