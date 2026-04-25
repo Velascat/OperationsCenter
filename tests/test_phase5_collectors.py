@@ -6,11 +6,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from control_plane.observer.collectors.architecture_signal import ArchitectureSignalCollector
-from control_plane.observer.collectors.benchmark_signal import BenchmarkSignalCollector
-from control_plane.observer.collectors.security_signal import SecuritySignalCollector
-from control_plane.observer.models import ArchitectureSignal, BenchmarkSignal, SecuritySignal
-from control_plane.observer.service import ObserverContext
+from operations_center.observer.collectors.architecture_signal import ArchitectureSignalCollector
+from operations_center.observer.collectors.benchmark_signal import BenchmarkSignalCollector
+from operations_center.observer.collectors.security_signal import SecuritySignalCollector
+from operations_center.observer.models import ArchitectureSignal, BenchmarkSignal, SecuritySignal
+from operations_center.observer.service import ObserverContext
 
 
 def _make_context(repo_path: Path, logs_root: Path | None = None) -> ObserverContext:
@@ -277,7 +277,7 @@ class TestSecuritySignalCollector:
 class TestBuildObserverServiceWiring:
     def test_import_and_build(self) -> None:
         """Verify that build_observer_service imports and constructs without error."""
-        from control_plane.entrypoints.autonomy_cycle.main import build_observer_service
+        from operations_center.entrypoints.autonomy_cycle.main import build_observer_service
 
         service = build_observer_service()
         assert service.architecture_signal_collector is not None

@@ -1,8 +1,8 @@
-# ControlPlane Execution Extraction
+# OperationsCenter Execution Extraction
 
 - Default worker entrypoint now builds a `TaskProposal`, routes it, and emits a proposal/decision bundle.
 - `PlanningService` now exposes the real stage boundary explicitly: `build_proposal()` then `route_proposal()`. `plan()` remains only as a thin convenience wrapper.
 - Default reviewer entrypoint is retired and no longer runs the legacy execution loop.
-- ARCHIVAL NOTE: the interim `control_plane.legacy_execution` quarantine path has been deleted.
-- ARCHIVAL NOTE: canonical execution now runs only through `control_plane.execution.coordinator`.
+- ARCHIVAL NOTE: the interim `operations_center.legacy_execution` quarantine path has been deleted.
+- ARCHIVAL NOTE: canonical execution now runs only through `operations_center.execution.coordinator`.
 - Spec-director LLM calls no longer route through a SwitchBoard proxy surface.

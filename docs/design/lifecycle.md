@@ -1,6 +1,6 @@
 # Lifecycle Contract
 
-Control Plane has six board-facing worker lanes:
+Operations Center has six board-facing worker lanes:
 
 - `goal`
 - `test`

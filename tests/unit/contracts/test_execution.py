@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.contracts.execution import (
+from operations_center.contracts.execution import (
     ExecutionArtifact,
     ExecutionRequest,
     ExecutionResult,
     RunTelemetry,
 )
-from control_plane.contracts.common import ChangedFileRef, ValidationSummary
-from control_plane.contracts.enums import (
+from operations_center.contracts.common import ChangedFileRef, ValidationSummary
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.adapters.git.client import GitClient, branch_allowed
+from operations_center.adapters.git.client import GitClient, branch_allowed
 
 
 class FakeGitClient(GitClient):

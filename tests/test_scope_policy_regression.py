@@ -1,5 +1,5 @@
 """Regression tests for scope policy edge cases (kodo test)."""
-from control_plane.application.scope_policy import ChangedFilePolicyChecker
+from operations_center.application.scope_policy import ChangedFilePolicyChecker
 
 
 def test_path_traversal_detected():

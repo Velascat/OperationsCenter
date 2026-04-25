@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.common import ChangedFileRef
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory, ValidationStatus
-from control_plane.tuning.compare import compare_backends, compare_by_task_type
-from control_plane.tuning.routing_models import (
+from operations_center.contracts.common import ChangedFileRef
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory, ValidationStatus
+from operations_center.tuning.compare import compare_backends, compare_by_task_type
+from operations_center.tuning.routing_models import (
     ChangeEvidenceClass,
     EvidenceStrength,
     LatencyClass,
@@ -205,7 +205,7 @@ class TestChangeEvidenceClass:
 
     def test_not_applicable_excluded_from_rate(self):
         # All policy_blocked → NOT_APPLICABLE → UNKNOWN class
-        from control_plane.contracts.enums import FailureReasonCategory
+        from operations_center.contracts.enums import FailureReasonCategory
         records = [
             make_record(
                 status=ExecutionStatus.FAILED,

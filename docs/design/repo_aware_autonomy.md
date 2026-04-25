@@ -1,6 +1,6 @@
 # Repo-Aware Autonomy Layer
 
-Control Plane's repo-aware autonomy layer is an internal pipeline that feeds bounded work into the existing proposer lane.
+Operations Center's repo-aware autonomy layer is an internal pipeline that feeds bounded work into the existing proposer lane.
 
 It is intentionally split into five explicit stages:
 
@@ -11,10 +11,10 @@ observe -> analyze -> decide -> propose -> (execute+review -> feedback)
 ## Stage Artifacts
 
 ```text
-tools/report/control_plane/observer/<run_id>/repo_state_snapshot.json
-tools/report/control_plane/insights/<run_id>/repo_insights.json
-tools/report/control_plane/decision/<run_id>/proposal_candidates.json
-tools/report/control_plane/proposer/<run_id>/proposal_results.json
+tools/report/operations_center/observer/<run_id>/repo_state_snapshot.json
+tools/report/operations_center/insights/<run_id>/repo_insights.json
+tools/report/operations_center/decision/<run_id>/proposal_candidates.json
+tools/report/operations_center/proposer/<run_id>/proposal_results.json
 state/proposal_feedback/<task_id>.json          ← written by reviewer watcher or manually
 ```
 
@@ -69,8 +69,8 @@ Each family has an autonomy tier that controls the initial Plane task state:
 Tiers are configured via `config/autonomy_tiers.json` and managed with:
 
 ```bash
-./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 1
-./scripts/control-plane.sh autonomy-tiers show
+./scripts/operations-center.sh autonomy-tiers set --family lint_fix --tier 1
+./scripts/operations-center.sh autonomy-tiers show
 ```
 
 ## Feedback Loop

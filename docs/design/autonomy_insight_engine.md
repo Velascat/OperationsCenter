@@ -19,7 +19,7 @@ observe -> analyze -> decide -> propose
 
 Primary input:
 
-- `tools/report/control_plane/observer/<run_id>/repo_state_snapshot.json`
+- `tools/report/operations_center/observer/<run_id>/repo_state_snapshot.json`
 
 The insight engine also reads a bounded recent snapshot history for the same repo to detect continuity patterns.
 
@@ -103,7 +103,7 @@ These insights feed the self-tuning regulator's acceptance rate rules.
 
 ### CrossRepoSynthesisDeriver
 
-Reads the latest `repo_insights.json` artifact for every repo found under `tools/report/control_plane/insights/`. Groups insight kinds across repos and derives:
+Reads the latest `repo_insights.json` artifact for every repo found under `tools/report/operations_center/insights/`. Groups insight kinds across repos and derives:
 
 | Insight | Condition |
 |---------|-----------|
@@ -115,8 +115,8 @@ Evidence includes `shared_insight_kind`, `repo_count`, `repos` (list), and a des
 
 Insight runs write retained artifacts under:
 
-- `tools/report/control_plane/insights/<run_id>/repo_insights.json`
-- `tools/report/control_plane/insights/<run_id>/repo_insights.md`
+- `tools/report/operations_center/insights/<run_id>/repo_insights.json`
+- `tools/report/operations_center/insights/<run_id>/repo_insights.md`
 
 The JSON artifact is the primary machine-consumable contract for later decision logic.
 

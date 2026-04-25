@@ -5,13 +5,13 @@ from datetime import datetime, UTC
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from control_plane.insights.derivers.arch_scheduler import (
+from operations_center.insights.derivers.arch_scheduler import (
     ArchSchedulerDeriver,
     _MIN_RUNS,
 )
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.decision.rules.arch_promotion import ArchPromotionRule
-from control_plane.observer.models import (
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.decision.rules.arch_promotion import ArchPromotionRule
+from operations_center.observer.models import (
     BacklogItem,
     BacklogSignal,
     DependencyDriftSignal,
@@ -22,7 +22,7 @@ from control_plane.observer.models import (
     CheckSignal,
     TodoSignal,
 )
-from control_plane.tuning.models import TuningRecommendation, TuningRunArtifact
+from operations_center.tuning.models import TuningRecommendation, TuningRunArtifact
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ def test_rule_ignores_blocked_insights():
 
 
 def test_rule_ignores_non_arch_insights():
-    from control_plane.insights.models import DerivedInsight
+    from operations_center.insights.models import DerivedInsight
     other = DerivedInsight(
         insight_id="x",
         kind="backlog_item",
@@ -282,7 +282,7 @@ def test_rule_ignores_non_arch_insights():
 
 
 def test_arch_promotion_not_in_default_families():
-    from control_plane.decision.service import _DEFAULT_ALLOWED_FAMILIES, ALL_FAMILIES
+    from operations_center.decision.service import _DEFAULT_ALLOWED_FAMILIES, ALL_FAMILIES
     assert "arch_promotion" not in _DEFAULT_ALLOWED_FAMILIES
     assert "arch_promotion" in ALL_FAMILIES
 

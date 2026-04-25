@@ -8,13 +8,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from control_plane.backends.archon.invoke import (
+from operations_center.backends.archon.invoke import (
     ArchonAdapter,
     ArchonBackendInvoker,
     ArchonRunResult,
     StubArchonAdapter,
 )
-from control_plane.backends.archon.models import ArchonWorkflowConfig
+from operations_center.backends.archon.models import ArchonWorkflowConfig
 
 
 def _config(**kw) -> ArchonWorkflowConfig:
@@ -86,7 +86,7 @@ def test_base_adapter_raises():
 
 
 def test_invoke_returns_run_capture():
-    from control_plane.backends.archon.models import ArchonRunCapture
+    from operations_center.backends.archon.models import ArchonRunCapture
     invoker = _invoker()
     capture = invoker.invoke(_config())
     assert isinstance(capture, ArchonRunCapture)

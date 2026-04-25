@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from control_plane.contracts.proposal import TaskProposal
-from control_plane.contracts.common import TaskTarget, ExecutionConstraints, BranchPolicy, ValidationProfile
-from control_plane.contracts.enums import (
+from operations_center.contracts.proposal import TaskProposal
+from operations_center.contracts.common import TaskTarget, ExecutionConstraints, BranchPolicy, ValidationProfile
+from operations_center.contracts.enums import (
     ExecutionMode,
     Priority,
     RiskLevel,
@@ -71,7 +71,7 @@ class TestTaskProposalConstruction:
             constraints=ExecutionConstraints(max_changed_files=10),
             validation_profile=ValidationProfile(profile_name="strict", commands=["pytest"]),
             branch_policy=BranchPolicy(open_pr=True),
-            proposer="control-plane-v2",
+            proposer="operations-center-v2",
             labels=["bug", "auth"],
         )
         assert p.priority == Priority.HIGH

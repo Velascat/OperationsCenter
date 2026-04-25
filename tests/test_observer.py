@@ -5,15 +5,15 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.config import load_settings
-from control_plane.observer.artifact_writer import ObserverArtifactWriter
-from control_plane.observer.collectors.dependency_drift import DependencyDriftCollector
-from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
-from control_plane.observer.collectors.git_context import GitContextCollector
-from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
-from control_plane.observer.collectors.check_signal import CheckSignalCollector
-from control_plane.observer.collectors.todo_signal import TodoSignalCollector
-from control_plane.observer.models import (
+from operations_center.config import load_settings
+from operations_center.observer.artifact_writer import ObserverArtifactWriter
+from operations_center.observer.collectors.dependency_drift import DependencyDriftCollector
+from operations_center.observer.collectors.file_hotspots import FileHotspotsCollector
+from operations_center.observer.collectors.git_context import GitContextCollector
+from operations_center.observer.collectors.recent_commits import RecentCommitsCollector
+from operations_center.observer.collectors.check_signal import CheckSignalCollector
+from operations_center.observer.collectors.todo_signal import TodoSignalCollector
+from operations_center.observer.models import (
     ArchitectureSignal,
     BenchmarkSignal,
     DependencyDriftSignal,
@@ -24,8 +24,8 @@ from control_plane.observer.models import (
     CheckSignal as ObserverCheckSignal,
     TodoSignal,
 )
-from control_plane.observer.service import RepoObserverService, new_observer_context
-from control_plane.observer.snapshot_builder import SnapshotBuilder
+from operations_center.observer.service import RepoObserverService, new_observer_context
+from operations_center.observer.snapshot_builder import SnapshotBuilder
 
 
 def write_config(tmp_path: Path) -> Path:
@@ -41,8 +41,8 @@ def write_config(tmp_path: Path) -> Path:
                 "git: {}",
                 "kodo: {}",
                 "repos:",
-                "  control-plane:",
-                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "  operations-center:",
+                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
                 "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]
@@ -75,9 +75,9 @@ def test_snapshot_builder_serializes_with_partial_errors() -> None:
     snapshot = SnapshotBuilder().build(
         run_id="obs_1",
         observed_at=datetime(2026, 3, 31, tzinfo=UTC),
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         repo=RepoContextSnapshot(
-            name="control-plane",
+            name="operations-center",
             path=Path("/tmp/repo"),
             current_branch="main",
             base_branch="main",
@@ -109,10 +109,10 @@ def test_git_context_and_recent_commits_collectors(tmp_path: Path) -> None:
     settings = load_settings(write_config(tmp_path))
     context = new_observer_context(
         repo_path=repo,
-        repo_name="control-plane",
+        repo_name="operations-center",
         base_branch="main",
         settings=settings,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         commit_limit=5,
         hotspot_window=5,
         todo_limit=5,
@@ -139,10 +139,10 @@ def test_file_hotspots_and_todo_signal_collectors(tmp_path: Path) -> None:
     settings = load_settings(write_config(tmp_path))
     context = new_observer_context(
         repo_path=repo,
-        repo_name="control-plane",
+        repo_name="operations-center",
         base_branch="main",
         settings=settings,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         commit_limit=5,
         hotspot_window=5,
         todo_limit=5,
@@ -182,10 +182,10 @@ def test_test_signal_and_dependency_drift_collectors(tmp_path: Path) -> None:
     settings = load_settings(write_config(tmp_path))
     context = new_observer_context(
         repo_path=tmp_path,
-        repo_name="control-plane",
+        repo_name="operations-center",
         base_branch="main",
         settings=settings,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         commit_limit=5,
         hotspot_window=5,
         todo_limit=5,
@@ -222,10 +222,10 @@ def test_observer_service_writes_snapshot_artifacts(tmp_path: Path) -> None:
     )
     context = new_observer_context(
         repo_path=repo,
-        repo_name="control-plane",
+        repo_name="operations-center",
         base_branch="main",
         settings=settings,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         commit_limit=5,
         hotspot_window=5,
         todo_limit=5,
@@ -303,10 +303,10 @@ def _make_service(tmp_path: Path, **extra_collectors) -> tuple[RepoObserverServi
     )
     context = new_observer_context(
         repo_path=repo,
-        repo_name="control-plane",
+        repo_name="operations-center",
         base_branch="main",
         settings=settings,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         commit_limit=5,
         hotspot_window=5,
         todo_limit=5,

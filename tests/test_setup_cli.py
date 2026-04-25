@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from control_plane.entrypoints.setup.main import (
+from operations_center.entrypoints.setup.main import (
     RepoSetupAnswers,
     SetupAnswers,
     check_command_installed,
@@ -15,7 +15,7 @@ from control_plane.entrypoints.setup.main import (
     render_settings_yaml,
     render_task_template,
 )
-from control_plane.entrypoints.setup.providers import ProviderStatus, summarize_provider_statuses
+from operations_center.entrypoints.setup.providers import ProviderStatus, summarize_provider_statuses
 
 
 def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
@@ -32,7 +32,7 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
         git_provider="github",
         git_token_env="GITHUB_TOKEN",
         git_token_value="gh-secret",
-        git_author_name="Control Plane Bot",
+        git_author_name="Operations Center Bot",
         git_author_email="bot@example.com",
         git_sign_commits=True,
         git_signing_key="ABC12345",
@@ -50,8 +50,8 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
         provider_versions={},
         repos=[
             RepoSetupAnswers(
-                repo_key="control-plane",
-                repo_clone_url="git@github.com:you/control-plane.git",
+                repo_key="operations-center",
+                repo_clone_url="git@github.com:you/operations-center.git",
                 repo_default_branch="main",
                 repo_allowed_base_branches=["main", "develop"],
                 repo_validation_commands=[".venv/bin/pytest -q", ".venv/bin/ruff check ."],
@@ -61,7 +61,7 @@ def test_render_settings_yaml_contains_local_repo_bootstrap_defaults() -> None:
                 repo_install_dev_command=".venv/bin/pip install -e .[dev]",
             )
         ],
-        default_repo_key="control-plane",
+        default_repo_key="operations-center",
     )
 
     rendered = render_settings_yaml(answers)
@@ -124,7 +124,7 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
         git_provider="github",
         git_token_env="GITHUB_TOKEN",
         git_token_value="gh-secret",
-        git_author_name="Control Plane Bot",
+        git_author_name="Operations Center Bot",
         git_author_email="bot@example.com",
         git_sign_commits=False,
         git_signing_key=None,
@@ -142,8 +142,8 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
         provider_versions={"codex": "0.117.0"},
         repos=[
             RepoSetupAnswers(
-                repo_key="control-plane",
-                repo_clone_url="git@github.com:you/control-plane.git",
+                repo_key="operations-center",
+                repo_clone_url="git@github.com:you/operations-center.git",
                 repo_default_branch="main",
                 repo_allowed_base_branches=["main"],
                 repo_validation_commands=[".venv/bin/pytest -q"],
@@ -153,24 +153,24 @@ def test_render_env_file_for_subscription_mode_skips_provider_secret_export() ->
                 repo_install_dev_command=".venv/bin/pip install -e .[dev]",
             )
         ],
-        default_repo_key="control-plane",
+        default_repo_key="operations-center",
     )
 
     rendered = render_env_file(answers)
 
     assert "export PLANE_API_TOKEN='plane-secret'" in rendered
-    assert "export CONTROL_PLANE_PLANE_URL='http://plane.local'" in rendered
-    assert "export CONTROL_PLANE_PLANE_START_COMMAND='docker compose up -d'" in rendered
-    assert "export CONTROL_PLANE_PLANE_VERSION='v1.2.3'" in rendered
-    assert "export CONTROL_PLANE_PLANE_OPEN_BROWSER='1'" in rendered
-    assert "export CONTROL_PLANE_KODO_INSTALL_REF='v0.4.272'" in rendered
+    assert "export OPERATIONS_CENTER_PLANE_URL='http://plane.local'" in rendered
+    assert "export OPERATIONS_CENTER_PLANE_START_COMMAND='docker compose up -d'" in rendered
+    assert "export OPERATIONS_CENTER_PLANE_VERSION='v1.2.3'" in rendered
+    assert "export OPERATIONS_CENTER_PLANE_OPEN_BROWSER='1'" in rendered
+    assert "export OPERATIONS_CENTER_KODO_INSTALL_REF='v0.4.272'" in rendered
     assert "export GITHUB_TOKEN='gh-secret'" in rendered
-    assert "export CONTROL_PLANE_PROVIDER_CODEX_VERSION='0.117.0'" in rendered
-    assert "export CONTROL_PLANE_PROVIDER_PREFERRED_SMART='claude'" in rendered
-    assert "export CONTROL_PLANE_PROVIDER_PREFERRED_FAST='codex'" in rendered
-    assert "export CONTROL_PLANE_ALLOWED_PROVIDERS='claude,codex'" in rendered
-    assert "export CONTROL_PLANE_PROVIDER_HEADLESS_REQUIRED=0" in rendered
-    assert "export CONTROL_PLANE_DEFAULT_REPO='control-plane'" in rendered
+    assert "export OPERATIONS_CENTER_PROVIDER_CODEX_VERSION='0.117.0'" in rendered
+    assert "export OPERATIONS_CENTER_PROVIDER_PREFERRED_SMART='claude'" in rendered
+    assert "export OPERATIONS_CENTER_PROVIDER_PREFERRED_FAST='codex'" in rendered
+    assert "export OPERATIONS_CENTER_ALLOWED_PROVIDERS='claude,codex'" in rendered
+    assert "export OPERATIONS_CENTER_PROVIDER_HEADLESS_REQUIRED=0" in rendered
+    assert "export OPERATIONS_CENTER_DEFAULT_REPO='operations-center'" in rendered
     assert "OPENAI_API_KEY" not in rendered
 
 
@@ -188,7 +188,7 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
         git_provider="github",
         git_token_env="GITHUB_TOKEN",
         git_token_value="gh-secret",
-        git_author_name="Control Plane Bot",
+        git_author_name="Operations Center Bot",
         git_author_email="bot@example.com",
         git_sign_commits=False,
         git_signing_key=None,
@@ -206,8 +206,8 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
         provider_versions={},
         repos=[
             RepoSetupAnswers(
-                repo_key="control-plane",
-                repo_clone_url="git@github.com:you/control-plane.git",
+                repo_key="operations-center",
+                repo_clone_url="git@github.com:you/operations-center.git",
                 repo_default_branch="main",
                 repo_allowed_base_branches=["main"],
                 repo_validation_commands=[".venv/bin/pytest -q"],
@@ -228,12 +228,12 @@ def test_render_settings_yaml_supports_multiple_repos() -> None:
                 repo_install_dev_command=".venv/bin/pip install -e .[dev]",
             ),
         ],
-        default_repo_key="control-plane",
+        default_repo_key="operations-center",
     )
 
     rendered = render_settings_yaml(answers)
 
-    assert "control-plane:" in rendered
+    assert "operations-center:" in rendered
     assert "other-repo:" in rendered
     assert "bootstrap_enabled: false" in rendered
     assert "- feature/*" in rendered
@@ -253,7 +253,7 @@ def test_render_task_template_uses_default_repo() -> None:
         git_provider="github",
         git_token_env="GITHUB_TOKEN",
         git_token_value="gh-secret",
-        git_author_name="Control Plane Bot",
+        git_author_name="Operations Center Bot",
         git_author_email="bot@example.com",
         git_sign_commits=False,
         git_signing_key=None,
@@ -271,8 +271,8 @@ def test_render_task_template_uses_default_repo() -> None:
         provider_versions={},
         repos=[
             RepoSetupAnswers(
-                repo_key="control-plane",
-                repo_clone_url="git@github.com:you/control-plane.git",
+                repo_key="operations-center",
+                repo_clone_url="git@github.com:you/operations-center.git",
                 repo_default_branch="main",
                 repo_allowed_base_branches=["main", "develop"],
                 repo_validation_commands=[".venv/bin/pytest -q"],
@@ -282,18 +282,18 @@ def test_render_task_template_uses_default_repo() -> None:
                 repo_install_dev_command=".venv/bin/pip install -e .[dev]",
             )
         ],
-        default_repo_key="control-plane",
+        default_repo_key="operations-center",
     )
 
     rendered = render_task_template(answers)
 
-    assert "repo: control-plane" in rendered
+    assert "repo: operations-center" in rendered
     assert "base_branch: main" in rendered
     assert "## Goal" in rendered
 
 
 def test_github_https_to_ssh_converts_github_remote() -> None:
-    assert github_https_to_ssh("https://github.com/Velascat/ControlPlane.git") == "git@github.com:Velascat/ControlPlane.git"
+    assert github_https_to_ssh("https://github.com/Velascat/OperationsCenter.git") == "git@github.com:Velascat/OperationsCenter.git"
 
 
 def test_github_https_to_ssh_ignores_non_github_remote() -> None:
@@ -312,7 +312,7 @@ def test_parse_remote_branches_extracts_head_names() -> None:
 
 
 def test_infer_repo_key_from_clone_url_prefers_repo_name() -> None:
-    assert infer_repo_key_from_clone_url("git@github.com:Velascat/ControlPlane.git") == "ControlPlane"
+    assert infer_repo_key_from_clone_url("git@github.com:Velascat/OperationsCenter.git") == "OperationsCenter"
 
 
 def test_prepend_local_bin_to_path_adds_home_local_bin(monkeypatch) -> None:

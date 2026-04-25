@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from control_plane.observer.collectors.check_signal import CheckSignalCollector
-from control_plane.observer.service import ObserverContext
+from operations_center.observer.collectors.check_signal import CheckSignalCollector
+from operations_center.observer.service import ObserverContext
 
 
 def _make_context(tmp_path: Path) -> ObserverContext:
@@ -90,7 +90,7 @@ def test_discoverable_with_pyproject(tmp_path: Path) -> None:
         stderr="",
     )
 
-    with patch("control_plane.observer.collectors.check_signal.subprocess.run", return_value=fake_result) as mock_run:
+    with patch("operations_center.observer.collectors.check_signal.subprocess.run", return_value=fake_result) as mock_run:
         sig = CheckSignalCollector().collect(ctx)
 
     assert sig.status == "discoverable"
@@ -109,7 +109,7 @@ def test_discoverable_with_pytest_ini(tmp_path: Path) -> None:
         args=[], returncode=0, stdout=collect_stdout, stderr="",
     )
 
-    with patch("control_plane.observer.collectors.check_signal.subprocess.run", return_value=fake_result):
+    with patch("operations_center.observer.collectors.check_signal.subprocess.run", return_value=fake_result):
         sig = CheckSignalCollector().collect(ctx)
 
     assert sig.status == "discoverable"
@@ -153,7 +153,7 @@ def test_unknown_on_timeout(tmp_path: Path) -> None:
     (ctx.repo_path / "pytest.ini").write_text("[pytest]\n")
 
     with patch(
-        "control_plane.observer.collectors.check_signal.subprocess.run",
+        "operations_center.observer.collectors.check_signal.subprocess.run",
         side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=5),
     ):
         sig = CheckSignalCollector().collect(ctx)
@@ -174,7 +174,7 @@ def test_unknown_on_nonzero_returncode(tmp_path: Path) -> None:
         args=[], returncode=1, stdout="", stderr="ERROR collecting\n",
     )
 
-    with patch("control_plane.observer.collectors.check_signal.subprocess.run", return_value=fake_result):
+    with patch("operations_center.observer.collectors.check_signal.subprocess.run", return_value=fake_result):
         sig = CheckSignalCollector().collect(ctx)
 
     assert sig.status == "unknown"
@@ -193,7 +193,7 @@ def test_unknown_on_zero_tests_collected(tmp_path: Path) -> None:
         args=[], returncode=5, stdout="no tests ran in 0.01s\n", stderr="",
     )
 
-    with patch("control_plane.observer.collectors.check_signal.subprocess.run", return_value=fake_result):
+    with patch("operations_center.observer.collectors.check_signal.subprocess.run", return_value=fake_result):
         sig = CheckSignalCollector().collect(ctx)
 
     assert sig.status == "unknown"

@@ -13,11 +13,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from control_plane.contracts.enums import FailureReasonCategory
-from control_plane.contracts.proposal import TaskProposal
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.planning.proposal_builder import build_proposal
-from control_plane.routing.client import SwitchBoardUnavailableError
+from operations_center.contracts.enums import FailureReasonCategory
+from operations_center.contracts.proposal import TaskProposal
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.planning.proposal_builder import build_proposal
+from operations_center.routing.client import SwitchBoardUnavailableError
 
 
 def _make_service(*, route_raises: Exception | None = None):
@@ -37,8 +37,8 @@ def _make_service(*, route_raises: Exception | None = None):
     if route_raises is not None:
         service.route_proposal.side_effect = route_raises
     else:
-        from control_plane.contracts.enums import BackendName, LaneName
-        from control_plane.contracts.routing import LaneDecision
+        from operations_center.contracts.enums import BackendName, LaneName
+        from operations_center.contracts.routing import LaneDecision
         decision = LaneDecision(
             proposal_id=proposal.proposal_id,
             selected_lane=LaneName.AIDER_LOCAL,
@@ -60,14 +60,14 @@ def _make_service(*, route_raises: Exception | None = None):
 class TestWorkerSwitchBoardFailure:
     def _run(self, capsys, goal="Fix lint errors", raises=None):
         """Run main() with a mock service, capturing stdout."""
-        from control_plane.entrypoints.worker import main as worker_main
+        from operations_center.entrypoints.worker import main as worker_main
 
         exc = raises or SwitchBoardUnavailableError("SwitchBoard unreachable at http://localhost:20401")
         service, proposal = _make_service(route_raises=exc)
 
         with patch("sys.argv", ["worker", "--goal", goal]):
             # Suppress partial artifact write (RunArtifactWriter default path)
-            with patch("control_plane.execution.artifact_writer.RunArtifactWriter.write_partial"):
+            with patch("operations_center.execution.artifact_writer.RunArtifactWriter.write_partial"):
                 code = worker_main.main(service=service)
 
         captured = capsys.readouterr()
@@ -115,7 +115,7 @@ class TestWorkerSwitchBoardFailure:
         assert "Error" not in out or out.strip().startswith("{")
 
     def test_timeout_exception_also_handled(self, capsys):
-        from control_plane.routing.client import SwitchBoardUnavailableError
+        from operations_center.routing.client import SwitchBoardUnavailableError
         code, out, _ = self._run(capsys, raises=SwitchBoardUnavailableError("timed out"))
         assert code == 1
         data = json.loads(out)
@@ -129,7 +129,7 @@ class TestWorkerSwitchBoardFailure:
 
 class TestWorkerHappyPath:
     def test_returns_0_on_success(self, capsys):
-        from control_plane.entrypoints.worker import main as worker_main
+        from operations_center.entrypoints.worker import main as worker_main
 
         service, _ = _make_service()
         with patch("sys.argv", ["worker", "--goal", "Fix lint errors"]):
@@ -138,7 +138,7 @@ class TestWorkerHappyPath:
         assert code == 0
 
     def test_stdout_contains_proposal_key(self, capsys):
-        from control_plane.entrypoints.worker import main as worker_main
+        from operations_center.entrypoints.worker import main as worker_main
 
         service, _ = _make_service()
         with patch("sys.argv", ["worker", "--goal", "Fix lint errors"]):

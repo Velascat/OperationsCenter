@@ -1,40 +1,40 @@
 # Backlog — Post-Hardening: Tuning, Trust, and Public Packaging
 
-The hardening phase is complete. The system is running with two active repos (ControlPlane and ExternalRepo), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
+The hardening phase is complete. The system is running with two active repos (OperationsCenter and ExternalRepo), a functional six-lane watcher (including the new spec-director), repo-aware autonomy loop, and PR review automation. This phase focuses on tuning the autonomy loop, building operator trust, and polishing the public-facing surface.
 
 ## Active
 
 ### tuning — Run analyze-artifacts loop and document threshold adjustments
 Run `analyze-artifacts` weekly, identify suppression patterns, tune per-family thresholds, document changes.
-Tracked: [#17](https://github.com/Velascat/ControlPlane/issues/17)
+Tracked: [#17](https://github.com/Velascat/OperationsCenter/issues/17)
 **Status**: in progress (`docs/operator/tuning.md` created; first tuning run pending)
 
 ---
 
 ### tuning — Candidate-family heuristics review
 Review emit/suppress rates for observation_coverage, test_visibility, dependency_drift. Define promotion criteria for hotspot_concentration and todo_accumulation.
-Tracked: [#18](https://github.com/Velascat/ControlPlane/issues/18)
+Tracked: [#18](https://github.com/Velascat/OperationsCenter/issues/18)
 **Status**: open
 
 ---
 
 ### trust — Validate PR review loop end-to-end
 Run the two-phase review loop against a real or controlled test PR. Verify audit trail, guardrail checklist, and escalation path.
-Tracked: [#19](https://github.com/Velascat/ControlPlane/issues/19)
+Tracked: [#19](https://github.com/Velascat/OperationsCenter/issues/19)
 **Status**: open (`docs/operator/pr_review.md` created; live validation pending)
 
 ---
 
 ### docs — Promote golden-path demo as ongoing validation ritual
 README and demo.md updated to position the demo as a post-change ritual. Ensure demo stays runnable as config and thresholds change.
-Tracked: [#20](https://github.com/Velascat/ControlPlane/issues/20)
+Tracked: [#20](https://github.com/Velascat/OperationsCenter/issues/20)
 **Status**: done (demo.md updated with Autonomy-Cycle Ritual section; README updated)
 
 ---
 
 ### docs — Polish public docs packaging
 Operator docs suite: tuning.md, pr_review.md, runtime.md (dry-run-first), README cross-links, backlog update.
-Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
+Tracked: [#21](https://github.com/Velascat/OperationsCenter/issues/21)
 **Status**: done (all operator docs created/updated)
 
 ---
@@ -51,7 +51,7 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 **Status**: done (`docs/demo.md`)
 
 ### config — Polish config templates as first-class product surface
-**Status**: done (`config/control_plane.example.yaml`, `.env.control-plane.example`)
+**Status**: done (`config/operations_center.example.yaml`, `.env.operations-center.example`)
 
 ### pr-automation — Harden PR automation with dry-run and audit trail
 **Status**: done
@@ -60,10 +60,10 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 **Status**: done
 
 ### autonomy — `analyze-artifacts` threshold tuning tool
-**Status**: done (`src/control_plane/entrypoints/analyze/main.py`)
+**Status**: done (`src/operations_center/entrypoints/analyze/main.py`)
 
 ### autonomy — `autonomy-cycle` dry-run-first wrapper
-**Status**: done (`src/control_plane/entrypoints/autonomy_cycle/main.py`)
+**Status**: done (`src/operations_center/entrypoints/autonomy_cycle/main.py`)
 
 ### validation — Contract validation for proposer candidates
 **Status**: done (`proposer/candidate_mapper.py`)
@@ -93,7 +93,7 @@ Tracked: [#21](https://github.com/Velascat/ControlPlane/issues/21)
 ### autonomy — Bounded self-tuning regulation loop (`tune-autonomy`)
 **Status**: done
 
-`TuningRegulatorService` aggregates per-family metrics from retained decision and proposer artifacts and applies explicit recommendation rules (over-suppressed → loosen; noisy → tighten; healthy → keep). Recommendation-only by default; auto-apply mode (opt-in via `--apply` + `CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1`) writes conservative bounded changes to `config/autonomy_tuning.json` with full cooldown, quota, oscillation, and allowlist guardrails. `DecisionEngineService` reads tuning overrides at startup. Full audit trail retained in `tools/report/control_plane/tuning/`. 47 tests.
+`TuningRegulatorService` aggregates per-family metrics from retained decision and proposer artifacts and applies explicit recommendation rules (over-suppressed → loosen; noisy → tighten; healthy → keep). Recommendation-only by default; auto-apply mode (opt-in via `--apply` + `OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1`) writes conservative bounded changes to `config/autonomy_tuning.json` with full cooldown, quota, oscillation, and allowlist guardrails. `DecisionEngineService` reads tuning overrides at startup. Full audit trail retained in `tools/report/operations_center/tuning/`. 47 tests.
 
 ---
 
@@ -150,7 +150,7 @@ Define "trusted" in terms of measurable execution health and tuning stability (l
 
 ### config — Per-repo execution budget overrides
 **Type**: feature
-Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when ExternalRepo and ControlPlane have different execution intensity.
+Allow repos to declare their own hourly/daily caps rather than sharing the global budget. Useful when ExternalRepo and OperationsCenter have different execution intensity.
 
 ### ci — Enforce `analyze-artifacts` output as a CI artifact
 **Type**: maintenance

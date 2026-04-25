@@ -5,7 +5,7 @@ This guide covers the operator-facing checks that help explain what the local sy
 ## Plane Doctor
 
 ```bash
-./scripts/control-plane.sh plane-doctor --task-id TASK-123
+./scripts/operations-center.sh plane-doctor --task-id TASK-123
 ```
 
 Use this to verify:
@@ -20,7 +20,7 @@ This is the fastest check when polling is not finding work.
 ## Plane Smoke Test
 
 ```bash
-./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
+./scripts/operations-center.sh smoke --task-id TASK-123 --comment-only
 ```
 
 Use this to verify Plane fetch/comment behavior without running a full Kodo task.
@@ -32,7 +32,7 @@ Retained smoke artifacts are written under:
 ## Providers Status
 
 ```bash
-./scripts/control-plane.sh providers-status
+./scripts/operations-center.sh providers-status
 ```
 
 Use this to re-check:
@@ -45,8 +45,8 @@ Use this to re-check:
 ## Dependency Check
 
 ```bash
-./scripts/control-plane.sh dependency-check
-./scripts/control-plane.sh dependency-check --create-plane-tasks
+./scripts/operations-center.sh dependency-check
+./scripts/operations-center.sh dependency-check --create-plane-tasks
 ```
 
 This maintenance checker:
@@ -74,18 +74,18 @@ Retained `result_summary.md` files align with board/log language and include:
 ## Watcher Heartbeat Check
 
 ```bash
-python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+python -m operations_center.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
 ```
 
 Returns exit code 0 if all watchers wrote a heartbeat within the last 5 minutes. Returns exit code 1 with a message listing stale roles. Run from cron to get paged when a watcher dies silently.
 
 ## Credential Validation and Expiry Detection
 
-On the first cycle of each watcher run, Control Plane validates GitHub and Plane tokens.
+On the first cycle of each watcher run, Operations Center validates GitHub and Plane tokens.
 
 **Invalid tokens (401/403):** The watcher logs `credential_invalid`, records an escalation event, and exits. If a watcher fails to start with `watch_credential_failure`, check that `GITHUB_TOKEN` and `PLANE_API_TOKEN` are set and valid for the configured workspace.
 
-**Upcoming expiry (fine-grained PATs):** If the GitHub `/user` response includes an `x-token-expiration` header, Control Plane checks whether expiry is within `escalation.credential_expiry_warn_days` days (default 7). When approaching expiry:
+**Upcoming expiry (fine-grained PATs):** If the GitHub `/user` response includes an `x-token-expiration` header, Operations Center checks whether expiry is within `escalation.credential_expiry_warn_days` days (default 7). When approaching expiry:
 
 - `≤ warn_days` remaining: logs `credential_expiry_soon` warning with days remaining and expiry date
 - `≤ 1 day` remaining: logs error and records a `credential_github_expiring` escalation event
@@ -94,8 +94,8 @@ Set `escalation.credential_expiry_warn_days: 0` to disable expiry monitoring. On
 
 ## Config Schema Drift Check
 
-At watcher startup (cycle 1), Control Plane compares your deployed config against
-`config/control_plane.example.yaml`.  If any top-level or nested key in the example is
+At watcher startup (cycle 1), Operations Center compares your deployed config against
+`config/operations_center.example.yaml`.  If any top-level or nested key in the example is
 absent from your config, it is logged as a `config_drift_detected` warning:
 
 ```
@@ -120,10 +120,10 @@ View execution count and estimated cost for the last N days:
 
 ```bash
 # Last 24 hours
-python -m control_plane.entrypoints.worker.main spend-report
+python -m operations_center.entrypoints.worker.main spend-report
 
 # Last 7 days
-python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+python -m operations_center.entrypoints.worker.main spend-report --window-days 7
 ```
 
 Returns JSON:
@@ -133,7 +133,7 @@ Returns JSON:
   "total_executions": 42,
   "total_estimated_usd": 6.30,
   "per_repo": {
-    "ControlPlane": {"executions": 18, "estimated_usd": 2.70},
+    "OperationsCenter": {"executions": 18, "estimated_usd": 2.70},
     "ExternalRepo": {"executions": 24, "estimated_usd": 3.60}
   }
 }
@@ -152,8 +152,8 @@ When a systemic failure (bad kodo version, auth regression) causes every executi
 in the watcher log. The circuit reopens automatically when the failure rate drops below 80% over the last 5 executions. To reset immediately: fix the underlying issue and wait for a successful execution.
 
 Thresholds are tunable via env vars:
-- `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD` (default `0.8`)
-- `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW` (default `5`)
+- `OPERATIONS_CENTER_CIRCUIT_BREAKER_THRESHOLD` (default `0.8`)
+- `OPERATIONS_CENTER_CIRCUIT_BREAKER_WINDOW` (default `5`)
 
 ## Connection Error Backoff
 
@@ -172,8 +172,8 @@ If `consecutive_errors` is climbing and not resetting, the Plane API is unreacha
 If you see this, re-run `observe-repo` before generating insights:
 
 ```bash
-./scripts/control-plane.sh observe-repo
-./scripts/control-plane.sh generate-insights
+./scripts/operations-center.sh observe-repo
+./scripts/operations-center.sh generate-insights
 ```
 
 ## Proposer Quiet Diagnosis
@@ -223,7 +223,7 @@ To audit suppression trends, filter the usage store for `"kind": "kodo_quality_w
 
 When `allowed_paths` is configured and a Kodo run modifies files outside the allowed set, the policy is enforced (changes are not pushed) and a `scope_violation` event is written to the usage store. Fields include `violated_files` and `repo_key`.
 
-Filter for `"kind": "scope_violation"` in `tools/report/control_plane/execution/usage.json` to see which tasks have exceeded their path budget. Recurring violations may indicate the `allowed_paths` config is too narrow for the goal.
+Filter for `"kind": "scope_violation"` in `tools/report/operations_center/execution/usage.json` to see which tasks have exceeded their path budget. Recurring violations may indicate the `allowed_paths` config is too narrow for the goal.
 
 ## Quota Exhaustion Detection
 
@@ -303,13 +303,13 @@ Track multi-step plan progress from the board:
 
 ```bash
 # Show all active campaigns
-python -m control_plane.entrypoints.campaign_status.main
+python -m operations_center.entrypoints.campaign_status.main
 
 # Show only in-progress campaigns
-python -m control_plane.entrypoints.campaign_status.main --status in_progress
+python -m operations_center.entrypoints.campaign_status.main --status in_progress
 
 # JSON output for scripting
-python -m control_plane.entrypoints.campaign_status.main --json
+python -m operations_center.entrypoints.campaign_status.main --json
 ```
 
 Campaigns are created automatically when the improve watcher decomposes a multi-step plan (tasks with titles containing `refactor`, `migrate`, `redesign`, etc. or labeled `plan: multi-step`). Each campaign tracks step completion and overall progress.
@@ -339,7 +339,7 @@ The CI webhook server receives GitHub check-run events and triggers autonomy cyc
 
 ```bash
 # Start the webhook server
-python -m control_plane.entrypoints.ci_webhook.main --port 8765 --secret "$WEBHOOK_SECRET"
+python -m operations_center.entrypoints.ci_webhook.main --port 8765 --secret "$WEBHOOK_SECRET"
 
 # Trigger files land in state/ci_webhook_triggers/
 ls state/ci_webhook_triggers/
@@ -368,7 +368,7 @@ The root cause of stray verdicts is either an old kodo run that predates the abs
 3. Plane comments on the task
 4. retained artifact directory in `tools/report/kodo_plane/`
 5. `plane-doctor` if the board/API contract looks wrong
-6. heartbeat check: `python -m control_plane.entrypoints.worker.main heartbeat-check`
+6. heartbeat check: `python -m operations_center.entrypoints.worker.main heartbeat-check`
 7. supervisor status: `cat logs/local/supervisor.status.json` (if using supervisor)
 8. config drift: look for `config_drift_detected` in watcher log at cycle 1
 9. workspace health: look for `workspace_health_*` events in improve watcher log
@@ -385,7 +385,7 @@ The root cause of stray verdicts is either an old kodo run that predates the abs
 20. credential expiry: look for `credential_expiry_soon` in watcher log at cycle 1
 21. cross-repo impact: look for `cross_repo_impact_detected` in goal watcher log
 22. dependency updates: look for `dependency_update_task_created` in improve watcher log
-23. quality trends: look for `quality_trend/lint_degrading` or `type_degrading` insights in `tools/report/control_plane/insights/`
+23. quality trends: look for `quality_trend/lint_degrading` or `type_degrading` insights in `tools/report/operations_center/insights/`
 24. confidence calibration: run `tune-autonomy` and check the calibration table for ⚠ families
 25. error ingest: look for `error_ingest_task_created` events; check `state/error_ingest_dedup.json` for dedup state
 26. no-op loop: look for `noop_loop/family_cycling` in the latest insights artifact; family is cycling without acceptance
@@ -400,14 +400,14 @@ The root cause of stray verdicts is either an old kodo run that predates the abs
 
 For autonomy-layer inputs:
 
-- `./scripts/control-plane.sh observe-repo`
-- `./scripts/control-plane.sh generate-insights`
-- `./scripts/control-plane.sh decide-proposals`
-- `./scripts/control-plane.sh propose-from-candidates --dry-run`
-- retained observer artifacts in `tools/report/control_plane/observer/`
-- retained insight artifacts in `tools/report/control_plane/insights/`
-- retained decision artifacts in `tools/report/control_plane/decision/`
-- retained proposer artifacts in `tools/report/control_plane/proposer/`
+- `./scripts/operations-center.sh observe-repo`
+- `./scripts/operations-center.sh generate-insights`
+- `./scripts/operations-center.sh decide-proposals`
+- `./scripts/operations-center.sh propose-from-candidates --dry-run`
+- retained observer artifacts in `tools/report/operations_center/observer/`
+- retained insight artifacts in `tools/report/operations_center/insights/`
+- retained decision artifacts in `tools/report/operations_center/decision/`
+- retained proposer artifacts in `tools/report/operations_center/proposer/`
 
 When the board is quiet, also check the proposer lane:
 
@@ -421,7 +421,7 @@ When the board is quiet, also check the proposer lane:
 When the `NoOpLoopDeriver` detects a family cycling without acceptance, a `noop_loop/family_cycling` insight is written. Check:
 
 ```bash
-cat tools/report/control_plane/insights/$(ls -t tools/report/control_plane/insights/ | head -1) | python3 -m json.tool | grep -A5 noop_loop
+cat tools/report/operations_center/insights/$(ls -t tools/report/operations_center/insights/ | head -1) | python3 -m json.tool | grep -A5 noop_loop
 ```
 
 Evidence fields: `family`, `proposals_in_window`, `merges_in_window`, `look_back_days`.
@@ -444,10 +444,10 @@ ls <repo_path>/coverage.xml <repo_path>/htmlcov/index.html 2>/dev/null
 If coverage data is available but no `coverage_gap` proposals are appearing, the total may be above the 60% threshold or the uncovered file count may be below 3. Check the latest observer artifact:
 
 ```bash
-python3 -c "import json; d=json.load(open('$(ls -t tools/report/control_plane/observer/*.json | head -1)')); print(d['signals'].get('coverage_signal', {}))"
+python3 -c "import json; d=json.load(open('$(ls -t tools/report/operations_center/observer/*.json | head -1)')); print(d['signals'].get('coverage_signal', {}))"
 ```
 
-Coverage collection requires pre-existing report files. ControlPlane never runs coverage tools itself. Generate coverage reports as part of your CI or test script, then retain the output files.
+Coverage collection requires pre-existing report files. OperationsCenter never runs coverage tools itself. Generate coverage reports as part of your CI or test script, then retain the output files.
 
 ## Theme Aggregation
 
@@ -482,7 +482,7 @@ Warning fields: `task_id`, `family`, `warning` (describes which tool group is mi
 The `QualityTrendDeriver` emits insights when lint or type error counts are trending in a direction across ≥3 observer snapshots. Check the latest insights artifact for these signals:
 
 ```bash
-cat tools/report/control_plane/insights/$(ls -t tools/report/control_plane/insights/ | head -1)
+cat tools/report/operations_center/insights/$(ls -t tools/report/operations_center/insights/ | head -1)
 ```
 
 Look for entries with `kind` starting with `quality_trend/`:
@@ -518,7 +518,7 @@ When a family shows ⚠, consider lowering its `min_confidence` threshold in con
 To record calibration data manually:
 
 ```bash
-python -m control_plane.entrypoints.feedback.main record \
+python -m operations_center.entrypoints.feedback.main record \
     --task-id <uuid> --outcome merged \
     --family lint_fix --confidence high
 ```

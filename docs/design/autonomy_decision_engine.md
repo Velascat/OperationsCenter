@@ -19,7 +19,7 @@ observe -> analyze -> decide -> propose
 
 Primary input:
 
-- `tools/report/control_plane/insights/<run_id>/repo_insights.json`
+- `tools/report/operations_center/insights/<run_id>/repo_insights.json`
 
 Optional bounded history:
 
@@ -142,15 +142,15 @@ Tier is read from `config/autonomy_tiers.json` (managed by the `autonomy-tiers` 
 To change a tier:
 
 ```bash
-./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 1
-./scripts/control-plane.sh autonomy-tiers show
+./scripts/operations-center.sh autonomy-tiers set --family lint_fix --tier 1
+./scripts/operations-center.sh autonomy-tiers show
 ```
 
 ## Output
 
 Decision runs write retained artifacts under:
 
-- `tools/report/control_plane/decision/<run_id>/proposal_candidates.json`
-- `tools/report/control_plane/decision/<run_id>/proposal_candidates.md`
+- `tools/report/operations_center/decision/<run_id>/proposal_candidates.json`
+- `tools/report/operations_center/decision/<run_id>/proposal_candidates.md`
 
 The resulting artifact is consumed by the proposer integration stage.

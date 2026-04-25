@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.decision.candidate_builder import CandidateBuilder, CandidateSpec
-from control_plane.decision.models import (
+from operations_center.decision.candidate_builder import CandidateBuilder, CandidateSpec
+from operations_center.decision.models import (
     CandidateRationale,
     ProposalCandidate,
     ProposalOutline,
 )
-from control_plane.decision.validation_profiles import (
+from operations_center.decision.validation_profiles import (
     CI_GREEN,
     MANUAL_REVIEW,
     RUFF_CLEAN,
@@ -28,8 +28,8 @@ from control_plane.decision.validation_profiles import (
     TY_CLEAN,
     profile_for_family,
 )
-from control_plane.proposer.candidate_mapper import ProposalCandidateMapper
-from control_plane.proposer.provenance import ProposalProvenance
+from operations_center.proposer.candidate_mapper import ProposalCandidateMapper
+from operations_center.proposer.provenance import ProposalProvenance
 
 
 # ── profile_for_family ───────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ def _candidate(
     )
 
 
-def _provenance(repo_name: str = "ControlPlane") -> ProposalProvenance:
+def _provenance(repo_name: str = "OperationsCenter") -> ProposalProvenance:
     return ProposalProvenance(
         source="autonomy",
         source_family="lint_fix",
@@ -149,7 +149,7 @@ def _provenance(repo_name: str = "ControlPlane") -> ProposalProvenance:
 
 
 def _make_settings(tmp_path: Path) -> object:
-    from control_plane.config.settings import load_settings
+    from operations_center.config.settings import load_settings
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
         "\n".join([
@@ -161,7 +161,7 @@ def _make_settings(tmp_path: Path) -> object:
             "git: {}",
             "kodo: {}",
             "repos:",
-            "  ControlPlane:",
+            "  OperationsCenter:",
             "    clone_url: git@github.com:test/repo.git",
             "    default_branch: main",
         ])

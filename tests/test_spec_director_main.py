@@ -21,7 +21,7 @@ def _make_settings(tmp_path):
 
 def test_run_once_calls_phase_orchestrator_before_recovery(tmp_path):
     """Phase orchestrator must run before recovery in each cycle."""
-    from control_plane.entrypoints.spec_director.main import run_once
+    from operations_center.entrypoints.spec_director.main import run_once
 
     settings = _make_settings(tmp_path)
     client = MagicMock()
@@ -30,10 +30,10 @@ def test_run_once_calls_phase_orchestrator_before_recovery(tmp_path):
     call_order = []
 
     with (
-        patch("control_plane.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
-        patch("control_plane.entrypoints.spec_director.main.RecoveryService") as mock_rec_cls,
+        patch("operations_center.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
+        patch("operations_center.entrypoints.spec_director.main.RecoveryService") as mock_rec_cls,
     ):
-        from control_plane.spec_director.phase_orchestrator import PhaseOrchestrationResult
+        from operations_center.spec_director.phase_orchestrator import PhaseOrchestrationResult
 
         mock_orch_inst = MagicMock()
         mock_orch_inst.run.side_effect = lambda issues: (
@@ -53,21 +53,21 @@ def test_run_once_calls_phase_orchestrator_before_recovery(tmp_path):
 
 
 def _make_orch_result():
-    from control_plane.spec_director.phase_orchestrator import PhaseOrchestrationResult
+    from operations_center.spec_director.phase_orchestrator import PhaseOrchestrationResult
     return PhaseOrchestrationResult()
 
 
 def test_run_once_fetches_issues_once(tmp_path):
     """list_issues() must be called exactly once per cycle (not once per counter)."""
-    from control_plane.entrypoints.spec_director.main import run_once
+    from operations_center.entrypoints.spec_director.main import run_once
 
     settings = _make_settings(tmp_path)
     client = MagicMock()
     client.list_issues.return_value = []
 
     with (
-        patch("control_plane.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
-        patch("control_plane.entrypoints.spec_director.main.RecoveryService"),
+        patch("operations_center.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
+        patch("operations_center.entrypoints.spec_director.main.RecoveryService"),
     ):
         mock_orch_inst = MagicMock()
         mock_orch_inst.run.return_value = _make_orch_result()
@@ -82,7 +82,7 @@ def test_run_once_fetches_issues_once(tmp_path):
 
 def test_run_once_disabled_returns_early(tmp_path):
     """When spec_director.enabled is False, run_once exits without touching the board."""
-    from control_plane.entrypoints.spec_director.main import run_once
+    from operations_center.entrypoints.spec_director.main import run_once
 
     settings = _make_settings(tmp_path)
     settings.spec_director.enabled = False
@@ -94,7 +94,7 @@ def test_run_once_disabled_returns_early(tmp_path):
 
 
 def test_run_once_does_not_set_switchboard_env(tmp_path, monkeypatch):
-    from control_plane.entrypoints.spec_director.main import run_once
+    from operations_center.entrypoints.spec_director.main import run_once
 
     settings = _make_settings(tmp_path)
     settings.spec_director.switchboard_url = "http://sb-configured:20401"
@@ -102,8 +102,8 @@ def test_run_once_does_not_set_switchboard_env(tmp_path, monkeypatch):
     client.list_issues.return_value = []
 
     with (
-        patch("control_plane.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
-        patch("control_plane.entrypoints.spec_director.main.RecoveryService"),
+        patch("operations_center.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
+        patch("operations_center.entrypoints.spec_director.main.RecoveryService"),
     ):
         mock_orch_inst = MagicMock()
         mock_orch_inst.run.return_value = _make_orch_result()

@@ -16,7 +16,7 @@ created_at: 2026-04-15T00:00:00+00:00
 
 
 def test_writes_spec_to_canonical_path(tmp_path):
-    from control_plane.spec_director.spec_writer import SpecWriter
+    from operations_center.spec_director.spec_writer import SpecWriter
     writer = SpecWriter(specs_dir=tmp_path / "docs/specs")
     path = writer.write(slug="add-auth", spec_text=_SPEC)
     assert path.exists()
@@ -25,7 +25,7 @@ def test_writes_spec_to_canonical_path(tmp_path):
 
 
 def test_copies_to_workspace(tmp_path):
-    from control_plane.spec_director.spec_writer import SpecWriter
+    from operations_center.spec_director.spec_writer import SpecWriter
     writer = SpecWriter(specs_dir=tmp_path / "docs/specs")
     workspace = tmp_path / "workspace/MyRepo"
     workspace.mkdir(parents=True)
@@ -36,7 +36,7 @@ def test_copies_to_workspace(tmp_path):
 
 
 def test_archive_old_specs(tmp_path):
-    from control_plane.spec_director.spec_writer import SpecWriter
+    from operations_center.spec_director.spec_writer import SpecWriter
     specs_dir = tmp_path / "docs/specs"
     specs_dir.mkdir(parents=True)
     old_spec = specs_dir / "old-campaign.md"

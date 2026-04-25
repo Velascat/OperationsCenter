@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.backends.kodo.models import KodoArtifactCapture, KodoRunCapture
-from control_plane.backends.kodo.normalize import normalize
-from control_plane.contracts.enums import (
+from operations_center.backends.kodo.models import KodoArtifactCapture, KodoRunCapture
+from operations_center.backends.kodo.normalize import normalize
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,
@@ -204,7 +204,7 @@ class TestChangedFiles:
 
 class TestResultSerialisation:
     def test_json_round_trip(self):
-        from control_plane.contracts.execution import ExecutionResult
+        from operations_center.contracts.execution import ExecutionResult
         result = _normalize(_capture())
         restored = ExecutionResult.model_validate_json(result.model_dump_json())
         assert restored == result

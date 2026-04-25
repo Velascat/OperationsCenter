@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "control-plane"
+name = "operations-center"
 version = "0.1.0"
 description = "Planning, policy, and evidence layer for canonical task proposals"
 readme = "README.md"
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-control-plane-setup = "control_plane.entrypoints.setup.main:app"
+operations-center-setup = "operations_center.entrypoints.setup.main:app"
 
 [project.optional-dependencies]
 dev = [

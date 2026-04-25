@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.contracts.enums import BackendName, LaneName, ExecutionStatus, FailureReasonCategory
-from control_plane.contracts.execution import ExecutionRequest, ExecutionResult
-from control_plane.contracts.routing import LaneDecision
-from control_plane.execution.artifact_writer import RunArtifactWriter
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.planning.proposal_builder import build_proposal
-from control_plane.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
+from operations_center.contracts.enums import BackendName, LaneName, ExecutionStatus, FailureReasonCategory
+from operations_center.contracts.execution import ExecutionRequest, ExecutionResult
+from operations_center.contracts.routing import LaneDecision
+from operations_center.execution.artifact_writer import RunArtifactWriter
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.planning.proposal_builder import build_proposal
+from operations_center.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +48,8 @@ def _request(bundle: ProposalDecisionBundle, tmp_path: Path) -> ExecutionRequest
 
 
 def _success_result(request: ExecutionRequest) -> ExecutionResult:
-    from control_plane.contracts.common import ValidationSummary
-    from control_plane.contracts.enums import ValidationStatus
+    from operations_center.contracts.common import ValidationSummary
+    from operations_center.contracts.enums import ValidationStatus
     return ExecutionResult(
         run_id=request.run_id,
         proposal_id=request.proposal_id,
@@ -61,8 +61,8 @@ def _success_result(request: ExecutionRequest) -> ExecutionResult:
 
 
 def _failure_result(request: ExecutionRequest) -> ExecutionResult:
-    from control_plane.contracts.common import ValidationSummary
-    from control_plane.contracts.enums import ValidationStatus
+    from operations_center.contracts.common import ValidationSummary
+    from operations_center.contracts.enums import ValidationStatus
     return ExecutionResult(
         run_id=request.run_id,
         proposal_id=request.proposal_id,

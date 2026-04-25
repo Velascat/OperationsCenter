@@ -13,7 +13,7 @@
 ## Supported Runtime Shape
 
 ```text
-ControlPlane proposes work
+OperationsCenter proposes work
   -> SwitchBoard selects how
   -> ExecutionCoordinator builds ExecutionRequest
   -> PolicyEngine constrains
@@ -23,9 +23,9 @@ ControlPlane proposes work
 
 ## Legacy / Quarantined
 
-- `control_plane.legacy_execution` has been removed from the runtime architecture.
+- `operations_center.legacy_execution` has been removed from the runtime architecture.
 - Supported entrypoints are the planning worker (`entrypoints/worker/main.py`) and the canonical execute entrypoint (`entrypoints/execute/main.py`).
-- ControlPlane routing now defaults to `HttpLaneRoutingClient`, which crosses the SwitchBoard `/route` service boundary instead of importing SwitchBoard internals in-process.
+- OperationsCenter routing now defaults to `HttpLaneRoutingClient`, which crosses the SwitchBoard `/route` service boundary instead of importing SwitchBoard internals in-process.
 - Backend invokers/adapters no longer accept execution proxy transport overrides.
 
 ## Deferred

@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.entrypoints.decision import main as decision_main
-from control_plane.insights.artifact_writer import InsightArtifactWriter
-from control_plane.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
+from operations_center.entrypoints.decision import main as decision_main
+from operations_center.insights.artifact_writer import InsightArtifactWriter
+from operations_center.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
 
 def write_insight(tmp_path: Path) -> None:
     artifact = RepoInsightsArtifact(
         run_id="ins_1",
         generated_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
-        source_command="control-plane generate-insights",
-        repo=InsightRepoRef(name="control-plane", path=tmp_path / "repo"),
+        source_command="operations-center generate-insights",
+        repo=InsightRepoRef(name="operations-center", path=tmp_path / "repo"),
         source_snapshots=[SourceSnapshotRef(run_id="obs_1", observed_at=datetime(2026, 3, 31, 11, tzinfo=UTC))],
         insights=[
             DerivedInsight(
@@ -30,7 +30,7 @@ def write_insight(tmp_path: Path) -> None:
             )
         ],
     )
-    InsightArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "insights").write(artifact)
+    InsightArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "insights").write(artifact)
 
 
 def test_decide_proposals_cli_writes_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -50,12 +50,12 @@ def test_decide_proposals_cli_succeeds_with_zero_candidates(tmp_path: Path, monk
     artifact = RepoInsightsArtifact(
         run_id="ins_2",
         generated_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
-        source_command="control-plane generate-insights",
-        repo=InsightRepoRef(name="control-plane", path=tmp_path / "repo"),
+        source_command="operations-center generate-insights",
+        repo=InsightRepoRef(name="operations-center", path=tmp_path / "repo"),
         source_snapshots=[SourceSnapshotRef(run_id="obs_1", observed_at=datetime(2026, 3, 31, 11, tzinfo=UTC))],
         insights=[],
     )
-    InsightArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "insights").write(artifact)
+    InsightArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "insights").write(artifact)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.argv", ["decide-proposals"])
 

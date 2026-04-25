@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from control_plane.tuning.metrics import aggregate_family_metrics
+from operations_center.tuning.metrics import aggregate_family_metrics
 
 
 def _write_decision(root: Path, run_id: str, *, candidates: list, suppressed: list, dry_run: bool = False) -> None:
@@ -14,7 +14,7 @@ def _write_decision(root: Path, run_id: str, *, candidates: list, suppressed: li
         "generated_at": "2026-04-04T12:00:00+00:00",
         "source_command": "test",
         "dry_run": dry_run,
-        "repo": {"name": "ControlPlane", "path": "/tmp/repo"},
+        "repo": {"name": "OperationsCenter", "path": "/tmp/repo"},
         "source_insight_run_id": "ins_1",
         "candidates": candidates,
         "suppressed": suppressed,
@@ -30,7 +30,7 @@ def _write_proposer(root: Path, run_id: str, decision_run_id: str, *, created: l
         "generated_at": "2026-04-04T12:00:00+00:00",
         "source_command": "test",
         "dry_run": dry_run,
-        "repo": {"name": "ControlPlane", "path": "/tmp/repo"},
+        "repo": {"name": "OperationsCenter", "path": "/tmp/repo"},
         "source_decision_run_id": decision_run_id,
         "created": created,
         "skipped": skipped,

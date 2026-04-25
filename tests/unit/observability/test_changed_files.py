@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
-from control_plane.observability.changed_files import (
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.observability.changed_files import (
     ChangedFilesStatus,
     normalize_changed_files,
 )

@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.backends.archon.models import ArchonArtifactCapture, ArchonRunCapture
-from control_plane.backends.archon.normalize import normalize
-from control_plane.contracts.enums import (
+from operations_center.backends.archon.models import ArchonArtifactCapture, ArchonRunCapture
+from operations_center.backends.archon.normalize import normalize
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,

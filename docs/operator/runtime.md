@@ -5,28 +5,28 @@ This repo runs as a local polling workflow.
 ## Main Commands
 
 ```bash
-./scripts/control-plane.sh start
-./scripts/control-plane.sh stop
-./scripts/control-plane.sh run --task-id TASK-123
-./scripts/control-plane.sh run-next
-./scripts/control-plane.sh watch --role goal
-./scripts/control-plane.sh watch --role test
-./scripts/control-plane.sh watch --role improve
-./scripts/control-plane.sh watch --role propose
-./scripts/control-plane.sh watch --role review
-./scripts/control-plane.sh watch --role spec
-./scripts/control-plane.sh watch-all
-./scripts/control-plane.sh watch-all-status
-./scripts/control-plane.sh watch-all-stop
-./scripts/control-plane.sh watch-stop --role goal
-./scripts/control-plane.sh backfill-pr-reviews
-./scripts/control-plane.sh observe-repo
-./scripts/control-plane.sh generate-insights
-./scripts/control-plane.sh decide-proposals
-./scripts/control-plane.sh propose-from-candidates
-./scripts/control-plane.sh autonomy-cycle
-./scripts/control-plane.sh tune-autonomy
-./scripts/control-plane.sh autonomy-tiers
+./scripts/operations-center.sh start
+./scripts/operations-center.sh stop
+./scripts/operations-center.sh run --task-id TASK-123
+./scripts/operations-center.sh run-next
+./scripts/operations-center.sh watch --role goal
+./scripts/operations-center.sh watch --role test
+./scripts/operations-center.sh watch --role improve
+./scripts/operations-center.sh watch --role propose
+./scripts/operations-center.sh watch --role review
+./scripts/operations-center.sh watch --role spec
+./scripts/operations-center.sh watch-all
+./scripts/operations-center.sh watch-all-status
+./scripts/operations-center.sh watch-all-stop
+./scripts/operations-center.sh watch-stop --role goal
+./scripts/operations-center.sh backfill-pr-reviews
+./scripts/operations-center.sh observe-repo
+./scripts/operations-center.sh generate-insights
+./scripts/operations-center.sh decide-proposals
+./scripts/operations-center.sh propose-from-candidates
+./scripts/operations-center.sh autonomy-cycle
+./scripts/operations-center.sh tune-autonomy
+./scripts/operations-center.sh autonomy-tiers
 ```
 
 ## Watchers
@@ -57,7 +57,7 @@ This repo runs as a local polling workflow.
 
 ### `watch --role review`
 
-- polls open PRs tracked in `state/pr_reviews/` every 60 seconds (configurable via `CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS`)
+- polls open PRs tracked in `state/pr_reviews/` every 60 seconds (configurable via `OPERATIONS_CENTER_WATCH_INTERVAL_REVIEW_SECONDS`)
 - only active for repos with `await_review: true` in config
 - drives the two-phase review loop:
   - **self-review phase**: kodo evaluates its own diff and either merges (LGTM) or revises and retries
@@ -80,9 +80,9 @@ This repo runs as a local polling workflow.
 Stop a single watcher role without stopping all six:
 
 ```bash
-./scripts/control-plane.sh watch-stop --role goal
-./scripts/control-plane.sh watch-stop --role test
-./scripts/control-plane.sh watch-stop --role propose
+./scripts/operations-center.sh watch-stop --role goal
+./scripts/operations-center.sh watch-stop --role test
+./scripts/operations-center.sh watch-stop --role propose
 ```
 
 Sends SIGTERM to the PID recorded in `logs/local/watch-all/<role>.pid`. The restart loop exits cleanly; the python worker finishes its current cycle or is interrupted by the signal. Use `watch-all-stop` to stop all roles at once.
@@ -127,7 +127,7 @@ This is the quickest way to tell whether the local system is alive or stalled.
 Each watcher also writes a `heartbeat_<role>.json` file to `logs/local/watch-all/` at the start of every cycle. Use the heartbeat-check CLI to verify all watchers are alive:
 
 ```bash
-python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+python -m operations_center.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
 ```
 
 Exits with code 0 when all watchers are healthy, code 1 when any heartbeat is stale (> 5 minutes old). Suitable for cron-based monitoring.
@@ -137,7 +137,7 @@ Exits with code 0 when all watchers are healthy, code 1 when any heartbeat is st
 Each watcher lane runs one task at a time by default. For higher throughput, set `parallel_slots` in config or pass `--parallel-slots N` on the CLI:
 
 ```bash
-./scripts/control-plane.sh watch --role goal --parallel-slots 3
+./scripts/operations-center.sh watch --role goal --parallel-slots 3
 ```
 
 Or in config:
@@ -193,13 +193,13 @@ To see how many tasks have been executed and their estimated cost:
 
 ```bash
 # Last 24 hours (default)
-python -m control_plane.entrypoints.worker.main spend-report
+python -m operations_center.entrypoints.worker.main spend-report
 
 # Last 7 days
-python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+python -m operations_center.entrypoints.worker.main spend-report --window-days 7
 ```
 
-Cost tracking requires `cost_per_execution_usd` to be set in config (default 0.0 = disabled). The value is operator-supplied; ControlPlane does not parse Kodo billing output.
+Cost tracking requires `cost_per_execution_usd` to be set in config (default 0.0 = disabled). The value is operator-supplied; OperationsCenter does not parse Kodo billing output.
 
 ```yaml
 cost_per_execution_usd: 0.15   # rough estimate per task run
@@ -211,14 +211,14 @@ cost_per_execution_usd: 0.15   # rough estimate per task run
 - Plane runtime logs: `logs/local/plane-runtime/`
 - watcher logs, PIDs, heartbeat files: `logs/local/watch-all/`
 - retained run artifacts: `tools/report/kodo_plane/`
-- observer snapshots: `tools/report/control_plane/observer/`
-- insight artifacts: `tools/report/control_plane/insights/`
-- decision artifacts: `tools/report/control_plane/decision/`
-- proposer result artifacts: `tools/report/control_plane/proposer/`
+- observer snapshots: `tools/report/operations_center/observer/`
+- insight artifacts: `tools/report/operations_center/insights/`
+- decision artifacts: `tools/report/operations_center/decision/`
+- proposer result artifacts: `tools/report/operations_center/proposer/`
 
 ### Machine-Level Kodo Artifacts (`~/.kodo/`)
 
-Kodo maintains its own run history at `~/.kodo/runs/` — one JSON file per execution. This is a machine-level bookkeeping directory written by Kodo itself, not by ControlPlane. It accumulates over time (hundreds of entries, tens of MB) and is safe to leave in place.
+Kodo maintains its own run history at `~/.kodo/runs/` — one JSON file per execution. This is a machine-level bookkeeping directory written by Kodo itself, not by OperationsCenter. It accumulates over time (hundreds of entries, tens of MB) and is safe to leave in place.
 
 The `~/.kodo/` directory is entirely separate from any per-repo `.kodo/` runtime directory that Kodo may create inside an ephemeral workspace during a run (e.g. `.kodo/team.json` for the Claude fallback override). The per-repo `.kodo/` directory is cleaned up automatically after each task run.
 
@@ -236,7 +236,7 @@ The propose watcher and `autonomy-cycle` both enforce a board saturation limit t
 Default limit is 15. Configurable via environment variable:
 
 ```bash
-CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS=20 ./scripts/control-plane.sh watch --role propose
+OPERATIONS_CENTER_MAX_QUEUED_AUTONOMY_TASKS=20 ./scripts/operations-center.sh watch --role propose
 ```
 
 When saturated, look for `"event": "propose_skipped_board_saturated"` in the propose watcher log. This is not an error — it means the board already has more work than the workers are consuming.
@@ -274,13 +274,13 @@ The preferred way to run the full autonomy pipeline in one command:
 
 ```bash
 # Dry-run (default) — shows what would be proposed, no Plane writes
-./scripts/control-plane.sh autonomy-cycle --config <config.yaml>
+./scripts/operations-center.sh autonomy-cycle --config <config.yaml>
 
 # Execute — creates real Plane tasks
-./scripts/control-plane.sh autonomy-cycle --config <config.yaml> --execute
+./scripts/operations-center.sh autonomy-cycle --config <config.yaml> --execute
 
 # Execute with all candidate families enabled
-./scripts/control-plane.sh autonomy-cycle --config <config.yaml> --execute --all-families
+./scripts/operations-center.sh autonomy-cycle --config <config.yaml> --execute --all-families
 ```
 
 **Always review the dry-run output before adding `--execute`**, especially after:
@@ -298,13 +298,13 @@ The bounded self-tuning regulation loop. Run this as a periodic maintenance step
 
 ```bash
 # Recommendation-only (default, safe — no config changes)
-./scripts/control-plane.sh tune-autonomy
+./scripts/operations-center.sh tune-autonomy
 
 # With wider artifact window
-./scripts/control-plane.sh tune-autonomy --window 30
+./scripts/operations-center.sh tune-autonomy --window 30
 
 # Auto-apply mode (opt-in, requires env var as second gate)
-CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/control-plane.sh tune-autonomy --apply
+OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/operations-center.sh tune-autonomy --apply
 ```
 
 Reads retained decision, proposer, and feedback artifacts. Produces per-family metrics including acceptance rates and emits conservative recommendations. See `docs/operator/tuning.md` and `docs/design/autonomy_self_tuning_regulator.md` for full details.
@@ -315,16 +315,16 @@ Manages per-family autonomy tiers that control the initial Plane task state:
 
 ```bash
 # Show current tier configuration
-./scripts/control-plane.sh autonomy-tiers show
+./scripts/operations-center.sh autonomy-tiers show
 
 # Promote a family to auto-execute (tier 2)
-./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
+./scripts/operations-center.sh autonomy-tiers set --family lint_fix --tier 2
 
 # Demote a family to backlog-only (tier 1)
-./scripts/control-plane.sh autonomy-tiers set --family type_fix --tier 1
+./scripts/operations-center.sh autonomy-tiers set --family type_fix --tier 1
 
 # Disable auto-creation for a family (tier 0)
-./scripts/control-plane.sh autonomy-tiers set --family arch_promotion --tier 0
+./scripts/operations-center.sh autonomy-tiers set --family arch_promotion --tier 0
 ```
 
 Tier changes are written to `config/autonomy_tiers.json` and take effect on the next `autonomy-cycle` run.
@@ -335,13 +335,13 @@ When a family's tier is raised from 1 to 2, tasks already sitting in Backlog fro
 
 ```bash
 # Dry-run (default): show what would be promoted, no Plane writes
-./scripts/control-plane.sh promote-backlog
+./scripts/operations-center.sh promote-backlog
 
 # Promote all tier-2 families
-./scripts/control-plane.sh promote-backlog --execute
+./scripts/operations-center.sh promote-backlog --execute
 
 # Promote one family only
-./scripts/control-plane.sh promote-backlog --family lint_fix --execute
+./scripts/operations-center.sh promote-backlog --family lint_fix --execute
 ```
 
 Promotion criteria (all must be true):
@@ -359,11 +359,11 @@ The error ingest service bridges production runtime errors into Plane tasks auto
 **Webhook receiver** — listens for HTTP `POST /ingest` with JSON body `{text, repo_key?}`:
 
 ```bash
-python -m control_plane.entrypoints.error_ingest.main \
-    --config config/control_plane.local.yaml
+python -m operations_center.entrypoints.error_ingest.main \
+    --config config/operations_center.local.yaml
 ```
 
-Configure in `config/control_plane.local.yaml`:
+Configure in `config/operations_center.local.yaml`:
 ```yaml
 error_ingest:
   webhook_port: 9000
@@ -402,26 +402,26 @@ Records proposal outcomes manually for tasks that were merged, escalated, or aba
 
 ```bash
 # Record a merge
-python -m control_plane.entrypoints.feedback.main record \
+python -m operations_center.entrypoints.feedback.main record \
     --task-id <uuid> --outcome merged --pr-number 42
 
 # Record an escalation
-python -m control_plane.entrypoints.feedback.main record \
+python -m operations_center.entrypoints.feedback.main record \
     --task-id <uuid> --outcome escalated
 
 # Record abandonment
-python -m control_plane.entrypoints.feedback.main record \
+python -m operations_center.entrypoints.feedback.main record \
     --task-id <uuid> --outcome abandoned
 
 # Record with confidence calibration data (optional)
-python -m control_plane.entrypoints.feedback.main record \
+python -m operations_center.entrypoints.feedback.main record \
     --task-id <uuid> --outcome merged --family lint_fix --confidence high
 
 # List all feedback records
-python -m control_plane.entrypoints.feedback.main list
+python -m operations_center.entrypoints.feedback.main list
 
 # Show feedback for a specific task
-python -m control_plane.entrypoints.feedback.main show --task-id <uuid>
+python -m operations_center.entrypoints.feedback.main show --task-id <uuid>
 ```
 
 The reviewer watcher writes feedback records automatically when it merges or escalates a PR. Use this command for manual retroactive recording.
@@ -442,13 +442,13 @@ Each stage writes its own retained artifact before the next stage consumes it.
 
 ```bash
 # Dry-run (default) — shows what would be proposed, no Plane writes
-./scripts/control-plane.sh autonomy-cycle
+./scripts/operations-center.sh autonomy-cycle
 
 # Execute — creates real Plane tasks
-./scripts/control-plane.sh autonomy-cycle --execute
+./scripts/operations-center.sh autonomy-cycle --execute
 
 # Execute with all candidate families enabled
-./scripts/control-plane.sh autonomy-cycle --execute --all-families
+./scripts/operations-center.sh autonomy-cycle --execute --all-families
 ```
 
 The dry-run output shows:
@@ -463,8 +463,8 @@ Review this output before adding `--execute`, especially after:
 
 The stage-by-stage commands also support dry-run:
 ```bash
-./scripts/control-plane.sh decide-proposals --dry-run
-./scripts/control-plane.sh propose-from-candidates --dry-run
+./scripts/operations-center.sh decide-proposals --dry-run
+./scripts/operations-center.sh propose-from-candidates --dry-run
 ```
 
 Use these when you want to inspect a single stage without running the full chain.
@@ -472,7 +472,7 @@ Use these when you want to inspect a single stage without running the full chain
 ## Retention
 
 ```bash
-./scripts/control-plane.sh janitor
+./scripts/operations-center.sh janitor
 ```
 
 The wrapper runs janitor automatically before write commands. Read-only and status commands (`watch-all-status`, `dev-status`, `watch-all-stop`, `watch-stop`, `plane-status`, `providers-status`, `doctor`) skip the janitor to avoid unnecessary work.
@@ -480,7 +480,7 @@ The wrapper runs janitor automatically before write commands. Read-only and stat
 Default retention is 1 day and can be changed with:
 
 ```bash
-CONTROL_PLANE_RETENTION_DAYS=<days>
+OPERATIONS_CENTER_RETENTION_DAYS=<days>
 ```
 
 ## Process Supervisor
@@ -488,7 +488,7 @@ CONTROL_PLANE_RETENTION_DAYS=<days>
 For unattended operation, use the process supervisor instead of (or on top of) the bash restart loops in `watch-all`. The supervisor is manifest-driven, tracks restart counts, and monitors heartbeat files independently of the shell session:
 
 ```bash
-python -m control_plane.entrypoints.supervisor.main \
+python -m operations_center.entrypoints.supervisor.main \
     --manifest config/supervisor_manifest.yaml \
     --log-dir logs/local \
     --check-interval 30
@@ -498,8 +498,8 @@ Example manifest (`config/supervisor_manifest.yaml`):
 ```yaml
 processes:
   - role: goal
-    command: ["python", "-m", "control_plane.entrypoints.worker.main",
-              "--config", "config/control_plane.local.yaml",
+    command: ["python", "-m", "operations_center.entrypoints.worker.main",
+              "--config", "config/operations_center.local.yaml",
               "--watch", "--role", "goal", "--status-dir", "logs/local"]
     restart_backoff_seconds: 10
   - role: improve
@@ -516,8 +516,8 @@ The supervisor writes `logs/local/supervisor.status.json` on every check — rea
 For reactive operation instead of scheduled-only runs, use the pipeline trigger daemon:
 
 ```bash
-python -m control_plane.entrypoints.pipeline_trigger.main \
-    --config config/control_plane.local.yaml \
+python -m operations_center.entrypoints.pipeline_trigger.main \
+    --config config/operations_center.local.yaml \
     --execute \
     --min-interval 300    # minimum seconds between runs (default 300)
     --poll-interval 30    # how often to check trigger files (default 30)
@@ -540,8 +540,8 @@ To surface dependency updates immediately without waiting for a cycle:
 
 ```bash
 # Run the improve watcher manually for one scan cycle
-python -m control_plane.entrypoints.worker.main \
-    --config config/control_plane.local.yaml --first-ready --role improve
+python -m operations_center.entrypoints.worker.main \
+    --config config/operations_center.local.yaml --first-ready --role improve
 ```
 
 ## Maintenance Windows
@@ -566,7 +566,7 @@ Supported report formats (checked in priority order):
 2. `pytest-coverage.txt` / `coverage.txt` — text totals only
 3. `htmlcov/index.html` — HTML report from `coverage html`
 
-To enable coverage proposals, generate coverage reports as part of your normal test run and keep the output files in the repo root or your logs directory. ControlPlane never runs coverage tools itself.
+To enable coverage proposals, generate coverage reports as part of your normal test run and keep the output files in the repo root or your logs directory. OperationsCenter never runs coverage tools itself.
 
 When coverage data is available, the autonomy pipeline can propose:
 - `[Improve] Improve test coverage (currently N%)` — when total coverage falls below 60%
@@ -592,10 +592,10 @@ Export a structured execution audit trail for the last N days:
 
 ```bash
 # Last 7 days (default)
-python -m control_plane.entrypoints.worker.main audit-export
+python -m operations_center.entrypoints.worker.main audit-export
 
 # Last 30 days, save to file
-python -m control_plane.entrypoints.worker.main audit-export --window-days 30 > audit.json
+python -m operations_center.entrypoints.worker.main audit-export --window-days 30 > audit.json
 ```
 
 Each entry has `kind: "execution"`, `task_id`, `outcome`, `succeeded`, `role`, `kodo_version`, and `timestamp`. Use for compliance review or debugging failure patterns.
@@ -603,8 +603,8 @@ Each entry has `kind: "execution"`, `task_id`, `outcome`, `succeeded`, `role`, `
 ## Board Health Snapshot
 
 ```bash
-python -m control_plane.entrypoints.worker.main board-health \
-    --config config/control_plane.local.yaml
+python -m operations_center.entrypoints.worker.main board-health \
+    --config config/operations_center.local.yaml
 ```
 
 Returns a JSON list of board anomalies:
@@ -633,9 +633,9 @@ When the cap is reached, the watcher logs `skip_repo_budget` and moves to the ne
 Track multi-step execution plan progress across related tasks:
 
 ```bash
-python -m control_plane.entrypoints.campaign_status.main
-python -m control_plane.entrypoints.campaign_status.main --status in_progress
-python -m control_plane.entrypoints.campaign_status.main --json
+python -m operations_center.entrypoints.campaign_status.main
+python -m operations_center.entrypoints.campaign_status.main --status in_progress
+python -m operations_center.entrypoints.campaign_status.main --json
 ```
 
 Campaigns are registered automatically when `build_multi_step_plan()` decomposes a complex task. Records are stored in `state/campaigns.json`.
@@ -645,14 +645,14 @@ Campaigns are registered automatically when `build_multi_step_plan()` decomposes
 Receive real-time GitHub `check_run` events instead of polling:
 
 ```bash
-python -m control_plane.entrypoints.ci_webhook.main --host 127.0.0.1 --port 8765
+python -m operations_center.entrypoints.ci_webhook.main --host 127.0.0.1 --port 8765
 ```
 
 Environment variables:
-- `CONTROL_PLANE_WEBHOOK_SECRET` — HMAC secret from GitHub webhook settings (required for signature validation)
-- `CONTROL_PLANE_WEBHOOK_PORT` — port (default: 8765)
-- `CONTROL_PLANE_WEBHOOK_HOST` — host (default: 127.0.0.1)
-- `CONTROL_PLANE_WEBHOOK_TRIGGER` — optional command to run on CI event (default: write trigger file to `state/ci_webhook_triggers/`)
+- `OPERATIONS_CENTER_WEBHOOK_SECRET` — HMAC secret from GitHub webhook settings (required for signature validation)
+- `OPERATIONS_CENTER_WEBHOOK_PORT` — port (default: 8765)
+- `OPERATIONS_CENTER_WEBHOOK_HOST` — host (default: 127.0.0.1)
+- `OPERATIONS_CENTER_WEBHOOK_TRIGGER` — optional command to run on CI event (default: write trigger file to `state/ci_webhook_triggers/`)
 
 Configure GitHub to send `check_run` events to `http://your-host:8765/webhook`.
 
@@ -667,7 +667,7 @@ After the operator replies in the task comments, `handle_awaiting_input_scan()` 
 Remove stale calibration events manually:
 
 ```python
-from control_plane.tuning.calibration import ConfidenceCalibrationStore
+from operations_center.tuning.calibration import ConfidenceCalibrationStore
 removed = ConfidenceCalibrationStore().cleanup_old_events(window_days=90)
 print(f"Removed {removed} old events")
 ```

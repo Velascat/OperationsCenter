@@ -8,10 +8,10 @@ from unittest.mock import patch
 
 import pytest
 
-from control_plane.backends.direct_local.adapter import DirectLocalBackendAdapter
-from control_plane.config.settings import AiderSettings
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
-from control_plane.contracts.execution import ExecutionRequest, ExecutionResult
+from operations_center.backends.direct_local.adapter import DirectLocalBackendAdapter
+from operations_center.config.settings import AiderSettings
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.contracts.execution import ExecutionRequest, ExecutionResult
 
 
 # ---------------------------------------------------------------------------

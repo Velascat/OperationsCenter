@@ -4,9 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from control_plane.spec_director.phase_orchestrator import PhaseOrchestrator
-from control_plane.spec_director.models import CampaignRecord
-from control_plane.spec_director.state import CampaignStateManager
+from operations_center.spec_director.phase_orchestrator import PhaseOrchestrator
+from operations_center.spec_director.models import CampaignRecord
+from operations_center.spec_director.state import CampaignStateManager
 
 
 _CAMPAIGN_ID = "test-campaign-uuid"
@@ -102,7 +102,7 @@ def test_does_not_advance_if_implement_blocked(tmp_path):
         blocked_issue,
         _make_issue(task_id="test-1", name="[Test] Goal 1", state="Backlog", kind="test_campaign"),
     ]
-    with patch("control_plane.spec_director.phase_orchestrator.call_claude") as mock_claude:
+    with patch("operations_center.spec_director.phase_orchestrator.call_claude") as mock_claude:
         mock_claude.return_value = (
             "## Execution\nrepo: repo_a\nbase_branch: main\nmode: goal\n"
             "spec_campaign_id: test-campaign-uuid\nspec_file: docs/specs/my-slug.md\n"
@@ -154,7 +154,7 @@ def test_blocked_task_rewritten_and_requeued(tmp_path):
     client.fetch_issue.return_value = dict(blocked_issue)
     client.list_issue_comments.return_value = [{"body": "Tests failed: assertion error on line 42."}]
 
-    with patch("control_plane.spec_director.phase_orchestrator.call_claude") as mock_claude:
+    with patch("operations_center.spec_director.phase_orchestrator.call_claude") as mock_claude:
         mock_claude.return_value = (
             "## Execution\nrepo: repo_a\nbase_branch: main\nmode: goal\n"
             "spec_campaign_id: test-campaign-uuid\nspec_file: docs/specs/my-slug.md\n"

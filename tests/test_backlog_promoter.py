@@ -19,7 +19,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 
-from control_plane.proposer.backlog_promoter import (
+from operations_center.proposer.backlog_promoter import (
     BacklogPromoterService,
     _parse_recorded_tier,
     _parse_source_family,

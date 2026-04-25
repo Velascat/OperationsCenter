@@ -20,7 +20,7 @@ When a task completes with a branch push and `await_review: true` is set for the
 
 ## Phase 1 — Self-Review (Automatic)
 
-The `review` watcher polls tracked PRs every 60 seconds (configurable via `CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS`).
+The `review` watcher polls tracked PRs every 60 seconds (configurable via `OPERATIONS_CENTER_WATCH_INTERVAL_REVIEW_SECONDS`).
 
 1. Kodo reads the diff against the base branch.
 2. Kodo writes a verdict: `LGTM` or `CONCERNS`.
@@ -41,7 +41,7 @@ The self-review verdict is posted as a PR comment with the `<!-- controlplane:bo
 
 ## Enabling the Review Loop
 
-In `config/control_plane.local.yaml`:
+In `config/operations_center.local.yaml`:
 
 ```yaml
 repos:
@@ -90,7 +90,7 @@ Before enabling `await_review: true` for a new repo, verify:
 - [ ] `<!-- controlplane:bot -->` marker is being appended to all bot comments (check any existing PR comment in `state/pr_reviews/`).
 - [ ] Branch protection rules on GitHub do not require status checks that the bot cannot satisfy — otherwise auto-merge will be blocked.
 - [ ] `max_self_review_loops` is set to a reasonable value (default 2 is conservative; raise to 3 only if the first revision reliably resolves concerns).
-- [ ] `CONTROL_PLANE_PR_DRY_RUN=1` is NOT set in production unless you intend to prevent all PR actions.
+- [ ] `OPERATIONS_CENTER_PR_DRY_RUN=1` is NOT set in production unless you intend to prevent all PR actions.
 
 ## Audit Trail
 
@@ -117,21 +117,21 @@ cat state/pr_reviews/<owner>/<repo>/<pr-number>.json | python3 -m json.tool
 If the review watcher restarts and misses PRs that were opened while it was down:
 
 ```bash
-./scripts/control-plane.sh backfill-pr-reviews
+./scripts/operations-center.sh backfill-pr-reviews
 ```
 
 This scans GitHub for open PRs on all `await_review`-enabled repos and creates missing state files. Run this after any watcher restart.
 
 ## Dry-Run Mode
 
-Set `CONTROL_PLANE_PR_DRY_RUN=1` to log all intended PR actions (merge, comment, push) without actually touching GitHub. Use this to:
+Set `OPERATIONS_CENTER_PR_DRY_RUN=1` to log all intended PR actions (merge, comment, push) without actually touching GitHub. Use this to:
 
 - Verify the review watcher is polling correctly.
 - Test the transition logic after a config change.
 - Debug a stuck review state without risk of unintended merges.
 
 ```bash
-CONTROL_PLANE_PR_DRY_RUN=1 ./scripts/control-plane.sh watch --role review
+OPERATIONS_CENTER_PR_DRY_RUN=1 ./scripts/operations-center.sh watch --role review
 ```
 
 ## Troubleshooting

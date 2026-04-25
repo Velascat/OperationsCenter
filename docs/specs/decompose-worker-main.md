@@ -6,7 +6,7 @@ phases:
   - test
   - improve
 repos:
-  - ControlPlane
+  - OperationsCenter
 area_keywords:
   - entrypoints/worker
   - worker
@@ -19,7 +19,7 @@ created_at: 2026-04-17T00:00:00Z
 
 ## Overview
 
-`src/control_plane/entrypoints/worker/main.py` is an 8 052-line monolith containing 164 top-level functions that mix proposal logic, AST-based code scanning, board reconciliation, blocked-issue triage, task execution handlers, and the main watch loop. This campaign extracts cohesive function groups into focused submodules inside the `entrypoints/worker/` package, turning the single file into a package of ≤ 800-line modules with a thin `main.py` re-exporting the public API.
+`src/operations_center/entrypoints/worker/main.py` is an 8 052-line monolith containing 164 top-level functions that mix proposal logic, AST-based code scanning, board reconciliation, blocked-issue triage, task execution handlers, and the main watch loop. This campaign extracts cohesive function groups into focused submodules inside the `entrypoints/worker/` package, turning the single file into a package of ≤ 800-line modules with a thin `main.py` re-exporting the public API.
 
 ## Goals
 
@@ -33,7 +33,7 @@ created_at: 2026-04-17T00:00:00Z
 
 ## Constraints
 
-- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that `from control_plane.entrypoints.worker.main import X` continues to work for external callers and tests. Use `from .proposals import *` style re-exports.
+- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that `from operations_center.entrypoints.worker.main import X` continues to work for external callers and tests. Use `from .proposals import *` style re-exports.
 - **No logic changes**: Each goal is a pure move-and-import refactor. Do not rename functions, change signatures, or alter behavior.
 - **Incremental**: Each goal is a standalone PR-able commit. Tests must pass after each extraction.
 - **Convert to package first**: The first commit of Goal 1 should convert `worker/` from a single `main.py` to a Python package (`__init__.py` + `main.py`), if not already done.
@@ -45,5 +45,5 @@ created_at: 2026-04-17T00:00:00Z
 - `worker/main.py` is under 2 500 lines (down from 8 052).
 - Four new modules exist: `proposals.py`, `scanning.py`, `reconciliation.py`, `task_handlers.py`.
 - `python -m pytest tests/test_worker_entrypoint.py` passes with zero import errors and no test changes.
-- `ruff check src/control_plane/entrypoints/worker/` reports no new lint violations.
+- `ruff check src/operations_center/entrypoints/worker/` reports no new lint violations.
 - Every previously-importable symbol from `worker.main` is still importable from that path.

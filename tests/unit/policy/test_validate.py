@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.policy.models import (
+from operations_center.policy.models import (
     BranchGuardrail,
     PathPolicy,
     PathScopeRule,
@@ -19,8 +19,8 @@ from control_plane.policy.models import (
     ToolGuardrail,
     ValidationRequirement,
 )
-from control_plane.policy.validate import validate_config
-from control_plane.policy.defaults import DEFAULT_POLICY_CONFIG
+from operations_center.policy.validate import validate_config
+from operations_center.policy.defaults import DEFAULT_POLICY_CONFIG
 
 from .conftest import make_policy_config, make_repo_policy
 

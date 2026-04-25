@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-from control_plane.observer.collectors.validation_history import ValidationHistoryCollector
-from control_plane.observer.models import ValidationFailureRecord
+from operations_center.observer.collectors.validation_history import ValidationHistoryCollector
+from operations_center.observer.models import ValidationFailureRecord
 
 
 @dataclass

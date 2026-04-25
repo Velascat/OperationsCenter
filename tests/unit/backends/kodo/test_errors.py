@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from control_plane.backends.kodo.errors import build_failure_reason, categorize_failure
-from control_plane.contracts.enums import FailureReasonCategory
+from operations_center.backends.kodo.errors import build_failure_reason, categorize_failure
+from operations_center.contracts.enums import FailureReasonCategory
 
 
 class TestCategorizeFailure:

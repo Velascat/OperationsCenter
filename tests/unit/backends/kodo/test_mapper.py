@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.contracts.execution import ExecutionRequest
-from control_plane.backends.kodo.mapper import check_support, map_request
-from control_plane.backends.kodo.models import KodoPreparedRun
+from operations_center.contracts.execution import ExecutionRequest
+from operations_center.backends.kodo.mapper import check_support, map_request
+from operations_center.backends.kodo.models import KodoPreparedRun
 
 
 # ---------------------------------------------------------------------------
@@ -51,12 +51,12 @@ class TestCheckSupport:
         assert "repo_key" in check.unsupported_fields
 
     def test_support_check_yes_factory(self):
-        from control_plane.backends.kodo.models import SupportCheck
+        from operations_center.backends.kodo.models import SupportCheck
         check = SupportCheck.yes()
         assert check.supported is True
 
     def test_support_check_no_factory(self):
-        from control_plane.backends.kodo.models import SupportCheck
+        from operations_center.backends.kodo.models import SupportCheck
         check = SupportCheck.no("missing field", fields=["goal_text"])
         assert check.supported is False
         assert check.unsupported_fields == ["goal_text"]

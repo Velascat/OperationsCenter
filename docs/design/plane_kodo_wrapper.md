@@ -100,6 +100,6 @@ This prevents Kodo subprocesses from becoming orphans that continue consuming CP
 
 ## Smoke verification
 
-- Use `python -m control_plane.entrypoints.smoke.plane --config ... --task-id ... --comment-only` to verify Plane connectivity and parsing without invoking Kodo.
+- Use `python -m operations_center.entrypoints.smoke.plane --config ... --task-id ... --comment-only` to verify Plane connectivity and parsing without invoking Kodo.
 - Smoke runs retain the raw fetched work-item payload in `plane_work_item.json`.
 - Live Plane API behavior still needs to be confirmed by the operator against the target deployment and recorded from retained smoke artifacts.

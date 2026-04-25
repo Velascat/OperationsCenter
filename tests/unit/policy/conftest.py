@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.common import BranchPolicy, TaskTarget, ValidationProfile
-from control_plane.contracts.enums import (
+from operations_center.contracts.common import BranchPolicy, TaskTarget, ValidationProfile
+from operations_center.contracts.enums import (
     BackendName,
     ExecutionMode,
     LaneName,
@@ -19,9 +19,9 @@ from control_plane.contracts.enums import (
     RiskLevel,
     TaskType,
 )
-from control_plane.contracts.proposal import TaskProposal
-from control_plane.contracts.routing import LaneDecision
-from control_plane.policy.models import (
+from operations_center.contracts.proposal import TaskProposal
+from operations_center.contracts.routing import LaneDecision
+from operations_center.policy.models import (
     BranchGuardrail,
     PathPolicy,
     PathScopeRule,

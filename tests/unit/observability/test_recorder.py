@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import (
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,
     ValidationStatus,
 )
-from control_plane.observability.changed_files import ChangedFilesStatus
-from control_plane.observability.models import BackendDetailRef, ExecutionRecord
-from control_plane.observability.recorder import ExecutionRecorder
+from operations_center.observability.changed_files import ChangedFilesStatus
+from operations_center.observability.models import BackendDetailRef, ExecutionRecord
+from operations_center.observability.recorder import ExecutionRecorder
 
 from .conftest import (
     make_artifact,

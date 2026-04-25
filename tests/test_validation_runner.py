@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from control_plane.application.validation import ValidationRunner
+from operations_center.application.validation import ValidationRunner
 
 
 class TestValidationRunnerNormalCompletion:
@@ -15,7 +15,7 @@ class TestValidationRunnerNormalCompletion:
         mock_proc.stdout = "ok\n"
         mock_proc.stderr = ""
 
-        with patch("control_plane.application.validation.subprocess.run", return_value=mock_proc) as mock_run:
+        with patch("operations_center.application.validation.subprocess.run", return_value=mock_proc) as mock_run:
             results = runner.run(["echo hello"], cwd=Path("/tmp"))
 
         assert len(results) == 1
@@ -37,7 +37,7 @@ class TestValidationRunnerTimeout:
         exc = subprocess.TimeoutExpired(cmd="sleep 999", timeout=60)
         exc.stdout = None
 
-        with patch("control_plane.application.validation.subprocess.run", side_effect=exc):
+        with patch("operations_center.application.validation.subprocess.run", side_effect=exc):
             results = runner.run(["sleep 999"], cwd=Path("/tmp"), timeout_seconds=60)
 
         assert len(results) == 1
@@ -53,7 +53,7 @@ class TestValidationRunnerTimeout:
         exc = subprocess.TimeoutExpired(cmd="make test", timeout=10)
         exc.stdout = None
 
-        with patch("control_plane.application.validation.subprocess.run", side_effect=exc):
+        with patch("operations_center.application.validation.subprocess.run", side_effect=exc):
             results = runner.run(["make test"], cwd=Path("/tmp"), timeout_seconds=10)
 
         assert not runner.passed(results)
@@ -67,7 +67,7 @@ class TestValidationRunnerNoTimeout:
         mock_proc.stdout = ""
         mock_proc.stderr = ""
 
-        with patch("control_plane.application.validation.subprocess.run", return_value=mock_proc) as mock_run:
+        with patch("operations_center.application.validation.subprocess.run", return_value=mock_proc) as mock_run:
             runner.run(["true"], cwd=Path("/tmp"), timeout_seconds=None)
 
         assert mock_run.call_args.kwargs.get("timeout") is None
@@ -79,7 +79,7 @@ class TestValidationRunnerTimeoutStdoutBytes:
         exc = subprocess.TimeoutExpired(cmd="sleep 999", timeout=60)
         exc.stdout = b"partial output\nline two"
 
-        with patch("control_plane.application.validation.subprocess.run", side_effect=exc):
+        with patch("operations_center.application.validation.subprocess.run", side_effect=exc):
             results = runner.run(["sleep 999"], cwd=Path("/tmp"), timeout_seconds=60)
 
         assert len(results) == 1
@@ -106,7 +106,7 @@ class TestValidationRunnerMixedCommandOutcomes:
         mock_proc_ok2.stderr = ""
 
         with patch(
-            "control_plane.application.validation.subprocess.run",
+            "operations_center.application.validation.subprocess.run",
             side_effect=[mock_proc_ok, timeout_exc, mock_proc_ok2],
         ):
             results = runner.run(

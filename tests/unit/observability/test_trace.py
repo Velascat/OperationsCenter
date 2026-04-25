@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import (
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,
     ValidationStatus,
 )
-from control_plane.observability.changed_files import ChangedFilesStatus
-from control_plane.observability.recorder import ExecutionRecorder
-from control_plane.observability.trace import ExecutionTrace, RunReportBuilder
+from operations_center.observability.changed_files import ChangedFilesStatus
+from operations_center.observability.recorder import ExecutionRecorder
+from operations_center.observability.trace import ExecutionTrace, RunReportBuilder
 
 from .conftest import (
     make_artifact,
@@ -220,7 +220,7 @@ def test_no_changed_file_warning_for_not_applicable(recorder, builder, policy_bl
 
 
 def test_backend_detail_refs_in_trace(recorder, builder, successful_rich_result):
-    from control_plane.observability.models import BackendDetailRef
+    from operations_center.observability.models import BackendDetailRef
     ref = BackendDetailRef(detail_type="stderr_log", path="/tmp/stderr.txt")
     record = recorder.record(successful_rich_result, raw_detail_refs=[ref])
     trace = builder.build_report(record)

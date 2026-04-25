@@ -1,0 +1,121 @@
+# Operations Center configuration template.
+# Copy to config/operations_center.local.yaml and fill in your values.
+# This file is safe to commit. Your local copy is gitignored.
+#
+# Split model:
+#   This file holds structure and behaviour (safe to version).
+#   .env.operations-center.local holds secrets and runtime knobs (never commit).
+#   Fields named *_env reference environment variable NAMES, not values.
+
+# ---------------------------------------------------------------------------
+# Plane board connection
+# ---------------------------------------------------------------------------
+plane:
+  base_url: http://localhost:8080       # URL of your local Plane instance
+  api_token_env: PLANE_API_TOKEN        # env var holding your Plane API token
+  workspace_slug: operations-center         # Plane workspace slug
+  project_id: <your-plane-project-uuid> # Plane project UUID
+
+# ---------------------------------------------------------------------------
+# Git behaviour
+# ---------------------------------------------------------------------------
+git:
+  provider: github
+  token_env: GITHUB_TOKEN               # env var holding your GitHub token (global fallback)
+  open_pr_default: false                # open a PR by default after push (per-repo overrides this)
+  push_on_validation_failure: true      # push a draft branch even when validation fails
+  author_name: Operations Center Bot
+  author_email: operations-center-bot@example.com
+  sign_commits: false
+  signing_key: null                     # GPG key ID if sign_commits: true
+
+# ---------------------------------------------------------------------------
+# Kodo execution engine
+# ---------------------------------------------------------------------------
+kodo:
+  binary: scripts/kodo-shim             # path to kodo binary or shim script
+  team: full                            # worker team preset (full = codex fast + claude smart)
+  cycles: 3                             # max orchestrator cycles per task
+  exchanges: 20                         # max exchanges per cycle
+  orchestrator: claude-code:opus        # orchestrator backend (uses Claude Code CLI subscription)
+  effort: standard                      # effort level: minimal | standard | thorough
+  timeout_seconds: 3600                 # hard timeout per task run (1 hour)
+
+# ---------------------------------------------------------------------------
+# Repos
+# ---------------------------------------------------------------------------
+# At least one repo is required. The repo key (e.g. "MyRepo") must match the
+# value used in the "repo: <key>" label on Plane work items.
+#
+# Minimal single-repo example:
+repos:
+  MyRepo:
+    clone_url: git@github.com:owner/MyRepo.git
+    default_branch: main
+    validation_commands:               # all must exit 0 for a push to be allowed
+      - .venv/bin/pytest -q
+      - .venv/bin/ruff check .
+    allowed_base_branches:             # only these branches may be used as PR base
+      - main
+    bootstrap_enabled: true            # create venv + install deps before each run
+    python_binary: python3
+    venv_dir: .venv
+    install_dev_command: .venv/bin/pip install -e .[dev]
+
+# ---------------------------------------------------------------------------
+# Multi-repo example (uncomment and adapt as needed):
+# ---------------------------------------------------------------------------
+#   FrontendRepo:
+#     clone_url: git@github.com:owner/FrontendRepo.git
+#     default_branch: dev
+#     validation_commands: []           # skip validation for non-Python repos
+#     allowed_base_branches:
+#       - dev
+#       - main
+#       - release-*                     # fnmatch patterns are supported
+#     bootstrap_enabled: false
+#     python_binary: python3
+#     venv_dir: .venv
+#     install_dev_command: null
+#
+#     # Per-repo GitHub token override (must match token_env in this block):
+#     token_env: GITHUB_TOKEN_FRONTEND
+#
+#     # PR review loop: create PR and enter a two-phase review loop before merging.
+#     # Phase 1 (automatic): kodo self-reviews its own diff. LGTM → merge.
+#     # CONCERNS → kodo revises and re-reviews (up to reviewer.max_self_review_loops times).
+#     # Phase 2 (escalated): if self-review can't resolve, posts a comment for human review.
+#     # Human 👍 on PR or bot reply → merge. Human comment → kodo revision pass (max 3).
+#     # No action after 1 day → merge automatically (timeout fallback).
+#     await_review: true
+#
+#     # Include this repo in idle-board proposer scans (default: true).
+#     propose_enabled: true
+#
+#     # Use a local checkout for proposer inspection instead of SSH clone.
+#     # This is faster for repos you already have checked out locally.
+#     local_path: /home/dev/Documents/GitHub/FrontendRepo
+#
+#     # Dry-run PR creation: log what would happen without actually
+#     # creating or merging the PR. Useful for testing the automation path.
+#     # Can also be set globally via OPERATIONS_CENTER_PR_DRY_RUN=1 in .env.
+#     # pr_dry_run: false
+
+# ---------------------------------------------------------------------------
+# Reviewer settings (optional — all fields have safe defaults)
+# ---------------------------------------------------------------------------
+# reviewer:
+#   # GitHub logins whose comments are always ignored (CI bots, integration accounts, etc.)
+#   bot_logins: []
+#   # If non-empty, only comments from these logins trigger human-phase revisions.
+#   # Leave empty to accept comments from any non-bot login.
+#   allowed_reviewer_logins: []
+#   # Max kodo self-review + revision cycles before escalating to human review (default: 2).
+#   max_self_review_loops: 2
+#   # HTML marker appended to every bot-posted comment — prevents re-processing own comments.
+#   bot_comment_marker: "<!-- controlplane:bot -->"
+
+# ---------------------------------------------------------------------------
+# Artifact storage root
+# ---------------------------------------------------------------------------
+report_root: tools/report/kodo_plane

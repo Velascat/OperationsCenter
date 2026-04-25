@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from control_plane.tuning.models import FamilyMetrics
-from control_plane.tuning.recommendations import (
+from operations_center.tuning.models import FamilyMetrics
+from operations_center.tuning.recommendations import (
     MIN_SAMPLE_FOR_RECOMMENDATION,
     RecommendationEngine,
 )

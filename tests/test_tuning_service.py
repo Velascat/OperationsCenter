@@ -4,12 +4,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.tuning.applier import TuningApplier, load_tuning_config
-from control_plane.tuning.artifact_writer import TuningArtifactWriter
-from control_plane.tuning.guardrails import TuningGuardrails
-from control_plane.tuning.loader import TuningArtifactLoader
-from control_plane.tuning.models import TuningConfig
-from control_plane.tuning.service import TuningContext, TuningRegulatorService
+from operations_center.tuning.applier import TuningApplier, load_tuning_config
+from operations_center.tuning.artifact_writer import TuningArtifactWriter
+from operations_center.tuning.guardrails import TuningGuardrails
+from operations_center.tuning.loader import TuningArtifactLoader
+from operations_center.tuning.models import TuningConfig
+from operations_center.tuning.service import TuningContext, TuningRegulatorService
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ def test_applier_skips_change_outside_range(tmp_path: Path) -> None:
 
 def test_artifact_writer_writes_all_four_files(tmp_path: Path) -> None:
     writer = TuningArtifactWriter(tuning_root=tmp_path / "tuning")
-    from control_plane.tuning.models import TuningRunArtifact
+    from operations_center.tuning.models import TuningRunArtifact
     artifact = TuningRunArtifact(
         run_id="tun_roundtrip",
         generated_at=datetime(2026, 4, 4, 12, tzinfo=UTC),
@@ -236,7 +236,7 @@ def test_artifact_writer_writes_all_four_files(tmp_path: Path) -> None:
 
 def test_loader_reads_written_artifact(tmp_path: Path) -> None:
     writer = TuningArtifactWriter(tuning_root=tmp_path / "tuning")
-    from control_plane.tuning.models import TuningRunArtifact
+    from operations_center.tuning.models import TuningRunArtifact
     artifact = TuningRunArtifact(
         run_id="tun_load_test",
         generated_at=datetime(2026, 4, 4, 12, tzinfo=UTC),

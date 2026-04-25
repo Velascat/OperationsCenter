@@ -9,14 +9,14 @@ who produces it, and who consumes it.
 
 | Contract | File | Line | Description |
 |---|---|---|---|
-| `TaskProposal` | `src/control_plane/contracts/proposal.py` | 31 | What needs to be done, where, and under what constraints |
-| `LaneDecision` | `src/control_plane/contracts/routing.py` | 28 | Selected lane/backend and routing rationale from SwitchBoard |
-| `ExecutionRequest` | `src/control_plane/contracts/execution.py` | 38 | Everything a backend adapter needs to carry out the work |
-| `ExecutionResult` | `src/control_plane/contracts/execution.py` | 146 | Backend-agnostic outcome of one execution run |
+| `TaskProposal` | `src/operations_center/contracts/proposal.py` | 31 | What needs to be done, where, and under what constraints |
+| `LaneDecision` | `src/operations_center/contracts/routing.py` | 28 | Selected lane/backend and routing rationale from SwitchBoard |
+| `ExecutionRequest` | `src/operations_center/contracts/execution.py` | 38 | Everything a backend adapter needs to carry out the work |
+| `ExecutionResult` | `src/operations_center/contracts/execution.py` | 146 | Backend-agnostic outcome of one execution run |
 
 All four are Pydantic v2 `BaseModel` with `model_config = {"frozen": True}`.
 All four are fully serializable via `.model_dump(mode="json")` / `.model_validate()`.
-All four are re-exported from `control_plane.contracts` (the public API surface).
+All four are re-exported from `operations_center.contracts` (the public API surface).
 
 ---
 
@@ -37,7 +37,7 @@ All four are re-exported from `control_plane.contracts` (the public API surface)
 ## Contract Flow
 
 ```
-PlanningContext          internal ControlPlane type; pre-validation raw input
+PlanningContext          internal OperationsCenter type; pre-validation raw input
     │
     │  planning/proposal_builder.py :: build_proposal()
     │  (enum validation, field mapping, branch/validation policy construction)
@@ -83,7 +83,7 @@ ExecutionRecord + ExecutionTrace   internal observability types (not part of the
 1. **One definition per contract.** Each of the four contracts is defined in exactly
    one file. No aliases, re-implementations, or competing definitions exist.
 
-2. **SwitchBoard owns `LaneDecision`.** ControlPlane never constructs a `LaneDecision`
+2. **SwitchBoard owns `LaneDecision`.** OperationsCenter never constructs a `LaneDecision`
    in the live execution path. The only live producer is `HttpLaneRoutingClient`, which
    deserializes the SwitchBoard HTTP response.
 
@@ -108,7 +108,7 @@ ExecutionRecord + ExecutionTrace   internal observability types (not part of the
 
 ## Internal Boundary Types (Not Contracts)
 
-These types carry context within ControlPlane but are not part of the public contract chain:
+These types carry context within OperationsCenter but are not part of the public contract chain:
 
 | Type | File | Purpose |
 |---|---|---|

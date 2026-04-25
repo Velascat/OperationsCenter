@@ -25,10 +25,10 @@ Add HTTP webhook endpoint to receive events.
 """
 
 
-@patch("control_plane.spec_director.brainstorm.call_claude", return_value=_FAKE_SPEC)
+@patch("operations_center.spec_director.brainstorm.call_claude", return_value=_FAKE_SPEC)
 def test_brainstorm_returns_spec_text_and_front_matter(mock_call):
-    from control_plane.spec_director.brainstorm import BrainstormService
-    from control_plane.spec_director.context_bundle import ContextBundle
+    from operations_center.spec_director.brainstorm import BrainstormService
+    from operations_center.spec_director.context_bundle import ContextBundle
 
     service = BrainstormService(model="claude-opus-4-6")
     bundle = ContextBundle(
@@ -47,10 +47,10 @@ def test_brainstorm_returns_spec_text_and_front_matter(mock_call):
     assert result.prompt_tokens == 0
 
 
-@patch("control_plane.spec_director.brainstorm.call_claude", return_value="# No front matter here\nJust text")
+@patch("operations_center.spec_director.brainstorm.call_claude", return_value="# No front matter here\nJust text")
 def test_brainstorm_raises_on_missing_front_matter(mock_call):
-    from control_plane.spec_director.brainstorm import BrainstormService, BrainstormError
-    from control_plane.spec_director.context_bundle import ContextBundle
+    from operations_center.spec_director.brainstorm import BrainstormService, BrainstormError
+    from operations_center.spec_director.context_bundle import ContextBundle
 
     service = BrainstormService(model="claude-opus-4-6")
     bundle = ContextBundle(

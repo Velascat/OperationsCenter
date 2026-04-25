@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
-from control_plane.backends.kodo.invoke import KodoBackendInvoker, _extract_artifacts
-from control_plane.backends.kodo.models import KodoPreparedRun
+from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.invoke import KodoBackendInvoker, _extract_artifacts
+from operations_center.backends.kodo.models import KodoPreparedRun
 
 
 # ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 def test_campaign_store_create_and_retrieve(tmp_path: Path) -> None:
-    from control_plane.execution.campaign_store import CampaignStore
+    from operations_center.execution.campaign_store import CampaignStore
 
     store = CampaignStore(path=tmp_path / "campaigns.json")
     campaign_id = store.create(
@@ -41,7 +41,7 @@ def test_campaign_store_create_and_retrieve(tmp_path: Path) -> None:
 
 
 def test_campaign_store_record_step_done(tmp_path: Path) -> None:
-    from control_plane.execution.campaign_store import CampaignStore
+    from operations_center.execution.campaign_store import CampaignStore
 
     store = CampaignStore(path=tmp_path / "campaigns.json")
     store.create(source_task_id="src-002", title="Test campaign", step_task_ids=["s1", "s2", "s3"])
@@ -60,7 +60,7 @@ def test_campaign_store_record_step_done(tmp_path: Path) -> None:
 
 
 def test_campaign_store_create_idempotent(tmp_path: Path) -> None:
-    from control_plane.execution.campaign_store import CampaignStore
+    from operations_center.execution.campaign_store import CampaignStore
 
     store = CampaignStore(path=tmp_path / "campaigns.json")
     id1 = store.create(source_task_id="src-003", title="T", step_task_ids=["a"])
@@ -70,7 +70,7 @@ def test_campaign_store_create_idempotent(tmp_path: Path) -> None:
 
 
 def test_campaign_store_list_filter_by_status(tmp_path: Path) -> None:
-    from control_plane.execution.campaign_store import CampaignStore
+    from operations_center.execution.campaign_store import CampaignStore
 
     store = CampaignStore(path=tmp_path / "campaigns.json")
     store.create(source_task_id="c1", title="A", step_task_ids=["s1"])
@@ -92,7 +92,7 @@ def test_campaign_store_list_filter_by_status(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_calibration_window_days_filters_old_events(tmp_path: Path) -> None:
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore
 
     store = ConfidenceCalibrationStore(path=tmp_path / "calibration.json")
 
@@ -127,7 +127,7 @@ def test_calibration_window_days_filters_old_events(tmp_path: Path) -> None:
 
 
 def test_calibration_cleanup_old_events(tmp_path: Path) -> None:
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore
 
     store = ConfidenceCalibrationStore(path=tmp_path / "calibration.json")
     old_date = (datetime.now(UTC) - timedelta(days=100)).isoformat()
@@ -151,7 +151,7 @@ def test_calibration_cleanup_old_events(tmp_path: Path) -> None:
 
 
 def test_calibration_report_window_days(tmp_path: Path) -> None:
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore
 
     store = ConfidenceCalibrationStore(path=tmp_path / "calibration.json")
     old_date = (datetime.now(UTC) - timedelta(days=100)).isoformat()
@@ -188,7 +188,7 @@ def test_calibration_report_window_days(tmp_path: Path) -> None:
 def test_ci_webhook_verify_signature_valid() -> None:
     import hmac as _hmac
     import hashlib
-    from control_plane.entrypoints.ci_webhook.main import _verify_signature
+    from operations_center.entrypoints.ci_webhook.main import _verify_signature
 
     secret = b"mysecret"
     body = b'{"action": "completed"}'
@@ -197,7 +197,7 @@ def test_ci_webhook_verify_signature_valid() -> None:
 
 
 def test_ci_webhook_verify_signature_invalid() -> None:
-    from control_plane.entrypoints.ci_webhook.main import _verify_signature
+    from operations_center.entrypoints.ci_webhook.main import _verify_signature
 
     secret = b"mysecret"
     body = b'{"action": "completed"}'
@@ -205,13 +205,13 @@ def test_ci_webhook_verify_signature_invalid() -> None:
 
 
 def test_ci_webhook_verify_signature_missing_prefix() -> None:
-    from control_plane.entrypoints.ci_webhook.main import _verify_signature
+    from operations_center.entrypoints.ci_webhook.main import _verify_signature
 
     assert _verify_signature(b"body", "abc123", b"secret") is False
 
 
 def test_ci_webhook_parse_check_run_event_completed() -> None:
-    from control_plane.entrypoints.ci_webhook.main import _parse_check_run_event
+    from operations_center.entrypoints.ci_webhook.main import _parse_check_run_event
 
     payload = {
         "action": "completed",
@@ -232,14 +232,14 @@ def test_ci_webhook_parse_check_run_event_completed() -> None:
 
 
 def test_ci_webhook_parse_check_run_event_irrelevant_action() -> None:
-    from control_plane.entrypoints.ci_webhook.main import _parse_check_run_event
+    from operations_center.entrypoints.ci_webhook.main import _parse_check_run_event
 
     payload = {"action": "created", "check_run": {"conclusion": "success"}, "repository": {}}
     assert _parse_check_run_event(payload) is None
 
 
 def test_ci_webhook_parse_check_run_event_irrelevant_conclusion() -> None:
-    from control_plane.entrypoints.ci_webhook.main import _parse_check_run_event
+    from operations_center.entrypoints.ci_webhook.main import _parse_check_run_event
 
     payload = {
         "action": "completed",
@@ -250,7 +250,7 @@ def test_ci_webhook_parse_check_run_event_irrelevant_conclusion() -> None:
 
 
 def test_ci_webhook_write_trigger_creates_file(tmp_path: Path) -> None:
-    from control_plane.entrypoints.ci_webhook import main as wh_mod
+    from operations_center.entrypoints.ci_webhook import main as wh_mod
 
     original_dir = wh_mod._TRIGGER_DIR
     wh_mod._TRIGGER_DIR = tmp_path / "triggers"
@@ -277,8 +277,8 @@ def test_ci_webhook_write_trigger_creates_file(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_cross_repo_synthesis_no_artifacts_returns_empty(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
+    from operations_center.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
 
     deriver = CrossRepoSynthesisDeriver(InsightNormalizer(), insights_root=tmp_path / "insights")
     result = deriver.derive([])
@@ -286,8 +286,8 @@ def test_cross_repo_synthesis_no_artifacts_returns_empty(tmp_path: Path) -> None
 
 
 def test_cross_repo_synthesis_single_repo_no_insight(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
+    from operations_center.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
 
     root = tmp_path / "insights"
     run_dir = root / "run-001"
@@ -305,8 +305,8 @@ def test_cross_repo_synthesis_single_repo_no_insight(tmp_path: Path) -> None:
 
 
 def test_cross_repo_synthesis_two_repos_shared_kind(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
+    from operations_center.insights.derivers.cross_repo_synthesis import CrossRepoSynthesisDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
 
     root = tmp_path / "insights"
 
@@ -340,7 +340,7 @@ def test_cross_repo_synthesis_two_repos_shared_kind(tmp_path: Path) -> None:
 
 def test_cross_repo_synthesis_only_latest_per_repo(tmp_path: Path) -> None:
     """When a repo has multiple run artifacts, only the latest is used."""
-    from control_plane.insights.derivers.cross_repo_synthesis import _read_latest_insight_kinds
+    from operations_center.insights.derivers.cross_repo_synthesis import _read_latest_insight_kinds
 
     root = tmp_path / "insights"
 
@@ -369,14 +369,14 @@ def test_cross_repo_synthesis_only_latest_per_repo(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_campaign_status_cli_json_output(tmp_path: Path, capsys) -> None:
-    from control_plane.entrypoints.campaign_status.main import main as campaign_main
-    from control_plane.execution.campaign_store import CampaignStore
+    from operations_center.entrypoints.campaign_status.main import main as campaign_main
+    from operations_center.execution.campaign_store import CampaignStore
 
     store = CampaignStore(path=tmp_path / "campaigns.json")
     store.create(source_task_id="cli-test-1", title="CLI test campaign", step_task_ids=["a", "b"])
 
     with patch(
-        "control_plane.execution.campaign_store.CampaignStore",
+        "operations_center.execution.campaign_store.CampaignStore",
         return_value=store,
     ), patch("sys.argv", ["campaign-status", "--json"]):
         campaign_main()

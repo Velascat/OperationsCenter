@@ -3,13 +3,13 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from control_plane.execution.usage_store import UsageStore
+from operations_center.execution.usage_store import UsageStore
 
 
 def test_usage_store_enforces_hourly_and_daily_budget(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
-    monkeypatch.setenv("CONTROL_PLANE_MAX_EXEC_PER_HOUR", "2")
-    monkeypatch.setenv("CONTROL_PLANE_MAX_EXEC_PER_DAY", "3")
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_EXEC_PER_HOUR", "2")
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_EXEC_PER_DAY", "3")
     store = UsageStore()
     now = datetime(2026, 3, 31, 12, tzinfo=UTC)
 
@@ -28,8 +28,8 @@ def test_usage_store_enforces_hourly_and_daily_budget(monkeypatch, tmp_path: Pat
 
 
 def test_usage_store_tracks_retry_and_noop_state(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
-    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "2")
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_RETRIES_PER_TASK", "2")
     store = UsageStore()
     now = datetime(2026, 3, 31, 12, tzinfo=UTC)
 
@@ -49,8 +49,8 @@ def test_usage_store_tracks_retry_and_noop_state(monkeypatch, tmp_path: Path) ->
 
 
 def test_retry_cap_reset_only_after_one_hour_gap(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
-    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "1")
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_RETRIES_PER_TASK", "1")
     store = UsageStore()
     now = datetime(2026, 3, 31, 12, tzinfo=UTC)
 
@@ -71,8 +71,8 @@ def test_retry_cap_reset_only_after_one_hour_gap(monkeypatch, tmp_path: Path) ->
 
 
 def test_retry_cap_reset_clears_signatures(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
-    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "1")
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_RETRIES_PER_TASK", "1")
     store = UsageStore()
     now = datetime(2026, 3, 31, 12, tzinfo=UTC)
 
@@ -92,8 +92,8 @@ def test_retry_cap_reset_clears_signatures(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_retry_cap_recent_block_preserves_attempts(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("CONTROL_PLANE_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
-    monkeypatch.setenv("CONTROL_PLANE_MAX_RETRIES_PER_TASK", "2")
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_RETRIES_PER_TASK", "2")
     store = UsageStore()
     now = datetime(2026, 3, 31, 12, tzinfo=UTC)
 

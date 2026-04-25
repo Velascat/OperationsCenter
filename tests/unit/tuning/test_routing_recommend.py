@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.tuning.routing_models import (
+from operations_center.tuning.routing_models import (
     BackendComparisonSummary,
     ChangeEvidenceClass,
     EvidenceStrength,
@@ -21,7 +21,7 @@ from control_plane.tuning.routing_models import (
     RoutingTuningProposal,
     StrategyFinding,
 )
-from control_plane.tuning.routing_recommend import derive_findings, generate_recommendations
+from operations_center.tuning.routing_recommend import derive_findings, generate_recommendations
 
 from .conftest import (
     make_failure,

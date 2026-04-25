@@ -1,5 +1,5 @@
 """
-Integration tests for ControlPlane → SwitchBoard routing boundary.
+Integration tests for OperationsCenter → SwitchBoard routing boundary.
 
 These tests require a running SwitchBoard instance. They are skipped automatically
 when SwitchBoard is unreachable. To run them:
@@ -12,18 +12,18 @@ when SwitchBoard is unreachable. To run them:
 
 Or target SwitchBoard explicitly:
 
-    CONTROL_PLANE_SWITCHBOARD_URL=http://localhost:20401 pytest tests/integration/ -v
+    OPERATIONS_CENTER_SWITCHBOARD_URL=http://localhost:20401 pytest tests/integration/ -v
 """
 
 from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import LaneName, BackendName
-from control_plane.contracts.routing import LaneDecision
-from control_plane.planning.models import PlanningContext
-from control_plane.planning.proposal_builder import build_proposal
-from control_plane.routing.client import HttpLaneRoutingClient, SwitchBoardUnavailableError
+from operations_center.contracts.enums import LaneName, BackendName
+from operations_center.contracts.routing import LaneDecision
+from operations_center.planning.models import PlanningContext
+from operations_center.planning.proposal_builder import build_proposal
+from operations_center.routing.client import HttpLaneRoutingClient, SwitchBoardUnavailableError
 
 
 def _ctx(**kw) -> PlanningContext:
@@ -45,7 +45,7 @@ def _ctx(**kw) -> PlanningContext:
 
 
 def test_canonical_proposal_returns_lane_decision(switchboard_url: str) -> None:
-    """ControlPlane sends a TaskProposal; SwitchBoard returns a valid LaneDecision."""
+    """OperationsCenter sends a TaskProposal; SwitchBoard returns a valid LaneDecision."""
     client = HttpLaneRoutingClient(switchboard_url)
     proposal = build_proposal(_ctx())
     try:

@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from control_plane.entrypoints.maintenance.dependency_check import (
+from operations_center.entrypoints.maintenance.dependency_check import (
     DependencyStatus,
     actionable_statuses,
     dependency_task_description,
@@ -24,7 +24,7 @@ def test_actionable_statuses_filters_to_items_with_notes() -> None:
 def test_dependency_task_description_uses_default_repo_and_context() -> None:
     settings = SimpleNamespace(
         repos={
-            "control-plane": SimpleNamespace(default_branch="main"),
+            "operations-center": SimpleNamespace(default_branch="main"),
         }
     )
     description = dependency_task_description(
@@ -40,7 +40,7 @@ def test_dependency_task_description_uses_default_repo_and_context() -> None:
             notes=["Pinned version differs"],
         ),
     )
-    assert "repo: control-plane" in description
+    assert "repo: operations-center" in description
     assert "base_branch: main" in description
     assert "mode: goal" in description
     assert "dependency: codex" in description

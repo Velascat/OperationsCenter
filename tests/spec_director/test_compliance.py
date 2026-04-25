@@ -1,13 +1,13 @@
 # tests/spec_director/test_compliance.py
 from __future__ import annotations
 from unittest.mock import patch
-from control_plane.spec_director.models import ComplianceInput
+from operations_center.spec_director.models import ComplianceInput
 
-_PATCH_TARGET = "control_plane.spec_director.compliance.call_claude"
+_PATCH_TARGET = "operations_center.spec_director.compliance.call_claude"
 
 
 def test_lgtm_verdict_parsed():
-    from control_plane.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.compliance import SpecComplianceService
     raw = '{"verdict": "LGTM", "spec_coverage": 0.95, "violations": [], "notes": "all good"}'
     with patch(_PATCH_TARGET, return_value=raw):
         service = SpecComplianceService(model="claude-sonnet-4-6")
@@ -25,7 +25,7 @@ def test_lgtm_verdict_parsed():
 
 
 def test_api_failure_returns_concerns():
-    from control_plane.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.compliance import SpecComplianceService
     with patch(_PATCH_TARGET, side_effect=Exception("network error")):
         service = SpecComplianceService(model="claude-sonnet-4-6", max_retries=1)
         inp = ComplianceInput(
@@ -38,7 +38,7 @@ def test_api_failure_returns_concerns():
 
 
 def test_truncates_large_diff():
-    from control_plane.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.compliance import SpecComplianceService
     raw = '{"verdict": "LGTM", "spec_coverage": 0.8, "violations": [], "notes": "ok"}'
     large_diff = "+" + "x" * 5000
 

@@ -5,14 +5,14 @@ import json
 import subprocess
 from pathlib import Path
 
-from control_plane.routing.client import HttpLaneRoutingClient
+from operations_center.routing.client import HttpLaneRoutingClient
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_default_planning_client_is_http_boundary() -> None:
-    service_module = __import__("control_plane.routing.service", fromlist=["PlanningService"])
+    service_module = __import__("operations_center.routing.service", fromlist=["PlanningService"])
     service = service_module.PlanningService.default()
     try:
         assert isinstance(service._client, HttpLaneRoutingClient)
@@ -21,20 +21,20 @@ def test_default_planning_client_is_http_boundary() -> None:
 
 
 def test_domain_no_longer_exports_competing_execution_contracts() -> None:
-    domain_init = (REPO_ROOT / "src" / "control_plane" / "domain" / "__init__.py").read_text(encoding="utf-8")
+    domain_init = (REPO_ROOT / "src" / "operations_center" / "domain" / "__init__.py").read_text(encoding="utf-8")
     assert '"BoardTask"' not in domain_init
     assert '"ExecutionRequest"' not in domain_init
     assert '"ExecutionResult"' not in domain_init
 
 
 def test_legacy_execution_runtime_is_removed() -> None:
-    assert not (REPO_ROOT / "src" / "control_plane" / "application" / "service.py").exists()
-    assert not (REPO_ROOT / "src" / "control_plane" / "legacy_execution").exists()
+    assert not (REPO_ROOT / "src" / "operations_center" / "application" / "service.py").exists()
+    assert not (REPO_ROOT / "src" / "operations_center" / "legacy_execution").exists()
 
 
 def test_worker_entrypoint_no_longer_injects_switchboard_source_tree() -> None:
     worker_main = (
-        REPO_ROOT / "src" / "control_plane" / "entrypoints" / "worker" / "main.py"
+        REPO_ROOT / "src" / "operations_center" / "entrypoints" / "worker" / "main.py"
     ).read_text(encoding="utf-8")
     assert "_SWITCHBOARD_SRC" not in worker_main
     assert "sys.path.insert" not in worker_main
@@ -42,14 +42,14 @@ def test_worker_entrypoint_no_longer_injects_switchboard_source_tree() -> None:
 
 def test_supported_execute_entrypoint_uses_canonical_boundary_not_legacy_runtime() -> None:
     execute_main = (
-        REPO_ROOT / "src" / "control_plane" / "entrypoints" / "execute" / "main.py"
+        REPO_ROOT / "src" / "operations_center" / "entrypoints" / "execute" / "main.py"
     ).read_text(encoding="utf-8")
     assert "ExecutionCoordinator" in execute_main
     assert "legacy_execution" not in execute_main
 
 
 def test_execute_entrypoint_builds_request_and_enforces_policy_before_execution(tmp_path) -> None:
-    config = tmp_path / "control_plane.yaml"
+    config = tmp_path / "operations_center.yaml"
     config.write_text(
         """
 plane:
@@ -123,7 +123,7 @@ repos:
     cmd = [
         str(REPO_ROOT / ".venv" / "bin" / "python"),
         "-m",
-        "control_plane.entrypoints.execute.main",
+        "operations_center.entrypoints.execute.main",
         "--config",
         str(config),
         "--bundle",
@@ -154,7 +154,7 @@ repos:
 
 
 def test_default_switchboard_url_targets_service_boundary(monkeypatch) -> None:
-    monkeypatch.delenv("CONTROL_PLANE_SWITCHBOARD_URL", raising=False)
+    monkeypatch.delenv("OPERATIONS_CENTER_SWITCHBOARD_URL", raising=False)
     client = HttpLaneRoutingClient.from_env()
     try:
         assert client.base_url == "http://localhost:20401"

@@ -4,8 +4,8 @@ from pathlib import Path
 
 
 def test_drop_file_trigger(tmp_path):
-    from control_plane.spec_director.trigger import TriggerDetector
-    from control_plane.spec_director.models import TriggerSource
+    from operations_center.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.models import TriggerSource
     drop = tmp_path / "spec_direction.md"
     drop.write_text("add webhook ingestion")
     detector = TriggerDetector(drop_file_path=drop)
@@ -16,7 +16,7 @@ def test_drop_file_trigger(tmp_path):
 
 
 def test_drop_file_not_triggered_when_campaign_active(tmp_path):
-    from control_plane.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.trigger import TriggerDetector
     drop = tmp_path / "spec_direction.md"
     drop.write_text("something")
     detector = TriggerDetector(drop_file_path=drop)
@@ -25,8 +25,8 @@ def test_drop_file_not_triggered_when_campaign_active(tmp_path):
 
 
 def test_queue_drain_trigger():
-    from control_plane.spec_director.trigger import TriggerDetector
-    from control_plane.spec_director.models import TriggerSource
+    from operations_center.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.models import TriggerSource
     detector = TriggerDetector(drop_file_path=Path("/nonexistent"))
     result = detector.detect(ready_count=0, running_count=0, has_active_campaign=False)
     assert result is not None
@@ -35,7 +35,7 @@ def test_queue_drain_trigger():
 
 
 def test_no_trigger_when_queue_full():
-    from control_plane.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.trigger import TriggerDetector
     detector = TriggerDetector(drop_file_path=Path("/nonexistent"))
     result = detector.detect(ready_count=5, running_count=0, has_active_campaign=False)
     assert result is None

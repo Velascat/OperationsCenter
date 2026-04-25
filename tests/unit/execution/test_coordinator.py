@@ -4,23 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
-from control_plane.backends.kodo.adapter import KodoBackendAdapter
-from control_plane.contracts.common import ChangedFileRef, ValidationSummary
-from control_plane.contracts.enums import (
+from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.adapter import KodoBackendAdapter
+from operations_center.contracts.common import ChangedFileRef, ValidationSummary
+from operations_center.contracts.enums import (
     BackendName,
     ExecutionStatus,
     FailureReasonCategory,
     LaneName,
     ValidationStatus,
 )
-from control_plane.contracts.execution import ExecutionResult
-from control_plane.observability.models import BackendDetailRef
-from control_plane.execution.coordinator import ExecutionCoordinator
-from control_plane.execution.handoff import ExecutionRuntimeContext
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.planning.proposal_builder import build_proposal
-from control_plane.policy.models import PolicyDecision, PolicyStatus
+from operations_center.contracts.execution import ExecutionResult
+from operations_center.observability.models import BackendDetailRef
+from operations_center.execution.coordinator import ExecutionCoordinator
+from operations_center.execution.handoff import ExecutionRuntimeContext
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.planning.proposal_builder import build_proposal
+from operations_center.policy.models import PolicyDecision, PolicyStatus
 
 
 class _StubPolicyEngine:
@@ -87,7 +87,7 @@ def _bundle() -> ProposalDecisionBundle:
 
 
 def proposal_decision(proposal_id: str):
-    from control_plane.contracts.routing import LaneDecision
+    from operations_center.contracts.routing import LaneDecision
 
     return LaneDecision(
         proposal_id=proposal_id,

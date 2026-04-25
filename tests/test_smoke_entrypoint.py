@@ -4,7 +4,7 @@ from pathlib import Path
 
 import httpx
 
-from control_plane.entrypoints.smoke import plane
+from operations_center.entrypoints.smoke import plane
 
 
 def test_smoke_entrypoint_writes_retained_plane_payload(

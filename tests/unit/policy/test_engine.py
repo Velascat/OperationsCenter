@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import LaneName, BackendName, RiskLevel, TaskType
-from control_plane.policy.engine import PolicyEngine
-from control_plane.policy.models import (
+from operations_center.contracts.enums import LaneName, BackendName, RiskLevel, TaskType
+from operations_center.policy.engine import PolicyEngine
+from operations_center.policy.models import (
     PathScopeRule,
     PolicyConfig,
     PolicyStatus,

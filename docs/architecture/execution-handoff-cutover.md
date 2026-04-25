@@ -10,7 +10,7 @@ TaskProposal
   -> ExecutionResult
 ```
 
-`ExecutionRequest` is no longer architecture theater. The supported runtime builds it in `control_plane.execution.handoff.ExecutionRequestBuilder` using:
+`ExecutionRequest` is no longer architecture theater. The supported runtime builds it in `operations_center.execution.handoff.ExecutionRequestBuilder` using:
 
 - `ProposalDecisionBundle`
 - runtime workspace context

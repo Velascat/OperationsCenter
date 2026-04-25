@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import ExecutionStatus
-from control_plane.observability.models import BackendDetailRef, ExecutionRecord
-from control_plane.observability.service import ExecutionObservabilityService
-from control_plane.observability.trace import ExecutionTrace
+from operations_center.contracts.enums import ExecutionStatus
+from operations_center.observability.models import BackendDetailRef, ExecutionRecord
+from operations_center.observability.service import ExecutionObservabilityService
+from operations_center.observability.trace import ExecutionTrace
 
 from .conftest import (
     successful_rich_result,
@@ -132,8 +132,8 @@ def test_default_creates_service():
 
 
 def test_with_client_injection():
-    from control_plane.observability.recorder import ExecutionRecorder
-    from control_plane.observability.trace import RunReportBuilder
+    from operations_center.observability.recorder import ExecutionRecorder
+    from operations_center.observability.trace import RunReportBuilder
 
     svc = ExecutionObservabilityService(
         recorder=ExecutionRecorder(),

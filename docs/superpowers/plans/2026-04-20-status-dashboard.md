@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a live-refresh terminal status dashboard (`control-plane.sh status`) that reads only local files, and a board snapshot writer that watchers write atomically after each `list_issues()` call.
+**Goal:** Add a live-refresh terminal status dashboard (`operations-center.sh status`) that reads only local files, and a board snapshot writer that watchers write atomically after each `list_issues()` call.
 
-**Architecture:** The watcher cycle gains a `write_board_snapshot()` call (try/except, non-blocking) that atomically writes `logs/local/watch-all/board_snapshot.json`. A standalone `scripts/cp-status.py` reads that file plus existing local files (watcher status JSONs, PID files, usage.json, /proc/meminfo, /tmp/cp-task-*) and renders a clear-screen 2s refresh loop. `control-plane.sh status` is a thin wrapper.
+**Architecture:** The watcher cycle gains a `write_board_snapshot()` call (try/except, non-blocking) that atomically writes `logs/local/watch-all/board_snapshot.json`. A standalone `scripts/cp-status.py` reads that file plus existing local files (watcher status JSONs, PID files, usage.json, /proc/meminfo, /tmp/cp-task-*) and renders a clear-screen 2s refresh loop. `operations-center.sh status` is a thin wrapper.
 
 **Tech Stack:** Python 3.12 stdlib only (`json`, `os`, `sys`, `time`, `pathlib`, `datetime`, `argparse`). Existing `issue_status_name`, `issue_label_names`, `issue_task_kind` helpers in `main.py`.
 
@@ -14,9 +14,9 @@
 
 | File | Change |
 |---|---|
-| `src/control_plane/entrypoints/worker/main.py` | Add `write_board_snapshot()` + call it in `run_watch_loop` |
+| `src/operations_center/entrypoints/worker/main.py` | Add `write_board_snapshot()` + call it in `run_watch_loop` |
 | `scripts/cp-status.py` | New — the dashboard script |
-| `scripts/control-plane.sh` | Add `status` command |
+| `scripts/operations-center.sh` | Add `status` command |
 | `tests/test_worker_entrypoint.py` | Add tests for `write_board_snapshot()` |
 
 ---
@@ -24,7 +24,7 @@
 ## Task 1: Add `write_board_snapshot()` to `main.py`
 
 **Files:**
-- Modify: `src/control_plane/entrypoints/worker/main.py` (after `write_watch_status` at line ~650)
+- Modify: `src/operations_center/entrypoints/worker/main.py` (after `write_watch_status` at line ~650)
 - Test: `tests/test_worker_entrypoint.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -41,7 +41,7 @@ def test_write_board_snapshot_creates_file() -> None:
             "id": "aaa",
             "name": "Fix login bug",
             "state_detail": {"name": "Running"},
-            "labels": ["repo: ControlPlane", "task-kind: goal"],
+            "labels": ["repo: OperationsCenter", "task-kind: goal"],
         },
         {
             "id": "bbb",
@@ -53,7 +53,7 @@ def test_write_board_snapshot_creates_file() -> None:
             "id": "ccc",
             "name": "Old task",
             "state_detail": {"name": "Done"},
-            "labels": ["repo: ControlPlane"],
+            "labels": ["repo: OperationsCenter"],
         },
     ]
     write_board_snapshot(issues, role="goal", status_dir=status_dir)
@@ -62,7 +62,7 @@ def test_write_board_snapshot_creates_file() -> None:
     data = json.loads(snapshot_path.read_text())
     assert data["written_by"] == "goal"
     assert "updated_at" in data
-    assert data["counts"]["ControlPlane"]["Running"] == 1
+    assert data["counts"]["OperationsCenter"]["Running"] == 1
     assert data["counts"]["ExternalRepo"]["Ready for AI"] == 1
     # Done issues excluded
     active_ids = {i["id"] for i in data["issues"]}
@@ -186,7 +186,7 @@ Expected: all existing tests pass plus the 3 new ones.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/control_plane/entrypoints/worker/main.py tests/test_worker_entrypoint.py
+git add src/operations_center/entrypoints/worker/main.py tests/test_worker_entrypoint.py
 git commit -m "feat(status): write board snapshot atomically after each watcher cycle
 
 Adds write_board_snapshot() which serializes active Plane issues to
@@ -206,7 +206,7 @@ so snapshot failures never affect the watcher main path."
 
 ```python
 #!/usr/bin/env python3
-"""ControlPlane live status dashboard. Reads local files only — no Plane API calls."""
+"""OperationsCenter live status dashboard. Reads local files only — no Plane API calls."""
 from __future__ import annotations
 
 import argparse
@@ -220,14 +220,14 @@ from pathlib import Path
 UTC = timezone.utc
 ROOT_DIR = Path(__file__).resolve().parent.parent
 WATCH_DIR = ROOT_DIR / "logs" / "local" / "watch-all"
-USAGE_JSON = ROOT_DIR / "tools" / "report" / "control_plane" / "execution" / "usage.json"
+USAGE_JSON = ROOT_DIR / "tools" / "report" / "operations_center" / "execution" / "usage.json"
 SNAPSHOT_PATH = WATCH_DIR / "board_snapshot.json"
 ROLES = ["goal", "test", "improve", "propose", "review", "spec"]
 
 # CB defaults — mirror usage_store.py constants
-_CB_WINDOW = int(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW", "5"))
-_CB_THRESHOLD = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
-_CB_STALENESS_HOURS = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_STALENESS_HOURS", "4"))
+_CB_WINDOW = int(os.environ.get("OPERATIONS_CENTER_CIRCUIT_BREAKER_WINDOW", "5"))
+_CB_THRESHOLD = float(os.environ.get("OPERATIONS_CENTER_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
+_CB_STALENESS_HOURS = float(os.environ.get("OPERATIONS_CENTER_CIRCUIT_BREAKER_STALENESS_HOURS", "4"))
 
 # ANSI
 _DIM = "\033[2m"
@@ -452,7 +452,7 @@ def _memory_row() -> str:
         total_mb = (avail_kb + swap_kb) // 1024
         total_gb = total_mb / 1024
         # Read threshold from env (mirrors main.py default of 400MB, local config sets 6144)
-        threshold_mb = int(os.environ.get("CONTROL_PLANE_MIN_KODO_AVAILABLE_MB", "6144"))
+        threshold_mb = int(os.environ.get("OPERATIONS_CENTER_MIN_KODO_AVAILABLE_MB", "6144"))
         threshold_gb = threshold_mb / 1024
         color = _RED if total_mb < threshold_mb else ""
         return f"  {color}{total_gb:.1f} GB available (RAM + swap){_RESET}   threshold: {threshold_gb:.1f} GB"
@@ -463,7 +463,7 @@ def _memory_row() -> str:
 def _render(repo_filter: list[str] | None) -> str:
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     width = 78
-    header = f"────────── ControlPlane Status  [{now_str}]  (Ctrl+C to exit) "
+    header = f"────────── OperationsCenter Status  [{now_str}]  (Ctrl+C to exit) "
     header = header.ljust(width - 1, "─")
     divider = "─" * (width - 1)
 
@@ -492,11 +492,11 @@ def _render(repo_filter: list[str] | None) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ControlPlane live status dashboard")
+    parser = argparse.ArgumentParser(description="OperationsCenter live status dashboard")
     parser.add_argument(
         "--repo",
         default="",
-        help="Comma-separated repo keys to filter (e.g. ControlPlane,ExternalRepo). Empty = show all.",
+        help="Comma-separated repo keys to filter (e.g. OperationsCenter,ExternalRepo). Empty = show all.",
     )
     args = parser.parse_args()
     repo_filter: list[str] | None = None
@@ -535,10 +535,10 @@ Expected: dashboard renders, refreshes every 2s. Ctrl+C exits cleanly with "Stop
 - [ ] **Step 4: Test with repo filter**
 
 ```bash
-python3 scripts/cp-status.py --repo ControlPlane
+python3 scripts/cp-status.py --repo OperationsCenter
 ```
 
-Expected: Board shows only ControlPlane block; watcher rows for tasks in other repos show `[other repo]` dimmed.
+Expected: Board shows only OperationsCenter block; watcher rows for tasks in other repos show `[other repo]` dimmed.
 
 - [ ] **Step 5: Commit**
 
@@ -553,14 +553,14 @@ and /tmp/cp-task-* workspaces. 2s clear-screen refresh. Supports
 
 ---
 
-## Task 3: Wire `control-plane.sh status`
+## Task 3: Wire `operations-center.sh status`
 
 **Files:**
-- Modify: `scripts/control-plane.sh`
+- Modify: `scripts/operations-center.sh`
 
 - [ ] **Step 1: Add `status` to the help text**
 
-Find the `usage()` function in `control-plane.sh` (around line 100). Add a `status` entry alongside other commands:
+Find the `usage()` function in `operations-center.sh` (around line 100). Add a `status` entry alongside other commands:
 
 ```bash
   status [--repo KEY,KEY]   Live status dashboard (Ctrl+C to exit)
@@ -581,13 +581,13 @@ Find the main `case "$1"` dispatch block. Add a `status)` case before the final 
 - [ ] **Step 3: Smoke-test the wrapper**
 
 ```bash
-bash scripts/control-plane.sh status
+bash scripts/operations-center.sh status
 ```
 
 Expected: same dashboard as direct `python3 scripts/cp-status.py`.
 
 ```bash
-bash scripts/control-plane.sh status --repo ControlPlane
+bash scripts/operations-center.sh status --repo OperationsCenter
 ```
 
 Expected: filtered view.
@@ -595,11 +595,11 @@ Expected: filtered view.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/control-plane.sh
-git commit -m "feat(status): add control-plane.sh status command
+git add scripts/operations-center.sh
+git commit -m "feat(status): add operations-center.sh status command
 
 Thin wrapper around cp-status.py. Passes --repo filter args through.
-Usage: control-plane.sh status [--repo ControlPlane,ExternalRepo]"
+Usage: operations-center.sh status [--repo OperationsCenter,ExternalRepo]"
 ```
 
 ---
@@ -622,11 +622,11 @@ Usage: control-plane.sh status [--repo ControlPlane,ExternalRepo]"
 | Stale snapshot warning (>5 min) | Task 2 `_board_rows()` — yellow when age_secs > 300 |
 | 2s refresh, Ctrl+C exits | Task 2 `main()` |
 | `--repo` filter: Board + Kodo filtered, watchers dimmed | Task 2 all three section functions |
-| `control-plane.sh status [--repo]` | Task 3 |
+| `operations-center.sh status [--repo]` | Task 3 |
 | Tests for `write_board_snapshot` | Task 1 Steps 1-4 |
 
 **Placeholder scan:** None found.
 
 **Type consistency:** `write_board_snapshot(issues: list[dict], role: str, status_dir: Path | None)` used consistently in Task 1 Steps 1, 3, and 5.
 
-**Min kodo threshold:** `cp-status.py` reads `CONTROL_PLANE_MIN_KODO_AVAILABLE_MB` env var (default 6144, matching the local config). The local config sets `min_kodo_available_mb: 6144` but this is read by the Python settings loader, not directly by the script — the env var approach is consistent with how other thresholds (CB window, threshold) are read.
+**Min kodo threshold:** `cp-status.py` reads `OPERATIONS_CENTER_MIN_KODO_AVAILABLE_MB` env var (default 6144, matching the local config). The local config sets `min_kodo_available_mb: 6144` but this is read by the Python settings loader, not directly by the script — the env var approach is consistent with how other thresholds (CB window, threshold) are read.

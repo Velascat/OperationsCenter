@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import PurePosixPath
 
-from control_plane.observer.collectors.architecture_signal import (
+from operations_center.observer.collectors.architecture_signal import (
     ArchitectureSignalCollector,
 )
 

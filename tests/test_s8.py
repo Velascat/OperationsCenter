@@ -22,9 +22,9 @@ import pytest
 # S8-2: ExecutionOutcomeDeriver (Phase 4)
 # ---------------------------------------------------------------------------
 
-from control_plane.insights.derivers.execution_outcome import ExecutionOutcomeDeriver  # noqa: E402
-from control_plane.insights.normalizer import InsightNormalizer  # noqa: E402
-from control_plane.observer.models import (  # noqa: E402
+from operations_center.insights.derivers.execution_outcome import ExecutionOutcomeDeriver  # noqa: E402
+from operations_center.insights.normalizer import InsightNormalizer  # noqa: E402
+from operations_center.observer.models import (  # noqa: E402
     RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
     CheckSignal, DependencyDriftSignal, TodoSignal,
 )
@@ -99,7 +99,7 @@ def test_execution_outcome_deriver_detects_validation_loop(tmp_path: Path) -> No
 # S8-5: Rollback on post-merge regression
 # ---------------------------------------------------------------------------
 
-from control_plane.adapters.git.client import GitClient  # noqa: E402
+from operations_center.adapters.git.client import GitClient  # noqa: E402
 
 
 def test_git_revert_commit_creates_branch(tmp_path: Path) -> None:
@@ -139,14 +139,14 @@ def test_git_revert_commit_creates_branch(tmp_path: Path) -> None:
 # S8-7: Quality trend tracking
 # ---------------------------------------------------------------------------
 
-from control_plane.insights.derivers.quality_trend import QualityTrendDeriver  # noqa: E402
-from control_plane.observer.models import LintSignal, TypeSignal  # noqa: E402
+from operations_center.insights.derivers.quality_trend import QualityTrendDeriver  # noqa: E402
+from operations_center.observer.models import LintSignal, TypeSignal  # noqa: E402
 
 
 def _make_snapshot_with_metrics(
     lint_violations: int, type_errors: int, days_ago: int = 0
 ) -> RepoStateSnapshot:
-    from control_plane.observer.models import RepoSignalsSnapshot
+    from operations_center.observer.models import RepoSignalsSnapshot
     signals = RepoSignalsSnapshot(
         test_signal=CheckSignal(status="unavailable"),
         dependency_drift=DependencyDriftSignal(status="unavailable"),
@@ -225,7 +225,7 @@ def test_quality_trend_stagnant() -> None:
 # S8-8: Runtime error ingestion
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.error_ingest.main import _is_duplicate, _mark_created, _dedup_key  # noqa: E402
+from operations_center.entrypoints.error_ingest.main import _is_duplicate, _mark_created, _dedup_key  # noqa: E402
 
 
 def test_error_ingest_dedup_key_is_stable() -> None:
@@ -235,7 +235,7 @@ def test_error_ingest_dedup_key_is_stable() -> None:
 
 
 def test_error_ingest_dedup_not_duplicate_before_mark(tmp_path: Path) -> None:
-    import control_plane.entrypoints.error_ingest.main as eingest
+    import operations_center.entrypoints.error_ingest.main as eingest
     orig = eingest._DEDUP_STATE_PATH
     eingest._DEDUP_STATE_PATH = tmp_path / "dedup.json"
 
@@ -246,7 +246,7 @@ def test_error_ingest_dedup_not_duplicate_before_mark(tmp_path: Path) -> None:
 
 
 def test_error_ingest_dedup_is_duplicate_after_mark(tmp_path: Path) -> None:
-    import control_plane.entrypoints.error_ingest.main as eingest
+    import operations_center.entrypoints.error_ingest.main as eingest
     orig = eingest._DEDUP_STATE_PATH
     eingest._DEDUP_STATE_PATH = tmp_path / "dedup.json"
 
@@ -259,7 +259,7 @@ def test_error_ingest_dedup_is_duplicate_after_mark(tmp_path: Path) -> None:
 
 def test_error_ingest_webhook_creates_plane_task(tmp_path: Path) -> None:
     """The webhook handler creates a Plane task for a valid ingest POST."""
-    import control_plane.entrypoints.error_ingest.main as eingest
+    import operations_center.entrypoints.error_ingest.main as eingest
     orig = eingest._DEDUP_STATE_PATH
     eingest._DEDUP_STATE_PATH = tmp_path / "dedup.json"
 
@@ -271,7 +271,7 @@ def test_error_ingest_webhook_creates_plane_task(tmp_path: Path) -> None:
             created_tasks.append(t)
             return t
 
-    from control_plane.entrypoints.error_ingest.main import _make_webhook_handler
+    from operations_center.entrypoints.error_ingest.main import _make_webhook_handler
     handler_class = _make_webhook_handler(_MockClient(), "myrepo")
 
     # Simulate a POST request using a mock socket
@@ -310,7 +310,7 @@ def test_error_ingest_webhook_creates_plane_task(tmp_path: Path) -> None:
 # S8-10: Confidence calibration infrastructure
 # ---------------------------------------------------------------------------
 
-from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE  # noqa: E402
+from operations_center.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE  # noqa: E402
 
 
 def test_calibration_record_and_retrieve(tmp_path: Path) -> None:

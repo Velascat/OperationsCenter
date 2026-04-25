@@ -13,7 +13,7 @@ A single reproducible walkthrough from local startup to a completed task with re
 ## Step 1 — First-time setup
 
 ```bash
-./scripts/control-plane.sh setup
+./scripts/operations-center.sh setup
 ```
 
 This creates `.venv`, installs dependencies, and walks through the initial config wizard.
@@ -21,13 +21,13 @@ This creates `.venv`, installs dependencies, and walks through the initial confi
 Alternatively, copy the templates manually:
 
 ```bash
-cp config/control_plane.example.yaml config/control_plane.local.yaml
-cp .env.control-plane.example .env.control-plane.local
+cp config/operations_center.example.yaml config/operations_center.local.yaml
+cp .env.operations-center.example .env.operations-center.local
 ```
 
 Edit both files. Minimum required changes:
 
-**`config/control_plane.local.yaml`**
+**`config/operations_center.local.yaml`**
 ```yaml
 plane:
   project_id: <your-plane-project-uuid>
@@ -38,7 +38,7 @@ repos:
     default_branch: main
 ```
 
-**`.env.control-plane.local`**
+**`.env.operations-center.local`**
 ```bash
 export PLANE_API_TOKEN='your-plane-api-token'
 export GITHUB_TOKEN='github_pat_...'
@@ -47,20 +47,20 @@ export GITHUB_TOKEN='github_pat_...'
 ## Step 2 — Start the local stack
 
 ```bash
-source .env.control-plane.local
-./scripts/control-plane.sh dev-up
+source .env.operations-center.local
+./scripts/operations-center.sh dev-up
 ```
 
 This starts:
 - **Plane** on `http://localhost:8080` — Plane infra is owned by WorkStation; `dev-up` delegates to `WorkStation/scripts/plane.sh` automatically
 - **Watchers**: `goal`, `test`, `improve`, `propose`, `review`
 
-**Prerequisite:** WorkStation must be cloned as a sibling of ControlPlane (or `CONTROL_PLANE_WORKSTATION_DIR` set). If WorkStation is not found, the Plane step will print instructions and exit.
+**Prerequisite:** WorkStation must be cloned as a sibling of OperationsCenter (or `OPERATIONS_CENTER_WORKSTATION_DIR` set). If WorkStation is not found, the Plane step will print instructions and exit.
 
 Confirm everything is running:
 
 ```bash
-./scripts/control-plane.sh dev-status
+./scripts/operations-center.sh dev-status
 ```
 
 Expected output: each watcher shows `state: idle` or `state: polling`.
@@ -175,15 +175,15 @@ A focused validation that covers the full autonomy chain without needing a Plane
 
 ```bash
 # Dry-run first — inspect what would be proposed
-./scripts/control-plane.sh autonomy-cycle
+./scripts/operations-center.sh autonomy-cycle
 
 # If the dry-run output looks reasonable, execute
-./scripts/control-plane.sh autonomy-cycle --execute
+./scripts/operations-center.sh autonomy-cycle --execute
 ```
 
 Confirm:
 - [ ] Dry-run output shows at least one candidate or a clear suppression reason
-- [ ] Artifact paths are printed and the files exist under `tools/report/control_plane/`
+- [ ] Artifact paths are printed and the files exist under `tools/report/operations_center/`
 - [ ] `--execute` creates a Plane task with `source: autonomy` and `source: propose` labels
 - [ ] The task description includes `## Proposal Provenance` with traceable run IDs
 
@@ -192,12 +192,12 @@ Confirm:
 To test Plane connectivity and task parsing without running a full kodo execution:
 
 ```bash
-./scripts/control-plane.sh plane-doctor --task-id <task-id>
-./scripts/control-plane.sh smoke --task-id <task-id> --comment-only
+./scripts/operations-center.sh plane-doctor --task-id <task-id>
+./scripts/operations-center.sh smoke --task-id <task-id> --comment-only
 ```
 
 ## Cleanup
 
 ```bash
-./scripts/control-plane.sh dev-down
+./scripts/operations-center.sh dev-down
 ```

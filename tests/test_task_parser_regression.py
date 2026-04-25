@@ -1,6 +1,6 @@
 """Regression tests for task parser edge cases (kodo test)."""
 import pytest
-from control_plane.application.task_parser import TaskParser
+from operations_center.application.task_parser import TaskParser
 
 
 def test_goal_text_excludes_execution_yaml():

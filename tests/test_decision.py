@@ -3,14 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from control_plane.decision.candidate_builder import CandidateBuilder, CandidateSpec
-from control_plane.decision.loader import DecisionLoader
-from control_plane.decision.models import ProposalCandidatesArtifact, ProposalOutline
-from control_plane.decision.policy import DecisionPolicy, DecisionPolicyConfig
-from control_plane.decision.service import DecisionEngineService, new_decision_context
-from control_plane.execution import UsageStore
-from control_plane.insights.artifact_writer import InsightArtifactWriter
-from control_plane.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
+from operations_center.decision.candidate_builder import CandidateBuilder, CandidateSpec
+from operations_center.decision.loader import DecisionLoader
+from operations_center.decision.models import ProposalCandidatesArtifact, ProposalOutline
+from operations_center.decision.policy import DecisionPolicy, DecisionPolicyConfig
+from operations_center.decision.service import DecisionEngineService, new_decision_context
+from operations_center.execution import UsageStore
+from operations_center.insights.artifact_writer import InsightArtifactWriter
+from operations_center.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
 
 def make_insight_artifact(
@@ -23,8 +23,8 @@ def make_insight_artifact(
     return RepoInsightsArtifact(
         run_id=run_id,
         generated_at=generated_at,
-        source_command="control-plane generate-insights",
-        repo=InsightRepoRef(name="control-plane", path=repo_path),
+        source_command="operations-center generate-insights",
+        repo=InsightRepoRef(name="operations-center", path=repo_path),
         source_snapshots=[SourceSnapshotRef(run_id="obs_1", observed_at=generated_at - timedelta(hours=1))],
         insights=insights,
     )
@@ -101,8 +101,8 @@ def test_policy_suppresses_on_cooldown_and_quota() -> None:
     prior = ProposalCandidatesArtifact(
         run_id="dec_old",
         generated_at=now - timedelta(minutes=30),
-        source_command="control-plane decide-proposals",
-        repo={"name": "control-plane", "path": "/tmp/repo"},
+        source_command="operations-center decide-proposals",
+        repo={"name": "operations-center", "path": "/tmp/repo"},
         source_insight_run_id="ins_old",
         candidates=[
             {
@@ -182,8 +182,8 @@ def test_service_emits_and_suppresses_candidates(tmp_path: Path) -> None:
             ),
             make_insight(
                 kind="file_hotspot",
-                subject="src/control_plane/watcher.py",
-                dedup_key="file_hotspot|src/control_plane/watcher.py|repeated_presence",
+                subject="src/operations_center/watcher.py",
+                dedup_key="file_hotspot|src/operations_center/watcher.py|repeated_presence",
                 evidence={"appears_in_recent_snapshots": 3},
             ),
         ],
@@ -199,7 +199,7 @@ def test_service_emits_and_suppresses_candidates(tmp_path: Path) -> None:
             history_limit=5,
             max_candidates=2,
             cooldown_minutes=120,
-            source_command="control-plane decide-proposals",
+            source_command="operations-center decide-proposals",
         )
     )
 
@@ -218,7 +218,7 @@ def test_zero_candidate_run_is_valid(tmp_path: Path) -> None:
         insights=[
             make_insight(
                 kind="commit_activity",
-                subject="control-plane",
+                subject="operations-center",
                 dedup_key="commit_activity|recent_window",
                 evidence={"current_commit_count": 2},
             )
@@ -235,7 +235,7 @@ def test_zero_candidate_run_is_valid(tmp_path: Path) -> None:
             history_limit=5,
             max_candidates=3,
             cooldown_minutes=120,
-            source_command="control-plane decide-proposals",
+            source_command="operations-center decide-proposals",
         )
     )
 

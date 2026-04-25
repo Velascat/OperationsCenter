@@ -90,7 +90,7 @@ proposer_run_id: <run_id>
 Bullet list of `evidence_lines` from the candidate — specific, factual observations that drove the proposal:
 
 ```
-- 47 lint violations in src/control_plane/decision/service.py
+- 47 lint violations in src/operations_center/decision/service.py
 - violation count increased from 32 in prior snapshot
 ```
 
@@ -122,7 +122,7 @@ Feedback record format:
 To record feedback manually (for tasks merged outside the reviewer loop):
 
 ```bash
-python -m control_plane.entrypoints.feedback.main record \
+python -m operations_center.entrypoints.feedback.main record \
     --task-id <uuid> --outcome merged --pr-number 42
 ```
 
@@ -136,7 +136,7 @@ To allow a candidate to be re-proposed after a human rejection, delete its entry
 
 ## Board Saturation Guard (autonomy-cycle path)
 
-Before `propose-from-candidates` runs inside `autonomy-cycle`, the orchestrator counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds `MAX_QUEUED_AUTONOMY_TASKS` (default 15, configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`), the entire propose stage is skipped for that cycle.
+Before `propose-from-candidates` runs inside `autonomy-cycle`, the orchestrator counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds `MAX_QUEUED_AUTONOMY_TASKS` (default 15, configurable via `OPERATIONS_CENTER_MAX_QUEUED_AUTONOMY_TASKS`), the entire propose stage is skipped for that cycle.
 
 This prevents the proposer from outpacing the workers during idle stretches (e.g. after a watcher restart or overnight backlog buildup). The saturation check runs before dry-run expansion, so it also applies in `--execute` mode.
 

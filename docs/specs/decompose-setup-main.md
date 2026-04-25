@@ -6,7 +6,7 @@ phases:
   - test
   - improve
 repos:
-  - ControlPlane
+  - OperationsCenter
 area_keywords:
   - entrypoints/setup
   - setup
@@ -19,7 +19,7 @@ created_at: 2026-04-18T00:00:00Z
 
 ## Overview
 
-`src/control_plane/entrypoints/setup/main.py` is a 1,210-line file containing 43 top-level functions and 3 dataclasses that mix SSH key management, GitHub remote manipulation, interactive CLI prompting, repository discovery, config/env file rendering, and the main wizard flow. This campaign extracts cohesive function groups into focused submodules inside the `entrypoints/setup/` package (which already contains `providers.py` and `doctor.py`), reducing `main.py` to a thin wizard orchestrator of ≤ 400 lines.
+`src/operations_center/entrypoints/setup/main.py` is a 1,210-line file containing 43 top-level functions and 3 dataclasses that mix SSH key management, GitHub remote manipulation, interactive CLI prompting, repository discovery, config/env file rendering, and the main wizard flow. This campaign extracts cohesive function groups into focused submodules inside the `entrypoints/setup/` package (which already contains `providers.py` and `doctor.py`), reducing `main.py` to a thin wizard orchestrator of ≤ 400 lines.
 
 ## Goals
 
@@ -31,7 +31,7 @@ created_at: 2026-04-18T00:00:00Z
 
 ## Constraints
 
-- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that any existing `from control_plane.entrypoints.setup.main import X` continues to work.
+- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that any existing `from operations_center.entrypoints.setup.main import X` continues to work.
 - **No logic changes**: Each goal is a pure move-and-import refactor. Do not rename functions, change signatures, or alter behavior.
 - **Incremental**: Each goal is a standalone PR-able commit. Tests must pass after each extraction.
 - **Goal ordering**: Goal 2 should be done before Goal 3 because `prompts.py` will import the dataclasses from `rendering.py`. Goal 1 is independent of both.
@@ -43,5 +43,5 @@ created_at: 2026-04-18T00:00:00Z
 - `main.py` contains only the `main()` wizard function, tool-installation helpers, and re-export lines — under 400 lines total.
 - Three new modules exist: `ssh.py`, `rendering.py`, `prompts.py`, each under 400 lines.
 - `python -m pytest tests/test_setup_cli.py` passes without modification to the test file.
-- `ruff check src/control_plane/entrypoints/setup/` reports no errors.
+- `ruff check src/operations_center/entrypoints/setup/` reports no errors.
 - No circular imports between the new modules or with `main.py`.

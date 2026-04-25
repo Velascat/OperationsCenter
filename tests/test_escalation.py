@@ -7,7 +7,7 @@ from typing import Any, cast
 import httpx
 import pytest
 
-from control_plane.adapters.escalation import post_escalation
+from operations_center.adapters.escalation import post_escalation
 
 
 def test_post_escalation_sends_correct_payload(monkeypatch: pytest.MonkeyPatch) -> None:

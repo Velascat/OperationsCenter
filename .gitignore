@@ -9,14 +9,14 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.env.control-plane.local
-config/control_plane.local.yaml
+.env.operations-center.local
+config/operations_center.local.yaml
 config/plane_task_template.local.md
 logs/
 deployment/plane/runtime/
 deployment/plane/logs/
 tools/report/kodo_plane/
-tools/report/control_plane/
+tools/report/operations_center/
 state/
 .review/
 .worktrees/

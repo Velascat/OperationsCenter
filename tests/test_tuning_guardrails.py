@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from control_plane.tuning.guardrails import TuningGuardrails, compute_new_value
-from control_plane.tuning.models import TuningChange, TuningRecommendation, TuningRunArtifact
+from operations_center.tuning.guardrails import TuningGuardrails, compute_new_value
+from operations_center.tuning.models import TuningChange, TuningRecommendation, TuningRunArtifact
 
 _NOW = datetime(2026, 4, 4, 12, tzinfo=UTC)
 

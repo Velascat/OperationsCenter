@@ -1,4 +1,4 @@
-# ControlPlane Roadmap
+# OperationsCenter Roadmap
 
 This document tracks what is deferred, what is partially done, and what must be true before each item is unlocked.
 
@@ -33,7 +33,7 @@ Phase 4 has two halves. The first is complete; the second is TODO'd.
 
 ### ✓ Done — execution feedback depth (S8)
 
-**`ExecutionOutcomeDeriver`** (`src/control_plane/insights/derivers/execution_outcome.py`)
+**`ExecutionOutcomeDeriver`** (`src/operations_center/insights/derivers/execution_outcome.py`)
 
 Reads retained `control_outcome.json` and `stderr.txt` artifacts from `tools/report/kodo_plane/` to classify failure modes: `timeout_pattern` (≥2 timeout failures), `test_regression` (test-output pattern in validation failures), `validation_loop` (same task failed validation ≥3 times). Wired into `build_insight_service()` in `autonomy_cycle/main.py`.
 
@@ -49,8 +49,8 @@ All three Phase 5 collectors and derivers are implemented and wired into the pip
 
 Static coupling analysis via AST: module size, import depth, circular dependencies. Runs in the observer stage; never modifies the repo. Emits `ArchitectureSignal`.
 
-- Collector: `src/control_plane/observer/collectors/architecture_signal.py`
-- Deriver: `src/control_plane/insights/derivers/architecture_drift.py` — emits `arch_drift/coupling_high`, `arch_drift/module_bloat`
+- Collector: `src/operations_center/observer/collectors/architecture_signal.py`
+- Deriver: `src/operations_center/insights/derivers/architecture_drift.py` — emits `arch_drift/coupling_high`, `arch_drift/module_bloat`
 - Registered in `build_observer_service()` and `build_insight_service()` in `autonomy_cycle/main.py`
 - Consumed by: `arch_promotion` family in the decision engine
 
@@ -58,16 +58,16 @@ Static coupling analysis via AST: module size, import depth, circular dependenci
 
 Reads pre-existing benchmark output files (pytest-benchmark JSON, hyperfine JSON, custom `report.json`). Never runs benchmarks itself. Detects regressions against prior retained outputs. Emits `BenchmarkSignal`.
 
-- Collector: `src/control_plane/observer/collectors/benchmark_signal.py`
-- Deriver: `src/control_plane/insights/derivers/benchmark_regression.py` — emits `benchmark_regression/present`
+- Collector: `src/operations_center/observer/collectors/benchmark_signal.py`
+- Deriver: `src/operations_center/insights/derivers/benchmark_regression.py` — emits `benchmark_regression/present`
 - Registered in both factory functions
 
 ### ✓ SecuritySignalCollector
 
 Reads pip-audit, npm audit, or trivy JSON output from retained artifacts. Never runs audit tools itself. Emits `SecuritySignal` when advisories are present.
 
-- Collector: `src/control_plane/observer/collectors/security_signal.py`
-- Deriver: `src/control_plane/insights/derivers/security_vuln.py` — emits `security_vuln/present`
+- Collector: `src/operations_center/observer/collectors/security_signal.py`
+- Deriver: `src/operations_center/insights/derivers/security_vuln.py` — emits `security_vuln/present`
 - Registered in both factory functions
 
 All three signals default to `status="unavailable"` when the tool output files are absent, making them safe no-ops on repos that do not use them.
@@ -76,7 +76,7 @@ All three signals default to `status="unavailable"` when the tool output files a
 
 ## S12 — Autonomous Spec-Driven Campaign Chain ✓ Complete
 
-A fully autonomous spec-driven development chain giving ControlPlane a sixth watcher role (`spec`).
+A fully autonomous spec-driven development chain giving OperationsCenter a sixth watcher role (`spec`).
 
 ### What was built
 
@@ -98,7 +98,7 @@ A fully autonomous spec-driven development chain giving ControlPlane a sixth wat
 
 **New task kinds**: `test_campaign` (→ `kodo --test`), `improve_campaign` (→ `kodo --improve`). Both are claimed by their corresponding role workers via `ROLE_TASK_KINDS` in `worker/main.py`.
 
-**Entrypoint** (`entrypoints/spec_director/main.py`): Polling loop, `--once` flag for supervised runs. `watch --role spec` registered in `scripts/control-plane.sh`.
+**Entrypoint** (`entrypoints/spec_director/main.py`): Polling loop, `--once` flag for supervised runs. `watch --role spec` registered in `scripts/operations-center.sh`.
 
 ---
 
@@ -111,11 +111,11 @@ A fully autonomous spec-driven development chain giving ControlPlane a sixth wat
 **What it does:** Tracks "when the system said confidence=high for family X, what was the actual acceptance rate?" Surfaces families where the confidence label is systematically miscalibrated (e.g., type_fix high-confidence proposals accepted only 40% of the time). Adds a calibration section to `tune-autonomy` output.
 
 **Where it plugs in:**
-- New module: `src/control_plane/tuning/calibration.py` — `ConfidenceCalibrationStore` (TODO comment in `metrics.py`)
+- New module: `src/operations_center/tuning/calibration.py` — `ConfidenceCalibrationStore` (TODO comment in `metrics.py`)
 - `DecisionContext.min_confidence` becomes per-family once calibration data is available
-- Calibration report added to `src/control_plane/entrypoints/tune_autonomy/main.py` output
+- Calibration report added to `src/operations_center/entrypoints/tune_autonomy/main.py` output
 
-**Design sketch** (in `src/control_plane/tuning/metrics.py` TODO comment):
+**Design sketch** (in `src/operations_center/tuning/metrics.py` TODO comment):
 ```python
 class ConfidenceCalibrationStore:
     def record(self, family: str, confidence: str, outcome: str) -> None: ...
@@ -150,8 +150,8 @@ class ConfidenceCalibrationStore:
 - Human still reviews and merges the PR; there is no auto-merge path
 
 **Where it plugs in:**
-- New entrypoint or `--experiment` flag in `src/control_plane/entrypoints/autonomy_cycle/main.py` (TODO comment already present)
-- Requires explicit env var: `CONTROL_PLANE_EXPERIMENT_MODE=1`
+- New entrypoint or `--experiment` flag in `src/operations_center/entrypoints/autonomy_cycle/main.py` (TODO comment already present)
+- Requires explicit env var: `OPERATIONS_CENTER_EXPERIMENT_MODE=1`
 - Validation profile check runs before PR creation; failure abandons the branch silently
 
 **This is the only phase that resembles autoresearch behavior, and it is explicitly bounded to the narrowest possible case.**

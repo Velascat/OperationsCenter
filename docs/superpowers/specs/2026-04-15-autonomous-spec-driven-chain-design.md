@@ -8,7 +8,7 @@
 
 ## Overview
 
-Add a fully autonomous spec-driven development chain to ControlPlane. The existing heuristic autonomy cycle (observe → insights → decide → propose) continues to run for mechanical fixes (lint, types, coverage). A new `spec` watch role sits above it as a priority layer: when a spec campaign is active, it suppresses heuristic proposals that overlap with the campaign's area and drives directed feature work through a Claude-authored spec.
+Add a fully autonomous spec-driven development chain to OperationsCenter. The existing heuristic autonomy cycle (observe → insights → decide → propose) continues to run for mechanical fixes (lint, types, coverage). A new `spec` watch role sits above it as a priority layer: when a spec campaign is active, it suppresses heuristic proposals that overlap with the campaign's area and drives directed feature work through a Claude-authored spec.
 
 The chain follows the superpowers pattern: brainstorm → spec → task campaign → execute → compliance review → PR.
 
@@ -21,18 +21,18 @@ Human interaction: operator drops a file or creates a labelled Plane task. Syste
 Six modules in a new `spec_director/` package:
 
 ```
-src/control_plane/spec_director/
+src/operations_center/spec_director/
   trigger.py          — detects start conditions (drop-file, Plane label, queue drain)
   brainstorm.py       — builds context bundle, calls Anthropic API, returns spec text
-  spec_writer.py      — writes spec to ControlPlane repo + copies into target workspace
+  spec_writer.py      — writes spec to OperationsCenter repo + copies into target workspace
   campaign_builder.py — creates Plane parent task + child tasks with campaign metadata
   compliance.py       — structured verdict (diff vs spec) via Anthropic API
   suppressor.py       — blocks heuristic proposals while a campaign covers their area
 
-src/control_plane/entrypoints/spec_director/
+src/operations_center/entrypoints/spec_director/
   main.py             — polling loop, wires the above together
 
-scripts/control-plane.sh  — new "spec" watch role (alongside goal/test/improve/propose/review)
+scripts/operations-center.sh  — new "spec" watch role (alongside goal/test/improve/propose/review)
 ```
 
 **Existing code changes (minimal):**
@@ -61,7 +61,7 @@ BRAINSTORM  (claude-opus-4-6, one call per campaign)
   Output: spec text, suggested slug, phase flags [implement, test, improve]
 
 SPEC WRITE
-  - docs/specs/<slug>.md in ControlPlane repo (canonical)
+  - docs/specs/<slug>.md in OperationsCenter repo (canonical)
   - copied into target workspace clone at same relative path
   - Plane parent campaign task created with campaign_id, spec_file reference, short summary
 
@@ -266,7 +266,7 @@ The spec director runs on the same machine as all other workers. It must not cro
 
 ### Disk Space
 
-The spec director calls `_check_disk_space` (existing helper, `src/control_plane/execution/usage_store.py`) at two points:
+The spec director calls `_check_disk_space` (existing helper, `src/operations_center/execution/usage_store.py`) at two points:
 
 1. **Before writing spec file** — checked against `docs/specs/` path. Below 200 MB free: log `spec_disk_space_low` warning and continue. Below 50 MB free: abort campaign creation, log `spec_disk_space_critical`, retry on next poll.
 2. **Before writing `state/campaigns/active.json`** — same thresholds.
@@ -288,7 +288,7 @@ Completed and cancelled campaign specs accumulate in `docs/specs/`. To keep the 
 
 ## Configuration
 
-New fields in `config/control_plane.local.yaml` (all optional, with defaults):
+New fields in `config/operations_center.local.yaml` (all optional, with defaults):
 
 ```yaml
 spec_director:

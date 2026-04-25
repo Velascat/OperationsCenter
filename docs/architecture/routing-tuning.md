@@ -151,7 +151,7 @@ The tuning layer does not pretend sparse evidence is strong evidence.
 Primary entry point:
 
 ```python
-from control_plane.tuning import StrategyTuningService
+from operations_center.tuning import StrategyTuningService
 
 service = StrategyTuningService.default()
 report = service.analyze(records)

@@ -1,6 +1,6 @@
 # Execution Budget And Safety Controls
 
-Control Plane now enforces a local execution control layer before expensive worker actions run.
+Operations Center now enforces a local execution control layer before expensive worker actions run.
 
 ## What Is Controlled
 
@@ -21,8 +21,8 @@ Both thresholds are tunable:
 
 | Env var | Default | Effect |
 |---------|---------|--------|
-| `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD` | `0.8` | Failure fraction that opens the circuit |
-| `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW` | `5` | Number of recent outcomes to sample |
+| `OPERATIONS_CENTER_CIRCUIT_BREAKER_THRESHOLD` | `0.8` | Failure fraction that opens the circuit |
+| `OPERATIONS_CENTER_CIRCUIT_BREAKER_WINDOW` | `5` | Number of recent outcomes to sample |
 
 The window requires ≥3 samples before the circuit can open (startup safety margin).
 
@@ -39,7 +39,7 @@ The same check also runs in `autonomy-cycle` before writing the cycle report. Th
 
 Before the propose watcher or `autonomy-cycle` creates new tasks, it counts open tasks labeled `source: autonomy` in `Ready for AI` and `Backlog`. If the count meets or exceeds `MAX_QUEUED_AUTONOMY_TASKS`, the propose stage is skipped entirely for that cycle.
 
-Default: 15. Configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`.
+Default: 15. Configurable via `OPERATIONS_CENTER_MAX_QUEUED_AUTONOMY_TASKS`.
 
 ## Quality Erosion Tracking
 
@@ -65,21 +65,21 @@ Hard quota exhaustion (`is_quota_exhausted(result)` is true) is treated differen
 
 ## Operator Knobs
 
-- `CONTROL_PLANE_MAX_EXEC_PER_HOUR`
-- `CONTROL_PLANE_MAX_EXEC_PER_DAY`
-- `CONTROL_PLANE_MAX_RETRIES_PER_TASK`
-- `CONTROL_PLANE_MIN_REMAINING_EXEC_FOR_PROPOSALS`
-- `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD`
-- `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW`
-- `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS`
-- `CONTROL_PLANE_WATCH_INTERVAL_GOAL_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS`
+- `OPERATIONS_CENTER_MAX_EXEC_PER_HOUR`
+- `OPERATIONS_CENTER_MAX_EXEC_PER_DAY`
+- `OPERATIONS_CENTER_MAX_RETRIES_PER_TASK`
+- `OPERATIONS_CENTER_MIN_REMAINING_EXEC_FOR_PROPOSALS`
+- `OPERATIONS_CENTER_CIRCUIT_BREAKER_THRESHOLD`
+- `OPERATIONS_CENTER_CIRCUIT_BREAKER_WINDOW`
+- `OPERATIONS_CENTER_MAX_QUEUED_AUTONOMY_TASKS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_GOAL_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_TEST_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_IMPROVE_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_PROPOSE_SECONDS`
 
 ## Retained Artifacts
 
-- execution usage ledger: `tools/report/control_plane/execution/usage.json`
+- execution usage ledger: `tools/report/operations_center/execution/usage.json`
 - per-run control outcome: `control_outcome.json` inside retained run directories
 - proposal rejection store: `state/proposal_rejections.json`
 

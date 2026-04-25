@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.tuning.analyze import StrategyTuningService
-from control_plane.tuning.routing_models import (
+from operations_center.tuning.analyze import StrategyTuningService
+from operations_center.tuning.routing_models import (
     EvidenceStrength,
     RoutingTuningProposal,
     StrategyAnalysisReport,
@@ -224,7 +224,7 @@ class TestRecommendationSeparation:
     def test_report_does_not_import_routing_policy_module(self):
         """The analysis layer never touches SwitchBoard lane policy directly."""
         import importlib
-        analyze_mod = importlib.import_module("control_plane.tuning.analyze")
+        analyze_mod = importlib.import_module("operations_center.tuning.analyze")
         source = getattr(analyze_mod, "__file__", "")
         # just verify the module loads cleanly without error
         assert analyze_mod is not None
@@ -267,7 +267,7 @@ class TestFilteringOptions:
 
     def test_dependency_injection_for_compare_fn(self):
         """Test that compare_fn injection works for test isolation."""
-        from control_plane.tuning.routing_models import BackendComparisonSummary, EvidenceStrength, ReliabilityClass, ChangeEvidenceClass
+        from operations_center.tuning.routing_models import BackendComparisonSummary, EvidenceStrength, ReliabilityClass, ChangeEvidenceClass
 
         stub_summary = BackendComparisonSummary(
             backend="stub",

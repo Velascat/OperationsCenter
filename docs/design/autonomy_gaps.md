@@ -12,7 +12,7 @@ gaps toward fully autonomous operation. They are grouped by session, then by the
 **Problem:** The proposer would create tasks about anything it found in the codebase, spreading
 kodo's attention across many topics before finishing what mattered.
 
-**Fix:** `focus_areas: [...]` in `config/control_plane.local.yaml` accepts a list of keywords.
+**Fix:** `focus_areas: [...]` in `config/operations_center.local.yaml` accepts a list of keywords.
 Proposals whose title or goal text does not match any keyword are demoted to Backlog with
 reduced confidence. Matching proposals are kept at their natural state.
 
@@ -81,15 +81,15 @@ high-priority `[Improve] Post-merge regression detected` tasks for any that fail
 ### 5. Self-Modification Controls
 
 **Problem:** The system could propose and automatically execute changes to its own codebase
-(ControlPlane itself), bypassing the human review that self-modification requires.
+(OperationsCenter itself), bypassing the human review that self-modification requires.
 
-**Fix:** `self_repo_key: ControlPlane` in config identifies the installation's own repo.
+**Fix:** `self_repo_key: OperationsCenter` in config identifies the installation's own repo.
 - Proposals for self-repo tasks are always capped at Backlog.
 - `select_watch_candidate` skips self-repo tasks unless they carry a `self-modify: approved` label.
 
 **Config:**
 ```yaml
-self_repo_key: ControlPlane
+self_repo_key: OperationsCenter
 ```
 
 **Files:** `settings.py` (`Settings.self_repo_key`), `main.py` (`_is_self_repo`, `_self_modify_approved`, `select_watch_candidate`, `build_proposal_candidates`)
@@ -175,7 +175,7 @@ every cycle. The `heartbeat-check` CLI subcommand reads all heartbeat files and 
 if any is older than 5 minutes.
 
 ```bash
-python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+python -m operations_center.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
 ```
 
 Wire this into cron or a process monitor for unattended operation.
@@ -277,7 +277,7 @@ scheduled_tasks:
   - cron: "0 9 * * 1"   # Monday 09:00 UTC
     title: Weekly dependency audit
     goal: Check for outdated dependencies and create upgrade tasks.
-    repo_key: ControlPlane
+    repo_key: OperationsCenter
     kind: goal
 ```
 
@@ -385,7 +385,7 @@ task is created so a human is alerted immediately.
 
 ### 5. Config Schema Drift Detection
 
-**Problem:** No mechanism existed to detect when a deployed `config/control_plane.local.yaml`
+**Problem:** No mechanism existed to detect when a deployed `config/operations_center.local.yaml`
 was missing keys added in newer versions. Features like `escalation`, `stale_pr_days`,
 `scheduled_tasks`, and `self_repo_key` silently defaulted to off if the operator's config
 predated them. Operators could run the system for weeks unaware that a feature was disabled.
@@ -415,7 +415,7 @@ operator-supplied via `cost_per_execution_usd: 0.0` in config (zero by default =
 disabled). A `spend-report` CLI subcommand prints the report as JSON.
 
 ```bash
-python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+python -m operations_center.entrypoints.worker.main spend-report --window-days 7
 ```
 
 **Config:**
@@ -447,7 +447,7 @@ parallel_slots: 2   # default 1 (serial)
 
 **CLI:**
 ```bash
-./scripts/control-plane.sh watch --role goal --parallel-slots 3
+./scripts/operations-center.sh watch --role goal --parallel-slots 3
 ```
 
 **Files:** `settings.py` (`Settings.parallel_slots`), `main.py` (`run_parallel_watch_loop`, `_slot_id` param on `run_watch_loop`, `--parallel-slots` arg in `main()`)
@@ -625,7 +625,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 **Problem:** The satiation signal (S1-8) detected when proposals weren't being consumed over multiple cycles, but couldn't directly observe the current board queue depth. A burst `autonomy-cycle --execute` run could flood the board with 30+ tasks when the watcher queue was already backed up, far exceeding what the goal/test lanes could drain in a reasonable time.
 
 **Fix:**
-- `MAX_QUEUED_AUTONOMY_TASKS = 15` constant in `main.py` (configurable via `CONTROL_PLANE_MAX_QUEUED_AUTONOMY_TASKS` env var)
+- `MAX_QUEUED_AUTONOMY_TASKS = 15` constant in `main.py` (configurable via `OPERATIONS_CENTER_MAX_QUEUED_AUTONOMY_TASKS` env var)
 - In `handle_propose_cycle`: after the `board_congested` check, counts `source: autonomy` tasks in `Ready for AI` or `Backlog`. If ≥ threshold, returns `decision="board_saturated"` immediately
 - In `autonomy_cycle/main.py`: performs the same count via `client.list_issues()` before calling `proposer_svc.run()`. Skips the propose stage and writes the cycle report with 0 created tasks
 
@@ -682,7 +682,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 **Fix:** `start_watch_role` now wraps each python process in a bash restart loop. On non-zero exit (crash) it logs a `watcher_restart` event and relaunches after 5 seconds. A SIGTERM trap ensures that `stop_watch_role` terminates both the wrapper bash and the running python child cleanly. Exit code 0 (intentional stop — e.g. credential failure at startup) breaks the loop.
 
-**Files:** `scripts/control-plane.sh` (`start_watch_role`)
+**Files:** `scripts/operations-center.sh` (`start_watch_role`)
 
 ---
 
@@ -700,7 +700,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 **Problem:** The execution budget was count-based only. When something systemic broke (bad kodo version, auth regression), the system would burn the full hourly or daily budget executing tasks that all failed — providing no value and consuming all capacity before the operator could investigate.
 
-**Fix:** `record_execution_outcome(*, task_id, role, succeeded, now)` is called after each `handle_goal_task` and `handle_test_task` completes. `budget_decision` checks the last `_CB_WINDOW = 5` execution outcomes. If `≥ _CB_THRESHOLD = 0.8` (80%) of them failed, the budget decision returns `reason="circuit_breaker_open"` and no further tasks run until the rate improves or the operator investigates. Both thresholds are tunable via `CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD` and `CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW` env vars.
+**Fix:** `record_execution_outcome(*, task_id, role, succeeded, now)` is called after each `handle_goal_task` and `handle_test_task` completes. `budget_decision` checks the last `_CB_WINDOW = 5` execution outcomes. If `≥ _CB_THRESHOLD = 0.8` (80%) of them failed, the budget decision returns `reason="circuit_breaker_open"` and no further tasks run until the rate improves or the operator investigates. Both thresholds are tunable via `OPERATIONS_CENTER_CIRCUIT_BREAKER_THRESHOLD` and `OPERATIONS_CENTER_CIRCUIT_BREAKER_WINDOW` env vars.
 
 **Files:** `usage_store.py` (`record_execution_outcome`, circuit-breaker check in `budget_decision`)
 
@@ -904,8 +904,8 @@ reviewer:
 **Fix:** `UsageStore.audit_export(window_days, now)` maps `execution_outcome` events to human-friendly `{kind: "execution", task_id, outcome, succeeded, role, kodo_version, timestamp}` dicts. The `audit-export` CLI subcommand prints the full list as JSON.
 
 ```bash
-python -m control_plane.entrypoints.worker.main audit-export --window-days 7
-python -m control_plane.entrypoints.worker.main audit-export --window-days 30 > audit.json
+python -m operations_center.entrypoints.worker.main audit-export --window-days 7
+python -m operations_center.entrypoints.worker.main audit-export --window-days 30 > audit.json
 ```
 
 **Files:** `execution/usage_store.py` (`audit_export`), `entrypoints/worker/main.py` (`audit-export` subcommand in `main()`)
@@ -924,7 +924,7 @@ python -m control_plane.entrypoints.worker.main audit-export --window-days 30 > 
 Called every 40 improve cycles in `run_watch_loop`. Also available as the `board-health` CLI subcommand.
 
 ```bash
-python -m control_plane.entrypoints.worker.main board-health --config config/control_plane.local.yaml
+python -m operations_center.entrypoints.worker.main board-health --config config/operations_center.local.yaml
 ```
 
 **Files:** `entrypoints/worker/main.py` (`board_health_check`, `board-health` subcommand)
@@ -948,7 +948,7 @@ Per-process `restart_max` limits the number of automatic restart attempts (defau
 ```yaml
 processes:
   - role: goal
-    command: ["python", "-m", "control_plane.entrypoints.worker.main",
+    command: ["python", "-m", "operations_center.entrypoints.worker.main",
               "--config", "/path/to/config.yaml", "--watch", "--role", "goal",
               "--status-dir", "logs/local"]
     restart_backoff_seconds: 10
@@ -1248,8 +1248,8 @@ When any source changes, fires `autonomy-cycle --config <config> [--execute]` as
 
 **Usage:**
 ```bash
-python -m control_plane.entrypoints.pipeline_trigger.main \
-    --config config/control_plane.local.yaml \
+python -m operations_center.entrypoints.pipeline_trigger.main \
+    --config config/operations_center.local.yaml \
     --execute \
     --min-interval 300
 ```
@@ -1468,7 +1468,7 @@ A warning is shown to the reviewer after each zero-change attempt indicating how
 
 New `entrypoints/campaign_status/main.py` CLI:
 ```
-python -m control_plane.entrypoints.campaign_status.main [--status ...] [--json]
+python -m operations_center.entrypoints.campaign_status.main [--status ...] [--json]
 ```
 
 **Files:** `execution/campaign_store.py` (NEW), `entrypoints/campaign_status/main.py` (NEW), `entrypoints/worker/main.py` (campaign registration in `build_multi_step_plan`)
@@ -1512,12 +1512,12 @@ Thresholds: ≥8 files → high; 3–7 → medium; <3 → low.
 
 ### S10-8: Real-Time CI Webhook
 
-**Problem:** ControlPlane polled for CI status every N seconds. Between CI completing and the next poll, the reviewer watcher was idle even though action could have been taken immediately.
+**Problem:** OperationsCenter polled for CI status every N seconds. Between CI completing and the next poll, the reviewer watcher was idle even though action could have been taken immediately.
 
 **Fix:** New `entrypoints/ci_webhook/main.py` HTTP server for GitHub `check_run` webhook events:
 - Listens on `127.0.0.1:8765` (configurable via env vars).
-- Validates `X-Hub-Signature-256` HMAC using `CONTROL_PLANE_WEBHOOK_SECRET`.
-- On `check_run.completed` with a relevant conclusion: writes a JSON trigger file to `state/ci_webhook_triggers/` (or runs a custom command via `CONTROL_PLANE_WEBHOOK_TRIGGER`).
+- Validates `X-Hub-Signature-256` HMAC using `OPERATIONS_CENTER_WEBHOOK_SECRET`.
+- On `check_run.completed` with a relevant conclusion: writes a JSON trigger file to `state/ci_webhook_triggers/` (or runs a custom command via `OPERATIONS_CENTER_WEBHOOK_TRIGGER`).
 - Trigger files are picked up by the reviewer watcher on the next cycle.
 
 **Files:** `entrypoints/ci_webhook/main.py` (NEW), `entrypoints/ci_webhook/__init__.py` (NEW)
@@ -1528,7 +1528,7 @@ Thresholds: ≥8 files → high; 3–7 → medium; <3 → low.
 
 **Problem:** When lint errors, security vulnerabilities, or architecture drift appeared simultaneously in multiple repos, the system proposed per-repo fix tasks with no visibility into the systemic pattern.
 
-**Fix:** New `CrossRepoSynthesisDeriver` in `insights/derivers/cross_repo_synthesis.py`. On each autonomy-cycle insights run, it reads the latest `repo_insights.json` artifact from every repo in `tools/report/control_plane/insights/`, computes insight-kind overlap, and emits `cross_repo/pattern_detected` for any kind shared by ≥2 repos. The evidence includes `shared_insight_kind`, `repo_count`, and `repos`.
+**Fix:** New `CrossRepoSynthesisDeriver` in `insights/derivers/cross_repo_synthesis.py`. On each autonomy-cycle insights run, it reads the latest `repo_insights.json` artifact from every repo in `tools/report/operations_center/insights/`, computes insight-kind overlap, and emits `cross_repo/pattern_detected` for any kind shared by ≥2 repos. The evidence includes `shared_insight_kind`, `repo_count`, and `repos`.
 
 Registered last in `build_insight_service()` so all per-repo derivers have already fired.
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import ArtifactType
-from control_plane.observability.artifacts import ArtifactIndex, ArtifactNormalizer
+from operations_center.contracts.enums import ArtifactType
+from operations_center.observability.artifacts import ArtifactIndex, ArtifactNormalizer
 
 from .conftest import make_artifact
 

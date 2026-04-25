@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from control_plane.contracts.enums import (
+from operations_center.contracts.enums import (
     ArtifactType,
     BackendName,
     ExecutionMode,

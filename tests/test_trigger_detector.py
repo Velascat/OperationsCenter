@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from control_plane.spec_director.trigger import TriggerDetector
-from control_plane.spec_director.models import TriggerSource
+from operations_center.spec_director.trigger import TriggerDetector
+from operations_center.spec_director.models import TriggerSource
 
 
 def _make_detector(tmp_path: Path) -> TriggerDetector:

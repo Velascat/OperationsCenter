@@ -6,7 +6,7 @@ phases:
   - test
   - improve
 repos:
-  - ControlPlane
+  - OperationsCenter
 area_keywords:
   - entrypoints/autonomy_cycle
   - autonomy_cycle
@@ -21,7 +21,7 @@ created_at: 2026-04-18T15:00:00Z
 
 ## Overview
 
-`src/control_plane/entrypoints/autonomy_cycle/main.py` is a 725-line file containing 7 top-level functions that mix service-factory wiring (observer, insight engine, decision engine), CLI argument parsing, a 4-stage pipeline orchestration duplicated between `main()` and `run_pipeline()`, a 150-line cycle-report writer, and a quiet-diagnosis escalation helper. This campaign extracts cohesive groups into focused submodules inside the `entrypoints/autonomy_cycle/` package, eliminating the pipeline duplication and reducing `main.py` to a thin CLI entrypoint of ≤ 150 lines.
+`src/operations_center/entrypoints/autonomy_cycle/main.py` is a 725-line file containing 7 top-level functions that mix service-factory wiring (observer, insight engine, decision engine), CLI argument parsing, a 4-stage pipeline orchestration duplicated between `main()` and `run_pipeline()`, a 150-line cycle-report writer, and a quiet-diagnosis escalation helper. This campaign extracts cohesive groups into focused submodules inside the `entrypoints/autonomy_cycle/` package, eliminating the pipeline duplication and reducing `main.py` to a thin CLI entrypoint of ≤ 150 lines.
 
 ## Goals
 
@@ -33,7 +33,7 @@ created_at: 2026-04-18T15:00:00Z
 
 ## Constraints
 
-- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that existing imports (`from control_plane.entrypoints.autonomy_cycle.main import build_observer_service`, `run_pipeline`, `_write_quiet_diagnosis`) continue to work. Four call sites exist: `worker/main.py`, `test_phase5_collectors.py`, `test_s7.py`, `test_phase5_derivers.py`.
+- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that existing imports (`from operations_center.entrypoints.autonomy_cycle.main import build_observer_service`, `run_pipeline`, `_write_quiet_diagnosis`) continue to work. Four call sites exist: `worker/main.py`, `test_phase5_collectors.py`, `test_s7.py`, `test_phase5_derivers.py`.
 - **No logic changes**: Goals 1 and 2 are pure move-and-import refactors. Goal 3 unifies duplicated code but must preserve identical behavior for both the CLI path and the programmatic `run_pipeline` path.
 - **Incremental**: Each goal is a standalone PR-able commit. Tests must pass after each extraction.
 - **Goal ordering**: Goals 1 and 2 are independent. Goal 3 depends on both (it imports factories from Goal 1 and reporting from Goal 2).

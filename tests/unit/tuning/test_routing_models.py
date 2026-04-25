@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from control_plane.tuning.routing_models import (
+from operations_center.tuning.routing_models import (
     BackendComparisonSummary,
     ChangeEvidenceClass,
     EvidenceStrength,

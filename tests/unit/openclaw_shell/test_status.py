@@ -6,16 +6,16 @@ from datetime import datetime, timezone
 
 import pytest
 
-from control_plane.contracts.enums import (
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,
     ValidationStatus,
 )
-from control_plane.observability.recorder import ExecutionRecorder
-from control_plane.observability.trace import RunReportBuilder
-from control_plane.openclaw_shell.models import ShellInspectionResult, ShellStatusSummary
-from control_plane.openclaw_shell.status import (
+from operations_center.observability.recorder import ExecutionRecorder
+from operations_center.observability.trace import RunReportBuilder
+from operations_center.openclaw_shell.models import ShellInspectionResult, ShellStatusSummary
+from operations_center.openclaw_shell.status import (
     inspection_from_record,
     status_from_record,
     status_from_result_only,

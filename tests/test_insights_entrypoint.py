@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.entrypoints.insights import main as insights_main
-from control_plane.observer.artifact_writer import ObserverArtifactWriter
-from control_plane.observer.models import (
+from operations_center.entrypoints.insights import main as insights_main
+from operations_center.observer.artifact_writer import ObserverArtifactWriter
+from operations_center.observer.models import (
     DependencyDriftSignal,
     RepoContextSnapshot,
     RepoSignalsSnapshot,
@@ -21,9 +21,9 @@ def make_snapshot(run_id: str, observed_at: datetime, *, repo_path: Path) -> Rep
     return RepoStateSnapshot(
         run_id=run_id,
         observed_at=observed_at,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         repo=RepoContextSnapshot(
-            name="control-plane",
+            name="operations-center",
             path=repo_path,
             current_branch="main",
             base_branch="main",
@@ -40,7 +40,7 @@ def make_snapshot(run_id: str, observed_at: datetime, *, repo_path: Path) -> Rep
 
 
 def test_generate_insights_cli_writes_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    observer_root = tmp_path / "tools" / "report" / "control_plane" / "observer"
+    observer_root = tmp_path / "tools" / "report" / "operations_center" / "observer"
     ObserverArtifactWriter(observer_root).write(
         make_snapshot("obs_1", datetime(2026, 3, 31, 12, tzinfo=UTC), repo_path=tmp_path / "repo")
     )

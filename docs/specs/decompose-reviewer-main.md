@@ -6,7 +6,7 @@ phases:
   - test
   - improve
 repos:
-  - ControlPlane
+  - OperationsCenter
 area_keywords:
   - entrypoints/reviewer
   - reviewer
@@ -18,7 +18,7 @@ created_at: 2026-04-18T00:00:00Z
 
 ## Overview
 
-`src/control_plane/entrypoints/reviewer/main.py` is a 1,472-line monolith containing 30+ top-level functions that mix spec-compliance extraction, proposal feedback persistence, rejection-pattern tracking, PR description quality checks, bot-comment management, merge/rebase orchestration, self-review processing, human-review processing, CI-fix handling, and the main polling loop. This campaign extracts cohesive function groups into focused submodules inside the `entrypoints/reviewer/` package, turning the single file into a package of ≤ 400-line modules with a thin `main.py` that re-exports the public API.
+`src/operations_center/entrypoints/reviewer/main.py` is a 1,472-line monolith containing 30+ top-level functions that mix spec-compliance extraction, proposal feedback persistence, rejection-pattern tracking, PR description quality checks, bot-comment management, merge/rebase orchestration, self-review processing, human-review processing, CI-fix handling, and the main polling loop. This campaign extracts cohesive function groups into focused submodules inside the `entrypoints/reviewer/` package, turning the single file into a package of ≤ 400-line modules with a thin `main.py` that re-exports the public API.
 
 ## Goals
 
@@ -30,7 +30,7 @@ created_at: 2026-04-18T00:00:00Z
 
 ## Constraints
 
-- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that `from control_plane.entrypoints.reviewer.main import X` continues to work for external callers and tests. Use `from .feedback import *` style re-exports.
+- **Backward-compatible imports**: `main.py` must re-export every moved symbol so that `from operations_center.entrypoints.reviewer.main import X` continues to work for external callers and tests. Use `from .feedback import *` style re-exports.
 - **No logic changes**: Each goal is a pure move-and-import refactor. Do not rename functions, change signatures, or alter behavior.
 - **Incremental**: Each goal is a standalone PR-able commit. Tests must pass after each extraction.
 - **Goal ordering matters**: Goal 3 depends on Goals 1 and 2 because the review-phase functions call helpers extracted in those goals. Goals 1 and 2 are independent of each other.
@@ -42,5 +42,5 @@ created_at: 2026-04-18T00:00:00Z
 - `reviewer/main.py` is under 500 lines (down from 1,472), containing only `backfill_pr_reviews`, `run_review_loop`, `main`, constants, and re-exports.
 - Three new modules exist: `feedback.py`, `pr_ops.py`, `review_phases.py`.
 - `python -m pytest tests/test_reviewer_entrypoint.py tests/test_self_review_verdict.py tests/spec_director/test_reviewer_compliance.py` passes with zero import errors and no test changes.
-- `ruff check src/control_plane/entrypoints/reviewer/` reports no new lint violations.
+- `ruff check src/operations_center/entrypoints/reviewer/` reports no new lint violations.
 - Every previously-importable symbol from `reviewer.main` is still importable from that path.

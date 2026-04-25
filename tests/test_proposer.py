@@ -3,27 +3,27 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.config.settings import load_settings
-from control_plane.decision.artifact_writer import DecisionArtifactWriter
-from control_plane.decision.models import (
+from operations_center.config.settings import load_settings
+from operations_center.decision.artifact_writer import DecisionArtifactWriter
+from operations_center.decision.models import (
     CandidateRationale,
     DecisionRepoRef,
     ProposalCandidate,
     ProposalCandidatesArtifact,
     ProposalOutline,
 )
-from control_plane.insights.artifact_writer import InsightArtifactWriter
-from control_plane.insights.models import InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
-from control_plane.proposer.candidate_integration import (
+from operations_center.insights.artifact_writer import InsightArtifactWriter
+from operations_center.insights.models import InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
+from operations_center.proposer.candidate_integration import (
     CandidateProposerIntegrationService,
     new_proposer_integration_context,
 )
-from control_plane.proposer.artifact_writer import ProposerArtifactWriter
-from control_plane.proposer.candidate_loader import ProposalCandidateLoader
-from control_plane.proposer.candidate_mapper import ProposalCandidateMapper
-from control_plane.execution import UsageStore
-from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
-from control_plane.proposer.provenance import build_provenance
+from operations_center.proposer.artifact_writer import ProposerArtifactWriter
+from operations_center.proposer.candidate_loader import ProposalCandidateLoader
+from operations_center.proposer.candidate_mapper import ProposalCandidateMapper
+from operations_center.execution import UsageStore
+from operations_center.proposer.guardrail_adapter import ProposerGuardrailAdapter
+from operations_center.proposer.provenance import build_provenance
 
 
 class FakePlaneClient:
@@ -71,11 +71,11 @@ def write_config(tmp_path: Path) -> Path:
                 "git: {}",
                 "kodo: {}",
                 "repos:",
-                "  control-plane:",
-                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "  operations-center:",
+                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
                 "    default_branch: main",
-                "  ControlPlane:",
-                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "  OperationsCenter:",
+                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
                 "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]
@@ -89,16 +89,16 @@ def make_decision_artifact(tmp_path: Path) -> tuple[ProposalCandidatesArtifact, 
     insight = RepoInsightsArtifact(
         run_id="ins_1",
         generated_at=generated_at,
-        source_command="control-plane generate-insights",
-        repo=InsightRepoRef(name="control-plane", path=tmp_path / "repo"),
+        source_command="operations-center generate-insights",
+        repo=InsightRepoRef(name="operations-center", path=tmp_path / "repo"),
         source_snapshots=[SourceSnapshotRef(run_id="obs_1", observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC))],
         insights=[],
     )
     decision = ProposalCandidatesArtifact(
         run_id="dec_1",
         generated_at=generated_at,
-        source_command="control-plane decide-proposals",
-        repo=DecisionRepoRef(name="control-plane", path=tmp_path / "repo"),
+        source_command="operations-center decide-proposals",
+        repo=DecisionRepoRef(name="operations-center", path=tmp_path / "repo"),
         source_insight_run_id="ins_1",
         candidates=[
             ProposalCandidate(
@@ -108,7 +108,7 @@ def make_decision_artifact(tmp_path: Path) -> tuple[ProposalCandidatesArtifact, 
                 subject="test_signal",
                 rationale=CandidateRationale(matched_rules=["rule_a"], suppressed_by=[]),
                 proposal_outline=ProposalOutline(
-                    title_hint="Improve test signal visibility for control-plane",
+                    title_hint="Improve test signal visibility for operations-center",
                     summary_hint="Add one bounded path for explicit test signal visibility.",
                     labels_hint=["task-kind: goal", "source: proposer"],
                     source_family="test_visibility",
@@ -117,16 +117,16 @@ def make_decision_artifact(tmp_path: Path) -> tuple[ProposalCandidatesArtifact, 
         ],
         suppressed=[],
     )
-    InsightArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "insights").write(insight)
-    DecisionArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "decision").write(decision)
+    InsightArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "insights").write(insight)
+    DecisionArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "decision").write(decision)
     return decision, insight
 
 
 def test_candidate_loader_reads_latest_decision_and_matching_insight(tmp_path: Path) -> None:
     decision, insight = make_decision_artifact(tmp_path)
     loader = ProposalCandidateLoader(
-        decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
-        insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
+        decision_root=tmp_path / "tools" / "report" / "operations_center" / "decision",
+        insights_root=tmp_path / "tools" / "report" / "operations_center" / "insights",
     )
 
     loaded_decision, loaded_insight = loader.load(repo=None, decision_run_id=None)
@@ -164,7 +164,7 @@ def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
 
 def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
     decision, insight = make_decision_artifact(tmp_path)
-    decision.repo.name = "ControlPlane"
+    decision.repo.name = "OperationsCenter"
     settings = load_settings(write_config(tmp_path))
     candidate = decision.candidates[0]
     mapper = ProposalCandidateMapper()
@@ -180,7 +180,7 @@ def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
         ),
     )
 
-    assert "repo: ControlPlane" in draft.description
+    assert "repo: OperationsCenter" in draft.description
     assert "base_branch: main" in draft.description
 
 
@@ -192,11 +192,11 @@ def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_
         settings=settings,
         client=client,
         loader=ProposalCandidateLoader(
-            decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
-            insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
+            decision_root=tmp_path / "tools" / "report" / "operations_center" / "decision",
+            insights_root=tmp_path / "tools" / "report" / "operations_center" / "insights",
         ),
-        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
-        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "operations_center" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
+        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "proposer"),
     )
 
     artifact, paths = service.run(
@@ -205,7 +205,7 @@ def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_
             decision_run_id=None,
             max_create=2,
             dry_run=True,
-            source_command="control-plane propose-from-candidates",
+            source_command="operations-center propose-from-candidates",
         )
     )
 
@@ -222,7 +222,7 @@ def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Pat
         [
             {
                 "id": "CP-1",
-                "name": "Improve test signal visibility for control-plane",
+                "name": "Improve test signal visibility for operations-center",
                 "description": "candidate_dedup_key: candidate|test_visibility|test_signal|unknown_persistent",
                 "state": {"name": "Backlog"},
                 "labels": [{"name": "task-kind: goal"}],
@@ -233,11 +233,11 @@ def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Pat
         settings=settings,
         client=client,
         loader=ProposalCandidateLoader(
-            decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
-            insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
+            decision_root=tmp_path / "tools" / "report" / "operations_center" / "decision",
+            insights_root=tmp_path / "tools" / "report" / "operations_center" / "insights",
         ),
-        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
-        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "operations_center" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
+        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "proposer"),
     )
 
     artifact, _ = service.run(
@@ -246,7 +246,7 @@ def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Pat
             decision_run_id=None,
             max_create=2,
             dry_run=False,
-            source_command="control-plane propose-from-candidates",
+            source_command="operations-center propose-from-candidates",
         )
     )
 
@@ -271,7 +271,7 @@ def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> 
             ),
         )
     )
-    DecisionArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "decision").write(decision)
+    DecisionArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "decision").write(decision)
     settings = load_settings(write_config(tmp_path))
 
     class FailingSecondCreateClient(FakePlaneClient):
@@ -285,11 +285,11 @@ def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> 
         settings=settings,
         client=client,
         loader=ProposalCandidateLoader(
-            decision_root=tmp_path / "tools" / "report" / "control_plane" / "decision",
-            insights_root=tmp_path / "tools" / "report" / "control_plane" / "insights",
+            decision_root=tmp_path / "tools" / "report" / "operations_center" / "decision",
+            insights_root=tmp_path / "tools" / "report" / "operations_center" / "insights",
         ),
-        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "control_plane" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
-        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "proposer"),
+        guardrails=ProposerGuardrailAdapter(proposer_root=tmp_path / "tools" / "report" / "operations_center" / "proposer", usage_store=UsageStore(tmp_path / "usage.json")),
+        artifact_writer=ProposerArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "proposer"),
     )
 
     artifact, _ = service.run(
@@ -298,7 +298,7 @@ def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> 
             decision_run_id=None,
             max_create=5,
             dry_run=False,
-            source_command="control-plane propose-from-candidates",
+            source_command="operations-center propose-from-candidates",
         )
     )
 
@@ -326,7 +326,7 @@ def _guardrail(
 
 def test_recently_done_task_blocks_reproposal(tmp_path: Path) -> None:
     """A Done task updated within the window suppresses a new proposal."""
-    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from operations_center.proposer.guardrail_adapter import ProposerGuardrailAdapter
     from unittest.mock import MagicMock
 
     now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
@@ -359,7 +359,7 @@ def test_recently_done_task_blocks_reproposal(tmp_path: Path) -> None:
 
 def test_old_done_task_outside_window_does_not_block(tmp_path: Path) -> None:
     """A Done task updated outside the window does not suppress."""
-    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from operations_center.proposer.guardrail_adapter import ProposerGuardrailAdapter
     from unittest.mock import MagicMock
 
     now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
@@ -389,7 +389,7 @@ def test_old_done_task_outside_window_does_not_block(tmp_path: Path) -> None:
 
 def test_recently_done_window_zero_disables_guard(tmp_path: Path) -> None:
     """recently_done_window_days=0 disables the guard entirely."""
-    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from operations_center.proposer.guardrail_adapter import ProposerGuardrailAdapter
     from unittest.mock import MagicMock
 
     now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)
@@ -419,7 +419,7 @@ def test_recently_done_window_zero_disables_guard(tmp_path: Path) -> None:
 
 def test_recently_done_matches_by_dedup_key_in_description(tmp_path: Path) -> None:
     """Done task matched by dedup_key in description (not title) also blocks."""
-    from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+    from operations_center.proposer.guardrail_adapter import ProposerGuardrailAdapter
     from unittest.mock import MagicMock
 
     now = datetime(2026, 4, 5, 12, 0, 0, tzinfo=UTC)

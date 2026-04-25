@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from control_plane.upstream_eval import (
+from operations_center.upstream_eval import (
     ArchitecturalImpactClass,
     DivergenceRiskClass,
     EvidenceStrength,

@@ -4,14 +4,14 @@ This guide explains how to interpret `analyze-artifacts` output and tune the rep
 
 ## Two Tuning Tools
 
-Control Plane provides two complementary tools for understanding and adjusting autonomy behavior.
+Operations Center provides two complementary tools for understanding and adjusting autonomy behavior.
 
 ### `analyze-artifacts` — per-family inspection
 
 ```bash
-./scripts/control-plane.sh analyze-artifacts
-./scripts/control-plane.sh analyze-artifacts --repo ControlPlane
-./scripts/control-plane.sh analyze-artifacts --repo ControlPlane --limit 20
+./scripts/operations-center.sh analyze-artifacts
+./scripts/operations-center.sh analyze-artifacts --repo OperationsCenter
+./scripts/operations-center.sh analyze-artifacts --repo OperationsCenter --limit 20
 ```
 
 Reads retained decision and proposer artifacts and prints a per-family table with recommendations. Best for quick human inspection.
@@ -32,13 +32,13 @@ Flags:
 
 ```bash
 # Recommendation-only (default, safe, writes artifacts but no config changes)
-./scripts/control-plane.sh tune-autonomy
+./scripts/operations-center.sh tune-autonomy
 
 # With wider window
-./scripts/control-plane.sh tune-autonomy --window 30
+./scripts/operations-center.sh tune-autonomy --window 30
 
 # Auto-apply mode (opt-in, requires env var as second gate)
-CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/control-plane.sh tune-autonomy --apply
+OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/operations-center.sh tune-autonomy --apply
 ```
 
 The regulation loop:
@@ -46,7 +46,7 @@ The regulation loop:
 1. Aggregates per-family metrics from retained decision + proposer artifacts.
 2. Applies explicit recommendation rules (over-suppressed → loosen; noisy/low-value → tighten; healthy → keep).
 3. In auto-apply mode, applies conservative bounded changes to `config/autonomy_tuning.json`.
-4. Retains a full audit trail under `tools/report/control_plane/tuning/<run_id>/`.
+4. Retains a full audit trail under `tools/report/operations_center/tuning/<run_id>/`.
 
 The `DecisionEngineService` reads `config/autonomy_tuning.json` at startup if it exists, applying overrides to rule thresholds. To revert a change, delete or edit the file.
 
@@ -106,13 +106,13 @@ Autonomy tiers control the initial Plane task state for created tasks. Tier 2 ta
 
 ```bash
 # View current tiers
-./scripts/control-plane.sh autonomy-tiers show
+./scripts/operations-center.sh autonomy-tiers show
 
 # Promote a family to auto-execute after confirming track record
-./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
+./scripts/operations-center.sh autonomy-tiers set --family lint_fix --tier 2
 
 # Demote a family after a bad run
-./scripts/control-plane.sh autonomy-tiers set --family type_fix --tier 0
+./scripts/operations-center.sh autonomy-tiers set --family type_fix --tier 0
 ```
 
 **When to promote a family to tier 2:**
@@ -152,7 +152,7 @@ Two patterns:
 - **Condition**: `no_op_count / total_runs >= 0.5` and `total_runs >= 5`
 - **When to loosen**: too many spurious proposals for repos that legitimately have many no-op test runs; raise the rate threshold to 0.65 or raise `_MIN_RUNS_FOR_RATE`.
 - **When to tighten**: lower the threshold if you want earlier warning; e.g. 0.4 on repos where no-ops are reliably a signal of bad task quality.
-- **Where to change**: `src/control_plane/insights/derivers/execution_health.py` constants `_HIGH_NO_OP_RATE_THRESHOLD`, `_MIN_RUNS_FOR_RATE`.
+- **Where to change**: `src/operations_center/insights/derivers/execution_health.py` constants `_HIGH_NO_OP_RATE_THRESHOLD`, `_MIN_RUNS_FOR_RATE`.
 
 **`persistent_validation_failures`**
 - **Condition**: `validation_failed_count >= 3`
@@ -194,7 +194,7 @@ Fires when ruff detects lint violations.
 - **Rule**: `LintDriftRule` — fires on `lint_drift/present` or `lint_drift/worsened` insights
 - **Default tier**: 2 (auto-executes) — style risk class, bounded scope
 - **When to demote to tier 1**: repos where lint fixes have historically caused unintended refactors; demote to tier 1 so a human reviews before execution
-- **Where to change**: `src/control_plane/insights/derivers/lint_drift.py`
+- **Where to change**: `src/operations_center/insights/derivers/lint_drift.py`
 
 ### `type_fix`
 
@@ -204,7 +204,7 @@ Fires when `ty` or `mypy` reports type errors.
 - **Default tier**: 1 — logic risk class; requires human review before execution
 - **When to loosen**: raise tier to 2 after confirming that auto-generated type fixes are consistently bounded and safe in your codebase
 - **When to tighten**: lower `min_errors` threshold to 1 if you want earlier warning; raise to 10 if noise is high
-- **Where to change**: `src/control_plane/decision/rules/type_improvement.py` constant `min_errors`
+- **Where to change**: `src/operations_center/decision/rules/type_improvement.py` constant `min_errors`
 
 ### `validation_pattern_followup`
 
@@ -214,7 +214,7 @@ Fires when the same Plane task has ≥2 runs and ≥2 validation failures across
 - **Default tier**: 1 — logic risk class; investigation required before executing
 - **When to loosen**: lower `_MIN_FAILURES_FOR_PATTERN` to 1 if you want earlier warning
 - **When to tighten**: raise `_MIN_RUNS_FOR_PATTERN` to 3 if transient failures are common
-- **Where to change**: `src/control_plane/observer/collectors/validation_history.py`
+- **Where to change**: `src/operations_center/observer/collectors/validation_history.py`
 
 ### `ci_pattern` (gated, not default)
 
@@ -224,7 +224,7 @@ Fires when GitHub check-run history shows failing or flaky checks.
 - **Default tier**: 1 — logic risk class; root cause investigation required
 - **Promotion criteria**: enable once you have ≥2 weeks of CI history baseline and have confirmed that the failing/flaky classification is reliable for your repo
 - **Thresholds**: `FAILING_THRESHOLD=0.7` (≥70% fail rate), `FLAKY_THRESHOLD=0.2` (≥20%)
-- **Where to change**: `src/control_plane/observer/collectors/ci_history.py`
+- **Where to change**: `src/operations_center/observer/collectors/ci_history.py`
 
 ### `hotspot_concentration` (gated, not default)
 
@@ -252,7 +252,7 @@ To adjust these for a specific run:
 
 ```bash
 # Watcher uses these defaults; override in DecisionContext when calling directly
-./scripts/control-plane.sh decide-proposals --max-candidates 5 --cooldown-minutes 60
+./scripts/operations-center.sh decide-proposals --max-candidates 5 --cooldown-minutes 60
 ```
 
 Or update the watcher defaults in the worker `main.py` constants if you want permanent changes:
@@ -288,10 +288,10 @@ The `ConfidenceCalibrationStore` filters events by recency when computing accept
 
 ```bash
 # View calibration with the default 90-day window
-./scripts/control-plane.sh tune-autonomy
+./scripts/operations-center.sh tune-autonomy
 
 # Widen the window to see all historical data
-./scripts/control-plane.sh tune-autonomy --window 180
+./scripts/operations-center.sh tune-autonomy --window 180
 ```
 
 The `window_days` parameter is passed to `calibration_for()` and `report()` internally. Events older than the window are excluded from acceptance-rate calculations.
@@ -299,7 +299,7 @@ The `window_days` parameter is passed to `calibration_for()` and `report()` inte
 **Cleaning up stale events:**
 
 ```python
-from control_plane.tuning.calibration import ConfidenceCalibrationStore
+from operations_center.tuning.calibration import ConfidenceCalibrationStore
 store = ConfidenceCalibrationStore()
 store.cleanup_old_events(window_days=90)  # removes events older than 90 days
 ```

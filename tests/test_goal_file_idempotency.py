@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from control_plane.adapters.kodo.adapter import KodoAdapter
-from control_plane.config.settings import KodoSettings
+from operations_center.adapters.kodo.adapter import KodoAdapter
+from operations_center.config.settings import KodoSettings
 
 
 def _make_adapter() -> KodoAdapter:

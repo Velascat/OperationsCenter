@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import json
 
-from control_plane.observer.collectors.lint_signal import LintSignalCollector
-from control_plane.observer.collectors.type_check import TypeSignalCollector
+from operations_center.observer.collectors.lint_signal import LintSignalCollector
+from operations_center.observer.collectors.type_check import TypeSignalCollector
 
 
 # ── ruff JSON parser ────────────────────────────────────────────────────────

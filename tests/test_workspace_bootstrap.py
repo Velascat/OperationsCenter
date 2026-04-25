@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from control_plane.adapters.workspace.bootstrap import RepoEnvironmentBootstrapper
+from operations_center.adapters.workspace.bootstrap import RepoEnvironmentBootstrapper
 
 
 def test_environment_for_prepends_repo_local_venv_bin() -> None:

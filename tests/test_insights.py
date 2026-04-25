@@ -3,17 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
-from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
-from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
-from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
-from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
-from control_plane.insights.derivers.test_continuity import TestContinuityDeriver as ContinuityDeriver
-from control_plane.insights.derivers.todo_concentration import TodoConcentrationDeriver
-from control_plane.insights.loader import SnapshotLoader
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.observer.artifact_writer import ObserverArtifactWriter
-from control_plane.observer.models import (
+from operations_center.insights.derivers.commit_activity import CommitActivityDeriver
+from operations_center.insights.derivers.dependency_drift import DependencyDriftDeriver
+from operations_center.insights.derivers.dirty_tree import DirtyTreeDeriver
+from operations_center.insights.derivers.file_hotspots import FileHotspotsDeriver
+from operations_center.insights.derivers.observation_coverage import ObservationCoverageDeriver
+from operations_center.insights.derivers.test_continuity import TestContinuityDeriver as ContinuityDeriver
+from operations_center.insights.derivers.todo_concentration import TodoConcentrationDeriver
+from operations_center.insights.loader import SnapshotLoader
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.observer.artifact_writer import ObserverArtifactWriter
+from operations_center.observer.models import (
     CommitMetadata,
     DependencyDriftSignal,
     FileHotspot,
@@ -54,10 +54,10 @@ def make_snapshot(
     return RepoStateSnapshot(
         run_id=run_id,
         observed_at=observed_at,
-        source_command="control-plane observe-repo",
+        source_command="operations-center observe-repo",
         repo=RepoContextSnapshot(
-            name="control-plane",
-            path=Path("/tmp/control-plane"),
+            name="operations-center",
+            path=Path("/tmp/operations-center"),
             current_branch="main",
             base_branch="main",
             is_dirty=is_dirty,
@@ -80,7 +80,7 @@ def test_loader_reads_latest_snapshot_with_bounded_history(tmp_path: Path) -> No
     writer.write(oldest)
     writer.write(newest)
 
-    snapshots = SnapshotLoader(tmp_path / "observer").load(repo="control-plane", snapshot_run_id=None, history_limit=1)
+    snapshots = SnapshotLoader(tmp_path / "observer").load(repo="operations-center", snapshot_run_id=None, history_limit=1)
 
     assert [snapshot.run_id for snapshot in snapshots] == ["obs_new", "obs_old"]
 
@@ -106,12 +106,12 @@ def test_derivers_cover_bounded_insight_kinds() -> None:
         observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
         is_dirty=True,
         commit_count=4,
-        hotspot=("src/control_plane/watcher.py", 6),
+        hotspot=("src/operations_center/watcher.py", 6),
         test_status="failed",
         dependency_status="available",
         todo_count=4,
         fixme_count=1,
-        top_file=("src/control_plane/watcher.py", 3),
+        top_file=("src/operations_center/watcher.py", 3),
         collector_errors={"dependency_drift": "timeout"},
     )
     previous = make_snapshot(
@@ -119,12 +119,12 @@ def test_derivers_cover_bounded_insight_kinds() -> None:
         observed_at=datetime(2026, 3, 31, 11, tzinfo=UTC),
         is_dirty=True,
         commit_count=1,
-        hotspot=("src/control_plane/watcher.py", 3),
+        hotspot=("src/operations_center/watcher.py", 3),
         test_status="unknown",
         dependency_status="available",
         todo_count=2,
         fixme_count=0,
-        top_file=("src/control_plane/watcher.py", 2),
+        top_file=("src/operations_center/watcher.py", 2),
         collector_errors={"dependency_drift": "timeout"},
     )
     snapshots = [current, previous]
@@ -145,8 +145,8 @@ def test_derivers_cover_bounded_insight_kinds() -> None:
     assert "dirty_tree|working_tree|dirty" in dedup_keys
     assert "commit_activity|recent_window" in dedup_keys
     assert "commit_activity|recent_window_changed" in dedup_keys
-    assert "file_hotspot|src/control_plane/watcher.py|dominant_current" in dedup_keys
-    assert "file_hotspot|src/control_plane/watcher.py|repeated_presence" in dedup_keys
+    assert "file_hotspot|src/operations_center/watcher.py|dominant_current" in dedup_keys
+    assert "file_hotspot|src/operations_center/watcher.py|repeated_presence" in dedup_keys
     assert "test_status_continuity|unknown|failed|transition" in dedup_keys
     assert "dependency_drift_continuity|present|current" in dedup_keys
     assert "dependency_drift_continuity|present|persistent" in dedup_keys

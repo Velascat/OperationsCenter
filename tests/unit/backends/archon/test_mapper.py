@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.backends.archon.mapper import check_support, map_request
-from control_plane.backends.archon.models import SupportCheck
-from control_plane.contracts.execution import ExecutionRequest
+from operations_center.backends.archon.mapper import check_support, map_request
+from operations_center.backends.archon.models import SupportCheck
+from operations_center.contracts.execution import ExecutionRequest
 
 
 def _req(tmp_path: Path, **kw) -> ExecutionRequest:
@@ -85,7 +85,7 @@ def test_support_check_no_factory():
 
 
 def test_map_request_returns_workflow_config(tmp_path):
-    from control_plane.backends.archon.models import ArchonWorkflowConfig
+    from operations_center.backends.archon.models import ArchonWorkflowConfig
     config = map_request(_req(tmp_path))
     assert isinstance(config, ArchonWorkflowConfig)
 

@@ -13,12 +13,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from control_plane.decision.rules.lint_fix import LintFixRule
-from control_plane.decision.rules.type_improvement import TypeImprovementRule
-from control_plane.insights.derivers.cross_signal import CrossSignalDeriver
-from control_plane.insights.models import DerivedInsight
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.observer.models import (
+from operations_center.decision.rules.lint_fix import LintFixRule
+from operations_center.decision.rules.type_improvement import TypeImprovementRule
+from operations_center.insights.derivers.cross_signal import CrossSignalDeriver
+from operations_center.insights.models import DerivedInsight
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.observer.models import (
     DependencyDriftSignal,
     FileHotspot,
     LintSignal,

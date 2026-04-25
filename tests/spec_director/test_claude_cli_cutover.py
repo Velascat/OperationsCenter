@@ -3,13 +3,13 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-from control_plane.spec_director._claude_cli import call_claude
+from operations_center.spec_director._claude_cli import call_claude
 
 
 def test_call_claude_ignores_switchboard_url_after_cutover(monkeypatch) -> None:
     monkeypatch.setenv("SWITCHBOARD_URL", "http://localhost:20401")
 
-    with patch("control_plane.spec_director._claude_cli._call_claude_cli", return_value="from-cli") as mock_cli:
+    with patch("operations_center.spec_director._claude_cli._call_claude_cli", return_value="from-cli") as mock_cli:
         result = call_claude("hello", system_prompt="be concise")
 
     assert result == "from-cli"
@@ -24,8 +24,8 @@ def test_call_claude_ignores_switchboard_url_after_cutover(monkeypatch) -> None:
 def test_run_once_does_not_export_switchboard_url(tmp_path, monkeypatch) -> None:
     from unittest.mock import MagicMock, patch
 
-    from control_plane.entrypoints.spec_director.main import run_once
-    from control_plane.spec_director.phase_orchestrator import PhaseOrchestrationResult
+    from operations_center.entrypoints.spec_director.main import run_once
+    from operations_center.spec_director.phase_orchestrator import PhaseOrchestrationResult
 
     settings = MagicMock()
     settings.spec_director.enabled = True
@@ -40,8 +40,8 @@ def test_run_once_does_not_export_switchboard_url(tmp_path, monkeypatch) -> None
     monkeypatch.delenv("SWITCHBOARD_URL", raising=False)
 
     with (
-        patch("control_plane.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
-        patch("control_plane.entrypoints.spec_director.main.RecoveryService"),
+        patch("operations_center.entrypoints.spec_director.main.PhaseOrchestrator") as mock_orch_cls,
+        patch("operations_center.entrypoints.spec_director.main.RecoveryService"),
     ):
         mock_orch_cls.return_value.run.return_value = PhaseOrchestrationResult()
         run_once(settings, client)

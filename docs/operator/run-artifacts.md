@@ -8,7 +8,7 @@ and post-mortem analysis.
 ## Location
 
 ```
-~/.fob/control_plane/runs/<run_id>/
+~/.console/operations_center/runs/<run_id>/
 ```
 
 Each `<run_id>` is the `ExecutionResult.run_id` (UUID4), set once at
@@ -32,15 +32,15 @@ Each `<run_id>` is the `ExecutionResult.run_id` (UUID4), set once at
 
 ```bash
 # List recent runs (newest last)
-ls -lt ~/.fob/control_plane/runs/
+ls -lt ~/.console/operations_center/runs/
 
 # Inspect a specific run
 RUN=<run_id>
-cat ~/.fob/control_plane/runs/$RUN/run_metadata.json | python3 -m json.tool
-cat ~/.fob/control_plane/runs/$RUN/result.json | python3 -m json.tool
+cat ~/.console/operations_center/runs/$RUN/run_metadata.json | python3 -m json.tool
+cat ~/.console/operations_center/runs/$RUN/result.json | python3 -m json.tool
 
 # Find all failed runs
-grep -rl '"success": false' ~/.fob/control_plane/runs/
+grep -rl '"success": false' ~/.console/operations_center/runs/
 ```
 
 ---
@@ -86,8 +86,8 @@ whatever contracts exist. The resulting `run_metadata.json` will contain:
 Pass `--no-artifacts` to the execute entrypoint to skip disk writes:
 
 ```bash
-python -m control_plane.entrypoints.execute.main \
-  --config control_plane.yaml \
+python -m operations_center.entrypoints.execute.main \
+  --config operations_center.yaml \
   --bundle bundle.json \
   --workspace-path ./workspace \
   --task-branch auto/my-task \
@@ -99,9 +99,9 @@ python -m control_plane.entrypoints.execute.main \
 ## Programmatic access
 
 ```python
-from control_plane.execution.artifact_writer import RunArtifactWriter
+from operations_center.execution.artifact_writer import RunArtifactWriter
 
-writer = RunArtifactWriter()  # defaults to ~/.fob/control_plane/runs/
+writer = RunArtifactWriter()  # defaults to ~/.console/operations_center/runs/
 written = writer.write_run(
     proposal=bundle.proposal,
     decision=bundle.decision,

@@ -6,7 +6,7 @@
 
 **Architecture:** The core new piece is `phase_orchestrator.py` which reads campaign task states from the board and advances implement→test→improve phases automatically. Supporting changes trim dead code (revise_spec, Plane label trigger, insight_snapshot) and simplify the state model. The main loop is reordered to run phase orchestration before trigger detection.
 
-**Tech Stack:** Python 3.11+, Pydantic v2, PlaneClient (internal adapter), `call_claude()` subprocess wrapper (`src/control_plane/spec_director/_claude_cli.py`), pytest.
+**Tech Stack:** Python 3.11+, Pydantic v2, PlaneClient (internal adapter), `call_claude()` subprocess wrapper (`src/operations_center/spec_director/_claude_cli.py`), pytest.
 
 ---
 
@@ -14,16 +14,16 @@
 
 | File | Action |
 |---|---|
-| `src/control_plane/entrypoints/worker/main.py` | Modify — add `"spec-campaign"` to `_AUTO_SOURCES` |
-| `src/control_plane/spec_director/phase_orchestrator.py` | **Create** — new module |
-| `src/control_plane/spec_director/trigger.py` | Modify — remove Plane label trigger, fix queue drain condition |
-| `src/control_plane/spec_director/models.py` | Modify — slim down `CampaignRecord` |
-| `src/control_plane/spec_director/state.py` | Modify — remove `update_progress`, `increment_revision_count` |
-| `src/control_plane/spec_director/suppressor.py` | Modify — read `area_keywords` from spec front matter |
-| `src/control_plane/spec_director/recovery.py` | Modify — remove `revise_spec`, `revision_budget_ok`, `is_stalled` |
-| `src/control_plane/spec_director/context_bundle.py` | Modify — remove `insight_snapshot`, add board signals |
-| `src/control_plane/spec_director/brainstorm.py` | Modify — update prompt to include available repos |
-| `src/control_plane/entrypoints/spec_director/main.py` | Modify — add phase orchestration, new trigger interface |
+| `src/operations_center/entrypoints/worker/main.py` | Modify — add `"spec-campaign"` to `_AUTO_SOURCES` |
+| `src/operations_center/spec_director/phase_orchestrator.py` | **Create** — new module |
+| `src/operations_center/spec_director/trigger.py` | Modify — remove Plane label trigger, fix queue drain condition |
+| `src/operations_center/spec_director/models.py` | Modify — slim down `CampaignRecord` |
+| `src/operations_center/spec_director/state.py` | Modify — remove `update_progress`, `increment_revision_count` |
+| `src/operations_center/spec_director/suppressor.py` | Modify — read `area_keywords` from spec front matter |
+| `src/operations_center/spec_director/recovery.py` | Modify — remove `revise_spec`, `revision_budget_ok`, `is_stalled` |
+| `src/operations_center/spec_director/context_bundle.py` | Modify — remove `insight_snapshot`, add board signals |
+| `src/operations_center/spec_director/brainstorm.py` | Modify — update prompt to include available repos |
+| `src/operations_center/entrypoints/spec_director/main.py` | Modify — add phase orchestration, new trigger interface |
 | `tests/test_spec_campaign_source.py` | **Create** |
 | `tests/test_phase_orchestrator.py` | **Create** |
 | `tests/test_trigger_detector.py` | **Create** |
@@ -33,7 +33,7 @@
 ## Task 1: Fix `_AUTO_SOURCES` so spec-campaign tasks are promoted from Backlog
 
 **Files:**
-- Modify: `src/control_plane/entrypoints/worker/main.py:1084`
+- Modify: `src/operations_center/entrypoints/worker/main.py:1084`
 - Create: `tests/test_spec_campaign_source.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -48,7 +48,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from control_plane.entrypoints.worker.main import promote_backlog_tasks
+from operations_center.entrypoints.worker.main import promote_backlog_tasks
 
 
 def _make_issue(*, task_id: str, state: str, labels: list[str]) -> dict:
@@ -91,7 +91,7 @@ def test_non_spec_campaign_task_without_known_source_is_not_promoted():
 - [ ] **Step 2: Run to verify it fails**
 
 ```bash
-cd /home/dev/Documents/GitHub/ControlPlane
+cd /home/dev/Documents/GitHub/OperationsCenter
 python -m pytest tests/test_spec_campaign_source.py -v 2>&1 | head -30
 ```
 
@@ -99,7 +99,7 @@ Expected: `FAILED tests/test_spec_campaign_source.py::test_spec_campaign_source_
 
 - [ ] **Step 3: Add `"spec-campaign"` to `_AUTO_SOURCES`**
 
-In `src/control_plane/entrypoints/worker/main.py` at line 1084, change:
+In `src/operations_center/entrypoints/worker/main.py` at line 1084, change:
 
 ```python
         _AUTO_SOURCES = {"proposer", "autonomy", "improve-worker", "reviewer-dep-conflict", "post-merge-ci", "multi-step-plan"}
@@ -130,7 +130,7 @@ Expected: all pass (or existing failures only — baseline before this PR)
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/control_plane/entrypoints/worker/main.py tests/test_spec_campaign_source.py
+git add src/operations_center/entrypoints/worker/main.py tests/test_spec_campaign_source.py
 git commit -m "fix: add spec-campaign to _AUTO_SOURCES so implement tasks promote from Backlog"
 ```
 
@@ -141,9 +141,9 @@ git commit -m "fix: add spec-campaign to _AUTO_SOURCES so implement tasks promot
 The spec says: board is ground truth for phase state; local JSON is a thin index. `area_keywords` moves from the state file to being read on demand from the spec front matter. `last_progress_at`, `spec_revision_count`, and `trigger_source` are only used by code we're removing in Task 6.
 
 **Files:**
-- Modify: `src/control_plane/spec_director/models.py`
-- Modify: `src/control_plane/spec_director/state.py`
-- Modify: `src/control_plane/spec_director/suppressor.py`
+- Modify: `src/operations_center/spec_director/models.py`
+- Modify: `src/operations_center/spec_director/state.py`
+- Modify: `src/operations_center/spec_director/suppressor.py`
 
 - [ ] **Step 1: Write a failing test for suppressor reading from spec file**
 
@@ -152,8 +152,8 @@ Add to `tests/test_spec_campaign_source.py`:
 ```python
 def test_suppressor_reads_area_keywords_from_spec_file(tmp_path):
     """Suppressor must work even when CampaignRecord has no area_keywords."""
-    from control_plane.spec_director.suppressor import is_suppressed
-    from control_plane.spec_director.models import CampaignRecord
+    from operations_center.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.models import CampaignRecord
 
     # Write a spec file with area_keywords
     specs_dir = tmp_path / "docs" / "specs"
@@ -195,8 +195,8 @@ A test spec.
 
 
 def test_suppressor_not_suppressed_when_no_keyword_match(tmp_path):
-    from control_plane.spec_director.suppressor import is_suppressed
-    from control_plane.spec_director.models import CampaignRecord
+    from operations_center.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.models import CampaignRecord
 
     specs_dir = tmp_path / "docs" / "specs"
     specs_dir.mkdir(parents=True)
@@ -269,7 +269,7 @@ Update `rebuild_from_specs()` to not set `area_keywords`:
 ```python
     def rebuild_from_specs(self, specs_dir: Path) -> ActiveCampaigns:
         """Rebuild active campaigns list by scanning spec front matter."""
-        from control_plane.spec_director.models import SpecFrontMatter
+        from operations_center.spec_director.models import SpecFrontMatter
         campaigns = []
         for spec_file in sorted(specs_dir.glob("*.md")):
             try:
@@ -298,13 +298,13 @@ Update `rebuild_from_specs()` to not set `area_keywords`:
 Read the current `suppressor.py`:
 
 ```bash
-cat src/control_plane/spec_director/suppressor.py
+cat src/operations_center/spec_director/suppressor.py
 ```
 
 Replace the `is_suppressed` function signature and implementation:
 
 ```python
-# src/control_plane/spec_director/suppressor.py
+# src/operations_center/spec_director/suppressor.py
 from __future__ import annotations
 
 import logging
@@ -312,7 +312,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from control_plane.spec_director.models import CampaignRecord
+    from operations_center.spec_director.models import CampaignRecord
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +347,7 @@ def _load_area_keywords(campaign: "CampaignRecord", specs_dir: Path | None) -> l
     if specs_dir is not None and not spec_path.is_absolute():
         spec_path = specs_dir / spec_path.name
     try:
-        from control_plane.spec_director.models import SpecFrontMatter
+        from operations_center.spec_director.models import SpecFrontMatter
         text = spec_path.read_text(encoding="utf-8")
         fm = SpecFrontMatter.from_spec_text(text)
         return fm.area_keywords
@@ -391,7 +391,7 @@ Fix any breakage from removing `area_keywords` from `CampaignRecord` (callers in
 
 - [ ] **Step 8: Update `main.py` campaign record creation**
 
-In `src/control_plane/entrypoints/spec_director/main.py`, remove `area_keywords` from the `CampaignRecord(...)` constructor call:
+In `src/operations_center/entrypoints/spec_director/main.py`, remove `area_keywords` from the `CampaignRecord(...)` constructor call:
 
 ```python
     campaign_record = CampaignRecord(
@@ -416,10 +416,10 @@ Expected: all pass.
 - [ ] **Step 10: Commit**
 
 ```bash
-git add src/control_plane/spec_director/models.py \
-        src/control_plane/spec_director/state.py \
-        src/control_plane/spec_director/suppressor.py \
-        src/control_plane/entrypoints/spec_director/main.py \
+git add src/operations_center/spec_director/models.py \
+        src/operations_center/spec_director/state.py \
+        src/operations_center/spec_director/suppressor.py \
+        src/operations_center/entrypoints/spec_director/main.py \
         tests/test_spec_campaign_source.py
 git commit -m "refactor: slim CampaignRecord to thin index, read area_keywords from spec front matter"
 ```
@@ -429,7 +429,7 @@ git commit -m "refactor: slim CampaignRecord to thin index, read area_keywords f
 ## Task 3: Remove `revise_spec` and dead recovery code
 
 **Files:**
-- Modify: `src/control_plane/spec_director/recovery.py`
+- Modify: `src/operations_center/spec_director/recovery.py`
 
 No new tests needed — we are removing code that has no callers after this PR (confirm below).
 
@@ -437,17 +437,17 @@ No new tests needed — we are removing code that has no callers after this PR (
 
 ```bash
 grep -rn "revise_spec\|revision_budget_ok\|is_stalled\|increment_revision_count\|update_progress" \
-    src/control_plane/ --include="*.py"
+    src/operations_center/ --include="*.py"
 ```
 
 Expected: only defined in `recovery.py` and `state.py` (already removed from state.py in Task 2); `revise_spec` called nowhere externally.
 
 - [ ] **Step 2: Remove dead methods from `recovery.py`**
 
-Replace the contents of `src/control_plane/spec_director/recovery.py` with:
+Replace the contents of `src/operations_center/spec_director/recovery.py` with:
 
 ```python
-# src/control_plane/spec_director/recovery.py
+# src/operations_center/spec_director/recovery.py
 from __future__ import annotations
 
 import logging
@@ -455,8 +455,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from control_plane.spec_director.models import CampaignRecord
-from control_plane.spec_director.state import CampaignStateManager
+from operations_center.spec_director.models import CampaignRecord
+from operations_center.spec_director.state import CampaignStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -531,7 +531,7 @@ Expected: all pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/control_plane/spec_director/recovery.py
+git add src/operations_center/spec_director/recovery.py
 git commit -m "refactor: remove revise_spec and stale recovery methods from RecoveryService"
 ```
 
@@ -540,8 +540,8 @@ git commit -m "refactor: remove revise_spec and stale recovery methods from Reco
 ## Task 4: Rewrite trigger — queue drain primary, drop file secondary, remove Plane label
 
 **Files:**
-- Modify: `src/control_plane/spec_director/trigger.py`
-- Modify: `src/control_plane/spec_director/models.py` (remove `PLANE_LABEL` from `TriggerSource`)
+- Modify: `src/operations_center/spec_director/trigger.py`
+- Modify: `src/operations_center/spec_director/models.py` (remove `PLANE_LABEL` from `TriggerSource`)
 - Create: `tests/test_trigger_detector.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -557,8 +557,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from control_plane.spec_director.trigger import TriggerDetector
-from control_plane.spec_director.models import TriggerSource
+from operations_center.spec_director.trigger import TriggerDetector
+from operations_center.spec_director.models import TriggerSource
 
 
 def _make_detector(tmp_path: Path, queue_empty: bool = True) -> TriggerDetector:
@@ -642,10 +642,10 @@ Expected: multiple failures (wrong signature, PLANE_LABEL references, etc.)
 
 - [ ] **Step 3: Rewrite `trigger.py`**
 
-Replace `src/control_plane/spec_director/trigger.py` with:
+Replace `src/operations_center/spec_director/trigger.py` with:
 
 ```python
-# src/control_plane/spec_director/trigger.py
+# src/operations_center/spec_director/trigger.py
 from __future__ import annotations
 
 import logging
@@ -653,7 +653,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.spec_director.models import TriggerSource
+from operations_center.spec_director.models import TriggerSource
 
 logger = logging.getLogger(__name__)
 
@@ -744,8 +744,8 @@ Fix any breakage from `PLANE_LABEL` removal (grep for it first: `grep -rn PLANE_
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/control_plane/spec_director/trigger.py \
-        src/control_plane/spec_director/models.py \
+git add src/operations_center/spec_director/trigger.py \
+        src/operations_center/spec_director/models.py \
         tests/test_trigger_detector.py
 git commit -m "refactor: rewrite trigger — queue drain primary, drop file secondary, remove Plane label"
 ```
@@ -755,8 +755,8 @@ git commit -m "refactor: rewrite trigger — queue drain primary, drop file seco
 ## Task 5: Refactor context bundle — remove insight_snapshot, add board signals
 
 **Files:**
-- Modify: `src/control_plane/spec_director/context_bundle.py`
-- Modify: `src/control_plane/spec_director/brainstorm.py`
+- Modify: `src/operations_center/spec_director/context_bundle.py`
+- Modify: `src/operations_center/spec_director/brainstorm.py`
 
 - [ ] **Step 1: Write a failing test**
 
@@ -764,7 +764,7 @@ Add to `tests/test_spec_campaign_source.py`:
 
 ```python
 def test_context_bundle_has_no_insight_snapshot():
-    from control_plane.spec_director.context_bundle import ContextBundle
+    from operations_center.spec_director.context_bundle import ContextBundle
     bundle = ContextBundle(
         git_logs={},
         specs_index=[],
@@ -778,7 +778,7 @@ def test_context_bundle_has_no_insight_snapshot():
 
 
 def test_context_bundle_build_includes_board_signals():
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder
+    from operations_center.spec_director.context_bundle import ContextBundleBuilder
     builder = ContextBundleBuilder()
     board_issues = [
         {"name": "Fix login bug", "state": {"name": "Done"}, "updated_at": "2026-04-10T00:00:00Z"},
@@ -810,10 +810,10 @@ Expected: `FAILED` (old `ContextBundle` has `insight_snapshot`, new fields don't
 
 - [ ] **Step 3: Rewrite `context_bundle.py`**
 
-Replace `src/control_plane/spec_director/context_bundle.py` with:
+Replace `src/operations_center/spec_director/context_bundle.py` with:
 
 ```python
-# src/control_plane/spec_director/context_bundle.py
+# src/operations_center/spec_director/context_bundle.py
 from __future__ import annotations
 
 import subprocess
@@ -896,7 +896,7 @@ class ContextBundleBuilder:
     @staticmethod
     def collect_specs_index(specs_dir: Path) -> list[dict]:
         """Return [{slug, status}] for each spec in specs_dir."""
-        from control_plane.spec_director.models import SpecFrontMatter
+        from operations_center.spec_director.models import SpecFrontMatter
         index = []
         for p in sorted(specs_dir.glob("*.md")):
             if p.parent.name == "archive":
@@ -911,7 +911,7 @@ class ContextBundleBuilder:
 
 - [ ] **Step 4: Update `brainstorm.py` prompt to include available repos and use new bundle fields**
 
-In `src/control_plane/spec_director/brainstorm.py`:
+In `src/operations_center/spec_director/brainstorm.py`:
 
 Update `_SYSTEM_PROMPT` to reference available repos:
 
@@ -995,8 +995,8 @@ Fix any breakage from `ContextBundle` field changes (the old `insight_snapshot` 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/control_plane/spec_director/context_bundle.py \
-        src/control_plane/spec_director/brainstorm.py \
+git add src/operations_center/spec_director/context_bundle.py \
+        src/operations_center/spec_director/brainstorm.py \
         tests/test_spec_campaign_source.py
 git commit -m "refactor: remove insight_snapshot from context bundle, add board signals and multi-repo git logs"
 ```
@@ -1011,7 +1011,7 @@ This is the core new module. It reads campaign task states from the board and:
 3. Detects campaign completion and closes the parent task
 
 **Files:**
-- Create: `src/control_plane/spec_director/phase_orchestrator.py`
+- Create: `src/operations_center/spec_director/phase_orchestrator.py`
 - Create: `tests/test_phase_orchestrator.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1027,9 +1027,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from control_plane.spec_director.phase_orchestrator import PhaseOrchestrator
-from control_plane.spec_director.models import ActiveCampaigns, CampaignRecord
-from control_plane.spec_director.state import CampaignStateManager
+from operations_center.spec_director.phase_orchestrator import PhaseOrchestrator
+from operations_center.spec_director.models import ActiveCampaigns, CampaignRecord
+from operations_center.spec_director.state import CampaignStateManager
 
 
 _CAMPAIGN_ID = "test-campaign-uuid"
@@ -1162,7 +1162,7 @@ def test_blocked_task_rewritten_and_requeued(tmp_path):
     # fetch_issue returns full description
     client.fetch_issue.return_value = dict(blocked_issue)
 
-    with patch("control_plane.spec_director.phase_orchestrator.call_claude") as mock_claude:
+    with patch("operations_center.spec_director.phase_orchestrator.call_claude") as mock_claude:
         mock_claude.return_value = (
             "## Execution\nrepo: repo_a\nbase_branch: main\nmode: goal\n"
             "spec_campaign_id: test-campaign-uuid\nspec_file: docs/specs/my-slug.md\n"
@@ -1216,10 +1216,10 @@ Expected: `ImportError` or `ModuleNotFoundError` — `phase_orchestrator` doesn'
 
 - [ ] **Step 3: Create `phase_orchestrator.py`**
 
-Create `src/control_plane/spec_director/phase_orchestrator.py`:
+Create `src/operations_center/spec_director/phase_orchestrator.py`:
 
 ```python
-# src/control_plane/spec_director/phase_orchestrator.py
+# src/operations_center/spec_director/phase_orchestrator.py
 """Phase orchestrator — advances spec campaign phases and unblocks stuck tasks."""
 from __future__ import annotations
 
@@ -1229,8 +1229,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from control_plane.spec_director._claude_cli import call_claude
-from control_plane.spec_director.state import CampaignStateManager
+from operations_center.spec_director._claude_cli import call_claude
+from operations_center.spec_director.state import CampaignStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -1513,7 +1513,7 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/control_plane/spec_director/phase_orchestrator.py \
+git add src/operations_center/spec_director/phase_orchestrator.py \
         tests/test_phase_orchestrator.py
 git commit -m "feat: add PhaseOrchestrator for spec campaign phase advancement and blocked-task unblocking"
 ```
@@ -1532,12 +1532,12 @@ The main loop needs to:
 7. Use the new `ContextBundle` (multi-repo git logs, board signals, available_repos)
 
 **Files:**
-- Modify: `src/control_plane/entrypoints/spec_director/main.py`
+- Modify: `src/operations_center/entrypoints/spec_director/main.py`
 
 - [ ] **Step 1: Read the current main.py**
 
 ```bash
-cat src/control_plane/entrypoints/spec_director/main.py
+cat src/operations_center/entrypoints/spec_director/main.py
 ```
 
 (Already read above — confirms current structure.)
@@ -1550,7 +1550,7 @@ Add to `tests/test_spec_campaign_source.py`:
 def test_main_run_once_with_no_trigger_and_no_campaigns(tmp_path, monkeypatch):
     """run_once exits cleanly when board is non-empty and no drop file exists."""
     from unittest.mock import MagicMock, patch
-    from control_plane.entrypoints.spec_director.main import run_once
+    from operations_center.entrypoints.spec_director.main import run_once
 
     # Minimal settings
     settings = MagicMock()
@@ -1714,7 +1714,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
 
     # Determine repo and branch from brainstorm result
     # Use the repo specified in the spec front matter; fall back to first available repo.
-    from control_plane.spec_director.models import SpecFrontMatter
+    from operations_center.spec_director.models import SpecFrontMatter
     try:
         fm = SpecFrontMatter.from_spec_text(result.spec_text)
         spec_repo_key = fm.repos[0] if fm.repos else (available_repos[0] if available_repos else "")
@@ -1770,7 +1770,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
 Also update the imports at the top of `main.py` to add `PhaseOrchestrator`:
 
 ```python
-from control_plane.spec_director.phase_orchestrator import PhaseOrchestrator
+from operations_center.spec_director.phase_orchestrator import PhaseOrchestrator
 ```
 
 And update `RecoveryService` instantiation to use the trimmed constructor (remove `stall_hours` and `spec_revision_budget` params).
@@ -1794,7 +1794,7 @@ Fix any remaining breakage.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/control_plane/entrypoints/spec_director/main.py \
+git add src/operations_center/entrypoints/spec_director/main.py \
         tests/test_spec_campaign_source.py
 git commit -m "feat: rewrite spec director main loop — phase orchestration first, new trigger interface"
 ```
@@ -1814,7 +1814,7 @@ Expected: all tests pass (or same baseline failures as before this PR).
 - [ ] **Step 2: Verify the spec-campaign label fix is deployed**
 
 ```bash
-grep -n "spec-campaign" src/control_plane/entrypoints/worker/main.py
+grep -n "spec-campaign" src/operations_center/entrypoints/worker/main.py
 ```
 
 Expected: `_AUTO_SOURCES = {..., "spec-campaign"}` on line ~1084.
@@ -1822,10 +1822,10 @@ Expected: `_AUTO_SOURCES = {..., "spec-campaign"}` on line ~1084.
 - [ ] **Step 3: Verify phase_orchestrator is imported in main**
 
 ```bash
-grep "PhaseOrchestrator" src/control_plane/entrypoints/spec_director/main.py
+grep "PhaseOrchestrator" src/operations_center/entrypoints/spec_director/main.py
 ```
 
-Expected: `from control_plane.spec_director.phase_orchestrator import PhaseOrchestrator`
+Expected: `from operations_center.spec_director.phase_orchestrator import PhaseOrchestrator`
 
 - [ ] **Step 4: Verify revise_spec is gone**
 
@@ -1838,7 +1838,7 @@ Expected: no matches.
 - [ ] **Step 5: Verify insight_snapshot is gone**
 
 ```bash
-grep -rn "insight_snapshot" src/control_plane/spec_director/
+grep -rn "insight_snapshot" src/operations_center/spec_director/
 ```
 
 Expected: no matches.
@@ -1846,7 +1846,7 @@ Expected: no matches.
 - [ ] **Step 6: Verify PLANE_LABEL trigger is gone**
 
 ```bash
-grep -rn "plane_label\|PLANE_LABEL\|_check_plane_label" src/control_plane/spec_director/
+grep -rn "plane_label\|PLANE_LABEL\|_check_plane_label" src/operations_center/spec_director/
 ```
 
 Expected: no matches.

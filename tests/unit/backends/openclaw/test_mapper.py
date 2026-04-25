@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.backends.openclaw.mapper import check_support, map_request
-from control_plane.backends.openclaw.models import OpenClawPreparedRun, SupportCheck
-from control_plane.contracts.execution import ExecutionRequest
+from operations_center.backends.openclaw.mapper import check_support, map_request
+from operations_center.backends.openclaw.models import OpenClawPreparedRun, SupportCheck
+from operations_center.contracts.execution import ExecutionRequest
 
 
 def _req(tmp_path: Path, **kw) -> ExecutionRequest:

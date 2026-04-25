@@ -6,7 +6,7 @@ phases:
   - test
   - improve
 repos:
-  - control-plane
+  - operations-center
 area_keywords:
   - application
   - service
@@ -17,7 +17,7 @@ created_at: 2026-04-18T19:10:00Z
 
 ## Overview
 
-The `src/control_plane/application/service.py` file is 1613 lines with a single `ExecutionService` class containing 28 methods that span task execution, self-review orchestration, PR-fix workflows, validation baseline checks, reporting/comment generation, and git branch operations. This campaign decomposes it into focused modules while keeping the public `ExecutionService` facade intact for backward compatibility.
+The `src/operations_center/application/service.py` file is 1613 lines with a single `ExecutionService` class containing 28 methods that span task execution, self-review orchestration, PR-fix workflows, validation baseline checks, reporting/comment generation, and git branch operations. This campaign decomposes it into focused modules while keeping the public `ExecutionService` facade intact for backward compatibility.
 
 ## Goals
 

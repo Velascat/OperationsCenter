@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.contracts.common import ChangedFileRef
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
-from control_plane.tuning.analyze import StrategyTuningService
-from control_plane.tuning.routing_models import (
+from operations_center.contracts.common import ChangedFileRef
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.tuning.analyze import StrategyTuningService
+from operations_center.tuning.routing_models import (
     ChangeEvidenceClass,
     EvidenceStrength,
     ReliabilityClass,

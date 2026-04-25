@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.decision.artifact_writer import DecisionArtifactWriter
-from control_plane.decision.models import (
+from operations_center.decision.artifact_writer import DecisionArtifactWriter
+from operations_center.decision.models import (
     CandidateRationale,
     DecisionRepoRef,
     ProposalCandidate,
     ProposalCandidatesArtifact,
     ProposalOutline,
 )
-from control_plane.entrypoints.proposer import main as proposer_main
-from control_plane.insights.artifact_writer import InsightArtifactWriter
-from control_plane.insights.models import InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
+from operations_center.entrypoints.proposer import main as proposer_main
+from operations_center.insights.artifact_writer import InsightArtifactWriter
+from operations_center.insights.models import InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
 
 def write_config(tmp_path: Path) -> Path:
@@ -31,8 +31,8 @@ def write_config(tmp_path: Path) -> Path:
                 "git: {}",
                 "kodo: {}",
                 "repos:",
-                "  control-plane:",
-                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "  operations-center:",
+                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
                 "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]
@@ -46,16 +46,16 @@ def write_decision_inputs(tmp_path: Path) -> None:
     insight = RepoInsightsArtifact(
         run_id="ins_1",
         generated_at=generated_at,
-        source_command="control-plane generate-insights",
-        repo=InsightRepoRef(name="control-plane", path=tmp_path / "repo"),
+        source_command="operations-center generate-insights",
+        repo=InsightRepoRef(name="operations-center", path=tmp_path / "repo"),
         source_snapshots=[SourceSnapshotRef(run_id="obs_1", observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC))],
         insights=[],
     )
     decision = ProposalCandidatesArtifact(
         run_id="dec_1",
         generated_at=generated_at,
-        source_command="control-plane decide-proposals",
-        repo=DecisionRepoRef(name="control-plane", path=tmp_path / "repo"),
+        source_command="operations-center decide-proposals",
+        repo=DecisionRepoRef(name="operations-center", path=tmp_path / "repo"),
         source_insight_run_id="ins_1",
         candidates=[
             ProposalCandidate(
@@ -65,7 +65,7 @@ def write_decision_inputs(tmp_path: Path) -> None:
                 subject="test_signal",
                 rationale=CandidateRationale(matched_rules=["rule_a"], suppressed_by=[]),
                 proposal_outline=ProposalOutline(
-                    title_hint="Improve test signal visibility for control-plane",
+                    title_hint="Improve test signal visibility for operations-center",
                     summary_hint="Add one bounded path for explicit test signal visibility.",
                     labels_hint=["task-kind: goal", "source: proposer"],
                     source_family="test_visibility",
@@ -74,8 +74,8 @@ def write_decision_inputs(tmp_path: Path) -> None:
         ],
         suppressed=[],
     )
-    InsightArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "insights").write(insight)
-    DecisionArtifactWriter(tmp_path / "tools" / "report" / "control_plane" / "decision").write(decision)
+    InsightArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "insights").write(insight)
+    DecisionArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "decision").write(decision)
 
 
 def test_propose_from_candidates_cli_writes_artifact_in_dry_run(
@@ -104,7 +104,7 @@ def test_propose_from_candidates_cli_writes_artifact_in_dry_run(
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr("control_plane.entrypoints.proposer.main.PlaneClient", FakeClient)
+    monkeypatch.setattr("operations_center.entrypoints.proposer.main.PlaneClient", FakeClient)
     monkeypatch.setattr(
         "sys.argv",
         ["propose-from-candidates", "--config", str(write_config(tmp_path)), "--dry-run"],

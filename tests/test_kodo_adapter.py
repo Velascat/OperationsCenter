@@ -1,9 +1,9 @@
 import pytest
 from pathlib import Path
 
-from control_plane.adapters.kodo import KodoAdapter
-from control_plane.adapters.kodo.adapter import KodoRunResult, _ORCHESTRATOR_RATE_LIMIT_SIGNALS
-from control_plane.config.settings import KodoSettings
+from operations_center.adapters.kodo import KodoAdapter
+from operations_center.adapters.kodo.adapter import KodoRunResult, _ORCHESTRATOR_RATE_LIMIT_SIGNALS
+from operations_center.config.settings import KodoSettings
 
 
 def test_build_command_uses_project_flag(tmp_path: Path) -> None:

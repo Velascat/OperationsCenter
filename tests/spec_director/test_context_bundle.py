@@ -3,7 +3,7 @@ from __future__ import annotations
 
 
 def test_bundle_includes_seed():
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder
+    from operations_center.spec_director.context_bundle import ContextBundleBuilder
     builder = ContextBundleBuilder()
     bundle = builder.build(
         seed_text="add webhook ingestion",
@@ -16,7 +16,7 @@ def test_bundle_includes_seed():
 
 
 def test_specs_index_capped():
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder
+    from operations_center.spec_director.context_bundle import ContextBundleBuilder
     builder = ContextBundleBuilder()
     index = [{"title": f"spec {i}", "status": "complete"} for i in range(100)]
     bundle = builder.build(

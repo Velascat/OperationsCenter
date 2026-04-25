@@ -9,15 +9,15 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.common import ChangedFileRef, ValidationSummary
-from control_plane.contracts.enums import (
+from operations_center.contracts.common import ChangedFileRef, ValidationSummary
+from operations_center.contracts.enums import (
     ExecutionStatus,
     FailureReasonCategory,
     ValidationStatus,
 )
-from control_plane.contracts.execution import ExecutionResult
-from control_plane.observability.recorder import ExecutionRecorder
-from control_plane.observability.models import ExecutionRecord
+from operations_center.contracts.execution import ExecutionResult
+from operations_center.observability.recorder import ExecutionRecorder
+from operations_center.observability.models import ExecutionRecord
 
 
 _recorder = ExecutionRecorder()

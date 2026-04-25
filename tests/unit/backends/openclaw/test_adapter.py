@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from control_plane.backends.openclaw.adapter import OpenClawBackendAdapter
-from control_plane.backends.openclaw.models import OpenClawRunCapture
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
-from control_plane.contracts.execution import ExecutionRequest, ExecutionResult
+from operations_center.backends.openclaw.adapter import OpenClawBackendAdapter
+from operations_center.backends.openclaw.models import OpenClawRunCapture
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.contracts.execution import ExecutionRequest, ExecutionResult
 
 
 def _req(tmp_path: Path, **kw) -> ExecutionRequest:
@@ -185,7 +185,7 @@ def test_execute_and_capture_event_stream_source_when_reported(tmp_path):
     reported = [{"path": "src/main.py", "change_type": "modified"}]
     adapter = OpenClawBackendAdapter.with_stub(reported_changed_files=reported)
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git",
         return_value=None,
     ):
         result, capture = adapter.execute_and_capture(_req(tmp_path))
@@ -199,7 +199,7 @@ def test_execute_and_capture_event_stream_source_when_reported(tmp_path):
 
 
 def test_adapter_does_not_import_openclaw_shell():
-    import control_plane.backends.openclaw.adapter as mod
+    import operations_center.backends.openclaw.adapter as mod
     # Confirm openclaw_shell is not in the actual imports (only in docstring comments)
     imports = [
         name for name in vars(mod)
@@ -211,5 +211,5 @@ def test_adapter_does_not_import_openclaw_shell():
 
 
 def test_adapter_module_path_is_backends():
-    from control_plane.backends.openclaw import OpenClawBackendAdapter as imported
+    from operations_center.backends.openclaw import OpenClawBackendAdapter as imported
     assert "backends.openclaw" in imported.__module__

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ControlPlane live status dashboard. Reads local files only — no Plane API calls."""
+"""OperationsCenter live status dashboard. Reads local files only — no Plane API calls."""
 from __future__ import annotations
 
 import argparse
@@ -14,14 +14,14 @@ from pathlib import Path
 UTC = timezone.utc
 ROOT_DIR = Path(__file__).resolve().parent.parent
 WATCH_DIR = ROOT_DIR / "logs" / "local" / "watch-all"
-USAGE_JSON = ROOT_DIR / "tools" / "report" / "control_plane" / "execution" / "usage.json"
+USAGE_JSON = ROOT_DIR / "tools" / "report" / "operations_center" / "execution" / "usage.json"
 SNAPSHOT_PATH = WATCH_DIR / "board_snapshot.json"
 ROLES = ["goal", "test", "improve", "propose", "review", "spec"]
 
 # CB defaults — mirror usage_store.py constants
-_CB_WINDOW = int(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_WINDOW", "5"))
-_CB_THRESHOLD = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
-_CB_STALENESS_HOURS = float(os.environ.get("CONTROL_PLANE_CIRCUIT_BREAKER_STALENESS_HOURS", "4"))
+_CB_WINDOW = int(os.environ.get("OPERATIONS_CENTER_CIRCUIT_BREAKER_WINDOW", "5"))
+_CB_THRESHOLD = float(os.environ.get("OPERATIONS_CENTER_CIRCUIT_BREAKER_THRESHOLD", "0.8"))
+_CB_STALENESS_HOURS = float(os.environ.get("OPERATIONS_CENTER_CIRCUIT_BREAKER_STALENESS_HOURS", "4"))
 
 # ANSI
 _DIM = "\033[2m"
@@ -245,7 +245,7 @@ def _memory_row() -> str:
                 swap_kb = int(line.split()[1])
         total_mb = (avail_kb + swap_kb) // 1024
         total_gb = total_mb / 1024
-        threshold_mb = int(os.environ.get("CONTROL_PLANE_MIN_KODO_AVAILABLE_MB", "6144"))
+        threshold_mb = int(os.environ.get("OPERATIONS_CENTER_MIN_KODO_AVAILABLE_MB", "6144"))
         threshold_gb = threshold_mb / 1024
         color = _RED if total_mb < threshold_mb else ""
         reset = _RESET if color else ""
@@ -256,7 +256,7 @@ def _memory_row() -> str:
 
 def _render(repo_filter: list[str] | None, width: int = 78) -> str:
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-    header = f"────────── ControlPlane Status  [{now_str}]  (Ctrl+C to exit) "
+    header = f"────────── OperationsCenter Status  [{now_str}]  (Ctrl+C to exit) "
     header = header.ljust(width - 1, "─")
     divider = "─" * (width - 1)
 
@@ -382,7 +382,7 @@ def _render_rich(repo_filter: list[str] | None, console) -> None:
 
     console.print(Panel(
         content,
-        title=f"[bold cyan]ControlPlane Status[/bold cyan]  [dim]{now_str}[/dim]",
+        title=f"[bold cyan]OperationsCenter Status[/bold cyan]  [dim]{now_str}[/dim]",
         subtitle="[dim]Ctrl+C to exit · refresh 2s[/dim]",
         border_style="cyan",
         box=box.HEAVY,
@@ -390,11 +390,11 @@ def _render_rich(repo_filter: list[str] | None, console) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ControlPlane live status dashboard")
+    parser = argparse.ArgumentParser(description="OperationsCenter live status dashboard")
     parser.add_argument(
         "--repo",
         default="",
-        help="Comma-separated repo keys to filter (e.g. ControlPlane,ExternalRepo). Empty = show all.",
+        help="Comma-separated repo keys to filter (e.g. OperationsCenter,ExternalRepo). Empty = show all.",
     )
     args = parser.parse_args()
     repo_filter: list[str] | None = None

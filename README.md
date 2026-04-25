@@ -1,15 +1,15 @@
-# Control Plane
+# Operations Center
 
-Local planning, execution, policy, and evidence service for the coding platform. ControlPlane turns work context into canonical proposals, routes them through SwitchBoard, executes routed work through bounded adapters, and retains evidence around what happened later.
+Local planning, execution, policy, and evidence service for the coding platform. OperationsCenter turns work context into canonical proposals, routes them through SwitchBoard, executes routed work through bounded adapters, and retains evidence around what happened later.
 
 ## Primary Operator Model
 
-ControlPlane is operated through a **planning -> routing -> execution** flow:
+OperationsCenter is operated through a **planning -> routing -> execution** flow:
 
 1. Gather or derive work intent.
 2. Build a canonical `TaskProposal`.
 3. Route it through SwitchBoard to get a `LaneDecision`.
-4. Hand the proposal/decision bundle to ControlPlane's canonical execution boundary.
+4. Hand the proposal/decision bundle to OperationsCenter's canonical execution boundary.
 5. `ExecutionCoordinator` builds `ExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
 
 For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it as a validation ritual after any significant config or threshold change.
@@ -19,8 +19,8 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 ## What This System Is
 
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
-- **ControlPlane** is the planning, execution, policy, and evidence layer.
-- **Execution backends** live behind canonical adapters owned by ControlPlane's execution boundary.
+- **OperationsCenter** is the planning, execution, policy, and evidence layer.
+- **Execution backends** live behind canonical adapters owned by OperationsCenter's execution boundary.
 - **goal**, **test**, **improve**, **propose**, and **review** are the board-facing worker lanes.
 - The system is **local-first**, **single-machine**, and **polling-based** today.
 
@@ -33,25 +33,25 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 - Expensive execution is budget-aware and suppresses unnecessary runs.
 - Repo-aware autonomy stages remain explicit and inspectable for now.
 
-## What ControlPlane Is Not
+## What OperationsCenter Is Not
 
-- **Not the lane selector.** ControlPlane may supply lane hints, but SwitchBoard
-  makes the final lane selection. ControlPlane does not know which execution lane
+- **Not the lane selector.** OperationsCenter may supply lane hints, but SwitchBoard
+  makes the final lane selection. OperationsCenter does not know which execution lane
   will run a task.
 
 - **Not the workflow harness.** Multi-step workflow structure (plan → implement →
-  validate → PR) is Archon's responsibility. ControlPlane drives the autonomy loop;
+  validate → PR) is Archon's responsibility. OperationsCenter drives the autonomy loop;
   it does not own execution step sequencing.
 
-- **Not the infrastructure layer.** ControlPlane does not deploy or manage services.
+- **Not the infrastructure layer.** OperationsCenter does not deploy or manage services.
   WorkStation owns the Plane stack, SwitchBoard container, and local model deployment.
 
 - **Not the operator shell.** OpenClaw (optional) provides the human-facing operator
-  experience. ControlPlane is the autonomous engine that runs beneath it.
+  experience. OperationsCenter is the autonomous engine that runs beneath it.
 
 ## Canonical Contracts and Planning Pipeline (Phase 3–6)
 
-ControlPlane integrates with a canonical cross-repo contract layer that
+OperationsCenter integrates with a canonical cross-repo contract layer that
 makes task proposals and routing decisions backend-agnostic.
 
 ### Planning pipeline
@@ -70,8 +70,8 @@ PlanningContext  →  TaskProposal  →  LaneDecision  →  ProposalDecisionBund
    into a `ProposalDecisionBundle`.
 
 ```python
-from control_plane.planning.models import PlanningContext
-from control_plane.routing.service import PlanningService
+from operations_center.planning.models import PlanningContext
+from operations_center.routing.service import PlanningService
 
 service = PlanningService.default()
 bundle = service.plan(PlanningContext(
@@ -92,7 +92,7 @@ For full architecture and examples see:
 
 ### Canonical contract types
 
-All cross-repo contracts live in `src/control_plane/contracts/`:
+All cross-repo contracts live in `src/operations_center/contracts/`:
 
 | Module | Types |
 |---|---|
@@ -104,7 +104,7 @@ All cross-repo contracts live in `src/control_plane/contracts/`:
 
 See `WorkStation/docs/architecture/contracts.md` for full documentation.
 
-### Backend adapters (inside ControlPlane's execution boundary)
+### Backend adapters (inside OperationsCenter's execution boundary)
 
 The supported live execution path is:
 
@@ -124,12 +124,12 @@ are not silently upgraded to authoritative.
 ```python
 from pathlib import Path
 
-from control_plane.backends.factory import CanonicalBackendRegistry
-from control_plane.config.settings import load_settings
-from control_plane.execution.coordinator import ExecutionCoordinator
-from control_plane.execution.handoff import ExecutionRuntimeContext
+from operations_center.backends.factory import CanonicalBackendRegistry
+from operations_center.config.settings import load_settings
+from operations_center.execution.coordinator import ExecutionCoordinator
+from operations_center.execution.handoff import ExecutionRuntimeContext
 
-settings = load_settings("config/control_plane.local.yaml")
+settings = load_settings("config/operations_center.local.yaml")
 registry = CanonicalBackendRegistry.from_settings(settings)
 coordinator = ExecutionCoordinator(adapter_registry=registry)
 
@@ -149,11 +149,11 @@ outcome = coordinator.execute(
 `KodoBackendAdapter` wraps the kodo subprocess behind the canonical interface:
 
 ```python
-from control_plane.backends.kodo import KodoBackendAdapter
+from operations_center.backends.kodo import KodoBackendAdapter
 result = KodoBackendAdapter.from_settings().execute(request)  # ExecutionRequest → ExecutionResult
 ```
 
-These adapters are ControlPlane-owned integration modules reached through the
+These adapters are OperationsCenter-owned integration modules reached through the
 canonical execution boundary rather than legacy worker runtime code.
 
 ### Archon Backend Adapter (Phase 8, optional)
@@ -161,7 +161,7 @@ canonical execution boundary rather than legacy worker runtime code.
 `ArchonBackendAdapter` is an optional, bounded second backend for workflow-oriented execution. Archon runs multi-step agentic workflows (plan → execute → validate) internally. It follows the same canonical interface as kodo but stays completely separate from it:
 
 ```python
-from control_plane.backends.archon.adapter import ArchonBackendAdapter
+from operations_center.backends.archon.adapter import ArchonBackendAdapter
 
 # Use the stub factory in tests
 adapter = ArchonBackendAdapter.with_stub(outcome="success", output_text="done")
@@ -185,7 +185,7 @@ See `WorkStation/docs/architecture/archon-adapter.md` for architecture and usage
 `OpenClawBackendAdapter` makes OpenClaw available as an execution backend behind the canonical contracts. This is the **backend adapter role** — it is separate from the optional outer-shell role (Phase 10).
 
 ```python
-from control_plane.backends.openclaw import OpenClawBackendAdapter
+from operations_center.backends.openclaw import OpenClawBackendAdapter
 
 adapter = OpenClawBackendAdapter.with_stub(outcome="success")
 result = adapter.execute(request)  # ExecutionRequest → ExecutionResult
@@ -212,8 +212,8 @@ See `WorkStation/docs/architecture/openclaw-backend-adapter.md` for architecture
 **The system runs fully without OpenClaw active.** The shell is enabled by setting `OPENCLAW_SHELL_ENABLED=1`.
 
 ```python
-from control_plane.openclaw_shell.bridge import OpenClawBridge
-from control_plane.openclaw_shell.models import OperatorContext
+from operations_center.openclaw_shell.bridge import OpenClawBridge
+from operations_center.openclaw_shell.models import OperatorContext
 
 if OpenClawBridge.is_enabled():
     bridge = OpenClawBridge.default()
@@ -240,7 +240,7 @@ See `WorkStation/docs/architecture/openclaw-outer-shell.md` for architecture and
 `ExecutionObservabilityService` normalizes execution outcomes into retained records:
 
 ```python
-from control_plane.observability.service import ExecutionObservabilityService
+from operations_center.observability.service import ExecutionObservabilityService
 
 svc = ExecutionObservabilityService.default()
 record, trace = svc.observe(result, backend="kodo", lane="claude_cli")
@@ -265,7 +265,7 @@ See `WorkStation/docs/architecture/execution-observability.md` for architecture 
 `PolicyEngine` evaluates a `TaskProposal` + `LaneDecision` against configured guardrails and returns an inspectable `PolicyDecision`. Policy is a first-class system concern — it is not hidden inside a backend or shell.
 
 ```python
-from control_plane.policy import PolicyEngine, explain
+from operations_center.policy import PolicyEngine, explain
 
 engine = PolicyEngine.from_defaults()
 decision = engine.evaluate(proposal, lane_decision)
@@ -309,7 +309,7 @@ See `WorkStation/docs/architecture/policy-guardrails.md` for full architecture a
 `StrategyTuningService` analyzes retained `ExecutionRecord` evidence and produces routing/backend strategy comparisons, findings, and reviewable proposals.
 
 ```python
-from control_plane.tuning import StrategyTuningService
+from operations_center.tuning import StrategyTuningService
 
 service = StrategyTuningService.default()
 report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisReport
@@ -340,7 +340,7 @@ See [docs/architecture/routing-tuning.md](docs/architecture/routing-tuning.md) f
 `UpstreamPatchEvaluator` evaluates whether recurring friction around external systems like `openclaw`, `archon`, or `kodo` actually justifies upstream patching or deeper native integration work.
 
 ```python
-from control_plane.upstream_eval import UpstreamPatchEvaluator
+from operations_center.upstream_eval import UpstreamPatchEvaluator
 
 evaluator = UpstreamPatchEvaluator.default()
 report = evaluator.analyze(evidence)
@@ -403,7 +403,7 @@ The repo-aware autonomy loop can be run stage-by-stage or as a single chained co
 - `analyze-artifacts` reads retained decision + proposer artifacts, computes per-family emit/suppress/create rates, and prints recommendations when suppression is too high or emitted candidates never reach the board.
 
 **Self-tuning regulation (bounded):**
-- `tune-autonomy` runs a bounded self-tuning regulation loop: reads retained decision and proposer artifacts, computes per-family behavior metrics, and emits conservative threshold recommendations. Recommendation-only by default. Optional `--apply` mode (requires `CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1`) applies small bounded changes to `config/autonomy_tuning.json` with full cooldowns, quotas, and audit trail. The `DecisionEngineService` reads the tuning config at startup if it exists.
+- `tune-autonomy` runs a bounded self-tuning regulation loop: reads retained decision and proposer artifacts, computes per-family behavior metrics, and emits conservative threshold recommendations. Recommendation-only by default. Optional `--apply` mode (requires `OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1`) applies small bounded changes to `config/autonomy_tuning.json` with full cooldowns, quotas, and audit trail. The `DecisionEngineService` reads the tuning config at startup if it exists.
 
 **Execution health (automatic):**
 - Every `autonomy-cycle` run also reads retained execution artifacts and checks whether the system is generating useful work. If no-op rate is high or validation keeps failing, a bounded improve task is proposed automatically. No separate command needed.
@@ -448,8 +448,8 @@ The naming is intentionally close because the second is the board adapter for th
 
 ### PR Automation with Review Loop
 
-- After a successful push, Control Plane opens a PR and enters a two-phase review loop.
-- Opt-in per repo via `await_review: true` in `config/control_plane.local.yaml`.
+- After a successful push, Operations Center opens a PR and enters a two-phase review loop.
+- Opt-in per repo via `await_review: true` in `config/operations_center.local.yaml`.
 - A dedicated `review` watcher polls GitHub every 60 seconds and drives the loop:
 
 **Phase 1 — Self-review (automatic):**
@@ -472,15 +472,15 @@ The naming is intentionally close because the second is the board adapter for th
 
 - Token resolution: per-repo `token_env` if set, otherwise falls back to the global `git.token_env`.
 - PR creation and merge failures are logged but do not block the task from completing.
-- Set `CONTROL_PLANE_PR_DRY_RUN=1` to log intended PR actions without touching GitHub.
-- Existing open PRs are backfilled into the review loop on watcher startup: `./scripts/control-plane.sh backfill-pr-reviews`.
+- Set `OPERATIONS_CENTER_PR_DRY_RUN=1` to log intended PR actions without touching GitHub.
+- Existing open PRs are backfilled into the review loop on watcher startup: `./scripts/operations-center.sh backfill-pr-reviews`.
 
 ### Execution Safety and Self-Healing
 
 - Execution budget enforcement, retry caps, no-op suppression, and proposal suppression when execution budget is low.
 - Contract validation rejects unknown repo keys, missing goal text, and disallowed base branches early with clear Plane comments — no silent fallback.
 - Retry cap auto-reset: if the last attempt on a task was more than 1 hour ago, the cap is cleared automatically so a human-unblocked task gets a clean slate.
-- Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Control Plane merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
+- Merge conflict self-healing: when retrying a task whose branch is behind the base branch, Operations Center merges the base into the branch so conflict markers appear in the working tree. Kodo resolves them as part of the task. No manual rebase needed.
 
 ### Autonomy Hardening (83 improvements across ten implementation rounds)
 
@@ -492,7 +492,7 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Dependency ordering** — `depends_on: <uuid>` in task descriptions is parsed and enforced; dependent tasks are skipped by the watcher until their dependencies reach Done.
 - **Task sizing gate** — decompose findings targeting files >800 lines are split at proposal time into 2–4 bounded part-tasks so Kodo never receives a scope it cannot complete in one context window.
 - **Post-merge CI feedback** — every 10 improve cycles, merged PRs are checked for CI failures; regression tasks are created automatically.
-- **Self-modification controls** — `self_repo_key` in config identifies the ControlPlane repo itself; proposals for it are capped at Backlog; auto-execution requires a `self-modify: approved` label.
+- **Self-modification controls** — `self_repo_key` in config identifies the OperationsCenter repo itself; proposals for it are capped at Backlog; auto-execution requires a `self-modify: approved` label.
 - **Three-tier conflict detection** — proposals are checked against (1) artifact `changed_files` for Review/Running tasks, (2) open PR file lists from the GitHub API, (3) title tokens as a fallback.
 - **Better failure attribution** — `context_limit` and `dependency_missing` classifications added to `classify_execution_result` before `validation_failure`, so follow-up tasks are scoped correctly.
 - **Satiation signal** — proposal cycles are recorded; when the last 5 cycles were ≥90% dedup+skipped with zero new tasks created, proposing stops until external state changes.
@@ -501,7 +501,7 @@ The following capabilities were added to close gaps toward full autonomous opera
 
 - **Human escalation channel** — when the same classification blocks ≥5 tasks in 24 hours, a webhook POST is sent to `escalation.webhook_url`; a per-classification cooldown prevents spam.
 - **Merge conflict detection and rebase** — every 5 improve cycles, open PRs are checked for `mergeable==false`; an in-place rebase is attempted; a `[Rebase]` task is created on failure.
-- **Watcher heartbeat monitoring** — each watcher writes `heartbeat_<role>.json` every cycle; `python -m control_plane.entrypoints.worker.main heartbeat-check` exits non-zero when any watcher is stale.
+- **Watcher heartbeat monitoring** — each watcher writes `heartbeat_<role>.json` every cycle; `python -m operations_center.entrypoints.worker.main heartbeat-check` exits non-zero when any watcher is stale.
 - **Context handoff for context_limit tasks** — the execution summary is saved in the task artifact; `context_limit` follow-up tasks include a `prior_progress:` block so Kodo continues from where it stopped.
 - **Flaky test detection** — per-command pass/fail history is tracked; when a command fails ≥30% of its last 10 runs, it is classified as `flaky_test` rather than `validation_failure`.
 - **PR review revision cycle** — every 3 improve cycles, open PRs are checked for `CHANGES_REQUESTED` reviews; `[Revise]` tasks are created with the review comment text as context.
@@ -516,7 +516,7 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Pre-execution task validation** — before claiming a goal task, the watcher validates the goal text is non-empty, appropriately scoped, and not a vague catch-all; failures are moved to Backlog with an explanation.
 - **Feedback loop automation** — every 15 improve cycles, Done tasks with PR URLs are checked on GitHub; merged/closed outcomes are written to `state/proposal_feedback/` automatically, closing the `proposal_success_rate` learning loop without operator CLI calls.
 - **Workspace health monitoring** — every 25 improve cycles, the venv python is verified for each repo with a `local_path`; an automatic bootstrap repair is attempted on failure; a high-priority `[Workspace]` task is created if repair fails.
-- **Config schema drift detection** — at watcher startup, `config/control_plane.local.yaml` is compared against the bundled example; missing keys are logged as warnings so silently-disabled features are surfaced immediately.
+- **Config schema drift detection** — at watcher startup, `config/operations_center.local.yaml` is compared against the bundled example; missing keys are logged as warnings so silently-disabled features are surfaced immediately.
 - **Cost/spend telemetry** — `cost_per_execution_usd` in config enables per-task cost recording; `spend-report` CLI subcommand shows total executions and estimated USD per repo per day/week.
 - **Parallel execution within lanes** — `parallel_slots: N` in config (or `--parallel-slots N` CLI flag) launches N task-execution threads; slot 0 owns all periodic scans; throughput scales linearly for independent tasks.
 - **Multi-step dependency planning** — tasks with titles containing `refactor`, `migrate`, `redesign`, etc. (or labeled `plan: multi-step`) are automatically decomposed into Analyze → Implement → Verify subtasks with `depends_on` links before any execution begins.
@@ -584,14 +584,14 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **Complexity gate** — `_estimate_task_complexity()` counts affected files; proposals touching ≥8 files are automatically placed in Backlog instead of Ready for AI, preventing Kodo from receiving an unachievable scope in one context window.
 - **Utility scoring** — `_score_proposal_utility()` combines confidence weight, calibration acceptance bonus, state bonus, and scope penalty into a float; proposals are sorted by score before the cycle cap is applied, ensuring the highest-value proposals are created first.
 - **CI webhook** — `entrypoints/ci_webhook/main.py` accepts GitHub check-run events over HTTP with HMAC-SHA256 signature validation; writes trigger files to `state/ci_webhook_triggers/` or runs a configurable command, enabling event-driven autonomy-cycle invocation on CI completion.
-- **Cross-repo synthesis** — `CrossRepoSynthesisDeriver` reads the latest `repo_insights.json` artifact for every repo in `tools/report/control_plane/insights/` and emits `cross_repo/pattern_detected` when the same insight kind appears in ≥2 repos, surfacing org-wide patterns that warrant a single shared fix task.
+- **Cross-repo synthesis** — `CrossRepoSynthesisDeriver` reads the latest `repo_insights.json` artifact for every repo in `tools/report/operations_center/insights/` and emits `cross_repo/pattern_detected` when the same insight kind appears in ≥2 repos, surfacing org-wide patterns that warrant a single shared fix task.
 - **Priority rescore scan** — every 45 improve cycles, `handle_priority_rescore_scan()` re-evaluates backlog autonomy tasks: demotes those whose signal family's calibration acceptance rate has dropped below 40% (adds `signal_stale` label), and promotes those above 75% to `priority: high`.
 
 ### Repo and Branch Selection
 
 - Repo is selected via a `repo: <key>` label on the Plane work item — no separate UI needed.
 - Branch defaults to the repo's `default_branch` from config when not specified in the task description.
-- Proposer scope is controlled by `propose_enabled: true/false` per repo in `config/control_plane.local.yaml`.
+- Proposer scope is controlled by `propose_enabled: true/false` per repo in `config/operations_center.local.yaml`.
 - Unknown repo keys and disallowed branches are rejected at task-start with a Plane comment explaining the failure.
 
 ## Lifecycle Contract
@@ -611,8 +611,8 @@ Two files drive local setup — both are gitignored. Committed templates documen
 
 | Template | Copy to | Purpose |
 |----------|---------|---------|
-| `config/control_plane.example.yaml` | `config/control_plane.local.yaml` | Repos, branches, Plane connection, git behaviour, execution engine |
-| `.env.control-plane.example` | `.env.control-plane.local` | Secrets and runtime knobs — never commit real values |
+| `config/operations_center.example.yaml` | `config/operations_center.local.yaml` | Repos, branches, Plane connection, git behaviour, execution engine |
+| `.env.operations-center.example` | `.env.operations-center.local` | Secrets and runtime knobs — never commit real values |
 
 The split is intentional: config yaml holds structure and behaviour (safe to version), env file holds secrets (gitignored). `token_env` fields in the config yaml reference env var **names**, not values.
 
@@ -625,7 +625,7 @@ Key per-repo config options:
 Top-level config options added in the autonomy hardening phase:
 
 - `focus_areas: [...]` — keywords; proposals not matching any entry are demoted to Backlog
-- `self_repo_key: <key>` — identifies this ControlPlane installation; proposals for it go to Backlog; auto-execution requires `self-modify: approved` label
+- `self_repo_key: <key>` — identifies this OperationsCenter installation; proposals for it go to Backlog; auto-execution requires `self-modify: approved` label
 - `stale_pr_days: 7` — PRs open longer than this are closed and requeued by the stale-PR scan
 - `escalation.webhook_url: <url>` — POST target for threshold-based escalations
 - `escalation.block_threshold: 5` — same-classification blocks within 24h before escalating
@@ -637,67 +637,67 @@ Top-level config options added in the autonomy hardening phase:
 ## Fastest Happy Path
 
 ```bash
-./scripts/control-plane.sh setup
-source .env.control-plane.local
-./scripts/control-plane.sh dev-up
-./scripts/control-plane.sh dev-status
+./scripts/operations-center.sh setup
+source .env.operations-center.local
+./scripts/operations-center.sh dev-up
+./scripts/operations-center.sh dev-status
 ```
 
 Then:
 
 1. Create a Plane work item in the configured project.
-2. Add labels: `repo: <key>` (e.g. `repo: ControlPlane`) and `task-kind: goal`.
+2. Add labels: `repo: <key>` (e.g. `repo: OperationsCenter`) and `task-kind: goal`.
 3. Optionally write a `## Goal` section in the description, or just write the goal as plain text.
 4. Move it to `Ready for AI`.
 5. Watch the local loop with:
 
 ```bash
-./scripts/control-plane.sh dev-status
+./scripts/operations-center.sh dev-status
 ```
 
 ## Core Commands
 
 ```bash
-./scripts/control-plane.sh setup
-./scripts/control-plane.sh start
-./scripts/control-plane.sh stop
-./scripts/control-plane.sh plane-status
-./scripts/control-plane.sh run --task-id TASK-123
-./scripts/control-plane.sh run-next
-./scripts/control-plane.sh watch --role goal
-./scripts/control-plane.sh watch --role test
-./scripts/control-plane.sh watch --role improve
-./scripts/control-plane.sh watch --role propose
-./scripts/control-plane.sh watch --role review
-./scripts/control-plane.sh watch-all
-./scripts/control-plane.sh watch-all-status
-./scripts/control-plane.sh watch-all-stop
-./scripts/control-plane.sh dev-up
-./scripts/control-plane.sh dev-down
-./scripts/control-plane.sh dev-restart
-./scripts/control-plane.sh dev-status
-./scripts/control-plane.sh observe-repo
-./scripts/control-plane.sh generate-insights
-./scripts/control-plane.sh decide-proposals
-./scripts/control-plane.sh decide-proposals --dry-run
-./scripts/control-plane.sh propose-from-candidates
-./scripts/control-plane.sh propose-from-candidates --dry-run
-./scripts/control-plane.sh autonomy-cycle
-./scripts/control-plane.sh autonomy-cycle --execute
-./scripts/control-plane.sh autonomy-cycle --execute --all-families
-./scripts/control-plane.sh analyze-artifacts
-./scripts/control-plane.sh analyze-artifacts --repo ControlPlane --limit 20
-./scripts/control-plane.sh tune-autonomy
-./scripts/control-plane.sh tune-autonomy --window 30
-./scripts/control-plane.sh autonomy-tiers show
-./scripts/control-plane.sh autonomy-tiers set --family lint_fix --tier 2
-./scripts/control-plane.sh promote-backlog
-./scripts/control-plane.sh promote-backlog --family lint_fix --execute
-./scripts/control-plane.sh backfill-pr-reviews
-./scripts/control-plane.sh plane-doctor --task-id TASK-123
-./scripts/control-plane.sh smoke --task-id TASK-123 --comment-only
-./scripts/control-plane.sh dependency-check
-./scripts/control-plane.sh janitor
+./scripts/operations-center.sh setup
+./scripts/operations-center.sh start
+./scripts/operations-center.sh stop
+./scripts/operations-center.sh plane-status
+./scripts/operations-center.sh run --task-id TASK-123
+./scripts/operations-center.sh run-next
+./scripts/operations-center.sh watch --role goal
+./scripts/operations-center.sh watch --role test
+./scripts/operations-center.sh watch --role improve
+./scripts/operations-center.sh watch --role propose
+./scripts/operations-center.sh watch --role review
+./scripts/operations-center.sh watch-all
+./scripts/operations-center.sh watch-all-status
+./scripts/operations-center.sh watch-all-stop
+./scripts/operations-center.sh dev-up
+./scripts/operations-center.sh dev-down
+./scripts/operations-center.sh dev-restart
+./scripts/operations-center.sh dev-status
+./scripts/operations-center.sh observe-repo
+./scripts/operations-center.sh generate-insights
+./scripts/operations-center.sh decide-proposals
+./scripts/operations-center.sh decide-proposals --dry-run
+./scripts/operations-center.sh propose-from-candidates
+./scripts/operations-center.sh propose-from-candidates --dry-run
+./scripts/operations-center.sh autonomy-cycle
+./scripts/operations-center.sh autonomy-cycle --execute
+./scripts/operations-center.sh autonomy-cycle --execute --all-families
+./scripts/operations-center.sh analyze-artifacts
+./scripts/operations-center.sh analyze-artifacts --repo OperationsCenter --limit 20
+./scripts/operations-center.sh tune-autonomy
+./scripts/operations-center.sh tune-autonomy --window 30
+./scripts/operations-center.sh autonomy-tiers show
+./scripts/operations-center.sh autonomy-tiers set --family lint_fix --tier 2
+./scripts/operations-center.sh promote-backlog
+./scripts/operations-center.sh promote-backlog --family lint_fix --execute
+./scripts/operations-center.sh backfill-pr-reviews
+./scripts/operations-center.sh plane-doctor --task-id TASK-123
+./scripts/operations-center.sh smoke --task-id TASK-123 --comment-only
+./scripts/operations-center.sh dependency-check
+./scripts/operations-center.sh janitor
 ```
 
 ## CI and Local Validation
@@ -722,26 +722,26 @@ pytest -q
 
 ## Execution Controls
 
-Control Plane now enforces a bounded execution-control layer before expensive worker actions run.
+Operations Center now enforces a bounded execution-control layer before expensive worker actions run.
 
 - rolling execution budgets over hourly and daily windows
 - retry caps per task for automatic `goal` and `test` execution
 - watcher-side no-op suppression for unchanged task signatures
 - proposal suppression when execution budget is low
-- explicit retained accounting in `tools/report/control_plane/execution/usage.json`
+- explicit retained accounting in `tools/report/operations_center/execution/usage.json`
 
-Default local knobs are set in [.env.control-plane.local](/home/dev/Documents/GitHub/ControlPlane/.env.control-plane.local):
+Default local knobs are set in [.env.operations-center.local](/home/dev/Documents/GitHub/OperationsCenter/.env.operations-center.local):
 
-- `CONTROL_PLANE_MAX_EXEC_PER_HOUR`
-- `CONTROL_PLANE_MAX_EXEC_PER_DAY`
-- `CONTROL_PLANE_MAX_RETRIES_PER_TASK`
-- `CONTROL_PLANE_MIN_REMAINING_EXEC_FOR_PROPOSALS`
-- `CONTROL_PLANE_WATCH_INTERVAL_GOAL_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_TEST_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_IMPROVE_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_PROPOSE_SECONDS`
-- `CONTROL_PLANE_WATCH_INTERVAL_REVIEW_SECONDS`
-- `CONTROL_PLANE_PR_DRY_RUN` — set to `1` to log intended PR actions without touching GitHub
+- `OPERATIONS_CENTER_MAX_EXEC_PER_HOUR`
+- `OPERATIONS_CENTER_MAX_EXEC_PER_DAY`
+- `OPERATIONS_CENTER_MAX_RETRIES_PER_TASK`
+- `OPERATIONS_CENTER_MIN_REMAINING_EXEC_FOR_PROPOSALS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_GOAL_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_TEST_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_IMPROVE_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_PROPOSE_SECONDS`
+- `OPERATIONS_CENTER_WATCH_INTERVAL_REVIEW_SECONDS`
+- `OPERATIONS_CENTER_PR_DRY_RUN` — set to `1` to log intended PR actions without touching GitHub
 
 Skipping is treated as a valid outcome when execution is not justified. Budget skips, no-op skips, retry-cap blocks, and proposal suppression are written to retained artifacts and surfaced in watcher logs.
 
@@ -750,7 +750,7 @@ Skipping is treated as a valid outcome when execution is not justified. Budget s
 Each watcher writes a `heartbeat_<role>.json` timestamp file every cycle. To check liveness:
 
 ```bash
-python -m control_plane.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
+python -m operations_center.entrypoints.worker.main heartbeat-check --log-dir logs/local/watch-all
 ```
 
 Exit code 0 = all healthy. Exit code 1 = stale watchers listed on stderr. Wire this into cron or a simple monitoring script for unattended operation.
@@ -758,7 +758,7 @@ Exit code 0 = all healthy. Exit code 1 = stale watchers listed on stderr. Wire t
 ### Spend Report
 
 ```bash
-python -m control_plane.entrypoints.worker.main spend-report --window-days 7
+python -m operations_center.entrypoints.worker.main spend-report --window-days 7
 ```
 
 Shows total executions and estimated cost per repo. Requires `cost_per_execution_usd` in config.
@@ -768,7 +768,7 @@ Shows total executions and estimated cost per repo. Requires `cost_per_execution
 The easiest way to bring up the whole local system is:
 
 ```bash
-./scripts/control-plane.sh dev-up
+./scripts/operations-center.sh dev-up
 ```
 
 That starts:
@@ -778,17 +778,17 @@ That starts:
 
 Useful companions:
 
-- `./scripts/control-plane.sh dev-status`
-- `./scripts/control-plane.sh dev-down`
-- `./scripts/control-plane.sh dev-restart`
+- `./scripts/operations-center.sh dev-status`
+- `./scripts/operations-center.sh dev-down`
+- `./scripts/operations-center.sh dev-restart`
 
 ### Live Status Dashboard
 
 ```bash
-./scripts/control-plane.sh status [--repo REPO,REPO]
+./scripts/operations-center.sh status [--repo REPO,REPO]
 ```
 
-Runs `scripts/cp-status.py` — a live terminal dashboard that refreshes every 2 seconds, showing watcher state (role, cycle, last action, task ID, age, alive), active Kodo workspaces, board counts per repo, circuit breaker status, and available memory. Uses direct row addressing so it never grows the terminal scrollback. Pass `--repo ControlPlane,FOB` to filter board and workspace rows by repo key.
+Runs `scripts/cp-status.py` — a live terminal dashboard that refreshes every 2 seconds, showing watcher state (role, cycle, last action, task ID, age, alive), active Kodo workspaces, board counts per repo, circuit breaker status, and available memory. Uses direct row addressing so it never grows the terminal scrollback. Pass `--repo OperationsCenter,OperatorConsole` to filter board and workspace rows by repo key.
 
 ## Runtime Files
 
@@ -796,16 +796,16 @@ Runs `scripts/cp-status.py` — a live terminal dashboard that refreshes every 2
 - Plane runtime logs: `logs/local/plane-runtime/`
 - Watcher logs, PIDs, and heartbeat files: `logs/local/watch-all/`
 - Retained execution artifacts: `tools/report/kodo_plane/`
-- Retained execution usage ledger: `tools/report/control_plane/execution/`
-- Repo observer snapshots: `tools/report/control_plane/observer/`
-- Insight artifacts: `tools/report/control_plane/insights/`
-- Decision artifacts: `tools/report/control_plane/decision/`
-- Proposer result artifacts: `tools/report/control_plane/proposer/`
-- Tuning run artifacts: `tools/report/control_plane/tuning/`
+- Retained execution usage ledger: `tools/report/operations_center/execution/`
+- Repo observer snapshots: `tools/report/operations_center/observer/`
+- Insight artifacts: `tools/report/operations_center/insights/`
+- Decision artifacts: `tools/report/operations_center/decision/`
+- Proposer result artifacts: `tools/report/operations_center/proposer/`
+- Tuning run artifacts: `tools/report/operations_center/tuning/`
 - Proposal feedback records: `state/proposal_feedback/`
 - Autonomy cycle reports: `logs/autonomy_cycle/`
 
-The wrapper runs `janitor` automatically before commands and keeps local logs/artifacts for 1 day by default. Override with `CONTROL_PLANE_RETENTION_DAYS`.
+The wrapper runs `janitor` automatically before commands and keeps local logs/artifacts for 1 day by default. Override with `OPERATIONS_CENTER_RETENTION_DAYS`.
 
 ## Why An Autonomy-Generated Task Exists
 
@@ -844,7 +844,7 @@ The repo-aware autonomy loop is behaving well when:
 - No unlimited autonomous self-generated work; proposer is bounded by guardrails.
 - No automatic dependency repinning workflow during normal runs.
 - Scheduled tasks require the optional `croniter` Python package (`pip install croniter`).
-- Cost telemetry is estimate-based; `cost_per_execution_usd` must be set manually — ControlPlane does not parse Kodo billing output.
+- Cost telemetry is estimate-based; `cost_per_execution_usd` must be set manually — OperationsCenter does not parse Kodo billing output.
 - Parallel slots share the Plane API rate limit; monitor `github_rate_limit_low` warnings when `parallel_slots > 1`.
 
 ## Documentation
@@ -881,9 +881,9 @@ The repo-aware autonomy loop is behaving well when:
 
 The minimum required to create a task manually in Plane:
 
-**Labels:** `repo: ControlPlane`, `task-kind: goal`
+**Labels:** `repo: OperationsCenter`, `task-kind: goal`
 
-Repos currently managed: `ControlPlane`, `FOB`, `SwitchBoard`, `WorkStation`.
+Repos currently managed: `OperationsCenter`, `OperatorConsole`, `SwitchBoard`, `WorkStation`.
 
 **Description (plain):**
 ```text
@@ -894,7 +894,7 @@ Branch defaults to the repo's `default_branch` from config. For full control, us
 
 ```text
 ## Execution
-repo: ControlPlane
+repo: OperationsCenter
 base_branch: main
 mode: goal
 allowed_paths:
@@ -920,11 +920,11 @@ Notes:
 
 ## Ownership boundary
 
-ControlPlane owns everything about how autonomous agents reason, act, and interact with platform services: the autonomy loop, proposal/decision logic, executor adapters (Aider, Kodo), and client adapters for Plane and SwitchBoard (`PlaneClient`, `SwitchBoardClient`).
+OperationsCenter owns everything about how autonomous agents reason, act, and interact with platform services: the autonomy loop, proposal/decision logic, executor adapters (Aider, Kodo), and client adapters for Plane and SwitchBoard (`PlaneClient`, `SwitchBoardClient`).
 
-ControlPlane does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/Velascat/WorkStation). ControlPlane's `.env.control-plane.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
+OperationsCenter does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/Velascat/WorkStation). OperationsCenter's `.env.operations-center.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
 
-**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `WorkStation/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. WorkStation must be cloned as a sibling directory (or `CONTROL_PLANE_WORKSTATION_DIR` must be set).
+**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `WorkStation/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. WorkStation must be cloned as a sibling directory (or `OPERATIONS_CENTER_WORKSTATION_DIR` must be set).
 
 For the full platform ownership model see `WorkStation/docs/architecture/ownership.md`.
 

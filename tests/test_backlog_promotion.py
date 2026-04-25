@@ -5,15 +5,15 @@ from datetime import datetime, UTC
 from pathlib import Path
 
 
-from control_plane.observer.collectors.backlog import (
+from operations_center.observer.collectors.backlog import (
     BacklogCollector,
     _parse_backlog,
     promotable_items,
 )
-from control_plane.observer.models import BacklogItem, BacklogSignal, RepoSignalsSnapshot, RepoStateSnapshot, RepoContextSnapshot, CheckSignal, DependencyDriftSignal, TodoSignal
-from control_plane.insights.derivers.backlog_promotion import BacklogPromotionDeriver
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.decision.rules.backlog_promotion import BacklogPromotionRule
+from operations_center.observer.models import BacklogItem, BacklogSignal, RepoSignalsSnapshot, RepoStateSnapshot, RepoContextSnapshot, CheckSignal, DependencyDriftSignal, TodoSignal
+from operations_center.insights.derivers.backlog_promotion import BacklogPromotionDeriver
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.decision.rules.backlog_promotion import BacklogPromotionRule
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ def test_rule_emits_candidate_per_backlog_insight():
 
 
 def test_rule_skips_non_backlog_insights():
-    from control_plane.insights.models import DerivedInsight
+    from operations_center.insights.models import DerivedInsight
     other = DerivedInsight(
         insight_id="test-id",
         kind="observation_coverage",
@@ -223,7 +223,7 @@ def test_rule_title_hint_matches_backlog_title():
 
 
 def test_backlog_promotion_not_in_default_families():
-    from control_plane.decision.service import _DEFAULT_ALLOWED_FAMILIES, ALL_FAMILIES
+    from operations_center.decision.service import _DEFAULT_ALLOWED_FAMILIES, ALL_FAMILIES
     assert "backlog_promotion" not in _DEFAULT_ALLOWED_FAMILIES
     assert "backlog_promotion" in ALL_FAMILIES
 

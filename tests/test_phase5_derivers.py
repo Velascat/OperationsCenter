@@ -4,11 +4,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.insights.derivers.architecture_drift import ArchitectureDriftDeriver
-from control_plane.insights.derivers.benchmark_regression import BenchmarkRegressionDeriver
-from control_plane.insights.derivers.security_vuln import SecurityVulnDeriver
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.observer.models import (
+from operations_center.insights.derivers.architecture_drift import ArchitectureDriftDeriver
+from operations_center.insights.derivers.benchmark_regression import BenchmarkRegressionDeriver
+from operations_center.insights.derivers.security_vuln import SecurityVulnDeriver
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.observer.models import (
     ArchitectureSignal,
     BenchmarkSignal,
     DependencyDriftSignal,
@@ -302,7 +302,7 @@ class TestSecurityVulnDeriver:
 class TestBuildInsightServiceWiring:
     def test_derivers_include_phase5_before_cross_signal(self) -> None:
         """All three Phase 5 derivers appear in the derivers list before CrossSignalDeriver."""
-        from control_plane.entrypoints.autonomy_cycle.main import build_insight_service
+        from operations_center.entrypoints.autonomy_cycle.main import build_insight_service
 
         service = build_insight_service()
         deriver_types = [type(d).__name__ for d in service.derivers]

@@ -19,7 +19,7 @@ import pytest
 # S7-1: Process supervisor
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.supervisor.main import (
+from operations_center.entrypoints.supervisor.main import (
     ManagedProcess,
     _heartbeat_age_seconds,
     _is_alive,
@@ -98,7 +98,7 @@ def test_supervisor_maybe_restart_after_exit(tmp_path: Path) -> None:
 # S7-4: Self-healing — consecutive_blocks_for_task
 # ---------------------------------------------------------------------------
 
-from control_plane.execution.usage_store import UsageStore  # noqa: E402
+from operations_center.execution.usage_store import UsageStore  # noqa: E402
 
 
 def test_consecutive_blocks_zero_when_no_events(tmp_path: Path) -> None:
@@ -137,7 +137,7 @@ def test_consecutive_blocks_ignores_other_tasks(tmp_path: Path) -> None:
 # S7-7: Circuit-breaker escalation + quiet-cycle escalation
 # ---------------------------------------------------------------------------
 
-from control_plane.entrypoints.autonomy_cycle.main import _write_quiet_diagnosis  # noqa: E402
+from operations_center.entrypoints.autonomy_cycle.main import _write_quiet_diagnosis  # noqa: E402
 
 
 def test_quiet_diagnosis_fires_escalation_when_quiet(tmp_path: Path) -> None:
@@ -154,9 +154,9 @@ def test_quiet_diagnosis_fires_escalation_when_quiet(tmp_path: Path) -> None:
     def fake_post(url, *, classification, count, task_ids, now):
         escalation_calls.append({"url": url, "classification": classification})
 
-    with patch("control_plane.adapters.escalation.post_escalation", side_effect=fake_post):
-        with patch("control_plane.execution.usage_store.UsageStore.should_escalate", return_value=(True, [])):
-            with patch("control_plane.execution.usage_store.UsageStore.record_escalation"):
+    with patch("operations_center.adapters.escalation.post_escalation", side_effect=fake_post):
+        with patch("operations_center.execution.usage_store.UsageStore.should_escalate", return_value=(True, [])):
+            with patch("operations_center.execution.usage_store.UsageStore.record_escalation"):
                 _write_quiet_diagnosis(
                     report_dir,
                     quiet_window=5,
@@ -181,7 +181,7 @@ def test_quiet_diagnosis_no_escalation_when_below_window(tmp_path: Path) -> None
     def fake_post(url, **kwargs):
         escalation_calls.append({"url": url})
 
-    with patch("control_plane.adapters.escalation.post_escalation", side_effect=fake_post):
+    with patch("operations_center.adapters.escalation.post_escalation", side_effect=fake_post):
         _write_quiet_diagnosis(
             report_dir,
             quiet_window=5,
@@ -204,7 +204,7 @@ def test_quiet_diagnosis_no_escalation_when_no_webhook(tmp_path: Path) -> None:
     def fake_post(url, **kwargs):
         escalation_calls.append({"url": url})
 
-    with patch("control_plane.adapters.escalation.post_escalation", side_effect=fake_post):
+    with patch("operations_center.adapters.escalation.post_escalation", side_effect=fake_post):
         # No webhook
         _write_quiet_diagnosis(report_dir, quiet_window=5, escalation_webhook="")
 

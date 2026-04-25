@@ -9,16 +9,16 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.policy.engine import PolicyEngine
-from control_plane.policy.explain import explain
-from control_plane.policy.models import (
+from operations_center.policy.engine import PolicyEngine
+from operations_center.policy.explain import explain
+from operations_center.policy.models import (
     PolicyDecision,
     PolicyExplanation,
     PolicyStatus,
     PolicyViolation,
     PolicyWarning,
 )
-from control_plane.contracts.enums import RiskLevel, TaskType
+from operations_center.contracts.enums import RiskLevel, TaskType
 
 from .conftest import (
     make_policy_config,

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from control_plane.policy.models import (
+from operations_center.policy.models import (
     BranchGuardrail,
     PathPolicy,
     PathScopeRule,

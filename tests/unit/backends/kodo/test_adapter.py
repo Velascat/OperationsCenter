@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from control_plane.adapters.kodo.adapter import KodoAdapter, KodoRunResult
-from control_plane.backends.kodo.adapter import KodoBackendAdapter
-from control_plane.backends.kodo.models import KodoRunCapture
-from control_plane.contracts.execution import ExecutionRequest
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.adapter import KodoBackendAdapter
+from operations_center.backends.kodo.models import KodoRunCapture
+from operations_center.contracts.execution import ExecutionRequest
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ class TestExecuteSuccess:
         repo.mkdir()
         adapter = _adapter(_mock_kodo(exit_code=0))
         result = adapter.execute(_request(tmp_path))
-        from control_plane.contracts.execution import ExecutionResult
+        from operations_center.contracts.execution import ExecutionResult
         assert isinstance(result, ExecutionResult)
 
     def test_success_result(self, tmp_path):
@@ -233,7 +233,7 @@ class TestBoundaryEnforcement:
     def test_result_is_canonical_execution_result(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        from control_plane.contracts.execution import ExecutionResult
+        from operations_center.contracts.execution import ExecutionResult
         result = _adapter(_mock_kodo()).execute(_request(tmp_path))
         assert isinstance(result, ExecutionResult)
 

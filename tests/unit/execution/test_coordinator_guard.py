@@ -10,19 +10,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from control_plane.backends.factory import CanonicalBackendRegistry
-from control_plane.contracts.enums import (
+from operations_center.backends.factory import CanonicalBackendRegistry
+from operations_center.contracts.enums import (
     BackendName,
     ExecutionStatus,
     FailureReasonCategory,
     LaneName,
 )
-from control_plane.contracts.execution import ExecutionResult
-from control_plane.contracts.routing import LaneDecision
-from control_plane.execution.coordinator import ExecutionCoordinator
-from control_plane.execution.handoff import ExecutionRuntimeContext
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.planning.proposal_builder import build_proposal
+from operations_center.contracts.execution import ExecutionResult
+from operations_center.contracts.routing import LaneDecision
+from operations_center.execution.coordinator import ExecutionCoordinator
+from operations_center.execution.handoff import ExecutionRuntimeContext
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.planning.proposal_builder import build_proposal
 
 
 # ---------------------------------------------------------------------------

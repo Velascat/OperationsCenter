@@ -4,38 +4,38 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.config import load_settings
-from control_plane.decision.artifact_writer import DecisionArtifactWriter
-from control_plane.decision.loader import DecisionLoader
-from control_plane.decision.service import DecisionEngineService, new_decision_context
-from control_plane.insights.artifact_writer import InsightArtifactWriter
-from control_plane.insights.derivers.commit_activity import CommitActivityDeriver
-from control_plane.insights.derivers.dependency_drift import DependencyDriftDeriver
-from control_plane.insights.derivers.dirty_tree import DirtyTreeDeriver
-from control_plane.insights.derivers.file_hotspots import FileHotspotsDeriver
-from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
-from control_plane.insights.derivers.test_continuity import TestContinuityDeriver as ContinuityDeriver
-from control_plane.insights.derivers.todo_concentration import TodoConcentrationDeriver
-from control_plane.insights.loader import SnapshotLoader
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.insights.service import InsightEngineService, new_generation_context
-from control_plane.observer.artifact_writer import ObserverArtifactWriter
-from control_plane.observer.collectors.dependency_drift import DependencyDriftCollector
-from control_plane.observer.collectors.file_hotspots import FileHotspotsCollector
-from control_plane.observer.collectors.git_context import GitContextCollector
-from control_plane.observer.collectors.recent_commits import RecentCommitsCollector
-from control_plane.observer.collectors.check_signal import CheckSignalCollector
-from control_plane.observer.collectors.todo_signal import TodoSignalCollector
-from control_plane.observer.service import RepoObserverService, new_observer_context
-from control_plane.observer.snapshot_builder import SnapshotBuilder
-from control_plane.proposer.artifact_writer import ProposerArtifactWriter
-from control_plane.proposer.candidate_integration import (
+from operations_center.config import load_settings
+from operations_center.decision.artifact_writer import DecisionArtifactWriter
+from operations_center.decision.loader import DecisionLoader
+from operations_center.decision.service import DecisionEngineService, new_decision_context
+from operations_center.insights.artifact_writer import InsightArtifactWriter
+from operations_center.insights.derivers.commit_activity import CommitActivityDeriver
+from operations_center.insights.derivers.dependency_drift import DependencyDriftDeriver
+from operations_center.insights.derivers.dirty_tree import DirtyTreeDeriver
+from operations_center.insights.derivers.file_hotspots import FileHotspotsDeriver
+from operations_center.insights.derivers.observation_coverage import ObservationCoverageDeriver
+from operations_center.insights.derivers.test_continuity import TestContinuityDeriver as ContinuityDeriver
+from operations_center.insights.derivers.todo_concentration import TodoConcentrationDeriver
+from operations_center.insights.loader import SnapshotLoader
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.insights.service import InsightEngineService, new_generation_context
+from operations_center.observer.artifact_writer import ObserverArtifactWriter
+from operations_center.observer.collectors.dependency_drift import DependencyDriftCollector
+from operations_center.observer.collectors.file_hotspots import FileHotspotsCollector
+from operations_center.observer.collectors.git_context import GitContextCollector
+from operations_center.observer.collectors.recent_commits import RecentCommitsCollector
+from operations_center.observer.collectors.check_signal import CheckSignalCollector
+from operations_center.observer.collectors.todo_signal import TodoSignalCollector
+from operations_center.observer.service import RepoObserverService, new_observer_context
+from operations_center.observer.snapshot_builder import SnapshotBuilder
+from operations_center.proposer.artifact_writer import ProposerArtifactWriter
+from operations_center.proposer.candidate_integration import (
     CandidateProposerIntegrationService,
     new_proposer_integration_context,
 )
-from control_plane.proposer.candidate_loader import ProposalCandidateLoader
-from control_plane.execution import UsageStore
-from control_plane.proposer.guardrail_adapter import ProposerGuardrailAdapter
+from operations_center.proposer.candidate_loader import ProposalCandidateLoader
+from operations_center.execution import UsageStore
+from operations_center.proposer.guardrail_adapter import ProposerGuardrailAdapter
 
 
 class FakePlaneClient:
@@ -83,8 +83,8 @@ def write_config(tmp_path: Path) -> Path:
                 "git: {}",
                 "kodo: {}",
                 "repos:",
-                "  control-plane:",
-                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "  operations-center:",
+                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
                 "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]
@@ -123,7 +123,7 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     logs_root = tmp_path / "logs" / "local"
     logs_root.mkdir(parents=True)
 
-    observer_root = tmp_path / "tools" / "report" / "control_plane" / "observer"
+    observer_root = tmp_path / "tools" / "report" / "operations_center" / "observer"
     observer_service = RepoObserverService(
         repo_collector=GitContextCollector(),
         recent_commits_collector=RecentCommitsCollector(),
@@ -141,10 +141,10 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     ]:
         context = new_observer_context(
             repo_path=repo,
-            repo_name="control-plane",
+            repo_name="operations-center",
             base_branch="main",
             settings=settings,
-            source_command="control-plane observe-repo",
+            source_command="operations-center observe-repo",
             commit_limit=5,
             hotspot_window=10,
             todo_limit=5,
@@ -154,7 +154,7 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
         observer_service.observe(context)
 
     normalizer = InsightNormalizer()
-    insights_root = tmp_path / "tools" / "report" / "control_plane" / "insights"
+    insights_root = tmp_path / "tools" / "report" / "operations_center" / "insights"
     insight_service = InsightEngineService(
         loader=SnapshotLoader(observer_root),
         derivers=[
@@ -170,14 +170,14 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     )
     insight_artifact, insight_paths = insight_service.generate(
         new_generation_context(
-            repo_filter="control-plane",
+            repo_filter="operations-center",
             snapshot_run_id=None,
             history_limit=5,
-            source_command="control-plane generate-insights",
+            source_command="operations-center generate-insights",
         )
     )
 
-    decision_root = tmp_path / "tools" / "report" / "control_plane" / "decision"
+    decision_root = tmp_path / "tools" / "report" / "operations_center" / "decision"
     decision_service = DecisionEngineService(
         loader=DecisionLoader(insights_root=insights_root, decision_root=decision_root),
         artifact_writer=DecisionArtifactWriter(decision_root),
@@ -185,17 +185,17 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     )
     decision_artifact, decision_paths = decision_service.decide(
         new_decision_context(
-            repo_filter="control-plane",
+            repo_filter="operations-center",
             insight_run_id=insight_artifact.run_id,
             history_limit=5,
             max_candidates=3,
             cooldown_minutes=120,
-            source_command="control-plane decide-proposals",
+            source_command="operations-center decide-proposals",
         )
     )
 
     plane_client = FakePlaneClient()
-    proposer_root = tmp_path / "tools" / "report" / "control_plane" / "proposer"
+    proposer_root = tmp_path / "tools" / "report" / "operations_center" / "proposer"
     proposer_service = CandidateProposerIntegrationService(
         settings=settings,
         client=plane_client,  # type: ignore[arg-type]
@@ -205,11 +205,11 @@ def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) 
     )
     proposal_artifact, proposal_paths = proposer_service.run(
         new_proposer_integration_context(
-            repo_filter="control-plane",
+            repo_filter="operations-center",
             decision_run_id=decision_artifact.run_id,
             max_create=2,
             dry_run=False,
-            source_command="control-plane propose-from-candidates",
+            source_command="operations-center propose-from-candidates",
         )
     )
 

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from control_plane.decision.rules.test_visibility import TestVisibilityRule
-from control_plane.insights.derivers.observation_coverage import ObservationCoverageDeriver
-from control_plane.insights.derivers.test_continuity import TestContinuityDeriver
-from control_plane.insights.normalizer import InsightNormalizer
+from operations_center.decision.rules.test_visibility import TestVisibilityRule
+from operations_center.insights.derivers.observation_coverage import ObservationCoverageDeriver
+from operations_center.insights.derivers.test_continuity import TestContinuityDeriver
+from operations_center.insights.normalizer import InsightNormalizer
 
 # Re-use the helper from the existing test module.
 from test_insights import make_snapshot

@@ -1,6 +1,6 @@
 # Setup Guide
 
-`./scripts/control-plane.sh setup` is the interactive local operator setup flow.
+`./scripts/operations-center.sh setup` is the interactive local operator setup flow.
 
 It prepares:
 
@@ -14,15 +14,15 @@ It prepares:
 
 Setup writes:
 
-- `config/control_plane.local.yaml`
-- `.env.control-plane.local`
+- `config/operations_center.local.yaml`
+- `.env.operations-center.local`
 - `config/plane_task_template.local.md`
 
 ## Typical Flow
 
 ```bash
-./scripts/control-plane.sh setup
-source .env.control-plane.local
+./scripts/operations-center.sh setup
+source .env.operations-center.local
 ```
 
 ## What Setup Covers
@@ -44,7 +44,7 @@ source .env.control-plane.local
 
 ### Kodo
 
-Kodo ([github.com/ikamensh/kodo](https://github.com/ikamensh/kodo)) is the multi-agent coding engine ControlPlane uses for task execution.
+Kodo ([github.com/ikamensh/kodo](https://github.com/ikamensh/kodo)) is the multi-agent coding engine OperationsCenter uses for task execution.
 
 - install/verify `kodo`
 - configure orchestrator defaults
@@ -66,13 +66,13 @@ Kodo ([github.com/ikamensh/kodo](https://github.com/ikamensh/kodo)) is the multi
 
 ## Repo Bootstrap Convention
 
-Before kodo runs on a task, ControlPlane bootstraps the repo's Python environment.
+Before kodo runs on a task, OperationsCenter bootstraps the repo's Python environment.
 
 **Default (Python repos):** set `bootstrap_enabled: true` in the repo config.
-ControlPlane creates a venv at `venv_dir` and runs `install_dev_command`.
+OperationsCenter creates a venv at `venv_dir` and runs `install_dev_command`.
 
 **Custom bootstrap:** set `bootstrap_enabled: false` and place a `tools/bootstrap.sh`
-in the repo root.  ControlPlane auto-discovers and runs it — no `bootstrap_commands`
+in the repo root.  OperationsCenter auto-discovers and runs it — no `bootstrap_commands`
 config needed.  The script can set up any environment the repo requires; it runs
 with the repo root as the working directory.
 

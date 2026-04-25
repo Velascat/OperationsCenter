@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.common import (
+from operations_center.contracts.common import (
     BranchPolicy,
     ChangedFileRef,
     ExecutionConstraints,
@@ -12,7 +12,7 @@ from control_plane.contracts.common import (
     ValidationProfile,
     ValidationSummary,
 )
-from control_plane.contracts.enums import ValidationStatus
+from operations_center.contracts.enums import ValidationStatus
 
 
 class TestTaskTarget:

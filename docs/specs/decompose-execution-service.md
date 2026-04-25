@@ -6,7 +6,7 @@ phases:
   - test
   - improve
 repos:
-  - ControlPlane
+  - OperationsCenter
 area_keywords:
   - application/service
   - execution_service
@@ -18,7 +18,7 @@ created_at: 2026-04-18T18:00:00Z
 
 ## Overview
 
-`src/control_plane/application/service.py` is a 1,613-line file whose `ExecutionService` class holds 27 methods spanning five distinct responsibilities: the core `run_task` orchestration (750 lines), output formatting helpers, baseline-validation / fix-task creation, git operations (revert, rebase), and review-pass execution (self-review + human-review + fix-PR). This campaign extracts the non-orchestration method groups into focused modules inside `application/`, leaving `service.py` with only `ExecutionService.__init__`, `run_task`, contract validation, and delegation stubs.
+`src/operations_center/application/service.py` is a 1,613-line file whose `ExecutionService` class holds 27 methods spanning five distinct responsibilities: the core `run_task` orchestration (750 lines), output formatting helpers, baseline-validation / fix-task creation, git operations (revert, rebase), and review-pass execution (self-review + human-review + fix-PR). This campaign extracts the non-orchestration method groups into focused modules inside `application/`, leaving `service.py` with only `ExecutionService.__init__`, `run_task`, contract validation, and delegation stubs.
 
 ## Goals
 
@@ -30,7 +30,7 @@ created_at: 2026-04-18T18:00:00Z
 
 ## Constraints
 
-- **Backward-compatible imports**: `from control_plane.application.service import ExecutionService`, `_SelfReviewVerdict`, `_BaselineResult`, `TaskContractError`, and `_build_scope_constraints_section` must continue to work. `service.py` re-exports every moved symbol.
+- **Backward-compatible imports**: `from operations_center.application.service import ExecutionService`, `_SelfReviewVerdict`, `_BaselineResult`, `TaskContractError`, and `_build_scope_constraints_section` must continue to work. `service.py` re-exports every moved symbol.
 - **No logic changes**: Each goal is a pure extract-and-delegate refactor. No renaming, no signature changes, no behavioral modifications.
 - **Incremental**: Each goal is a standalone PR-able commit. Tests must pass after each extraction.
 - **Goal ordering**: Goal 1 is independent. Goal 2 is independent. Goal 3 depends on Goal 1 (review-pass methods call formatting helpers). Execute Goal 1 first, then Goals 2 and 3 in either order.
@@ -43,5 +43,5 @@ created_at: 2026-04-18T18:00:00Z
 - `service.py` is under 900 lines, containing `ExecutionService` with `__init__`, `run_task`, `_repo_target_for`, `task_branch`, `_validate_task_contract`, `_log_event`, and thin delegation stubs.
 - Three new modules exist: `formatting.py` (~180 lines), `baseline.py` (~350 lines), `review_ops.py` (~350 lines).
 - All existing test files pass without modification: `pytest tests/test_self_review_verdict.py tests/test_circuit_breaker.py tests/test_circuit_breaker_e2e.py tests/test_fix_validation_task.py tests/test_scope_injection.py tests/test_goal_section_guard.py tests/test_service_reporting.py tests/test_policy_retry.py tests/test_worker_logging.py tests/test_service_bootstrap.py tests/test_execution_modes.py tests/test_validation_retry_integration.py`.
-- `ruff check src/control_plane/application/` reports no new lint violations.
+- `ruff check src/operations_center/application/` reports no new lint violations.
 - Every previously-importable symbol from `application.service` is still importable from that path.

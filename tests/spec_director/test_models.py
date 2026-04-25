@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pytest
-from control_plane.spec_director.models import (
+from operations_center.spec_director.models import (
     CampaignRecord, ActiveCampaigns, ComplianceVerdict,
     SpecFrontMatter, TriggerSource,
 )
@@ -72,7 +72,7 @@ def test_trigger_source_values():
 
 
 def test_spec_director_settings_defaults():
-    from control_plane.config.settings import SpecDirectorSettings
+    from operations_center.config.settings import SpecDirectorSettings
     s = SpecDirectorSettings()
     assert s.enabled is True
     assert s.poll_interval_seconds == 120
@@ -84,13 +84,13 @@ def test_spec_director_settings_defaults():
 
 
 def test_spec_front_matter_missing_close_delimiter():
-    from control_plane.spec_director.models import SpecFrontMatter
+    from operations_center.spec_director.models import SpecFrontMatter
     with pytest.raises(ValueError, match="missing closing"):
         SpecFrontMatter.from_spec_text("---\ncampaign_id: abc\n# no closing delimiter")
 
 
 def test_spec_front_matter_yaml_date_normalized():
-    from control_plane.spec_director.models import SpecFrontMatter
+    from operations_center.spec_director.models import SpecFrontMatter
     raw = "---\ncampaign_id: abc-123\nslug: test\ncreated_at: 2026-04-15\n---\n# Title\n"
     fm = SpecFrontMatter.from_spec_text(raw)
     assert isinstance(fm.created_at, str)

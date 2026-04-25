@@ -4,23 +4,23 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import ExecutionStatus, ValidationStatus
-from control_plane.openclaw_shell.models import (
+from operations_center.contracts.enums import ExecutionStatus, ValidationStatus
+from operations_center.openclaw_shell.models import (
     OperatorContext,
     ShellRunHandle,
     ShellStatusSummary,
     ShellInspectionResult,
 )
-from control_plane.openclaw_shell.service import OpenClawShellService
+from operations_center.openclaw_shell.service import OpenClawShellService
 
 from ..observability.conftest import (
     make_artifact,
     make_changed_file,
     make_result,
 )
-from control_plane.contracts.enums import ArtifactType, FailureReasonCategory
-from control_plane.observability.recorder import ExecutionRecorder
-from control_plane.observability.trace import RunReportBuilder
+from operations_center.contracts.enums import ArtifactType, FailureReasonCategory
+from operations_center.observability.recorder import ExecutionRecorder
+from operations_center.observability.trace import RunReportBuilder
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 """
-Integration tests for the ControlPlane execution boundary.
+Integration tests for the OperationsCenter execution boundary.
 
 These tests prove the full pipeline:
 
@@ -12,7 +12,7 @@ No live external service is required. The adapter is invoked directly:
 - The missing-binary path proves the full boundary without needing aider installed.
 - The aider-available path is skipped unless `which aider` succeeds.
 
-Run from the ControlPlane repo:
+Run from the OperationsCenter repo:
 
     pytest tests/integration/test_execution_boundary.py -v
 """
@@ -24,16 +24,16 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.backends.direct_local.adapter import DirectLocalBackendAdapter
-from control_plane.config.settings import AiderSettings
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
-from control_plane.contracts.execution import ExecutionResult
-from control_plane.contracts.routing import LaneDecision
-from control_plane.contracts.enums import BackendName, LaneName
-from control_plane.execution.artifact_writer import RunArtifactWriter
-from control_plane.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.planning.proposal_builder import build_proposal
+from operations_center.backends.direct_local.adapter import DirectLocalBackendAdapter
+from operations_center.config.settings import AiderSettings
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.contracts.execution import ExecutionResult
+from operations_center.contracts.routing import LaneDecision
+from operations_center.contracts.enums import BackendName, LaneName
+from operations_center.execution.artifact_writer import RunArtifactWriter
+from operations_center.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.planning.proposal_builder import build_proposal
 
 
 # ---------------------------------------------------------------------------

@@ -13,9 +13,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from control_plane.decision.candidate_builder import CandidateSpec
-from control_plane.decision.chain_policy import ChainPolicy
-from control_plane.decision.models import (
+from operations_center.decision.candidate_builder import CandidateSpec
+from operations_center.decision.chain_policy import ChainPolicy
+from operations_center.decision.models import (
     DecisionRepoRef,
     ProposalCandidatesArtifact,
     ProposalCandidate,

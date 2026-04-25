@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from control_plane.upstream_eval.models import (
+from operations_center.upstream_eval.models import (
     EvidenceStrength,
     FrequencyClass,
     IntegrationFrictionEvidence,

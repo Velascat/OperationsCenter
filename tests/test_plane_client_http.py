@@ -2,7 +2,7 @@ import json
 
 import httpx
 
-from control_plane.adapters.plane import PlaneClient
+from operations_center.adapters.plane import PlaneClient
 
 
 def test_plane_comment_and_state_update_flow() -> None:

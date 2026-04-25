@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from control_plane.contracts.enums import BackendName, LaneName
-from control_plane.contracts.routing import LaneDecision
-from control_plane.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.planning.proposal_builder import build_proposal
-from control_plane.policy.models import PolicyDecision, PolicyStatus
+from operations_center.contracts.enums import BackendName, LaneName
+from operations_center.contracts.routing import LaneDecision
+from operations_center.execution.handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.planning.proposal_builder import build_proposal
+from operations_center.policy.models import PolicyDecision, PolicyStatus
 
 
 def _bundle() -> ProposalDecisionBundle:

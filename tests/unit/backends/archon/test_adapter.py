@@ -7,10 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from control_plane.backends.archon.adapter import ArchonBackendAdapter
-from control_plane.backends.archon.invoke import ArchonAdapter, ArchonRunResult
-from control_plane.contracts.enums import ExecutionStatus, FailureReasonCategory
-from control_plane.contracts.execution import ExecutionRequest
+from operations_center.backends.archon.adapter import ArchonBackendAdapter
+from operations_center.backends.archon.invoke import ArchonAdapter, ArchonRunResult
+from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.contracts.execution import ExecutionRequest
 
 
 def _req(tmp_path: Path, **kw) -> ExecutionRequest:
@@ -75,7 +75,7 @@ def test_missing_repo_key_not_supported(tmp_path):
 
 
 def test_execute_returns_execution_result(tmp_path):
-    from control_plane.contracts.execution import ExecutionResult
+    from operations_center.contracts.execution import ExecutionResult
     result = _adapter().execute(_req(tmp_path))
     assert isinstance(result, ExecutionResult)
 

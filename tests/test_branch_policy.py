@@ -1,4 +1,4 @@
-from control_plane.adapters.git import branch_allowed
+from operations_center.adapters.git import branch_allowed
 
 
 def test_branch_allowed_with_glob() -> None:

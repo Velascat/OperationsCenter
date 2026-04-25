@@ -1,6 +1,6 @@
 # Autonomy Self-Tuning Regulator
 
-Control Plane includes a bounded self-tuning regulation loop that uses retained artifact evidence to recommend and optionally apply conservative threshold adjustments to the decision engine.
+Operations Center includes a bounded self-tuning regulation loop that uses retained artifact evidence to recommend and optionally apply conservative threshold adjustments to the decision engine.
 
 This is **not** an open-ended self-modification system. It is a bounded regulator with explicit guardrails.
 
@@ -26,8 +26,8 @@ observe -> analyze -> decide -> propose
 ## Regulation Loop
 
 ```
-tools/report/control_plane/decision/*/proposal_candidates.json
-tools/report/control_plane/proposer/*/proposal_results.json
+tools/report/operations_center/decision/*/proposal_candidates.json
+tools/report/operations_center/proposer/*/proposal_results.json
 state/proposal_feedback/*.json
                   ↓
           MetricsAggregator
@@ -53,24 +53,24 @@ state/proposal_feedback/*.json
 ### Recommendation-only (default)
 
 ```bash
-./scripts/control-plane.sh tune-autonomy
+./scripts/operations-center.sh tune-autonomy
 ```
 
 - Reads retained decision, proposer, and feedback artifacts.
 - Computes per-family behavior metrics.
 - Emits conservative tuning recommendations.
-- Writes retained artifacts to `tools/report/control_plane/tuning/<run_id>/`.
+- Writes retained artifacts to `tools/report/operations_center/tuning/<run_id>/`.
 - **Does not modify any config**.
 
 ### Auto-apply (opt-in)
 
 ```bash
-CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/control-plane.sh tune-autonomy --apply
+OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/operations-center.sh tune-autonomy --apply
 ```
 
 Two conditions must both be true:
 1. `--apply` flag is passed.
-2. `CONTROL_PLANE_TUNING_AUTO_APPLY_ENABLED=1` env var is set.
+2. `OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1` env var is set.
 
 This double-gate prevents accidental application.
 
@@ -140,12 +140,12 @@ Maximum ±1 per family per application. No multi-step jumps.
 ### Per-family cooldown
 
 Default: 48 hours. No change to the same family within this window.
-Override: `CONTROL_PLANE_TUNING_FAMILY_COOLDOWN_HOURS`
+Override: `OPERATIONS_CENTER_TUNING_FAMILY_COOLDOWN_HOURS`
 
 ### Daily quota
 
 Default: 2 changes total per day across all families.
-Override: `CONTROL_PLANE_TUNING_MAX_CHANGES_PER_DAY`
+Override: `OPERATIONS_CENTER_TUNING_MAX_CHANGES_PER_DAY`
 
 ### Oscillation prevention
 
@@ -157,7 +157,7 @@ Auto-apply is skipped if `sample_runs < 5` (same floor as recommendations).
 
 ## Retained Artifacts
 
-Every tuning run writes four files under `tools/report/control_plane/tuning/<run_id>/`:
+Every tuning run writes four files under `tools/report/operations_center/tuning/<run_id>/`:
 
 | File | Contents |
 |------|----------|
@@ -200,7 +200,7 @@ The regulator is not wired into the hot-path autonomy cycle. Run it as a periodi
 
 ```bash
 # Weekly during the first month; monthly thereafter
-./scripts/control-plane.sh tune-autonomy
+./scripts/operations-center.sh tune-autonomy
 ```
 
 ## What This Is Not

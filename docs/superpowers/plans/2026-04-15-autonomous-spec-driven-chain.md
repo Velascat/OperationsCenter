@@ -13,19 +13,19 @@
 ## File Map
 
 **New files:**
-- `src/control_plane/spec_director/__init__.py`
-- `src/control_plane/spec_director/models.py` — all Pydantic models for the spec director
-- `src/control_plane/spec_director/state.py` — read/write `state/campaigns/active.json`
-- `src/control_plane/spec_director/suppressor.py` — heuristic proposal suppression
-- `src/control_plane/spec_director/context_bundle.py` — brainstorm context assembly
-- `src/control_plane/spec_director/brainstorm.py` — Anthropic API call → spec text
-- `src/control_plane/spec_director/spec_writer.py` — write spec to disk + workspace
-- `src/control_plane/spec_director/campaign_builder.py` — create Plane tasks
-- `src/control_plane/spec_director/compliance.py` — structured diff-vs-spec verdict
-- `src/control_plane/spec_director/recovery.py` — stall detection, spec revision, self-cancel
-- `src/control_plane/spec_director/trigger.py` — detect start conditions
-- `src/control_plane/entrypoints/spec_director/__init__.py`
-- `src/control_plane/entrypoints/spec_director/main.py` — polling loop
+- `src/operations_center/spec_director/__init__.py`
+- `src/operations_center/spec_director/models.py` — all Pydantic models for the spec director
+- `src/operations_center/spec_director/state.py` — read/write `state/campaigns/active.json`
+- `src/operations_center/spec_director/suppressor.py` — heuristic proposal suppression
+- `src/operations_center/spec_director/context_bundle.py` — brainstorm context assembly
+- `src/operations_center/spec_director/brainstorm.py` — Anthropic API call → spec text
+- `src/operations_center/spec_director/spec_writer.py` — write spec to disk + workspace
+- `src/operations_center/spec_director/campaign_builder.py` — create Plane tasks
+- `src/operations_center/spec_director/compliance.py` — structured diff-vs-spec verdict
+- `src/operations_center/spec_director/recovery.py` — stall detection, spec revision, self-cancel
+- `src/operations_center/spec_director/trigger.py` — detect start conditions
+- `src/operations_center/entrypoints/spec_director/__init__.py`
+- `src/operations_center/entrypoints/spec_director/main.py` — polling loop
 - `tests/spec_director/__init__.py`
 - `tests/spec_director/test_models.py`
 - `tests/spec_director/test_state.py`
@@ -39,23 +39,23 @@
 - `tests/spec_director/test_trigger.py`
 
 **Modified files:**
-- `src/control_plane/domain/models.py` — extend `ExecutionMode` literal
-- `src/control_plane/application/task_parser.py` — extend `SUPPORTED_MODES`, pass-through campaign metadata fields
-- `src/control_plane/adapters/kodo/adapter.py` — add `kodo_mode` to `build_command` and `run`
-- `src/control_plane/application/service.py` — derive `kodo_mode` from `execution_mode` in `run_task`
-- `src/control_plane/config/settings.py` — add `SpecDirectorSettings`, add field to `Settings`
-- `src/control_plane/entrypoints/worker/main.py` — `ROLE_TASK_KINDS` map, update `select_ready_task_id`
-- `src/control_plane/entrypoints/reviewer/main.py` — compliance branch in `_process_self_review`
-- `src/control_plane/proposer/candidate_integration.py` — suppression check
-- `scripts/control-plane.sh` — spec watch role + watch-all wiring
+- `src/operations_center/domain/models.py` — extend `ExecutionMode` literal
+- `src/operations_center/application/task_parser.py` — extend `SUPPORTED_MODES`, pass-through campaign metadata fields
+- `src/operations_center/adapters/kodo/adapter.py` — add `kodo_mode` to `build_command` and `run`
+- `src/operations_center/application/service.py` — derive `kodo_mode` from `execution_mode` in `run_task`
+- `src/operations_center/config/settings.py` — add `SpecDirectorSettings`, add field to `Settings`
+- `src/operations_center/entrypoints/worker/main.py` — `ROLE_TASK_KINDS` map, update `select_ready_task_id`
+- `src/operations_center/entrypoints/reviewer/main.py` — compliance branch in `_process_self_review`
+- `src/operations_center/proposer/candidate_integration.py` — suppression check
+- `scripts/operations-center.sh` — spec watch role + watch-all wiring
 
 ---
 
 ### Task 1: Foundation models
 
 **Files:**
-- Create: `src/control_plane/spec_director/__init__.py`
-- Create: `src/control_plane/spec_director/models.py`
+- Create: `src/operations_center/spec_director/__init__.py`
+- Create: `src/operations_center/spec_director/models.py`
 - Create: `tests/spec_director/__init__.py`
 - Create: `tests/spec_director/test_models.py`
 
@@ -65,7 +65,7 @@
 # tests/spec_director/test_models.py
 from __future__ import annotations
 import pytest
-from control_plane.spec_director.models import (
+from operations_center.spec_director.models import (
     CampaignRecord, ActiveCampaigns, ComplianceInput, ComplianceVerdict,
     SpecFrontMatter, TriggerSource,
 )
@@ -140,20 +140,20 @@ def test_trigger_source_values():
 - [ ] **Step 2: Run tests to confirm they fail**
 
 ```bash
-cd /home/dev/Documents/GitHub/ControlPlane
+cd /home/dev/Documents/GitHub/OperationsCenter
 .venv/bin/pytest tests/spec_director/test_models.py -v 2>&1 | head -20
 ```
 
-Expected: `ModuleNotFoundError: No module named 'control_plane.spec_director'`
+Expected: `ModuleNotFoundError: No module named 'operations_center.spec_director'`
 
 - [ ] **Step 3: Create the package and models**
 
 ```python
-# src/control_plane/spec_director/__init__.py
+# src/operations_center/spec_director/__init__.py
 ```
 
 ```python
-# src/control_plane/spec_director/models.py
+# src/operations_center/spec_director/models.py
 from __future__ import annotations
 
 from enum import Enum
@@ -244,7 +244,7 @@ Expected: 5 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/__init__.py src/control_plane/spec_director/models.py \
+git add src/operations_center/spec_director/__init__.py src/operations_center/spec_director/models.py \
         tests/spec_director/__init__.py tests/spec_director/test_models.py
 git commit -m "feat(spec-director): add foundation models"
 ```
@@ -254,7 +254,7 @@ git commit -m "feat(spec-director): add foundation models"
 ### Task 2: Config schema
 
 **Files:**
-- Modify: `src/control_plane/config/settings.py`
+- Modify: `src/operations_center/config/settings.py`
 
 - [ ] **Step 1: Write failing test**
 
@@ -262,7 +262,7 @@ git commit -m "feat(spec-director): add foundation models"
 # append to tests/spec_director/test_models.py
 
 def test_spec_director_settings_defaults():
-    from control_plane.config.settings import SpecDirectorSettings
+    from operations_center.config.settings import SpecDirectorSettings
     s = SpecDirectorSettings()
     assert s.enabled is True
     assert s.poll_interval_seconds == 120
@@ -286,7 +286,7 @@ Expected: `ImportError: cannot import name 'SpecDirectorSettings'`
 
 - [ ] **Step 3: Add SpecDirectorSettings to settings.py**
 
-Open `src/control_plane/config/settings.py`. Add this class after `ErrorIngestSettings`:
+Open `src/operations_center/config/settings.py`. Add this class after `ErrorIngestSettings`:
 
 ```python
 class SpecDirectorSettings(BaseModel):
@@ -324,7 +324,7 @@ Expected: 6 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/config/settings.py tests/spec_director/test_models.py
+git add src/operations_center/config/settings.py tests/spec_director/test_models.py
 git commit -m "feat(spec-director): add SpecDirectorSettings config schema"
 ```
 
@@ -333,10 +333,10 @@ git commit -m "feat(spec-director): add SpecDirectorSettings config schema"
 ### Task 3: Extend ExecutionMode and KodoAdapter kodo_mode
 
 **Files:**
-- Modify: `src/control_plane/domain/models.py`
-- Modify: `src/control_plane/application/task_parser.py`
-- Modify: `src/control_plane/adapters/kodo/adapter.py`
-- Modify: `src/control_plane/application/service.py`
+- Modify: `src/operations_center/domain/models.py`
+- Modify: `src/operations_center/application/task_parser.py`
+- Modify: `src/operations_center/adapters/kodo/adapter.py`
+- Modify: `src/operations_center/application/service.py`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -345,7 +345,7 @@ git commit -m "feat(spec-director): add SpecDirectorSettings config schema"
 # Check existing file first: ls tests/test_execution_modes.py
 
 def test_task_parser_accepts_test_campaign():
-    from control_plane.application.task_parser import TaskParser
+    from operations_center.application.task_parser import TaskParser
     p = TaskParser()
     body = """## Execution
 repo: MyRepo
@@ -364,8 +364,8 @@ Run adversarial tests against the new auth layer.
 
 def test_kodo_adapter_build_command_test_mode():
     from pathlib import Path
-    from control_plane.adapters.kodo.adapter import KodoAdapter
-    from control_plane.config.settings import KodoSettings
+    from operations_center.adapters.kodo.adapter import KodoAdapter
+    from operations_center.config.settings import KodoSettings
     adapter = KodoAdapter(KodoSettings(binary="kodo", team="full", cycles=3,
                                        exchanges=20, orchestrator="claude", effort="standard",
                                        timeout_seconds=600))
@@ -376,8 +376,8 @@ def test_kodo_adapter_build_command_test_mode():
 
 def test_kodo_adapter_build_command_improve_mode():
     from pathlib import Path
-    from control_plane.adapters.kodo.adapter import KodoAdapter
-    from control_plane.config.settings import KodoSettings
+    from operations_center.adapters.kodo.adapter import KodoAdapter
+    from operations_center.config.settings import KodoSettings
     adapter = KodoAdapter(KodoSettings(binary="kodo", team="full", cycles=3,
                                        exchanges=20, orchestrator="claude", effort="standard",
                                        timeout_seconds=600))
@@ -388,8 +388,8 @@ def test_kodo_adapter_build_command_improve_mode():
 
 def test_kodo_adapter_build_command_goal_mode_unchanged():
     from pathlib import Path
-    from control_plane.adapters.kodo.adapter import KodoAdapter
-    from control_plane.config.settings import KodoSettings
+    from operations_center.adapters.kodo.adapter import KodoAdapter
+    from operations_center.config.settings import KodoSettings
     adapter = KodoAdapter(KodoSettings(binary="kodo", team="full", cycles=3,
                                        exchanges=20, orchestrator="claude", effort="standard",
                                        timeout_seconds=600))
@@ -420,7 +420,7 @@ ExecutionMode = Literal["goal", "fix_pr", "test_campaign", "improve_campaign"]
 
 - [ ] **Step 4: Extend TaskParser**
 
-In `src/control_plane/application/task_parser.py`, change:
+In `src/operations_center/application/task_parser.py`, change:
 ```python
     SUPPORTED_MODES = {"goal", "fix_pr"}
 ```
@@ -452,7 +452,7 @@ Also remove the mode validation error for unsupported modes (replace `raise Valu
 
 - [ ] **Step 5: Add kodo_mode to KodoAdapter.build_command**
 
-In `src/control_plane/adapters/kodo/adapter.py`, change `build_command` signature and body:
+In `src/operations_center/adapters/kodo/adapter.py`, change `build_command` signature and body:
 
 ```python
     def build_command(
@@ -540,7 +540,7 @@ Update `_run_with_claude_fallback` signature and internal `build_command` call t
 
 - [ ] **Step 6: Derive kodo_mode from execution_mode in service.py**
 
-In `src/control_plane/application/service.py`, find the `run_task` method (around line 131). Locate the first `kodo_result = self.kodo.run(goal_file, repo_path, ...)` call. Before it, add:
+In `src/operations_center/application/service.py`, find the `run_task` method (around line 131). Locate the first `kodo_result = self.kodo.run(goal_file, repo_path, ...)` call. Before it, add:
 
 ```python
             # Derive kodo mode from campaign task kinds
@@ -577,10 +577,10 @@ Expected: no regressions
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/control_plane/domain/models.py \
-        src/control_plane/application/task_parser.py \
-        src/control_plane/adapters/kodo/adapter.py \
-        src/control_plane/application/service.py \
+git add src/operations_center/domain/models.py \
+        src/operations_center/application/task_parser.py \
+        src/operations_center/adapters/kodo/adapter.py \
+        src/operations_center/application/service.py \
         tests/test_execution_modes.py
 git commit -m "feat(spec-director): extend ExecutionMode and add kodo_mode to adapter"
 ```
@@ -590,7 +590,7 @@ git commit -m "feat(spec-director): extend ExecutionMode and add kodo_mode to ad
 ### Task 4: Worker routing for test_campaign / improve_campaign
 
 **Files:**
-- Modify: `src/control_plane/entrypoints/worker/main.py`
+- Modify: `src/operations_center/entrypoints/worker/main.py`
 
 - [ ] **Step 1: Write failing test**
 
@@ -609,17 +609,17 @@ def _make_issue(task_kind: str, status: str = "Ready for AI") -> dict:
 
 
 def test_test_role_picks_test_campaign():
-    from control_plane.entrypoints.worker.main import ROLE_TASK_KINDS
+    from operations_center.entrypoints.worker.main import ROLE_TASK_KINDS
     assert "test_campaign" in ROLE_TASK_KINDS["test"]
 
 
 def test_improve_role_picks_improve_campaign():
-    from control_plane.entrypoints.worker.main import ROLE_TASK_KINDS
+    from operations_center.entrypoints.worker.main import ROLE_TASK_KINDS
     assert "improve_campaign" in ROLE_TASK_KINDS["improve"]
 
 
 def test_goal_role_does_not_pick_test_campaign():
-    from control_plane.entrypoints.worker.main import ROLE_TASK_KINDS
+    from operations_center.entrypoints.worker.main import ROLE_TASK_KINDS
     assert "test_campaign" not in ROLE_TASK_KINDS["goal"]
 ```
 
@@ -633,7 +633,7 @@ Expected: `ImportError: cannot import name 'ROLE_TASK_KINDS'`
 
 - [ ] **Step 3: Add ROLE_TASK_KINDS and update select_ready_task_id**
 
-In `src/control_plane/entrypoints/worker/main.py`, after the imports section (around line 50), add:
+In `src/operations_center/entrypoints/worker/main.py`, after the imports section (around line 50), add:
 
 ```python
 # Maps each watcher role to the set of task-kind label values it will claim.
@@ -681,7 +681,7 @@ Expected: routing tests pass, no regressions
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/entrypoints/worker/main.py tests/spec_director/test_worker_routing.py
+git add src/operations_center/entrypoints/worker/main.py tests/spec_director/test_worker_routing.py
 git commit -m "feat(spec-director): add ROLE_TASK_KINDS routing for test_campaign/improve_campaign"
 ```
 
@@ -690,7 +690,7 @@ git commit -m "feat(spec-director): add ROLE_TASK_KINDS routing for test_campaig
 ### Task 5: Campaign state manager
 
 **Files:**
-- Create: `src/control_plane/spec_director/state.py`
+- Create: `src/operations_center/spec_director/state.py`
 - Create: `tests/spec_director/test_state.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -701,18 +701,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import pytest
-from control_plane.spec_director.models import CampaignRecord, ActiveCampaigns
+from operations_center.spec_director.models import CampaignRecord, ActiveCampaigns
 
 
 def test_load_returns_empty_when_missing(tmp_path):
-    from control_plane.spec_director.state import CampaignStateManager
+    from operations_center.spec_director.state import CampaignStateManager
     mgr = CampaignStateManager(state_path=tmp_path / "active.json")
     ac = mgr.load()
     assert ac.campaigns == []
 
 
 def test_save_and_load_roundtrip(tmp_path):
-    from control_plane.spec_director.state import CampaignStateManager
+    from operations_center.spec_director.state import CampaignStateManager
     mgr = CampaignStateManager(state_path=tmp_path / "active.json")
     record = CampaignRecord(
         campaign_id="abc", slug="test", spec_file="docs/specs/test.md",
@@ -725,7 +725,7 @@ def test_save_and_load_roundtrip(tmp_path):
 
 
 def test_corrupt_file_returns_empty_and_renames(tmp_path):
-    from control_plane.spec_director.state import CampaignStateManager
+    from operations_center.spec_director.state import CampaignStateManager
     p = tmp_path / "active.json"
     p.write_text("not json {{{")
     mgr = CampaignStateManager(state_path=p)
@@ -736,7 +736,7 @@ def test_corrupt_file_returns_empty_and_renames(tmp_path):
 
 
 def test_mark_complete(tmp_path):
-    from control_plane.spec_director.state import CampaignStateManager
+    from operations_center.spec_director.state import CampaignStateManager
     mgr = CampaignStateManager(state_path=tmp_path / "active.json")
     record = CampaignRecord(
         campaign_id="abc", slug="test", spec_file="docs/specs/test.md",
@@ -757,7 +757,7 @@ def test_mark_complete(tmp_path):
 - [ ] **Step 3: Implement CampaignStateManager**
 
 ```python
-# src/control_plane/spec_director/state.py
+# src/operations_center/spec_director/state.py
 from __future__ import annotations
 
 import json
@@ -765,7 +765,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.spec_director.models import ActiveCampaigns, CampaignRecord
+from operations_center.spec_director.models import ActiveCampaigns, CampaignRecord
 
 _DEFAULT_STATE_PATH = Path("state/campaigns/active.json")
 logger = logging.getLogger(__name__)
@@ -835,7 +835,7 @@ class CampaignStateManager:
 
     def rebuild_from_specs(self, specs_dir: Path) -> ActiveCampaigns:
         """Rebuild active campaigns list by scanning spec front matter."""
-        from control_plane.spec_director.models import SpecFrontMatter
+        from operations_center.spec_director.models import SpecFrontMatter
         campaigns = []
         for spec_file in sorted(specs_dir.glob("*.md")):
             try:
@@ -867,7 +867,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/state.py tests/spec_director/test_state.py
+git add src/operations_center/spec_director/state.py tests/spec_director/test_state.py
 git commit -m "feat(spec-director): add CampaignStateManager"
 ```
 
@@ -876,9 +876,9 @@ git commit -m "feat(spec-director): add CampaignStateManager"
 ### Task 6: Suppressor + proposer integration
 
 **Files:**
-- Create: `src/control_plane/spec_director/suppressor.py`
+- Create: `src/operations_center/spec_director/suppressor.py`
 - Create: `tests/spec_director/test_suppressor.py`
-- Modify: `src/control_plane/proposer/candidate_integration.py`
+- Modify: `src/operations_center/proposer/candidate_integration.py`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -886,7 +886,7 @@ git commit -m "feat(spec-director): add CampaignStateManager"
 # tests/spec_director/test_suppressor.py
 from __future__ import annotations
 from pathlib import Path
-from control_plane.spec_director.models import ActiveCampaigns, CampaignRecord
+from operations_center.spec_director.models import ActiveCampaigns, CampaignRecord
 
 
 def _active(keywords: list[str]) -> ActiveCampaigns:
@@ -900,31 +900,31 @@ def _active(keywords: list[str]) -> ActiveCampaigns:
 
 
 def test_suppressed_by_path_keyword():
-    from control_plane.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.suppressor import is_suppressed
     ac = _active(["src/auth/"])
     assert is_suppressed("Fix auth login", ["src/auth/session.py"], ac) is True
 
 
 def test_suppressed_by_title_keyword():
-    from control_plane.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.suppressor import is_suppressed
     ac = _active(["authentication"])
     assert is_suppressed("Improve authentication flow", [], ac) is True
 
 
 def test_not_suppressed_unrelated():
-    from control_plane.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.suppressor import is_suppressed
     ac = _active(["src/auth/"])
     assert is_suppressed("Fix lint errors in src/reporting/", ["src/reporting/base.py"], ac) is False
 
 
 def test_not_suppressed_no_active_campaigns():
-    from control_plane.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.suppressor import is_suppressed
     ac = ActiveCampaigns(campaigns=[])
     assert is_suppressed("Fix anything", ["src/auth/x.py"], ac) is False
 
 
 def test_suppressed_case_insensitive():
-    from control_plane.spec_director.suppressor import is_suppressed
+    from operations_center.spec_director.suppressor import is_suppressed
     ac = _active(["Authentication"])
     assert is_suppressed("improve authentication handler", [], ac) is True
 ```
@@ -938,14 +938,14 @@ def test_suppressed_case_insensitive():
 - [ ] **Step 3: Implement suppressor**
 
 ```python
-# src/control_plane/spec_director/suppressor.py
+# src/operations_center/spec_director/suppressor.py
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-from control_plane.spec_director.models import ActiveCampaigns
-from control_plane.spec_director.state import CampaignStateManager
+from operations_center.spec_director.models import ActiveCampaigns
+from operations_center.spec_director.state import CampaignStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -984,12 +984,12 @@ def is_suppressed(
 
 - [ ] **Step 4: Add suppression check to candidate_integration.py**
 
-In `src/control_plane/proposer/candidate_integration.py`, find the `run` method of `CandidateProposerIntegrationService`. Locate the loop where proposals are created (look for `self.client.create_issue` or similar). Add a suppression check before the creation call:
+In `src/operations_center/proposer/candidate_integration.py`, find the `run` method of `CandidateProposerIntegrationService`. Locate the loop where proposals are created (look for `self.client.create_issue` or similar). Add a suppression check before the creation call:
 
 ```python
         # Spec-director suppression: skip proposals that overlap with an active campaign
-        from control_plane.spec_director.suppressor import is_suppressed as _spec_suppressed
-        from control_plane.spec_director.state import CampaignStateManager as _CampaignStateManager
+        from operations_center.spec_director.suppressor import is_suppressed as _spec_suppressed
+        from operations_center.spec_director.state import CampaignStateManager as _CampaignStateManager
         _active_campaigns = _CampaignStateManager().load()
 ```
 
@@ -1006,7 +1006,7 @@ Then in the per-candidate loop, before creating the Plane task, add:
                 continue
 ```
 
-(Adjust field names to match the actual `ProposalCandidate` model — check `src/control_plane/decision/models.py` for the exact field names.)
+(Adjust field names to match the actual `ProposalCandidate` model — check `src/operations_center/decision/models.py` for the exact field names.)
 
 - [ ] **Step 5: Run tests**
 
@@ -1020,9 +1020,9 @@ Expected: suppressor tests pass, no regressions
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/control_plane/spec_director/suppressor.py \
+git add src/operations_center/spec_director/suppressor.py \
         tests/spec_director/test_suppressor.py \
-        src/control_plane/proposer/candidate_integration.py
+        src/operations_center/proposer/candidate_integration.py
 git commit -m "feat(spec-director): add suppressor and proposer integration"
 ```
 
@@ -1031,7 +1031,7 @@ git commit -m "feat(spec-director): add suppressor and proposer integration"
 ### Task 7: Context bundle assembly
 
 **Files:**
-- Create: `src/control_plane/spec_director/context_bundle.py`
+- Create: `src/operations_center/spec_director/context_bundle.py`
 - Create: `tests/spec_director/test_context_bundle.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1045,7 +1045,7 @@ import pytest
 
 
 def test_bundle_truncates_snapshot(tmp_path):
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder
+    from operations_center.spec_director.context_bundle import ContextBundleBuilder
     snapshot_dir = tmp_path / "report" / "autonomy_cycle" / "run1"
     snapshot_dir.mkdir(parents=True)
     big_insights = {"derivers": ["x" * 1000] * 20}
@@ -1056,14 +1056,14 @@ def test_bundle_truncates_snapshot(tmp_path):
 
 
 def test_bundle_includes_seed():
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder, ContextBundle
+    from operations_center.spec_director.context_bundle import ContextBundleBuilder, ContextBundle
     builder = ContextBundleBuilder()
     bundle = builder.build(seed_text="add webhook ingestion", board_summary=[], specs_index=[], git_log="")
     assert "add webhook ingestion" in bundle.seed_text
 
 
 def test_specs_index_capped():
-    from control_plane.spec_director.context_bundle import ContextBundleBuilder
+    from operations_center.spec_director.context_bundle import ContextBundleBuilder
     builder = ContextBundleBuilder()
     index = [{"title": f"spec {i}", "status": "complete"} for i in range(100)]
     bundle = builder.build(seed_text="", board_summary=[], specs_index=index, git_log="")
@@ -1079,7 +1079,7 @@ def test_specs_index_capped():
 - [ ] **Step 3: Implement ContextBundleBuilder**
 
 ```python
-# src/control_plane/spec_director/context_bundle.py
+# src/operations_center/spec_director/context_bundle.py
 from __future__ import annotations
 
 import json
@@ -1158,7 +1158,7 @@ class ContextBundleBuilder:
     @staticmethod
     def collect_specs_index(specs_dir: Path) -> list[dict]:
         """Return [{title, status, slug}] for each spec in specs_dir."""
-        from control_plane.spec_director.models import SpecFrontMatter
+        from operations_center.spec_director.models import SpecFrontMatter
         index = []
         for p in sorted(specs_dir.glob("*.md")):
             if p.parent.name == "archive":
@@ -1182,7 +1182,7 @@ Expected: 3 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/context_bundle.py tests/spec_director/test_context_bundle.py
+git add src/operations_center/spec_director/context_bundle.py tests/spec_director/test_context_bundle.py
 git commit -m "feat(spec-director): add context bundle assembly"
 ```
 
@@ -1191,7 +1191,7 @@ git commit -m "feat(spec-director): add context bundle assembly"
 ### Task 8: Brainstorm service
 
 **Files:**
-- Create: `src/control_plane/spec_director/brainstorm.py`
+- Create: `src/operations_center/spec_director/brainstorm.py`
 - Create: `tests/spec_director/test_brainstorm.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1225,8 +1225,8 @@ Add HTTP webhook endpoint to receive events.
 
 
 def test_brainstorm_returns_spec_text_and_front_matter():
-    from control_plane.spec_director.brainstorm import BrainstormService
-    from control_plane.spec_director.context_bundle import ContextBundle
+    from operations_center.spec_director.brainstorm import BrainstormService
+    from operations_center.spec_director.context_bundle import ContextBundle
 
     mock_client = MagicMock()
     mock_message = MagicMock()
@@ -1251,8 +1251,8 @@ def test_brainstorm_returns_spec_text_and_front_matter():
 
 
 def test_brainstorm_raises_on_missing_front_matter():
-    from control_plane.spec_director.brainstorm import BrainstormService, BrainstormError
-    from control_plane.spec_director.context_bundle import ContextBundle
+    from operations_center.spec_director.brainstorm import BrainstormService, BrainstormError
+    from operations_center.spec_director.context_bundle import ContextBundle
 
     mock_client = MagicMock()
     mock_message = MagicMock()
@@ -1276,14 +1276,14 @@ def test_brainstorm_raises_on_missing_front_matter():
 - [ ] **Step 3: Implement BrainstormService**
 
 ```python
-# src/control_plane/spec_director/brainstorm.py
+# src/operations_center/spec_director/brainstorm.py
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
 
-from control_plane.spec_director.context_bundle import ContextBundle
-from control_plane.spec_director.models import SpecFrontMatter
+from operations_center.spec_director.context_bundle import ContextBundle
+from operations_center.spec_director.models import SpecFrontMatter
 
 _SYSTEM_PROMPT = """\
 You are a software architect for a Python repository. Given signals about the codebase's \
@@ -1407,7 +1407,7 @@ Expected: 2 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/brainstorm.py tests/spec_director/test_brainstorm.py
+git add src/operations_center/spec_director/brainstorm.py tests/spec_director/test_brainstorm.py
 git commit -m "feat(spec-director): add BrainstormService"
 ```
 
@@ -1416,7 +1416,7 @@ git commit -m "feat(spec-director): add BrainstormService"
 ### Task 9: Spec writer
 
 **Files:**
-- Create: `src/control_plane/spec_director/spec_writer.py`
+- Create: `src/operations_center/spec_director/spec_writer.py`
 - Create: `tests/spec_director/test_spec_writer.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1442,7 +1442,7 @@ created_at: 2026-04-15T00:00:00+00:00
 
 
 def test_writes_spec_to_canonical_path(tmp_path):
-    from control_plane.spec_director.spec_writer import SpecWriter
+    from operations_center.spec_director.spec_writer import SpecWriter
     writer = SpecWriter(specs_dir=tmp_path / "docs/specs")
     path = writer.write(slug="add-auth", spec_text=_SPEC)
     assert path.exists()
@@ -1451,7 +1451,7 @@ def test_writes_spec_to_canonical_path(tmp_path):
 
 
 def test_copies_to_workspace(tmp_path):
-    from control_plane.spec_director.spec_writer import SpecWriter
+    from operations_center.spec_director.spec_writer import SpecWriter
     writer = SpecWriter(specs_dir=tmp_path / "docs/specs")
     workspace = tmp_path / "workspace/MyRepo"
     workspace.mkdir(parents=True)
@@ -1462,7 +1462,7 @@ def test_copies_to_workspace(tmp_path):
 
 
 def test_archive_old_specs(tmp_path):
-    from control_plane.spec_director.spec_writer import SpecWriter
+    from operations_center.spec_director.spec_writer import SpecWriter
     from datetime import UTC, datetime, timedelta
     import time
     specs_dir = tmp_path / "docs/specs"
@@ -1496,7 +1496,7 @@ created_at: 2020-01-01T00:00:00+00:00
 - [ ] **Step 3: Implement SpecWriter**
 
 ```python
-# src/control_plane/spec_director/spec_writer.py
+# src/operations_center/spec_director/spec_writer.py
 from __future__ import annotations
 
 import logging
@@ -1504,7 +1504,7 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.spec_director.models import SpecFrontMatter
+from operations_center.spec_director.models import SpecFrontMatter
 
 _DEFAULT_SPECS_DIR = Path("docs/specs")
 logger = logging.getLogger(__name__)
@@ -1583,7 +1583,7 @@ Expected: 3 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/spec_writer.py tests/spec_director/test_spec_writer.py
+git add src/operations_center/spec_director/spec_writer.py tests/spec_director/test_spec_writer.py
 git commit -m "feat(spec-director): add SpecWriter"
 ```
 
@@ -1592,7 +1592,7 @@ git commit -m "feat(spec-director): add SpecWriter"
 ### Task 10: Campaign builder
 
 **Files:**
-- Create: `src/control_plane/spec_director/campaign_builder.py`
+- Create: `src/operations_center/spec_director/campaign_builder.py`
 - Create: `tests/spec_director/test_campaign_builder.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1639,7 +1639,7 @@ created_at: 2026-04-15T00:00:00+00:00
 
 
 def test_creates_parent_and_child_tasks():
-    from control_plane.spec_director.campaign_builder import CampaignBuilder
+    from operations_center.spec_director.campaign_builder import CampaignBuilder
     mock_client = MagicMock()
     mock_client.create_issue.return_value = {"id": "task-001"}
     builder = CampaignBuilder(client=mock_client, project_id="proj-1", max_tasks=6)
@@ -1649,7 +1649,7 @@ def test_creates_parent_and_child_tasks():
 
 
 def test_task_limit_enforced():
-    from control_plane.spec_director.campaign_builder import CampaignBuilder
+    from operations_center.spec_director.campaign_builder import CampaignBuilder
     mock_client = MagicMock()
     mock_client.create_issue.return_value = {"id": "task-001"}
     builder = CampaignBuilder(client=mock_client, project_id="proj-1", max_tasks=2)
@@ -1659,7 +1659,7 @@ def test_task_limit_enforced():
 
 
 def test_child_task_body_contains_campaign_id():
-    from control_plane.spec_director.campaign_builder import CampaignBuilder
+    from operations_center.spec_director.campaign_builder import CampaignBuilder
     created_bodies = []
 
     def capture_create(**kwargs):
@@ -1684,7 +1684,7 @@ def test_child_task_body_contains_campaign_id():
 - [ ] **Step 3: Implement CampaignBuilder**
 
 ```python
-# src/control_plane/spec_director/campaign_builder.py
+# src/operations_center/spec_director/campaign_builder.py
 from __future__ import annotations
 
 import logging
@@ -1692,7 +1692,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from control_plane.spec_director.models import SpecFrontMatter
+from operations_center.spec_director.models import SpecFrontMatter
 
 logger = logging.getLogger(__name__)
 
@@ -1874,7 +1874,7 @@ Expected: 3 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/campaign_builder.py tests/spec_director/test_campaign_builder.py
+git add src/operations_center/spec_director/campaign_builder.py tests/spec_director/test_campaign_builder.py
 git commit -m "feat(spec-director): add CampaignBuilder"
 ```
 
@@ -1883,7 +1883,7 @@ git commit -m "feat(spec-director): add CampaignBuilder"
 ### Task 11: Trigger detection
 
 **Files:**
-- Create: `src/control_plane/spec_director/trigger.py`
+- Create: `src/operations_center/spec_director/trigger.py`
 - Create: `tests/spec_director/test_trigger.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -1897,8 +1897,8 @@ import pytest
 
 
 def test_drop_file_trigger(tmp_path):
-    from control_plane.spec_director.trigger import TriggerDetector, TriggerResult
-    from control_plane.spec_director.models import TriggerSource
+    from operations_center.spec_director.trigger import TriggerDetector, TriggerResult
+    from operations_center.spec_director.models import TriggerSource
     drop = tmp_path / "spec_direction.md"
     drop.write_text("add webhook ingestion")
     detector = TriggerDetector(drop_file_path=drop, plane_spec_label="spec-request",
@@ -1910,7 +1910,7 @@ def test_drop_file_trigger(tmp_path):
 
 
 def test_drop_file_not_triggered_when_campaign_active(tmp_path):
-    from control_plane.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.trigger import TriggerDetector
     drop = tmp_path / "spec_direction.md"
     drop.write_text("something")
     detector = TriggerDetector(drop_file_path=drop, plane_spec_label="spec-request",
@@ -1920,8 +1920,8 @@ def test_drop_file_not_triggered_when_campaign_active(tmp_path):
 
 
 def test_queue_drain_trigger():
-    from control_plane.spec_director.trigger import TriggerDetector
-    from control_plane.spec_director.models import TriggerSource
+    from operations_center.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.models import TriggerSource
     detector = TriggerDetector(drop_file_path=Path("/nonexistent"), plane_spec_label="spec-request",
                                queue_threshold=3, client=MagicMock())
     result = detector.detect(ready_count=2, has_active_campaign=False)
@@ -1931,7 +1931,7 @@ def test_queue_drain_trigger():
 
 
 def test_no_trigger_when_queue_full():
-    from control_plane.spec_director.trigger import TriggerDetector
+    from operations_center.spec_director.trigger import TriggerDetector
     detector = TriggerDetector(drop_file_path=Path("/nonexistent"), plane_spec_label="spec-request",
                                queue_threshold=3, client=MagicMock())
     result = detector.detect(ready_count=5, has_active_campaign=False)
@@ -1947,14 +1947,14 @@ def test_no_trigger_when_queue_full():
 - [ ] **Step 3: Implement TriggerDetector**
 
 ```python
-# src/control_plane/spec_director/trigger.py
+# src/operations_center/spec_director/trigger.py
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from control_plane.spec_director.models import TriggerSource
+from operations_center.spec_director.models import TriggerSource
 
 logger = logging.getLogger(__name__)
 
@@ -2046,7 +2046,7 @@ Expected: 4 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/trigger.py tests/spec_director/test_trigger.py
+git add src/operations_center/spec_director/trigger.py tests/spec_director/test_trigger.py
 git commit -m "feat(spec-director): add TriggerDetector"
 ```
 
@@ -2055,7 +2055,7 @@ git commit -m "feat(spec-director): add TriggerDetector"
 ### Task 12: Compliance service
 
 **Files:**
-- Create: `src/control_plane/spec_director/compliance.py`
+- Create: `src/operations_center/spec_director/compliance.py`
 - Create: `tests/spec_director/test_compliance.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -2065,7 +2065,7 @@ git commit -m "feat(spec-director): add TriggerDetector"
 from __future__ import annotations
 from unittest.mock import MagicMock
 import pytest
-from control_plane.spec_director.models import ComplianceInput, ComplianceVerdict
+from operations_center.spec_director.models import ComplianceInput, ComplianceVerdict
 
 
 def _make_client(verdict_json: str):
@@ -2079,7 +2079,7 @@ def _make_client(verdict_json: str):
 
 
 def test_lgtm_verdict_parsed():
-    from control_plane.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.compliance import SpecComplianceService
     raw = '{"verdict": "LGTM", "spec_coverage": 0.95, "violations": [], "notes": "all good"}'
     service = SpecComplianceService(client=_make_client(raw), model="claude-sonnet-4-6")
     inp = ComplianceInput(
@@ -2096,7 +2096,7 @@ def test_lgtm_verdict_parsed():
 
 
 def test_api_failure_returns_concerns():
-    from control_plane.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.compliance import SpecComplianceService
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = Exception("network error")
     service = SpecComplianceService(client=mock_client, model="claude-sonnet-4-6", max_retries=1)
@@ -2110,7 +2110,7 @@ def test_api_failure_returns_concerns():
 
 
 def test_truncates_large_diff():
-    from control_plane.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.compliance import SpecComplianceService
     raw = '{"verdict": "LGTM", "spec_coverage": 0.8, "violations": [], "notes": "ok"}'
     service = SpecComplianceService(client=_make_client(raw), model="claude-sonnet-4-6",
                                     max_diff_kb=1)
@@ -2147,13 +2147,13 @@ def test_truncates_large_diff():
 - [ ] **Step 3: Implement SpecComplianceService**
 
 ```python
-# src/control_plane/spec_director/compliance.py
+# src/operations_center/spec_director/compliance.py
 from __future__ import annotations
 
 import json
 import logging
 
-from control_plane.spec_director.models import ComplianceInput, ComplianceVerdict
+from operations_center.spec_director.models import ComplianceInput, ComplianceVerdict
 
 logger = logging.getLogger(__name__)
 
@@ -2271,7 +2271,7 @@ Expected: 3 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/compliance.py tests/spec_director/test_compliance.py
+git add src/operations_center/spec_director/compliance.py tests/spec_director/test_compliance.py
 git commit -m "feat(spec-director): add SpecComplianceService"
 ```
 
@@ -2280,7 +2280,7 @@ git commit -m "feat(spec-director): add SpecComplianceService"
 ### Task 13: Reviewer watcher compliance branch
 
 **Files:**
-- Modify: `src/control_plane/entrypoints/reviewer/main.py`
+- Modify: `src/operations_center/entrypoints/reviewer/main.py`
 
 - [ ] **Step 1: Write failing test**
 
@@ -2323,9 +2323,9 @@ Add JWT middleware.
         "self_review_loops": 0,
     }
 
-    with patch("control_plane.entrypoints.reviewer.main._get_spec_campaign_id") as mock_get_id:
+    with patch("operations_center.entrypoints.reviewer.main._get_spec_campaign_id") as mock_get_id:
         mock_get_id.return_value = "abc-123"
-        with patch("control_plane.entrypoints.reviewer.main._run_spec_compliance") as mock_compliance:
+        with patch("operations_center.entrypoints.reviewer.main._run_spec_compliance") as mock_compliance:
             mock_compliance.return_value = "LGTM"
             # If _get_spec_campaign_id returns a value, compliance branch should fire.
             assert mock_get_id("task description") == "abc-123"
@@ -2333,7 +2333,7 @@ Add JWT middleware.
 
 - [ ] **Step 2: Add helper functions and compliance branch to reviewer/main.py**
 
-In `src/control_plane/entrypoints/reviewer/main.py`, add these two helpers near the top of the file (after imports):
+In `src/operations_center/entrypoints/reviewer/main.py`, add these two helpers near the top of the file (after imports):
 
 ```python
 def _get_spec_campaign_id(task_description: str) -> str | None:
@@ -2372,8 +2372,8 @@ def _run_spec_compliance(
     """Run SpecComplianceService and return verdict string: LGTM | CONCERNS | FAIL."""
     import logging
     from pathlib import Path
-    from control_plane.spec_director.compliance import SpecComplianceService
-    from control_plane.spec_director.models import ComplianceInput
+    from operations_center.spec_director.compliance import SpecComplianceService
+    from operations_center.spec_director.models import ComplianceInput
 
     spec_path = Path(spec_file)
     if not spec_path.exists():
@@ -2478,7 +2478,7 @@ Before it, insert:
 - [ ] **Step 3: Check that GitHubPRClient has get_pr_diff — add if missing**
 
 ```bash
-grep -n "get_pr_diff\|pr_diff\|diff" /home/dev/Documents/GitHub/ControlPlane/src/control_plane/adapters/github_pr.py | head -10
+grep -n "get_pr_diff\|pr_diff\|diff" /home/dev/Documents/GitHub/OperationsCenter/src/operations_center/adapters/github_pr.py | head -10
 ```
 
 If `get_pr_diff` is missing, add it to `GitHubPRClient`:
@@ -2507,8 +2507,8 @@ Expected: no regressions
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/entrypoints/reviewer/main.py \
-        src/control_plane/adapters/github_pr.py \
+git add src/operations_center/entrypoints/reviewer/main.py \
+        src/operations_center/adapters/github_pr.py \
         tests/spec_director/test_reviewer_compliance.py
 git commit -m "feat(spec-director): add compliance branch to reviewer watcher"
 ```
@@ -2518,7 +2518,7 @@ git commit -m "feat(spec-director): add compliance branch to reviewer watcher"
 ### Task 14: Recovery service
 
 **Files:**
-- Create: `src/control_plane/spec_director/recovery.py`
+- Create: `src/operations_center/spec_director/recovery.py`
 - Create: `tests/spec_director/test_recovery.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -2528,7 +2528,7 @@ git commit -m "feat(spec-director): add compliance branch to reviewer watcher"
 from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
-from control_plane.spec_director.models import CampaignRecord, ActiveCampaigns
+from operations_center.spec_director.models import CampaignRecord, ActiveCampaigns
 
 
 def _stalled_campaign(hours_ago: int = 30) -> CampaignRecord:
@@ -2541,7 +2541,7 @@ def _stalled_campaign(hours_ago: int = 30) -> CampaignRecord:
 
 
 def test_stall_detected_after_threshold():
-    from control_plane.spec_director.recovery import RecoveryService
+    from operations_center.spec_director.recovery import RecoveryService
     campaign = _stalled_campaign(hours_ago=30)
     service = RecoveryService(
         client=MagicMock(), state_manager=MagicMock(),
@@ -2551,7 +2551,7 @@ def test_stall_detected_after_threshold():
 
 
 def test_no_stall_when_recent_progress():
-    from control_plane.spec_director.recovery import RecoveryService
+    from operations_center.spec_director.recovery import RecoveryService
     campaign = _stalled_campaign(hours_ago=1)
     service = RecoveryService(
         client=MagicMock(), state_manager=MagicMock(),
@@ -2561,7 +2561,7 @@ def test_no_stall_when_recent_progress():
 
 
 def test_abandon_threshold_check():
-    from control_plane.spec_director.recovery import RecoveryService
+    from operations_center.spec_director.recovery import RecoveryService
     campaign = _stalled_campaign(hours_ago=80)
     service = RecoveryService(
         client=MagicMock(), state_manager=MagicMock(),
@@ -2571,7 +2571,7 @@ def test_abandon_threshold_check():
 
 
 def test_spec_revision_within_budget():
-    from control_plane.spec_director.recovery import RecoveryService
+    from operations_center.spec_director.recovery import RecoveryService
     campaign = _stalled_campaign(hours_ago=1)
     campaign.spec_revision_count = 2
     state_mgr = MagicMock()
@@ -2584,7 +2584,7 @@ def test_spec_revision_within_budget():
 
 
 def test_spec_revision_exhausted():
-    from control_plane.spec_director.recovery import RecoveryService
+    from operations_center.spec_director.recovery import RecoveryService
     campaign = _stalled_campaign(hours_ago=1)
     campaign.spec_revision_count = 3
     service = RecoveryService(
@@ -2603,7 +2603,7 @@ def test_spec_revision_exhausted():
 - [ ] **Step 3: Implement RecoveryService**
 
 ```python
-# src/control_plane/spec_director/recovery.py
+# src/operations_center/spec_director/recovery.py
 from __future__ import annotations
 
 import json
@@ -2611,8 +2611,8 @@ import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from control_plane.spec_director.models import CampaignRecord, ComplianceVerdict
-from control_plane.spec_director.state import CampaignStateManager
+from operations_center.spec_director.models import CampaignRecord, ComplianceVerdict
+from operations_center.spec_director.state import CampaignStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -2751,7 +2751,7 @@ Expected: 5 passed
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/control_plane/spec_director/recovery.py tests/spec_director/test_recovery.py
+git add src/operations_center/spec_director/recovery.py tests/spec_director/test_recovery.py
 git commit -m "feat(spec-director): add RecoveryService"
 ```
 
@@ -2760,17 +2760,17 @@ git commit -m "feat(spec-director): add RecoveryService"
 ### Task 15: Spec director polling loop
 
 **Files:**
-- Create: `src/control_plane/entrypoints/spec_director/__init__.py`
-- Create: `src/control_plane/entrypoints/spec_director/main.py`
+- Create: `src/operations_center/entrypoints/spec_director/__init__.py`
+- Create: `src/operations_center/entrypoints/spec_director/main.py`
 
 - [ ] **Step 1: Create the entrypoint**
 
 ```python
-# src/control_plane/entrypoints/spec_director/__init__.py
+# src/operations_center/entrypoints/spec_director/__init__.py
 ```
 
 ```python
-# src/control_plane/entrypoints/spec_director/main.py
+# src/operations_center/entrypoints/spec_director/main.py
 from __future__ import annotations
 
 import argparse
@@ -2781,18 +2781,18 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from control_plane.adapters.plane import PlaneClient
-from control_plane.config import load_settings
-from control_plane.execution.usage_store import _check_disk_space
-from control_plane.spec_director.brainstorm import BrainstormService
-from control_plane.spec_director.campaign_builder import CampaignBuilder
-from control_plane.spec_director.compliance import SpecComplianceService
-from control_plane.spec_director.context_bundle import ContextBundleBuilder
-from control_plane.spec_director.models import CampaignRecord
-from control_plane.spec_director.recovery import RecoveryService
-from control_plane.spec_director.spec_writer import SpecWriter
-from control_plane.spec_director.state import CampaignStateManager
-from control_plane.spec_director.trigger import TriggerDetector
+from operations_center.adapters.plane import PlaneClient
+from operations_center.config import load_settings
+from operations_center.execution.usage_store import _check_disk_space
+from operations_center.spec_director.brainstorm import BrainstormService
+from operations_center.spec_director.campaign_builder import CampaignBuilder
+from operations_center.spec_director.compliance import SpecComplianceService
+from operations_center.spec_director.context_bundle import ContextBundleBuilder
+from operations_center.spec_director.models import CampaignRecord
+from operations_center.spec_director.recovery import RecoveryService
+from operations_center.spec_director.spec_writer import SpecWriter
+from operations_center.spec_director.state import CampaignStateManager
+from operations_center.spec_director.trigger import TriggerDetector
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -2994,7 +2994,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: Smoke test the entrypoint parses**
 
 ```bash
-.venv/bin/python -c "import control_plane.entrypoints.spec_director.main; print('ok')"
+.venv/bin/python -c "import operations_center.entrypoints.spec_director.main; print('ok')"
 ```
 
 Expected: `ok`
@@ -3010,8 +3010,8 @@ Expected: all tests pass
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/control_plane/entrypoints/spec_director/__init__.py \
-        src/control_plane/entrypoints/spec_director/main.py
+git add src/operations_center/entrypoints/spec_director/__init__.py \
+        src/operations_center/entrypoints/spec_director/main.py
 git commit -m "feat(spec-director): add polling loop entrypoint"
 ```
 
@@ -3020,13 +3020,13 @@ git commit -m "feat(spec-director): add polling loop entrypoint"
 ### Task 16: Shell role and watch-all wiring
 
 **Files:**
-- Modify: `scripts/control-plane.sh`
+- Modify: `scripts/operations-center.sh`
 
 - [ ] **Step 1: Read the current watch-all section**
 
 ```bash
 grep -n "start_watch_role\|watch-all\|watch_all\|role goal\|role test\|role improve\|role propose\|role review" \
-     /home/dev/Documents/GitHub/ControlPlane/scripts/control-plane.sh | head -30
+     /home/dev/Documents/GitHub/OperationsCenter/scripts/operations-center.sh | head -30
 ```
 
 - [ ] **Step 2: Add spec to all watch-role groups**
@@ -3047,7 +3047,7 @@ Do the same for `stop_watch_role`, `status_watch_role`, and the `poll_interval` 
 
 In the `poll_interval` case statement (around line 168), add:
 ```bash
-    spec) poll_interval="${CONTROL_PLANE_WATCH_INTERVAL_SPEC_SECONDS:-120}" ;;
+    spec) poll_interval="${OPERATIONS_CENTER_WATCH_INTERVAL_SPEC_SECONDS:-120}" ;;
 ```
 
 - [ ] **Step 4: Add the spec entrypoint dispatch**
@@ -3056,7 +3056,7 @@ Find where the `propose` role dispatches to its Python entrypoint. Add a paralle
 
 ```bash
   if [[ "${role}" == "spec" ]]; then
-    exec_with_log spec "${VENV_DIR}/bin/python" -m control_plane.entrypoints.spec_director.main \
+    exec_with_log spec "${VENV_DIR}/bin/python" -m operations_center.entrypoints.spec_director.main \
       --config "${CONFIG_PATH}"
     return
   fi
@@ -3067,7 +3067,7 @@ Find where the `propose` role dispatches to its Python entrypoint. Add a paralle
 - [ ] **Step 5: Verify the script is valid bash**
 
 ```bash
-bash -n /home/dev/Documents/GitHub/ControlPlane/scripts/control-plane.sh && echo "syntax ok"
+bash -n /home/dev/Documents/GitHub/OperationsCenter/scripts/operations-center.sh && echo "syntax ok"
 ```
 
 Expected: `syntax ok`
@@ -3097,8 +3097,8 @@ Expected: all tests pass
 - [ ] **Step 8: Commit**
 
 ```bash
-git add scripts/control-plane.sh docs/operator/runtime.md
-git commit -m "feat(spec-director): add spec watch role to control-plane.sh"
+git add scripts/operations-center.sh docs/operator/runtime.md
+git commit -m "feat(spec-director): add spec watch role to operations-center.sh"
 ```
 
 ---
@@ -3126,4 +3126,4 @@ git commit -m "feat(spec-director): add spec watch role to control-plane.sh"
 
 **Placeholder scan:** No TBD, TODO, or "similar to" references found. All code blocks are complete.
 
-**One gap found and fixed:** Task 6 in the file map says "Suppressor + proposer integration" but the proposer integration step says "Adjust field names to match the actual `ProposalCandidate` model — check `src/control_plane/decision/models.py` for the exact field names." The implementor must look up the exact field name (`title`, `goal_text`, etc.) before adding the suppression check. This is a one-line lookup, not a placeholder.
+**One gap found and fixed:** Task 6 in the file map says "Suppressor + proposer integration" but the proposer integration step says "Adjust field names to match the actual `ProposalCandidate` model — check `src/operations_center/decision/models.py` for the exact field names." The implementor must look up the exact field name (`title`, `goal_text`, etc.) before adding the suppression check. This is a one-line lookup, not a placeholder.

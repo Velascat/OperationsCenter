@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.common import ValidationSummary
-from control_plane.contracts.enums import ValidationStatus
-from control_plane.observability.validation import ValidationEvidence, normalize_validation
+from operations_center.contracts.common import ValidationSummary
+from operations_center.contracts.enums import ValidationStatus
+from operations_center.observability.validation import ValidationEvidence, normalize_validation
 
 
 def _summary(

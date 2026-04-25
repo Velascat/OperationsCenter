@@ -94,8 +94,8 @@ This is distinct from `ExecutionArtifactCollector`, which only aggregates overal
 
 Observer runs write retained artifacts under:
 
-- `tools/report/control_plane/observer/<run_id>/repo_state_snapshot.json`
-- `tools/report/control_plane/observer/<run_id>/repo_state_snapshot.md`
+- `tools/report/operations_center/observer/<run_id>/repo_state_snapshot.json`
+- `tools/report/operations_center/observer/<run_id>/repo_state_snapshot.md`
 
 The JSON snapshot is the primary machine-consumable contract for later passes.
 

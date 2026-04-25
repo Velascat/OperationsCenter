@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.contracts.enums import (
+from operations_center.contracts.enums import (
     ExecutionMode,
     Priority,
     RiskLevel,
     TaskType,
 )
-from control_plane.planning.models import PlanningContext
-from control_plane.planning.proposal_builder import (
+from operations_center.planning.models import PlanningContext
+from operations_center.planning.proposal_builder import (
     build_proposal,
     build_proposal_with_result,
 )

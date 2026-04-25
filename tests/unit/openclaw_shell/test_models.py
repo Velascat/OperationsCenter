@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.openclaw_shell.models import (
+from operations_center.openclaw_shell.models import (
     OperatorContext,
     ShellActionResult,
     ShellInspectionResult,

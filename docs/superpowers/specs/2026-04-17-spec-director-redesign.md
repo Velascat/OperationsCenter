@@ -58,7 +58,7 @@ This fixes implement-phase tasks getting stuck in Backlog. Test/improve-phase ta
 
 ## Section 2: Phase Orchestrator
 
-New file: `src/control_plane/spec_director/phase_orchestrator.py`
+New file: `src/operations_center/spec_director/phase_orchestrator.py`
 
 Runs at the top of every spec-director cycle before trigger detection.
 
@@ -117,7 +117,7 @@ class PhaseOrchestrator:
 
 ## Section 3: Trigger Detection (Rewrite)
 
-File: `src/control_plane/spec_director/trigger.py`
+File: `src/operations_center/spec_director/trigger.py`
 
 Two triggers in priority order. Checked only when no campaign is currently active.
 
@@ -138,7 +138,7 @@ Two triggers in priority order. Checked only when no campaign is currently activ
 
 ## Section 4: Context Bundle (Refactor)
 
-File: `src/control_plane/spec_director/context_bundle.py`
+File: `src/operations_center/spec_director/context_bundle.py`
 
 What Claude receives when brainstorming a new spec:
 
@@ -161,7 +161,7 @@ The brainstorm prompt includes the list of available repo keys so Claude can sco
 
 ## Section 5: Campaign State (Thin Index)
 
-File: `src/control_plane/spec_director/state.py`
+File: `src/operations_center/spec_director/state.py`
 
 Board is the ground truth for phase state, task counts, and task status. The local JSON becomes a thin index — only what cannot be efficiently derived from the board at poll time.
 
@@ -197,7 +197,7 @@ No phase tracking. No progress tracking. The phase orchestrator derives everythi
 
 ## Section 6: Recovery (Trim)
 
-File: `src/control_plane/spec_director/recovery.py`
+File: `src/operations_center/spec_director/recovery.py`
 
 **Remove `revise_spec()`** — it revised the spec to match violating code. This is backwards: if a task produces non-compliant code, the code is wrong, not the spec. Blocked task rewriting (section 2) is the correct resolution path.
 
@@ -218,7 +218,7 @@ class RecoveryService:
 
 ## Section 7: Main Loop (Rewrite)
 
-File: `src/control_plane/entrypoints/spec_director/main.py`
+File: `src/operations_center/entrypoints/spec_director/main.py`
 
 Cycle order:
 
@@ -237,7 +237,7 @@ Phase orchestration runs before trigger detection so a completing campaign relea
 
 ## Section 8: Brainstorm Prompt (Minor Improvement)
 
-File: `src/control_plane/spec_director/brainstorm.py`
+File: `src/operations_center/spec_director/brainstorm.py`
 
 Add available repos to the system prompt:
 

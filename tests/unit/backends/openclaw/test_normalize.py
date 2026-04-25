@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 import pytest
 
-from control_plane.backends.openclaw.models import OpenClawArtifactCapture, OpenClawRunCapture
-from control_plane.backends.openclaw.normalize import normalize
-from control_plane.contracts.enums import (
+from operations_center.backends.openclaw.models import OpenClawArtifactCapture, OpenClawRunCapture
+from operations_center.backends.openclaw.normalize import normalize
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,
@@ -167,11 +167,11 @@ def test_timeout_failure_category():
 def test_changed_files_from_git_diff(tmp_path):
     (tmp_path / "repo").mkdir()
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git"
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git"
     ) as mock_git:
         mock_git.return_value = [
             __import__(
-                "control_plane.contracts.common",
+                "operations_center.contracts.common",
                 fromlist=["ChangedFileRef"],
             ).ChangedFileRef(path="src/main.py", change_type="modified")
         ]
@@ -186,9 +186,9 @@ def test_changed_files_from_git_diff(tmp_path):
 def test_changed_files_source_set_to_git_diff(tmp_path):
     (tmp_path / "repo").mkdir()
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git"
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git"
     ) as mock_git:
-        from control_plane.contracts.common import ChangedFileRef
+        from operations_center.contracts.common import ChangedFileRef
         mock_git.return_value = [ChangedFileRef(path="src/a.py", change_type="modified")]
         capture = _capture()
         normalize(capture, proposal_id="p1", decision_id="d1",
@@ -200,9 +200,9 @@ def test_changed_files_source_set_to_git_diff(tmp_path):
 def test_result_preserves_git_diff_provenance(tmp_path):
     (tmp_path / "repo").mkdir()
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git"
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git"
     ) as mock_git:
-        from control_plane.contracts.common import ChangedFileRef
+        from operations_center.contracts.common import ChangedFileRef
         mock_git.return_value = [ChangedFileRef(path="src/a.py", change_type="modified")]
         capture = _capture()
         result = normalize(capture, proposal_id="p1", decision_id="d1", workspace_path=tmp_path / "repo")
@@ -220,7 +220,7 @@ def test_changed_files_from_event_stream_when_git_unavailable():
     files = [{"path": "src/main.py", "change_type": "modified"}]
     capture = _capture(reported_changed_files=files, changed_files_source="event_stream")
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git",
         return_value=None,
     ):
         result = normalize(capture, proposal_id="p1", decision_id="d1",
@@ -234,7 +234,7 @@ def test_changed_files_source_event_stream_after_git_fallback():
     files = [{"path": "src/a.py", "change_type": "added"}]
     capture = _capture(reported_changed_files=files)
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git",
         return_value=None,
     ):
         normalize(capture, proposal_id="p1", decision_id="d1",
@@ -247,7 +247,7 @@ def test_result_preserves_event_stream_provenance():
     files = [{"path": "src/a.py", "change_type": "added"}]
     capture = _capture(reported_changed_files=files)
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git",
         return_value=None,
     ):
         result = normalize(capture, proposal_id="p1", decision_id="d1",
@@ -261,7 +261,7 @@ def test_event_stream_change_type_preserved():
     files = [{"path": "src/b.py", "change_type": "deleted"}]
     capture = _capture(reported_changed_files=files)
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git",
         return_value=None,
     ):
         result = normalize(capture, proposal_id="p1", decision_id="d1",
@@ -304,10 +304,10 @@ def test_empty_workspace_path_sentinel_skips_git():
 def test_git_diff_takes_priority_over_event_stream():
     files = [{"path": "src/main.py", "change_type": "modified"}]
     capture = _capture(reported_changed_files=files)
-    from control_plane.contracts.common import ChangedFileRef
+    from operations_center.contracts.common import ChangedFileRef
     git_files = [ChangedFileRef(path="src/other.py", change_type="added")]
     with patch(
-        "control_plane.backends.openclaw.normalize._discover_changed_files_via_git",
+        "operations_center.backends.openclaw.normalize._discover_changed_files_via_git",
         return_value=git_files,
     ):
         result = normalize(capture, proposal_id="p1", decision_id="d1",

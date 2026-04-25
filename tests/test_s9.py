@@ -21,7 +21,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 def test_pipeline_trigger_snapshot_mtimes_detects_new_file(tmp_path: Path) -> None:
-    from control_plane.entrypoints.pipeline_trigger.main import _snapshot_mtimes, _has_changed
+    from operations_center.entrypoints.pipeline_trigger.main import _snapshot_mtimes, _has_changed
 
     f = tmp_path / "fetch_head"
     sources = [f]
@@ -42,7 +42,7 @@ def test_pipeline_trigger_snapshot_mtimes_detects_new_file(tmp_path: Path) -> No
 def test_pipeline_trigger_debounce_no_double_run(tmp_path: Path) -> None:
     """When elapsed < min_interval, has_changed returns list but no run should happen.
     We test the logic directly without spawning a subprocess."""
-    from control_plane.entrypoints.pipeline_trigger.main import _has_changed
+    from operations_center.entrypoints.pipeline_trigger.main import _has_changed
 
     snap_old = {"a": 1.0}
     snap_new = {"a": 2.0}
@@ -51,7 +51,7 @@ def test_pipeline_trigger_debounce_no_double_run(tmp_path: Path) -> None:
 
 
 def test_pipeline_trigger_no_change_when_same(tmp_path: Path) -> None:
-    from control_plane.entrypoints.pipeline_trigger.main import _has_changed
+    from operations_center.entrypoints.pipeline_trigger.main import _has_changed
 
     snap = {"a": 1.0, "b": 2.0}
     changed = _has_changed(snap, snap.copy())
@@ -63,9 +63,9 @@ def test_pipeline_trigger_no_change_when_same(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_noop_loop_deriver_no_insights_when_no_proposals(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.noop_loop import NoOpLoopDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
-    from control_plane.observer.models import (
+    from operations_center.insights.derivers.noop_loop import NoOpLoopDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
+    from operations_center.observer.models import (
         RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
         CheckSignal, DependencyDriftSignal, TodoSignal,
     )
@@ -93,9 +93,9 @@ def test_noop_loop_deriver_no_insights_when_no_proposals(tmp_path: Path) -> None
 
 
 def test_noop_loop_deriver_detects_cycling_family(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.noop_loop import NoOpLoopDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
-    from control_plane.observer.models import (
+    from operations_center.insights.derivers.noop_loop import NoOpLoopDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
+    from operations_center.observer.models import (
         RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
         CheckSignal, DependencyDriftSignal, TodoSignal,
     )
@@ -143,9 +143,9 @@ def test_noop_loop_deriver_detects_cycling_family(tmp_path: Path) -> None:
 
 
 def test_noop_loop_deriver_no_insight_when_family_has_merges(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.noop_loop import NoOpLoopDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
-    from control_plane.observer.models import (
+    from operations_center.insights.derivers.noop_loop import NoOpLoopDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
+    from operations_center.observer.models import (
         RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
         CheckSignal, DependencyDriftSignal, TodoSignal,
     )
@@ -197,7 +197,7 @@ def test_noop_loop_deriver_no_insight_when_family_has_merges(tmp_path: Path) -> 
 # ---------------------------------------------------------------------------
 
 def test_calibration_per_repo_segregation(tmp_path: Path) -> None:
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
 
     store = ConfidenceCalibrationStore(tmp_path / "cal.json")
 
@@ -217,7 +217,7 @@ def test_calibration_per_repo_segregation(tmp_path: Path) -> None:
 
 
 def test_calibration_global_aggregate_includes_all_repos(tmp_path: Path) -> None:
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
 
     store = ConfidenceCalibrationStore(tmp_path / "cal.json")
     for _ in range(_MIN_SAMPLE_SIZE):
@@ -231,7 +231,7 @@ def test_calibration_global_aggregate_includes_all_repos(tmp_path: Path) -> None
 
 
 def test_calibration_per_repo_report(tmp_path: Path) -> None:
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore, _MIN_SAMPLE_SIZE
 
     store = ConfidenceCalibrationStore(tmp_path / "cal.json")
     for _ in range(_MIN_SAMPLE_SIZE):
@@ -251,7 +251,7 @@ def test_calibration_per_repo_report(tmp_path: Path) -> None:
 
 def test_budget_calibration_penalty_not_applied_when_no_calibration_data(tmp_path: Path) -> None:
     """When no calibration data exists, no penalty should be applied."""
-    from control_plane.tuning.calibration import ConfidenceCalibrationStore
+    from operations_center.tuning.calibration import ConfidenceCalibrationStore
 
     store = ConfidenceCalibrationStore(tmp_path / "cal.json")
     rate = store.calibration_for("lint_fix", "high")
@@ -259,7 +259,7 @@ def test_budget_calibration_penalty_not_applied_when_no_calibration_data(tmp_pat
 
 
 def test_calibration_ratio_computation_for_low_performance() -> None:
-    from control_plane.tuning.calibration import _EXPECTED_RATES
+    from operations_center.tuning.calibration import _EXPECTED_RATES
 
     # For a "high" confidence family with 20% acceptance → ratio = 0.2 / 0.8 = 0.25 < 0.5
     acceptance_rate = 0.2
@@ -273,8 +273,8 @@ def test_calibration_ratio_computation_for_low_performance() -> None:
 # ---------------------------------------------------------------------------
 
 def test_coverage_signal_collector_reads_coverage_xml(tmp_path: Path) -> None:
-    from control_plane.observer.collectors.coverage_signal import CoverageSignalCollector
-    from control_plane.observer.service import ObserverContext
+    from operations_center.observer.collectors.coverage_signal import CoverageSignalCollector
+    from operations_center.observer.service import ObserverContext
 
     xml_content = """<?xml version="1.0" ?>
 <coverage line-rate="0.74" branch-rate="0.5" timestamp="1234567890">
@@ -304,8 +304,8 @@ def test_coverage_signal_collector_reads_coverage_xml(tmp_path: Path) -> None:
 
 
 def test_coverage_signal_collector_unavailable_when_no_files(tmp_path: Path) -> None:
-    from control_plane.observer.collectors.coverage_signal import CoverageSignalCollector
-    from control_plane.observer.service import ObserverContext
+    from operations_center.observer.collectors.coverage_signal import CoverageSignalCollector
+    from operations_center.observer.service import ObserverContext
 
     ctx = MagicMock(spec=ObserverContext)
     ctx.repo_path = tmp_path
@@ -317,9 +317,9 @@ def test_coverage_signal_collector_unavailable_when_no_files(tmp_path: Path) -> 
 
 
 def test_coverage_gap_deriver_emits_low_overall(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.coverage_gap import CoverageGapDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
-    from control_plane.observer.models import (
+    from operations_center.insights.derivers.coverage_gap import CoverageGapDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
+    from operations_center.observer.models import (
         CoverageSignal, RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
         CheckSignal, DependencyDriftSignal, TodoSignal,
     )
@@ -349,9 +349,9 @@ def test_coverage_gap_deriver_emits_low_overall(tmp_path: Path) -> None:
 
 
 def test_coverage_gap_deriver_no_insight_when_unavailable(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.coverage_gap import CoverageGapDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
-    from control_plane.observer.models import (
+    from operations_center.insights.derivers.coverage_gap import CoverageGapDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
+    from operations_center.observer.models import (
         CoverageSignal, RepoContextSnapshot, RepoSignalsSnapshot, RepoStateSnapshot,
         CheckSignal, DependencyDriftSignal, TodoSignal,
     )
@@ -380,7 +380,7 @@ def test_coverage_gap_deriver_no_insight_when_unavailable(tmp_path: Path) -> Non
 # ---------------------------------------------------------------------------
 
 def _make_snap_with_lint_file(tmp_path: Path, fpath: str, run_id: str) -> "RepoStateSnapshot":  # noqa: F821
-    from control_plane.observer.models import (
+    from operations_center.observer.models import (
         LintSignal, LintViolation, RepoContextSnapshot, RepoSignalsSnapshot,
         RepoStateSnapshot, CheckSignal, DependencyDriftSignal, TodoSignal,
     )
@@ -406,8 +406,8 @@ def _make_snap_with_lint_file(tmp_path: Path, fpath: str, run_id: str) -> "RepoS
 
 
 def test_theme_aggregation_detects_lint_cluster(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.theme_aggregation import ThemeAggregationDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
+    from operations_center.insights.derivers.theme_aggregation import ThemeAggregationDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
 
     normalizer = InsightNormalizer()
     deriver = ThemeAggregationDeriver(normalizer, min_appearances=3)
@@ -424,8 +424,8 @@ def test_theme_aggregation_detects_lint_cluster(tmp_path: Path) -> None:
 
 
 def test_theme_aggregation_no_cluster_below_threshold(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.theme_aggregation import ThemeAggregationDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
+    from operations_center.insights.derivers.theme_aggregation import ThemeAggregationDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
 
     normalizer = InsightNormalizer()
     deriver = ThemeAggregationDeriver(normalizer, min_appearances=5)
@@ -437,8 +437,8 @@ def test_theme_aggregation_no_cluster_below_threshold(tmp_path: Path) -> None:
 
 
 def test_theme_aggregation_no_cluster_for_single_snapshot(tmp_path: Path) -> None:
-    from control_plane.insights.derivers.theme_aggregation import ThemeAggregationDeriver
-    from control_plane.insights.normalizer import InsightNormalizer
+    from operations_center.insights.derivers.theme_aggregation import ThemeAggregationDeriver
+    from operations_center.insights.normalizer import InsightNormalizer
 
     normalizer = InsightNormalizer()
     deriver = ThemeAggregationDeriver(normalizer)

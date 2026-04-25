@@ -1,4 +1,4 @@
-from control_plane.application.scope_policy import ChangedFilePolicyChecker
+from operations_center.application.scope_policy import ChangedFilePolicyChecker
 
 
 def test_allowed_paths_accepts_in_scope_changes() -> None:

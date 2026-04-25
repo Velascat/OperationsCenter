@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from control_plane.backends import factory as backend_factory
+from operations_center.backends import factory as backend_factory
 
 
 def test_canonical_registry_does_not_thread_switchboard_proxy_transport(monkeypatch) -> None:

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from control_plane.backends.openclaw.invoke import (
+from operations_center.backends.openclaw.invoke import (
     OpenClawBackendInvoker,
     OpenClawRunResult,
     OpenClawRunner,
     StubOpenClawRunner,
 )
-from control_plane.backends.openclaw.models import (
+from operations_center.backends.openclaw.models import (
     OpenClawPreparedRun,
     OpenClawRunCapture,
 )

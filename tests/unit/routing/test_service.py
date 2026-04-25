@@ -5,12 +5,12 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from control_plane.contracts.enums import BackendName, LaneName
-from control_plane.contracts.proposal import TaskProposal
-from control_plane.contracts.routing import LaneDecision
-from control_plane.planning.models import PlanningContext, ProposalDecisionBundle
-from control_plane.routing.client import HttpLaneRoutingClient, StubLaneRoutingClient
-from control_plane.routing.service import PlanningService
+from operations_center.contracts.enums import BackendName, LaneName
+from operations_center.contracts.proposal import TaskProposal
+from operations_center.contracts.routing import LaneDecision
+from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
+from operations_center.routing.client import HttpLaneRoutingClient, StubLaneRoutingClient
+from operations_center.routing.service import PlanningService
 
 
 def _ctx(**kw) -> PlanningContext:

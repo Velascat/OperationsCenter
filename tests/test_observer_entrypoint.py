@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from control_plane.entrypoints.observer import main as observer_main
+from operations_center.entrypoints.observer import main as observer_main
 
 
 def write_config(tmp_path: Path) -> Path:
@@ -21,8 +21,8 @@ def write_config(tmp_path: Path) -> Path:
                 "git: {}",
                 "kodo: {}",
                 "repos:",
-                "  control-plane:",
-                "    clone_url: git@github.com:Velascat/ControlPlane.git",
+                "  operations-center:",
+                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
                 "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]

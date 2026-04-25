@@ -7,11 +7,11 @@ import json
 import httpx
 import pytest
 
-from control_plane.contracts.enums import BackendName, LaneName
-from control_plane.contracts.routing import LaneDecision
-from control_plane.planning.models import PlanningContext
-from control_plane.planning.proposal_builder import build_proposal
-from control_plane.routing.client import (
+from operations_center.contracts.enums import BackendName, LaneName
+from operations_center.contracts.routing import LaneDecision
+from operations_center.planning.models import PlanningContext
+from operations_center.planning.proposal_builder import build_proposal
+from operations_center.routing.client import (
     DEFAULT_SWITCHBOARD_URL,
     HttpLaneRoutingClient,
     LaneRoutingClient,
@@ -93,8 +93,8 @@ def test_http_client_serializes_canonical_proposal() -> None:
     assert seen["goal_text"] == "Fix lint errors in src/"
 
 
-def test_http_client_from_env_prefers_control_plane_specific_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CONTROL_PLANE_SWITCHBOARD_URL", "http://sb.internal:20401")
+def test_http_client_from_env_prefers_operations_center_specific_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_SWITCHBOARD_URL", "http://sb.internal:20401")
     client = HttpLaneRoutingClient.from_env()
     try:
         assert client.base_url == "http://sb.internal:20401"
@@ -103,7 +103,7 @@ def test_http_client_from_env_prefers_control_plane_specific_url(monkeypatch: py
 
 
 def test_http_client_from_env_falls_back_to_default_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("CONTROL_PLANE_SWITCHBOARD_URL", raising=False)
+    monkeypatch.delenv("OPERATIONS_CENTER_SWITCHBOARD_URL", raising=False)
     client = HttpLaneRoutingClient.from_env()
     try:
         assert client.base_url == DEFAULT_SWITCHBOARD_URL

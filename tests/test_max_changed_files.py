@@ -12,13 +12,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 
-from control_plane.decision.candidate_builder import CandidateSpec
-from control_plane.decision.models import ProposalOutline
-from control_plane.decision.policy import DecisionPolicy, DecisionPolicyConfig
-from control_plane.insights.derivers.lint_drift import LintDriftDeriver
-from control_plane.insights.derivers.type_health import TypeHealthDeriver
-from control_plane.insights.normalizer import InsightNormalizer
-from control_plane.observer.models import (
+from operations_center.decision.candidate_builder import CandidateSpec
+from operations_center.decision.models import ProposalOutline
+from operations_center.decision.policy import DecisionPolicy, DecisionPolicyConfig
+from operations_center.insights.derivers.lint_drift import LintDriftDeriver
+from operations_center.insights.derivers.type_health import TypeHealthDeriver
+from operations_center.insights.normalizer import InsightNormalizer
+from operations_center.observer.models import (
     LintSignal,
     LintViolation,
     RepoContextSnapshot,
@@ -271,7 +271,7 @@ def test_type_worsened_insight_includes_distinct_file_count() -> None:
 
 def test_lint_worsened_scope_guard_fires_via_rule_and_policy() -> None:
     """End-to-end: worsened lint insight with broad file scope → scope_too_broad suppression."""
-    from control_plane.decision.rules.lint_fix import LintFixRule
+    from operations_center.decision.rules.lint_fix import LintFixRule
 
     # Build a worsened insight with 35 distinct files (over the default 30 limit)
     current = _make_snapshot_with_count(lint_count=50, lint_distinct=35)
@@ -297,7 +297,7 @@ def test_lint_worsened_scope_guard_fires_via_rule_and_policy() -> None:
 
 def test_type_worsened_scope_guard_fires_via_rule_and_policy() -> None:
     """End-to-end: worsened type insight with broad file scope → scope_too_broad suppression."""
-    from control_plane.decision.rules.type_improvement import TypeImprovementRule
+    from operations_center.decision.rules.type_improvement import TypeImprovementRule
 
     current = _make_snapshot_with_count(type_count=40, type_distinct=32)
     prior = _make_snapshot_with_count(type_count=10, type_distinct=8)
@@ -322,7 +322,7 @@ def test_type_worsened_scope_guard_fires_via_rule_and_policy() -> None:
 
 def test_worsened_within_limit_passes_scope_guard() -> None:
     """Worsened candidate under the file limit is not suppressed by scope guard."""
-    from control_plane.decision.rules.lint_fix import LintFixRule
+    from operations_center.decision.rules.lint_fix import LintFixRule
 
     current = _make_snapshot_with_count(lint_count=25, lint_distinct=10)
     prior = _make_snapshot_with_count(lint_count=15, lint_distinct=8)

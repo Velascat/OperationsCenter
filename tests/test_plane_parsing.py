@@ -1,6 +1,6 @@
 import pytest
 
-from control_plane.application.task_parser import TaskParser
+from operations_center.application.task_parser import TaskParser
 
 
 def test_parser_extracts_execution_goal_constraints() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from control_plane.upstream_eval import (
+from operations_center.upstream_eval import (
     ArchitecturalImpactClass,
     DivergenceRiskClass,
     EvidenceStrength,

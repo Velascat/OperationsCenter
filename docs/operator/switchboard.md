@@ -1,22 +1,22 @@
 # SwitchBoard Configuration
 
-How ControlPlane locates SwitchBoard and what happens when it isn't available.
+How OperationsCenter locates SwitchBoard and what happens when it isn't available.
 
 ---
 
 ## Summary
 
-ControlPlane delegates all lane selection to SwitchBoard via HTTP.
+OperationsCenter delegates all lane selection to SwitchBoard via HTTP.
 
 ```text
-ControlPlane builds TaskProposal
+OperationsCenter builds TaskProposal
     ↓  POST /route
 SwitchBoard evaluates policy
     ↓  LaneDecision (JSON)
-ControlPlane validates and stores the decision
+OperationsCenter validates and stores the decision
 ```
 
-ControlPlane never chooses a lane itself. If SwitchBoard is unreachable, the
+OperationsCenter never chooses a lane itself. If SwitchBoard is unreachable, the
 request fails with a clear error.
 
 ---
@@ -40,29 +40,29 @@ SwitchBoard listens on port **20401** by default. This is set in WorkStation's
 
 | Variable | Default | Description |
 |---|---|---|
-| `CONTROL_PLANE_SWITCHBOARD_URL` | `http://localhost:20401` | Full base URL for the SwitchBoard service |
+| `OPERATIONS_CENTER_SWITCHBOARD_URL` | `http://localhost:20401` | Full base URL for the SwitchBoard service |
 
 Set this in your shell or in WorkStation's `.env` file:
 
 ```bash
-CONTROL_PLANE_SWITCHBOARD_URL=http://localhost:20401
+OPERATIONS_CENTER_SWITCHBOARD_URL=http://localhost:20401
 ```
 
 To point at a remote SwitchBoard instance:
 
 ```bash
-CONTROL_PLANE_SWITCHBOARD_URL=http://switchboard.internal:20401
+OPERATIONS_CENTER_SWITCHBOARD_URL=http://switchboard.internal:20401
 ```
 
 ---
 
-## How ControlPlane Reads the URL
+## How OperationsCenter Reads the URL
 
-`HttpLaneRoutingClient.from_env()` reads `CONTROL_PLANE_SWITCHBOARD_URL` and
+`HttpLaneRoutingClient.from_env()` reads `OPERATIONS_CENTER_SWITCHBOARD_URL` and
 falls back to the default if the variable is not set:
 
 ```python
-from control_plane.routing import HttpLaneRoutingClient
+from operations_center.routing import HttpLaneRoutingClient
 
 client = HttpLaneRoutingClient.from_env()
 ```
@@ -70,7 +70,7 @@ client = HttpLaneRoutingClient.from_env()
 `PlanningService.default()` uses `HttpLaneRoutingClient.from_env()` internally:
 
 ```python
-from control_plane.routing import PlanningService
+from operations_center.routing import PlanningService
 
 service = PlanningService.default()
 bundle = service.plan(context)
@@ -86,15 +86,15 @@ raises `SwitchBoardUnavailableError` with an actionable message:
 
 ```
 SwitchBoardUnavailableError: SwitchBoard unreachable at http://localhost:20401.
-Set CONTROL_PLANE_SWITCHBOARD_URL or start the SwitchBoard service.
+Set OPERATIONS_CENTER_SWITCHBOARD_URL or start the SwitchBoard service.
 Cause: <original httpx error>
 ```
 
-ControlPlane does **not** fall back to a default lane. The caller must handle
+OperationsCenter does **not** fall back to a default lane. The caller must handle
 or propagate the error.
 
 ```python
-from control_plane.routing import SwitchBoardUnavailableError
+from operations_center.routing import SwitchBoardUnavailableError
 
 try:
     bundle = service.plan(context)
@@ -126,10 +126,10 @@ if SwitchBoard is not reachable, so they are safe to include in full test runs.
 
 ## Startup Dependency
 
-SwitchBoard must be running before ControlPlane can route any proposal.
+SwitchBoard must be running before OperationsCenter can route any proposal.
 
 WorkStation's `scripts/up.sh` starts SwitchBoard and waits for it to become
-healthy before returning. If you start ControlPlane independently, ensure
+healthy before returning. If you start OperationsCenter independently, ensure
 SwitchBoard is healthy first:
 
 ```bash

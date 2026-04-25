@@ -8,14 +8,14 @@ from typing import Optional
 
 import pytest
 
-from control_plane.contracts.common import ChangedFileRef, ValidationSummary
-from control_plane.contracts.enums import (
+from operations_center.contracts.common import ChangedFileRef, ValidationSummary
+from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
     FailureReasonCategory,
     ValidationStatus,
 )
-from control_plane.contracts.execution import ExecutionArtifact, ExecutionResult
+from operations_center.contracts.execution import ExecutionArtifact, ExecutionResult
 
 
 def _ts() -> datetime:
