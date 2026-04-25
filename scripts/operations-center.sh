@@ -125,6 +125,7 @@ Usage:
   scripts/operations-center.sh watch-all
   scripts/operations-center.sh watch-all-stop
   scripts/operations-center.sh watch-all-status
+  scripts/operations-center.sh intake [--once]
   scripts/operations-center.sh status [--repo REPO,REPO]
   scripts/operations-center.sh watchdog
   scripts/operations-center.sh dev-status
@@ -203,7 +204,26 @@ start_watch_role() {
   # the PID file before killing the Python child, so the wrapper exits cleanly on the
   # next check rather than looping.  Any Python exit (including code 0) is treated as
   # a crash and triggers a restart with a 30-second backoff.
-  if [[ "${role}" == "review" ]]; then
+  if [[ "${role}" == "intake" ]]; then
+    setsid /bin/bash -lc "
+      cd '${ROOT_DIR}'
+      set -a
+      source '${ENV_PATH}'
+      set +a
+      _child_pid=''
+      trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
+      while true; do
+        '${VENV_DIR}/bin/python' -m operations_center.entrypoints.intake.main \
+          --config '${CONFIG_PATH}' &
+        _child_pid=\$!
+        wait \$_child_pid
+        _exit=\$?
+        [[ ! -f '${pid_file}' ]] && exit 0
+        echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"${role}\\\",\\\"exit_code\\\":\$_exit}\"
+        sleep 30
+      done
+    " >>"${log_file}" 2>&1 < /dev/null &
+  elif [[ "${role}" == "review" ]]; then
     setsid /bin/bash -lc "
       cd '${ROOT_DIR}'
       set -a
@@ -316,7 +336,7 @@ start_watchdog() {
     set -a
     source '${ENV_PATH}'
     set +a
-    _ROLES='goal test improve propose review spec'
+    _ROLES='goal test improve propose review spec intake'
     while [[ -f '${pid_file}' ]]; do
       sleep 120
       [[ ! -f '${pid_file}' ]] && break
@@ -443,6 +463,7 @@ case "${cmd}" in
     load_env_file
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
+    start_watch_role intake
     start_watch_role goal
     start_watch_role test
     start_watch_role improve
@@ -455,6 +476,7 @@ case "${cmd}" in
   dev-down)
     load_env_file
     stop_watchdog
+    stop_watch_role intake
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -469,6 +491,7 @@ case "${cmd}" in
     # Stop watchdog first so it doesn't revive roles during drain.
     stop_watchdog
     # Stop watchers from claiming new tasks.
+    stop_watch_role intake
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -513,6 +536,7 @@ PYEOF
   dev-restart)
     load_env_file
     stop_watchdog
+    stop_watch_role intake
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -523,6 +547,7 @@ PYEOF
     ensure_venv
     run_with_log plane-up "${PLANE_MANAGER}" up
     maybe_open_browser
+    start_watch_role intake
     start_watch_role goal
     start_watch_role test
     start_watch_role improve
@@ -535,6 +560,7 @@ PYEOF
   dev-status)
     load_env_file
     run_with_log plane-status "${PLANE_MANAGER}" status || true
+    status_watch_role intake
     status_watch_role goal
     status_watch_role test
     status_watch_role improve
@@ -602,6 +628,7 @@ PYEOF
   watch-all)
     ensure_venv
     load_env_file
+    start_watch_role intake
     start_watch_role goal
     start_watch_role test
     start_watch_role improve
@@ -612,6 +639,7 @@ PYEOF
     ;;
   watch-all-stop)
     stop_watchdog
+    stop_watch_role intake
     stop_watch_role goal
     stop_watch_role test
     stop_watch_role improve
@@ -620,6 +648,7 @@ PYEOF
     stop_watch_role spec
     ;;
   watch-all-status)
+    status_watch_role intake
     status_watch_role goal
     status_watch_role test
     status_watch_role improve
@@ -697,6 +726,12 @@ PYEOF
     ensure_venv
     load_env_file
     run_with_log dependency-check "${VENV_DIR}/bin/python" -m operations_center.entrypoints.maintenance.dependency_check --config "${CONFIG_PATH}" "$@"
+    ;;
+  intake)
+    ensure_venv
+    load_env_file
+    run_with_log intake "${VENV_DIR}/bin/python" -m operations_center.entrypoints.intake.main \
+      --config "${CONFIG_PATH}" "$@"
     ;;
   janitor)
     echo "Janitor complete. Retention window: ${JANITOR_MAX_AGE_DAYS} day(s)"
