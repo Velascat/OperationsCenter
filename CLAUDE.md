@@ -1,13 +1,13 @@
 <!-- console-context -->
-## OperatorConsole Briefing
+## OperatorConsole Context
 
-At the start of each session, read the compiled briefing before acting:
+At the start of each session, read the compiled context before acting:
 
 - `.console/.context` — compiled startup context (generated fresh each launch)
 
 The context file contains your current task, guidelines, backlog, log, and runtime context.
 
-**Source files** (editable truth — update these, not the briefing):
+**Source files** (editable truth — update these, not the context file):
 
 | File | Role |
 |------|------|
@@ -17,4 +17,4 @@ The context file contains your current task, guidelines, backlog, log, and runti
 | `.console/log.md` | Recent decisions, stop points, what changed and why |
 
 After meaningful progress, update `.console/backlog.md` and `.console/log.md`.
-Do not edit `.console/.context` directly — it is overwritten at each launch.
+Do not edit `.console/.context` directly — it is regenerated at each launch.
