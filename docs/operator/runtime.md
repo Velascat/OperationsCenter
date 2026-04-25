@@ -105,7 +105,7 @@ On the first cycle of each run, watchers perform two cleanup passes before polli
 
 1. **Stale running task reconciliation** — tasks that have been in `Running` state for more than 15 minutes are re-queued to `Ready for AI`. This is a shorter TTL than the normal 120-minute running timeout and is intentional: if the system just restarted, tasks that were running against now-dead workers should be re-claimed quickly. The short TTL only applies on cycle 1.
 
-2. **Orphaned workspace cleanup** — `/tmp/cp-task-*` directories not referenced by any live process are deleted. These accumulate when kodo workers are killed mid-run (OOM, SIGKILL, power cycle). Deleted paths are logged as `watch_cleanup_orphaned_workspaces`.
+2. **Orphaned workspace cleanup** — `/tmp/oc-task-*` directories not referenced by any live process are deleted. These accumulate when kodo workers are killed mid-run (OOM, SIGKILL, power cycle). Deleted paths are logged as `watch_cleanup_orphaned_workspaces`.
 
 Periodic orphan cleanup also runs automatically every 20 cycles for goal, test, and improve watchers — no operator action required.
 

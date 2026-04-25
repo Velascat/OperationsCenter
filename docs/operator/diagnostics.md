@@ -351,7 +351,7 @@ HMAC-SHA256 signature validation (`X-Hub-Signature-256` header) is enforced when
 
 ## Stray Artifact Isolation
 
-Self-review verdict files must land inside the task's ephemeral workspace (`/tmp/cp-task-<id>/`), not in `$HOME` or the repo root. The prompt uses an absolute path and the supervisor starts each watcher with `cd <ROOT_DIR>` so relative paths in the worker process resolve correctly.
+Self-review verdict files must land inside the task's ephemeral workspace (`/tmp/oc-task-<id>/`), not in `$HOME` or the repo root. The prompt uses an absolute path and the supervisor starts each watcher with `cd <ROOT_DIR>` so relative paths in the worker process resolve correctly.
 
 If you find `.review/` directories or `*_verdict.txt` files in unexpected locations (`$HOME`, bare `/home/dev/repo/`, unrelated repo clones), they are leftovers from before this fix. You can safely delete them:
 
@@ -396,7 +396,7 @@ The root cause of stray verdicts is either an old kodo run that predates the abs
 31. cross-repo patterns: look for `cross_repo/pattern_detected` in the latest insights artifact; consider org-wide fix tasks
 32. campaign status: run `campaign-status` CLI; check `state/campaigns.json` for stalled campaigns
 33. ci webhook triggers: check `state/ci_webhook_triggers/` for unprocessed trigger files
-34. orphaned workspaces: look for `watch_cleanup_orphaned_workspaces` at cycle 1 or every 20 cycles; leftover `/tmp/cp-task-*` dirs indicate prior worker crashes
+34. orphaned workspaces: look for `watch_cleanup_orphaned_workspaces` at cycle 1 or every 20 cycles; leftover `/tmp/oc-task-*` dirs indicate prior worker crashes
 
 For autonomy-layer inputs:
 
