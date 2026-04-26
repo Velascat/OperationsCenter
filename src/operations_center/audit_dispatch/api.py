@@ -122,6 +122,8 @@ def dispatch_managed_audit(
     ------
     RepoLockAlreadyHeldError
         If a concurrent audit is already dispatched for request.repo_id.
+        The lock is process-scoped (in-memory); it does not coordinate across
+        separate OS processes.
     AuditDispatchConfigError
         If the repo config, audit type, or command cannot be resolved.
         This indicates a programming or configuration error, not an operational

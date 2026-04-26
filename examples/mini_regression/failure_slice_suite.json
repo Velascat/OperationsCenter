@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "failure_evidence_suite",
+  "name": "Failure Evidence Regression Suite",
+  "description": "Validates that fixture packs harvested from partial or failed runs carry intact failure evidence: limitations present, manifests readable, metadata-only entries explained.",
+  "created_at": "2026-04-26T00:00:00Z",
+  "entries": [
+    {
+      "entry_id": "interrupted_run_failure_slice",
+      "fixture_pack_path": "tools/audit/fixtures/representative__Bucket_run999__minimal_failure__20260426_120000",
+      "replay_profile": "failure_slice",
+      "required": true,
+      "selected_fixture_artifact_ids": null,
+      "source_stage": null,
+      "artifact_kind": null,
+      "max_artifact_bytes": 10485760,
+      "fail_fast": false,
+      "metadata": {
+        "purpose": "verify failure limitations present in harvested failure pack"
+      }
+    },
+    {
+      "entry_id": "interrupted_run_metadata_only",
+      "fixture_pack_path": "tools/audit/fixtures/representative__Bucket_run999__minimal_failure__20260426_120000",
+      "replay_profile": "metadata_only_slice",
+      "required": true,
+      "selected_fixture_artifact_ids": null,
+      "source_stage": null,
+      "artifact_kind": null,
+      "max_artifact_bytes": 10485760,
+      "fail_fast": false,
+      "metadata": {
+        "purpose": "verify metadata-only entries carry copy_error or limitation"
+      }
+    },
+    {
+      "entry_id": "interrupted_run_integrity",
+      "fixture_pack_path": "tools/audit/fixtures/representative__Bucket_run999__minimal_failure__20260426_120000",
+      "replay_profile": "fixture_integrity",
+      "required": false,
+      "selected_fixture_artifact_ids": null,
+      "source_stage": null,
+      "artifact_kind": null,
+      "max_artifact_bytes": 10485760,
+      "fail_fast": false,
+      "metadata": {
+        "purpose": "optional — integrity cross-check on failure pack"
+      }
+    }
+  ],
+  "metadata": {
+    "owner": "ops-team",
+    "cadence": "after-incident-harvest"
+  }
+}

@@ -1,0 +1,353 @@
+{
+  "$defs": {
+    "ArtifactIndexSummary": {
+      "description": "High-level summary of a ManagedArtifactIndex.",
+      "properties": {
+        "total_artifacts": {
+          "title": "Total Artifacts",
+          "type": "integer"
+        },
+        "by_kind": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Kind",
+          "type": "object"
+        },
+        "by_location": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Location",
+          "type": "object"
+        },
+        "by_status": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Status",
+          "type": "object"
+        },
+        "singleton_count": {
+          "title": "Singleton Count",
+          "type": "integer"
+        },
+        "partial_count": {
+          "title": "Partial Count",
+          "type": "integer"
+        },
+        "excluded_path_count": {
+          "title": "Excluded Path Count",
+          "type": "integer"
+        },
+        "unresolved_path_count": {
+          "title": "Unresolved Path Count",
+          "type": "integer"
+        },
+        "missing_file_count": {
+          "title": "Missing File Count",
+          "type": "integer"
+        },
+        "machine_readable_count": {
+          "title": "Machine Readable Count",
+          "type": "integer"
+        },
+        "warnings_count": {
+          "title": "Warnings Count",
+          "type": "integer"
+        },
+        "errors_count": {
+          "title": "Errors Count",
+          "type": "integer"
+        },
+        "manifest_limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Manifest Limitations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_artifacts",
+        "by_kind",
+        "by_location",
+        "by_status",
+        "singleton_count",
+        "partial_count",
+        "excluded_path_count",
+        "unresolved_path_count",
+        "missing_file_count",
+        "machine_readable_count",
+        "warnings_count",
+        "errors_count",
+        "manifest_limitations"
+      ],
+      "title": "ArtifactIndexSummary",
+      "type": "object"
+    },
+    "FixtureArtifact": {
+      "description": "A single artifact entry within a fixture pack.\n\nPreserves full provenance back to its IndexedArtifact source.\n`copied=False` is valid when a file is missing, unresolved, oversized,\nor binary \u2014 the copy_error or limitation explains why.",
+      "properties": {
+        "fixture_artifact_id": {
+          "title": "Fixture Artifact Id",
+          "type": "string"
+        },
+        "source_artifact_id": {
+          "description": "ID of the source IndexedArtifact.",
+          "title": "Source Artifact Id",
+          "type": "string"
+        },
+        "artifact_kind": {
+          "title": "Artifact Kind",
+          "type": "string"
+        },
+        "source_stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source Stage"
+        },
+        "location": {
+          "title": "Location",
+          "type": "string"
+        },
+        "path_role": {
+          "title": "Path Role",
+          "type": "string"
+        },
+        "source_path": {
+          "description": "Original path from the manifest.",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "fixture_relative_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path relative to the fixture pack artifacts/ directory.",
+          "title": "Fixture Relative Path"
+        },
+        "content_type": {
+          "title": "Content Type",
+          "type": "string"
+        },
+        "checksum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checksum"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        },
+        "copied": {
+          "description": "True if the artifact file was copied into the pack.",
+          "title": "Copied",
+          "type": "boolean"
+        },
+        "copy_error": {
+          "default": "",
+          "description": "Reason the artifact was not copied.",
+          "title": "Copy Error",
+          "type": "string"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "source_artifact_id",
+        "artifact_kind",
+        "source_stage",
+        "location",
+        "path_role",
+        "source_path",
+        "content_type",
+        "copied"
+      ],
+      "title": "FixtureArtifact",
+      "type": "object"
+    },
+    "FixtureFindingReference": {
+      "description": "Evidence record linking a fixture pack to calibration findings.\n\nFinding references explain why artifacts were selected. They are\ndescriptive only \u2014 they must not be treated as executable policy.",
+      "properties": {
+        "source_finding_id": {
+          "title": "Source Finding Id",
+          "type": "string"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "source_finding_id",
+        "severity",
+        "category",
+        "summary"
+      ],
+      "title": "FixtureFindingReference",
+      "type": "object"
+    },
+    "HarvestProfile": {
+      "description": "Explicit selection strategy for a fixture pack.",
+      "enum": [
+        "minimal_failure",
+        "partial_run",
+        "artifact_health",
+        "producer_compliance",
+        "stage_slice",
+        "full_manifest_snapshot",
+        "manual_selection"
+      ],
+      "title": "HarvestProfile",
+      "type": "string"
+    }
+  },
+  "description": "Phase 9 fixture pack written by harvest_fixtures(). Produced by OpsCenter, consumed by Phase 10 slice replay and Phase 11 mini regression.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "fixture_pack_id": {
+      "description": "Stable, path-safe identifier. Format: {repo_id}__{run_id}__{profile}__{ts}.",
+      "title": "Fixture Pack Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "created_by": {
+      "default": "operations-center",
+      "title": "Created By",
+      "type": "string"
+    },
+    "source_repo_id": {
+      "title": "Source Repo Id",
+      "type": "string"
+    },
+    "source_run_id": {
+      "title": "Source Run Id",
+      "type": "string"
+    },
+    "source_audit_type": {
+      "title": "Source Audit Type",
+      "type": "string"
+    },
+    "source_manifest_path": {
+      "description": "Absolute path to the source artifact_manifest.json.",
+      "title": "Source Manifest Path",
+      "type": "string"
+    },
+    "source_index_summary": {
+      "$ref": "#/$defs/ArtifactIndexSummary"
+    },
+    "harvest_profile": {
+      "$ref": "#/$defs/HarvestProfile"
+    },
+    "selection_rationale": {
+      "default": "",
+      "description": "Human-readable explanation of why these artifacts were selected.",
+      "title": "Selection Rationale",
+      "type": "string"
+    },
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/FixtureArtifact"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/FixtureFindingReference"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "fixture_pack_id",
+    "source_repo_id",
+    "source_run_id",
+    "source_audit_type",
+    "source_manifest_path",
+    "source_index_summary",
+    "harvest_profile"
+  ],
+  "title": "FixturePack",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

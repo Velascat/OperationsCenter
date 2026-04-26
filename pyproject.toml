@@ -22,6 +22,8 @@ operations-center-artifacts = "operations_center.entrypoints.artifacts.main:app"
 operations-center-calibration = "operations_center.entrypoints.calibration.main:app"
 operations-center-fixtures = "operations_center.entrypoints.fixtures.main:app"
 operations-center-replay = "operations_center.entrypoints.replay.main:app"
+operations-center-regression = "operations_center.entrypoints.regression.main:app"
+operations-center-governance = "operations_center.entrypoints.governance.main:app"
 
 [project.optional-dependencies]
 dev = [

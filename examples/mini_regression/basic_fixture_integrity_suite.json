@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "basic_fixture_integrity",
+  "name": "Basic Fixture Integrity Suite",
+  "description": "Validates that all curated fixture packs load cleanly and their copied files are present and checksummed correctly.",
+  "created_at": "2026-04-26T00:00:00Z",
+  "entries": [
+    {
+      "entry_id": "representative_run999_integrity",
+      "fixture_pack_path": "tools/audit/fixtures/representative__Bucket_run999__full_manifest_snapshot__20260426_120000",
+      "replay_profile": "fixture_integrity",
+      "required": true,
+      "selected_fixture_artifact_ids": null,
+      "source_stage": null,
+      "artifact_kind": null,
+      "max_artifact_bytes": 10485760,
+      "fail_fast": false,
+      "metadata": {
+        "purpose": "smoke test — pack integrity after harvest"
+      }
+    },
+    {
+      "entry_id": "representative_run999_manifest_contract",
+      "fixture_pack_path": "tools/audit/fixtures/representative__Bucket_run999__full_manifest_snapshot__20260426_120000",
+      "replay_profile": "manifest_contract",
+      "required": true,
+      "selected_fixture_artifact_ids": null,
+      "source_stage": null,
+      "artifact_kind": null,
+      "max_artifact_bytes": 10485760,
+      "fail_fast": false,
+      "metadata": {
+        "purpose": "confirm source_manifest.json and source_index_summary.json present"
+      }
+    },
+    {
+      "entry_id": "representative_run999_readability",
+      "fixture_pack_path": "tools/audit/fixtures/representative__Bucket_run999__full_manifest_snapshot__20260426_120000",
+      "replay_profile": "artifact_readability",
+      "required": false,
+      "selected_fixture_artifact_ids": null,
+      "source_stage": null,
+      "artifact_kind": null,
+      "max_artifact_bytes": 10485760,
+      "fail_fast": false,
+      "metadata": {
+        "purpose": "optional — verify artifacts are readable JSON/text"
+      }
+    }
+  ],
+  "metadata": {
+    "owner": "ops-team",
+    "cadence": "per-harvest"
+  }
+}

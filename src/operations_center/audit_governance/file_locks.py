@@ -1,0 +1,53 @@
+"""File-level locking for governance state files (Linux/fcntl).
+
+Wraps fcntl.flock to provide exclusive, auto-released locks on state files.
+Used by budgets.py and cooldowns.py to prevent concurrent write races.
+"""
+
+from __future__ import annotations
+
+import fcntl
+import os
+import time
+from contextlib import contextmanager
+from pathlib import Path
+
+
+class FileLockTimeout(OSError):
+    """Raised when the exclusive lock cannot be acquired within the timeout."""
+
+
+@contextmanager
+def locked_state_file(path: Path, timeout: float = 5.0):
+    """Acquire an exclusive lock on a .lock file adjacent to *path*, then yield.
+
+    A separate <path>.lock sentinel is used so that locking never interferes
+    with normal file reads/writes on the state path itself.
+
+    Raises FileLockTimeout if the lock cannot be acquired within *timeout* seconds.
+    """
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    deadline = time.monotonic() + timeout
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY)
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise FileLockTimeout(
+                        f"Could not acquire lock on {lock_path} within {timeout}s"
+                    ) from None
+                time.sleep(0.02)
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+__all__ = ["FileLockTimeout", "locked_state_file"]
