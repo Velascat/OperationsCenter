@@ -7,11 +7,19 @@ but never apply them automatically.
 """
 
 from .analyzer import analyze_artifacts
+from .decision import CalibrationDecision
 from .errors import (
     AnalysisProfileError,
     BehaviorCalibrationError,
     CalibrationInputError,
     ReportWriteError,
+)
+from .guardrails import (
+    GuardrailViolation,
+    assert_no_mutation_fields,
+    enforce_requires_human_review,
+    validate_all_recommendations,
+    validate_recommendation_structure,
 )
 from .models import (
     AnalysisProfile,
@@ -33,6 +41,12 @@ __all__ = [
     "load_calibration_report",
     "produce_recommendations",
     "write_calibration_report",
+    # guardrails
+    "GuardrailViolation",
+    "assert_no_mutation_fields",
+    "enforce_requires_human_review",
+    "validate_all_recommendations",
+    "validate_recommendation_structure",
     # errors
     "AnalysisProfileError",
     "BehaviorCalibrationError",
@@ -43,6 +57,7 @@ __all__ = [
     "ArtifactIndexSummary",
     "BehaviorCalibrationInput",
     "BehaviorCalibrationReport",
+    "CalibrationDecision",
     "CalibrationFinding",
     "CalibrationRecommendation",
     "FindingCategory",
