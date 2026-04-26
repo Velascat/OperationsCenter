@@ -347,7 +347,7 @@ class AuditGovernanceReport(BaseModel):
     Written to: {output_dir}/{repo_id}/{audit_type}/{request_id}/governance_report.json
     """
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     request: AuditGovernanceRequest
     decision: AuditGovernanceDecision
     policy_results: list[PolicyResult]

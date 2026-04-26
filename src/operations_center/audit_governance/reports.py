@@ -4,11 +4,17 @@ write_governance_report() writes an AuditGovernanceReport to a durable path.
 load_governance_report() deserializes and validates a previously written report.
 
 Every governance request must produce a report — even denied or deferred ones.
+
+Schema versions
+---------------
+1.0 — original schema (no governance_status field; defaults to "denied" on load)
+1.1 — added governance_status field (populated by runner in all 4 code paths)
 """
 
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 from .errors import GovernanceReportError
@@ -87,6 +93,15 @@ def load_governance_report(path: Path | str) -> AuditGovernanceReport:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise GovernanceReportError(f"Governance report is not valid JSON: {exc}") from exc
+
+    if data.get("schema_version", "1.0") == "1.0":
+        warnings.warn(
+            f"Governance report at {report_path} was written with schema_version='1.0' "
+            "which predates the governance_status field. The loaded report will default "
+            "governance_status='denied' regardless of the actual outcome.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     try:
         return AuditGovernanceReport.model_validate(data)

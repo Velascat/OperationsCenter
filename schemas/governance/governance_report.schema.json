@@ -1,0 +1,543 @@
+{
+  "$defs": {
+    "AuditGovernanceDecision": {
+      "description": "Result of evaluating a governance request against all policies.",
+      "properties": {
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "repo_id": {
+          "title": "Repo Id",
+          "type": "string"
+        },
+        "audit_type": {
+          "title": "Audit Type",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "denied",
+            "needs_manual_approval",
+            "deferred"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "policy_results": {
+          "items": {
+            "$ref": "#/$defs/PolicyResult"
+          },
+          "title": "Policy Results",
+          "type": "array"
+        },
+        "requires_manual_approval": {
+          "title": "Requires Manual Approval",
+          "type": "boolean"
+        },
+        "approved_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved By"
+        },
+        "approved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approved At"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "request_id",
+        "repo_id",
+        "audit_type",
+        "decision",
+        "reasons",
+        "policy_results",
+        "requires_manual_approval"
+      ],
+      "title": "AuditGovernanceDecision",
+      "type": "object"
+    },
+    "AuditGovernanceRequest": {
+      "description": "A request to run a full managed audit under governance.\n\nRecommendations may appear as related_recommendation_ids for context only.\nThey cannot approve or execute a request.",
+      "properties": {
+        "request_id": {
+          "description": "Unique, path-safe identifier.",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "repo_id": {
+          "description": "Managed repo identifier.",
+          "title": "Repo Id",
+          "type": "string"
+        },
+        "audit_type": {
+          "description": "Audit type to run.",
+          "title": "Audit Type",
+          "type": "string"
+        },
+        "requested_by": {
+          "description": "Operator identity requesting the audit.",
+          "title": "Requested By",
+          "type": "string"
+        },
+        "requested_reason": {
+          "description": "Non-empty explanation of why the audit is needed.",
+          "title": "Requested Reason",
+          "type": "string"
+        },
+        "urgency": {
+          "default": "normal",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ],
+          "title": "Urgency",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "related_suite_report_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Related Suite Report Path"
+        },
+        "related_calibration_report_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Related Calibration Report Path"
+        },
+        "related_recommendation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Recommendation Ids",
+          "type": "array"
+        },
+        "requested_time_window": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requested Time Window"
+        },
+        "allow_if_recent_success": {
+          "default": false,
+          "title": "Allow If Recent Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "repo_id",
+        "audit_type",
+        "requested_by",
+        "requested_reason"
+      ],
+      "title": "AuditGovernanceRequest",
+      "type": "object"
+    },
+    "AuditManualApproval": {
+      "description": "Human approval record for a governance decision that requires manual sign-off.\n\nThis is a data artifact, not code execution.\nIt does not bypass known-repo or known-audit-type validation.",
+      "properties": {
+        "approval_id": {
+          "title": "Approval Id",
+          "type": "string"
+        },
+        "decision_id": {
+          "description": "ID of the AuditGovernanceDecision being approved.",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "ID of the original AuditGovernanceRequest.",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "approved_by": {
+          "description": "Human operator granting approval.",
+          "title": "Approved By",
+          "type": "string"
+        },
+        "approved_at": {
+          "format": "date-time",
+          "title": "Approved At",
+          "type": "string"
+        },
+        "approval_notes": {
+          "default": "",
+          "title": "Approval Notes",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "decision_id",
+        "request_id",
+        "approved_by"
+      ],
+      "title": "AuditManualApproval",
+      "type": "object"
+    },
+    "BudgetStateSummary": {
+      "description": "Snapshot of budget state at governance evaluation time.",
+      "properties": {
+        "runs_used": {
+          "title": "Runs Used",
+          "type": "integer"
+        },
+        "max_runs": {
+          "title": "Max Runs",
+          "type": "integer"
+        },
+        "runs_remaining": {
+          "title": "Runs Remaining",
+          "type": "integer"
+        },
+        "period_start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period Start"
+        },
+        "period_end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period End"
+        }
+      },
+      "required": [
+        "runs_used",
+        "max_runs",
+        "runs_remaining"
+      ],
+      "title": "BudgetStateSummary",
+      "type": "object"
+    },
+    "CooldownStateSummary": {
+      "description": "Snapshot of cooldown state at governance evaluation time.",
+      "properties": {
+        "in_cooldown": {
+          "title": "In Cooldown",
+          "type": "boolean"
+        },
+        "cooldown_seconds": {
+          "title": "Cooldown Seconds",
+          "type": "number"
+        },
+        "seconds_remaining": {
+          "title": "Seconds Remaining",
+          "type": "number"
+        },
+        "last_run_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Run At"
+        }
+      },
+      "required": [
+        "in_cooldown",
+        "cooldown_seconds",
+        "seconds_remaining"
+      ],
+      "title": "CooldownStateSummary",
+      "type": "object"
+    },
+    "DispatchResultSummary": {
+      "description": "Compact summary of dispatch result for governance report.",
+      "properties": {
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run Id"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "failure_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Kind"
+        },
+        "duration_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Seconds"
+        },
+        "artifact_manifest_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Manifest Path"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "run_id",
+        "status"
+      ],
+      "title": "DispatchResultSummary",
+      "type": "object"
+    },
+    "PolicyResult": {
+      "description": "Result of a single governance policy check.",
+      "properties": {
+        "policy_name": {
+          "title": "Policy Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "details": {
+          "default": "",
+          "title": "Details",
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy_name",
+        "status",
+        "reason"
+      ],
+      "title": "PolicyResult",
+      "type": "object"
+    }
+  },
+  "description": "Governance report written for every audit request (approved, denied, deferred, or needs_manual_approval). Schema version 1.1.",
+  "properties": {
+    "schema_version": {
+      "default": "1.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "request": {
+      "$ref": "#/$defs/AuditGovernanceRequest"
+    },
+    "decision": {
+      "$ref": "#/$defs/AuditGovernanceDecision"
+    },
+    "policy_results": {
+      "items": {
+        "$ref": "#/$defs/PolicyResult"
+      },
+      "title": "Policy Results",
+      "type": "array"
+    },
+    "governance_status": {
+      "default": "denied",
+      "enum": [
+        "approved_and_dispatched",
+        "denied",
+        "deferred",
+        "needs_manual_approval",
+        "dispatch_failed"
+      ],
+      "title": "Governance Status",
+      "type": "string"
+    },
+    "approval": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuditManualApproval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "dispatch_result_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DispatchResultSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "budget_state_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BudgetStateSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "cooldown_state_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CooldownStateSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "request",
+    "decision",
+    "policy_results"
+  ],
+  "title": "AuditGovernanceReport",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
