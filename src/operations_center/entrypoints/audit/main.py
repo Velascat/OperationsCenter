@@ -6,6 +6,15 @@ Commands
   status           Read and display run_status.json at a known path.
   resolve-manifest Resolve artifact_manifest_path from run_status.json.
 
+WARNING — GOVERNANCE BYPASS
+  ``operations-center-audit run`` is a low-level Phase 6 escape hatch.  It
+  calls dispatch_managed_audit() directly and bypasses ALL Phase 12 governance
+  policy checks: no budget tracking, no cooldown enforcement, no
+  mini-regression-first policy, no manual-approval gate.
+
+  For production dispatch use ``operations-center-governance run`` instead,
+  which enforces all governance policies and writes a durable audit trail.
+
 This CLI does not:
   - scan directories
   - index artifacts

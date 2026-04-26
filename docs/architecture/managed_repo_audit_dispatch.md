@@ -211,6 +211,16 @@ Discovery failures are explicit:
 
 ## CLI / Tool Entry Point
 
+> **WARNING — GOVERNANCE BYPASS**
+> `operations-center-audit run` is a low-level Phase 6 escape hatch. It calls
+> `dispatch_managed_audit()` directly and **bypasses all Phase 12 governance
+> policy checks** — no budget limits, no cooldown enforcement, no
+> mini-regression-first policy, no manual-approval gate, no audit trail report.
+>
+> **For production dispatch use `operations-center-governance run` instead.**
+> That command enforces all governance policies and writes a durable
+> `governance_report.json` for every request regardless of outcome.
+
 ```
 operations-center-audit run --repo videofoundry --type representative
 operations-center-audit run --repo videofoundry --type representative --timeout 600
