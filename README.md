@@ -933,3 +933,9 @@ For the full platform ownership model see `WorkStation/docs/architecture/ownersh
 ## Honesty Check
 
 This repo is not trying to be a production distributed control plane yet. It is a local autonomous workflow system with clear worker lanes, explicit lifecycle handoffs, and operator-visible board/runtime feedback.
+
+---
+
+## License
+
+GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
