@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 operations-center-setup = "operations_center.entrypoints.setup.main:app"
 operations-center-audit = "operations_center.entrypoints.audit.main:app"
+operations-center-artifacts = "operations_center.entrypoints.artifacts.main:app"
 
 [project.optional-dependencies]
 dev = [
