@@ -20,6 +20,7 @@ operations-center-setup = "operations_center.entrypoints.setup.main:app"
 operations-center-audit = "operations_center.entrypoints.audit.main:app"
 operations-center-artifacts = "operations_center.entrypoints.artifacts.main:app"
 operations-center-calibration = "operations_center.entrypoints.calibration.main:app"
+operations-center-fixtures = "operations_center.entrypoints.fixtures.main:app"
 
 [project.optional-dependencies]
 dev = [
