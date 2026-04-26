@@ -1,0 +1,22 @@
+{
+  "_example_note": "Synthetic contract example — not a real run. Shows a completed representative audit run after Phase 5 implementation.",
+  "schema_version": "1.0",
+  "contract_name": "managed-repo-audit",
+  "producer": "videofoundry",
+  "repo_id": "videofoundry",
+  "run_id": "3dead998d4c44e1cb296bef061de50f3",
+  "audit_type": "representative",
+  "status": "completed",
+  "current_phase": "post_run_audit",
+  "started_at": "2026-04-26T15:34:53Z",
+  "updated_at": "2026-04-26T17:22:10Z",
+  "completed_at": "2026-04-26T17:22:10Z",
+  "error": null,
+  "traceback": null,
+  "artifact_manifest_path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/artifact_manifest.json",
+  "metadata": {
+    "channel_slug": "Connective_Contours",
+    "timestamp": "20260426_153453",
+    "exit_code": 0
+  }
+}

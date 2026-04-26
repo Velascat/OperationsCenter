@@ -1,0 +1,463 @@
+{
+  "$defs": {
+    "ArtifactStatus": {
+      "description": "Whether an expected artifact is present or missing.",
+      "enum": [
+        "present",
+        "missing",
+        "expected"
+      ],
+      "title": "ArtifactStatus",
+      "type": "string"
+    },
+    "ConsumerType": {
+      "description": "Who or what may consume an artifact.",
+      "enum": [
+        "human_review",
+        "automated_analysis",
+        "fixture_harvesting",
+        "slice_replay",
+        "regression_testing",
+        "architecture_invariant_verification",
+        "failure_diagnosis",
+        "unknown"
+      ],
+      "title": "ConsumerType",
+      "type": "string"
+    },
+    "ExcludedPath": {
+      "description": "A path excluded from the artifact manifest because it is infrastructure noise.\n\nExamples: coverage.ini, .coverage.*, sitecustomize.py, __pycache__/",
+      "properties": {
+        "path": {
+          "description": "Path as it appears in the bucket.",
+          "title": "Path",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why this path is excluded.",
+          "title": "Reason",
+          "type": "string"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Glob pattern that matched, if pattern-based exclusion was used.",
+          "title": "Pattern"
+        }
+      },
+      "required": [
+        "path",
+        "reason"
+      ],
+      "title": "ExcludedPath",
+      "type": "object"
+    },
+    "Limitation": {
+      "description": "Known limitations or caveats on an artifact or manifest.",
+      "enum": [
+        "partial_run",
+        "missing_downstream_artifacts",
+        "producer_not_finalized",
+        "non_representative_audit_unverified",
+        "repo_singleton_overwritten",
+        "infrastructure_noise_excluded",
+        "path_layout_non_uniform",
+        "unknown"
+      ],
+      "title": "Limitation",
+      "type": "string"
+    },
+    "Location": {
+      "description": "Path-layout class for an artifact.\n\nDescribes WHERE in the file system the artifact lives relative\nto the per-run bucket, not what the artifact IS.\n\nDo not collapse REPO_SINGLETON into per-run locations \u2014\narchitecture-invariant outputs have no per-run scope.",
+      "enum": [
+        "run_root",
+        "artifacts_subdir",
+        "audit_subdir",
+        "text_overlay_subdir",
+        "repo_singleton",
+        "external_or_unknown"
+      ],
+      "title": "Location",
+      "type": "string"
+    },
+    "ManagedArtifactEntry": {
+      "description": "A single artifact entry in the artifact manifest.\n\nGeneric fields apply to any managed repo.\nartifact_kind and source_stage accept str so producer profiles\ncan use their own vocabulary without constraining the generic model.",
+      "properties": {
+        "artifact_id": {
+          "description": "Stable, unique identifier for this artifact within the run. Suggested format: '{producer}:{audit_type}:{source_stage}:{filename_slug}'. Must be stable across manifest rewrites during the same run.",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_kind": {
+          "description": "Producer-vocabulary artifact kind (e.g. VideoFoundryArtifactKind values). Use 'unknown' when the kind cannot be determined.",
+          "title": "Artifact Kind",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path as recorded by the producer. May be absolute or relative.",
+          "title": "Path",
+          "type": "string"
+        },
+        "relative_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path relative to run_root or artifact_root, where applicable. None for repo_singleton artifacts where no single root applies.",
+          "title": "Relative Path"
+        },
+        "location": {
+          "$ref": "#/$defs/Location",
+          "description": "Path-layout class (run_root, artifacts_subdir, repo_singleton, etc.)."
+        },
+        "path_role": {
+          "$ref": "#/$defs/PathRole",
+          "default": "unknown",
+          "description": "Semantic role of this artifact path."
+        },
+        "source_stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Producer stage that created this artifact. Use producer profile vocabulary (e.g. VideoFoundrySourceStage). None for lifecycle or unknown sources.",
+          "title": "Source Stage"
+        },
+        "status": {
+          "$ref": "#/$defs/ArtifactStatus",
+          "default": "present",
+          "description": "Whether the artifact is present, missing, or expected."
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 8601 UTC timestamp when the artifact was first written.",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 8601 UTC timestamp of the most recent write.",
+          "title": "Updated At"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File size in bytes at last observation. None if not yet measured.",
+          "title": "Size Bytes"
+        },
+        "content_type": {
+          "default": "unknown",
+          "description": "MIME-like content type (e.g. 'application/json', 'text/plain').",
+          "title": "Content Type",
+          "type": "string"
+        },
+        "checksum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Content checksum in '{algorithm}:{hex}' format (e.g. 'sha256:abc\u2026').",
+          "title": "Checksum"
+        },
+        "consumer_types": {
+          "description": "Who or what is expected to consume this artifact.",
+          "items": {
+            "$ref": "#/$defs/ConsumerType"
+          },
+          "title": "Consumer Types",
+          "type": "array"
+        },
+        "valid_for": {
+          "description": "Temporal/contextual scope for which this artifact is meaningful.",
+          "items": {
+            "$ref": "#/$defs/ValidFor"
+          },
+          "title": "Valid For",
+          "type": "array"
+        },
+        "limitations": {
+          "description": "Known caveats on this artifact's completeness or reliability.",
+          "items": {
+            "$ref": "#/$defs/Limitation"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "description": {
+          "default": "",
+          "description": "Human-readable description of what this artifact contains.",
+          "title": "Description",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Producer-specific metadata not covered by generic fields.",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "artifact_kind",
+        "path",
+        "location"
+      ],
+      "title": "ManagedArtifactEntry",
+      "type": "object"
+    },
+    "ManifestStatus": {
+      "description": "Lifecycle status of the artifact manifest itself.\n\nDistinct from RunStatus \u2014 the manifest can be partial even when\nthe run has completed (e.g. some artifact writes failed).",
+      "enum": [
+        "initializing",
+        "running",
+        "completed",
+        "failed",
+        "partial",
+        "unknown"
+      ],
+      "title": "ManifestStatus",
+      "type": "string"
+    },
+    "PathRole": {
+      "description": "Semantic role of an artifact path.",
+      "enum": [
+        "primary",
+        "summary",
+        "detail",
+        "gate",
+        "trace",
+        "metadata",
+        "noise",
+        "unknown"
+      ],
+      "title": "PathRole",
+      "type": "string"
+    },
+    "RunStatus": {
+      "description": "Lifecycle status of a managed audit run.\n\nCanonical values for run_status.json and artifact manifests.\n\nDecision: VideoFoundry currently emits \"in_progress\" (legacy).\nThe contract canonicalises this to RUNNING. Phase 5 must switch\nVideoFoundry to emit \"running\". IN_PROGRESS_LEGACY is accepted\nduring the transition period by readers but must not be emitted\nby compliant producers.",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "interrupted",
+        "unknown",
+        "in_progress"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    },
+    "ValidFor": {
+      "description": "Temporal/contextual scope for which an artifact is meaningful.",
+      "enum": [
+        "current_run_only",
+        "cross_run_comparison",
+        "latest_snapshot",
+        "historical_record",
+        "partial_run_analysis",
+        "unknown"
+      ],
+      "title": "ValidFor",
+      "type": "string"
+    }
+  },
+  "description": "Schema for artifact_manifest.json as defined by the managed-repo audit contract.\n\nProduced by VideoFoundry (Phase 5), defined by OperationsCenter (Phase 2),\nread by OpsCenter indexing (Phase 7).\n\nThe manifest is written incrementally. It is valid during initializing\nand running states. OpsCenter must tolerate a partial manifest.\n\nRepo-singleton rule:\n    Artifacts with location=REPO_SINGLETON have run_id=None in their\n    metadata and valid_for=[latest_snapshot]. The manifest run_id still\n    identifies the run that last updated the singleton reference.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "description": "Contract schema version.",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "contract_name": {
+      "default": "managed-repo-audit",
+      "description": "Identifies this as a managed-repo-audit contract file.",
+      "title": "Contract Name",
+      "type": "string"
+    },
+    "producer": {
+      "description": "Managed repo identifier (e.g. 'videofoundry').",
+      "title": "Producer",
+      "type": "string"
+    },
+    "repo_id": {
+      "description": "Stable repo identifier matching the managed repo config.",
+      "title": "Repo Id",
+      "type": "string"
+    },
+    "run_id": {
+      "description": "UUID hex generated by OperationsCenter before invocation.",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "audit_type": {
+      "description": "Audit type identifier (e.g. 'representative').",
+      "title": "Audit Type",
+      "type": "string"
+    },
+    "manifest_status": {
+      "$ref": "#/$defs/ManifestStatus",
+      "description": "Current lifecycle status of the manifest itself."
+    },
+    "run_status": {
+      "$ref": "#/$defs/RunStatus",
+      "description": "Current lifecycle status of the audit run."
+    },
+    "created_at": {
+      "description": "ISO 8601 UTC timestamp when the manifest was first created.",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "ISO 8601 UTC timestamp of the most recent manifest update.",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "finalized_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ISO 8601 UTC timestamp when the manifest reached a terminal state. None during initializing/running. Required on completed/failed/partial.",
+      "title": "Finalized At"
+    },
+    "artifact_root": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Root directory for resolving artifact paths in this manifest. Typically the VideoFoundry repo root. relative_path in each entry is relative to this root where applicable.",
+      "title": "Artifact Root"
+    },
+    "run_root": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The per-run bucket directory (relative to repo root). Example: tools/audit/report/representative/Connective_Contours_..._{run_id}",
+      "title": "Run Root"
+    },
+    "artifacts": {
+      "description": "Artifact entries. Populated incrementally during the run. May be empty or partial during initializing/running states.",
+      "items": {
+        "$ref": "#/$defs/ManagedArtifactEntry"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "excluded_paths": {
+      "description": "Infrastructure noise paths excluded from artifact tracking. Examples: coverage.ini, .coverage.*, sitecustomize.py.",
+      "items": {
+        "$ref": "#/$defs/ExcludedPath"
+      },
+      "title": "Excluded Paths",
+      "type": "array"
+    },
+    "warnings": {
+      "description": "Non-fatal warnings encountered during the run or manifest writing.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "errors": {
+      "description": "Errors encountered during artifact production.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "limitations": {
+      "description": "Manifest-level limitations (e.g. partial_run, path_layout_non_uniform).",
+      "items": {
+        "$ref": "#/$defs/Limitation"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Producer-specific metadata not covered by generic fields.",
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "producer",
+    "repo_id",
+    "run_id",
+    "audit_type",
+    "manifest_status",
+    "run_status",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "ManagedArtifactManifest",
+  "type": "object"
+}

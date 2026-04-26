@@ -1,0 +1,23 @@
+{
+  "_example_note": "Synthetic contract example — not a real run. Models the Phase 0 interrupted representative run pattern: authoring succeeded, rendering was interrupted.",
+  "schema_version": "1.0",
+  "contract_name": "managed-repo-audit",
+  "producer": "videofoundry",
+  "repo_id": "videofoundry",
+  "run_id": "aabbccdd11223344aabbccdd11223344",
+  "audit_type": "representative",
+  "status": "interrupted",
+  "current_phase": "rendering",
+  "started_at": "2026-04-26T10:00:00Z",
+  "updated_at": "2026-04-26T10:45:22Z",
+  "completed_at": "2026-04-26T10:45:22Z",
+  "error": "terminated by signal SIGTERM",
+  "traceback": null,
+  "artifact_manifest_path": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344/artifact_manifest.json",
+  "metadata": {
+    "channel_slug": "Connective_Contours",
+    "timestamp": "20260426_100000",
+    "signal": "SIGTERM",
+    "abnormal_exit": true
+  }
+}
