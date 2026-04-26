@@ -170,6 +170,7 @@ def run_governed_audit(
                 request=request,
                 decision=decision,
                 policy_results=policy_results,
+                governance_status="needs_manual_approval",
                 budget_state_summary=_make_budget_summary(budget_state),
                 cooldown_state_summary=_make_cooldown_summary(cooldown_state),
             )
@@ -188,6 +189,7 @@ def run_governed_audit(
                 request=request,
                 decision=decision,
                 policy_results=policy_results,
+                governance_status="denied",
                 approval=approval,
                 budget_state_summary=_make_budget_summary(budget_state),
                 cooldown_state_summary=_make_cooldown_summary(cooldown_state),
@@ -218,10 +220,12 @@ def run_governed_audit(
             "deferred": "deferred",
             "needs_manual_approval": "needs_manual_approval",
         }
+        gov_status = status_map.get(decision.decision, "denied")
         report = AuditGovernanceReport(
             request=request,
             decision=decision,
             policy_results=policy_results,
+            governance_status=gov_status,
             approval=approval,
             budget_state_summary=_make_budget_summary(budget_state),
             cooldown_state_summary=_make_cooldown_summary(cooldown_state),
@@ -230,7 +234,7 @@ def run_governed_audit(
         return AuditGovernedRunResult(
             request=request,
             decision=decision,
-            governance_status=status_map.get(decision.decision, "denied"),
+            governance_status=gov_status,
             report_path=str(report_path),
         )
 
@@ -261,6 +265,7 @@ def run_governed_audit(
             request=request,
             decision=decision,
             policy_results=policy_results,
+            governance_status="dispatch_failed",
             approval=approval,
             dispatch_result_summary=dispatch_summary,
             budget_state_summary=_make_budget_summary(budget_state),
@@ -303,6 +308,7 @@ def run_governed_audit(
         request=request,
         decision=decision,
         policy_results=policy_results,
+        governance_status="approved_and_dispatched",
         approval=approval,
         dispatch_result_summary=dispatch_summary,
         budget_state_summary=_make_budget_summary(budget_state),

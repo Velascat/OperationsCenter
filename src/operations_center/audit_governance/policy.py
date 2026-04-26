@@ -67,6 +67,13 @@ def _check_known_audit_type(
     known_audit_types: dict[str, list[str]],
 ) -> PolicyResult:
     """audit_type must be a configured type for the given repo_id."""
+    if not known_audit_types:
+        return PolicyResult(
+            policy_name="known_audit_type_required",
+            status="failed",
+            reason="known_audit_types is empty — all audit types are denied.",
+            details="Configure known_audit_types in GovernanceConfig.",
+        )
     allowed = known_audit_types.get(request.repo_id)
     if allowed is None:
         return PolicyResult(

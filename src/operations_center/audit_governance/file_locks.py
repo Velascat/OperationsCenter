@@ -1,7 +1,10 @@
-"""File-level locking for governance state files (Linux/fcntl).
+"""File-level locking for governance state files (Linux/macOS only).
 
-Wraps fcntl.flock to provide exclusive, auto-released locks on state files.
-Used by budgets.py and cooldowns.py to prevent concurrent write races.
+Wraps fcntl.flock (POSIX) to provide exclusive, auto-released locks on state
+files. Used by budgets.py and cooldowns.py to prevent concurrent write races.
+
+PLATFORM NOTE: fcntl is available on Linux and macOS but NOT on Windows.
+OperationsCenter is deployed on Linux; do not use this module on Windows hosts.
 """
 
 from __future__ import annotations

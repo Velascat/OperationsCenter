@@ -351,6 +351,7 @@ class AuditGovernanceReport(BaseModel):
     request: AuditGovernanceRequest
     decision: AuditGovernanceDecision
     policy_results: list[PolicyResult]
+    governance_status: GovernanceStatus = "denied"
     approval: AuditManualApproval | None = None
     dispatch_result_summary: DispatchResultSummary | None = None
     budget_state_summary: BudgetStateSummary | None = None
