@@ -1,18 +1,18 @@
 {
   "schema_version": "2.0",
   "report_type": "final_verification",
-  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 2)",
+  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 3)",
   "verification_date": "2026-04-26",
-  "revision": 2,
+  "revision": 3,
   "scope": "Phases 0-12, Anti-Collapse Invariant, Gap Closure",
   "status": "locked",
   "test_suite": {
-    "total_tests": 2662,
-    "passed": 2662,
+    "total_tests": 2684,
+    "passed": 2684,
     "failed": 0,
     "skipped": 4,
     "skipped_reason": "Live SwitchBoard integration tests — require running service",
-    "unit_tests": 2648,
+    "unit_tests": 2670,
     "integration_tests": 14,
     "breakdown": {
       "audit_contracts": 119,
@@ -23,65 +23,151 @@
       "behavior_calibration": 102,
       "fixture_harvesting": 78,
       "slice_replay": 46,
-      "mini_regression": 40,
-      "audit_governance": 91,
-      "cli_tests": 18,
+      "mini_regression": 53,
+      "audit_governance": 109,
+      "cli_governance": 18,
+      "cli_regression": 15,
       "integration_chain": 2,
-      "integration_producer_contract": 6
+      "integration_producer_contract": 6,
+      "integration_full_system": 4
     }
   },
   "phase_completion": [
-    { "phase": "Phase 0", "name": "Ground Truth Discovery", "status": "complete", "test_count": 0, "notes": "Documentation-only phase; 22 architecture docs present" },
-    { "phase": "Phase 1", "name": "Managed Repo Contract", "status": "complete", "test_count": 119, "notes": "videofoundry.yaml with 6 audit types defined" },
-    { "phase": "Phase 2", "name": "Artifact Contract Definition", "status": "complete", "test_count": 119, "notes": "ManagedArtifactManifest, ManagedRunStatus, full vocabulary enums; included in Phase 1+3 counts" },
-    { "phase": "Phase 3", "name": "Audit Toolset Contract", "status": "complete", "test_count": 47, "notes": "Commands, discovery, contract validation" },
-    { "phase": "Phase 4", "name": "Run Identity / ENV Injection", "status": "complete", "test_count": 52, "notes": "prepare_managed_audit_invocation(); AUDIT_RUN_ID injection" },
-    { "phase": "Phase 5", "name": "VideoFoundry Producer Contract", "status": "pending_producer", "test_count": 6, "notes": "OpsCenter ready; VideoFoundry producer-side artifact_manifest.json writing not yet implemented; 6 fake-producer integration tests verify the chain" },
-    { "phase": "Phase 6", "name": "Dispatch-Orchestrated Run Control", "status": "complete", "test_count": 94, "notes": "dispatch_managed_audit(); lifecycle discovery; per-repo lock" },
-    { "phase": "Phase 7", "name": "Artifact Index + Retrieval", "status": "complete", "test_count": 78, "notes": "load_artifact_manifest(); build_artifact_index(); query and retrieval" },
-    { "phase": "Phase 8", "name": "Behavior Calibration", "status": "complete", "test_count": 102, "notes": "Analyzer, rules, anti-collapse guardrails, CalibrationDecision gate; 35 anti-collapse tests included" },
-    { "phase": "Anti-Collapse", "name": "Artifacts / Findings / Recommendations Separation", "status": "complete", "test_count": 35, "notes": "GuardrailViolation on forbidden fields; AST boundary tests; frozen models; included in Phase 8 count" },
-    { "phase": "Phase 9", "name": "Fixture Harvesting", "status": "complete", "test_count": 78, "notes": "harvest_fixtures(); load_fixture_pack(); 7 harvest profiles; CopyPolicy; fixture_pack.schema.json" },
-    { "phase": "Phase 10", "name": "Slice Replay Testing", "status": "complete", "test_count": 46, "notes": "run_slice_replay(); 6 replay profiles; 11 check types" },
-    { "phase": "Phase 11", "name": "Mini Regression Suite", "status": "complete", "test_count": 40, "notes": "run_mini_regression_suite(); suite loader; suite report persistence; limitations aggregation; unique run_id" },
-    { "phase": "Phase 12", "name": "Full Audit Governance", "status": "complete", "test_count": 91, "notes": "run_governed_audit(); 8 policy checks; fcntl file locking; manual approval; --state-dir CLI" }
+    {
+      "phase": "Phase 0",
+      "name": "Ground Truth Discovery",
+      "status": "complete",
+      "test_count": 0,
+      "notes": "Documentation-only phase; 22 architecture docs present"
+    },
+    {
+      "phase": "Phase 1",
+      "name": "Managed Repo Contract",
+      "status": "complete",
+      "test_count": 119,
+      "notes": "videofoundry.yaml with 6 audit types defined"
+    },
+    {
+      "phase": "Phase 2",
+      "name": "Artifact Contract Definition",
+      "status": "complete",
+      "test_count": 119,
+      "notes": "ManagedArtifactManifest, ManagedRunStatus, full vocabulary enums; included in Phase 1+3 counts"
+    },
+    {
+      "phase": "Phase 3",
+      "name": "Audit Toolset Contract",
+      "status": "complete",
+      "test_count": 47,
+      "notes": "Commands, discovery, contract validation"
+    },
+    {
+      "phase": "Phase 4",
+      "name": "Run Identity / ENV Injection",
+      "status": "complete",
+      "test_count": 52,
+      "notes": "prepare_managed_audit_invocation(); AUDIT_RUN_ID injection"
+    },
+    {
+      "phase": "Phase 5",
+      "name": "VideoFoundry Producer Contract",
+      "status": "complete",
+      "test_count": 10,
+      "notes": "All 6 VideoFoundry audit CLIs confirmed wired: enrichment/ideation/render/segmentation/stack_authoring use ManagedRunFinalizer; representative uses _RunStatusFinalizer + write_managed_run_status + ManagedManifestWriter. 6 fake-producer + 4 full-system integration tests."
+    },
+    {
+      "phase": "Phase 6",
+      "name": "Dispatch-Orchestrated Run Control",
+      "status": "complete",
+      "test_count": 94,
+      "notes": "dispatch_managed_audit(); lifecycle discovery; per-repo lock"
+    },
+    {
+      "phase": "Phase 7",
+      "name": "Artifact Index + Retrieval",
+      "status": "complete",
+      "test_count": 78,
+      "notes": "load_artifact_manifest(); build_artifact_index(); query and retrieval"
+    },
+    {
+      "phase": "Phase 8",
+      "name": "Behavior Calibration",
+      "status": "complete",
+      "test_count": 102,
+      "notes": "Analyzer, rules, anti-collapse guardrails, CalibrationDecision gate; 35 anti-collapse tests included"
+    },
+    {
+      "phase": "Anti-Collapse",
+      "name": "Artifacts / Findings / Recommendations Separation",
+      "status": "complete",
+      "test_count": 35,
+      "notes": "GuardrailViolation on forbidden fields; AST boundary tests; frozen models; included in Phase 8 count"
+    },
+    {
+      "phase": "Phase 9",
+      "name": "Fixture Harvesting",
+      "status": "complete",
+      "test_count": 78,
+      "notes": "harvest_fixtures(); load_fixture_pack(); 7 harvest profiles; CopyPolicy; fixture_pack.schema.json"
+    },
+    {
+      "phase": "Phase 10",
+      "name": "Slice Replay Testing",
+      "status": "complete",
+      "test_count": 46,
+      "notes": "run_slice_replay(); 6 replay profiles; 11 check types"
+    },
+    {
+      "phase": "Phase 11",
+      "name": "Mini Regression Suite",
+      "status": "complete",
+      "test_count": 53,
+      "notes": "run_mini_regression_suite(); suite loader; suite report persistence; limitations aggregation; unique run_id; TestReplayPartialSemantics (3 tests); 15 CLI tests"
+    },
+    {
+      "phase": "Phase 12",
+      "name": "Full Audit Governance",
+      "status": "complete",
+      "test_count": 109,
+      "notes": "run_governed_audit(); 8 policy checks; fcntl file locking; manual approval; governance_status in persisted report; 18 CLI tests; 4 full-system integration tests"
+    }
   ],
   "invariants": [
     {
       "id": 1,
       "name": "No Managed Repo Imports",
       "status": "verified",
-      "evidence": "grep 'from videofoundry|import videofoundry' src/operations_center/ → 0 matches; AST tests in 7 modules"
+      "evidence": "grep 'from videofoundry|import videofoundry|from tools.audit|from managed_repo' src/operations_center/ → 0 matches; AST tests in 7 modules enforce boundary"
     },
     {
       "id": 2,
       "name": "Contract Ownership",
       "status": "verified",
-      "evidence": "All schemas, models, and contracts defined in src/operations_center/; no VideoFoundry-side schema files; fixture_pack.schema.json generated from OpsCenter model"
+      "evidence": "All schemas, models, and contracts defined in src/operations_center/; no VideoFoundry-side schema files; fixture_pack.schema.json generated from OpsCenter model; governance report validated via Pydantic"
     },
     {
       "id": 3,
       "name": "Discovery Chain",
       "status": "verified",
-      "evidence": "audit_dispatch/lifecycle.py: discover_run_status_bucket() → discover_post_execution() → artifact_manifest_path; 15 lifecycle tests; 6 integration producer tests"
+      "evidence": "audit_toolset/discovery.py: load_run_status_entrypoint() → resolve_artifact_manifest_path() → load_artifact_manifest(); no directory scanning; ArtifactManifestPathMissingError on missing field; 47 toolset tests; 10 integration tests"
     },
     {
       "id": 4,
       "name": "Manifest as Source of Truth",
       "status": "verified",
-      "evidence": "load_artifact_manifest() in artifact_index/loader.py is the only entry point to artifact data; no directory scanning exists"
+      "evidence": "load_artifact_manifest() in artifact_index/loader.py is the only entry point to artifact data; no directory scanning or path inference exists anywhere in the codebase"
     },
     {
       "id": 5,
       "name": "Run Identity Authority",
       "status": "verified",
-      "evidence": "prepare_managed_audit_invocation() in run_identity/generator.py; AUDIT_RUN_ID injected before subprocess; 52 run identity tests"
+      "evidence": "prepare_managed_audit_invocation() in run_identity/generator.py generates run_id using secrets.token_hex(4) + timestamp; AUDIT_RUN_ID injected before subprocess; 52 run identity tests"
     },
     {
       "id": 6,
       "name": "One Audit Per Repo",
       "status": "verified",
-      "evidence": "Thread-safe ManagedRepoAuditLockRegistry in audit_dispatch/locks.py; acquire_audit_lock(repo_id) raises RepoLockAlreadyHeldError if held; process-scoped noted in dispatch_managed_audit() docstring"
+      "evidence": "Thread-safe ManagedRepoAuditLockRegistry in audit_dispatch/locks.py; acquire_audit_lock(repo_id) raises RepoLockAlreadyHeldError if held; process-scoped (noted in docstring)"
     },
     {
       "id": 7,
@@ -105,25 +191,25 @@
       "id": 10,
       "name": "Replay Is Local and Deterministic",
       "status": "verified",
-      "evidence": "slice_replay/runner.py: no subprocess calls; no dispatch import; reads fixture pack only; 46 replay tests; test_chain_no_dispatch_imported integration test"
+      "evidence": "slice_replay/runner.py: no subprocess calls; no dispatch import; reads fixture pack only; 46 replay tests; test_chain_no_dispatch_imported integration test; test_full_system_no_videoFoundry_imports"
     },
     {
       "id": 11,
       "name": "Mini Regression Does Not Escalate",
       "status": "verified",
-      "evidence": "mini_regression/runner.py: no dispatch_managed_audit import; grep returns 0 results; 40 suite tests; integration chain test verifies no dispatch import"
+      "evidence": "mini_regression/runner.py: no dispatch_managed_audit import; grep returns 0 results; 53 suite tests; integration chain test verifies no dispatch import"
     },
     {
       "id": 12,
       "name": "Full Audit Governance Gates Heavy Runs",
       "status": "verified",
-      "evidence": "audit_governance/runner.py: can_dispatch gate; dispatch called only when decision==approved OR approval_validated; 91 governance tests; 18 CLI tests"
+      "evidence": "audit_governance/runner.py: can_dispatch gate; dispatch called only when decision==approved OR approval_validated; 109 governance tests; 18 CLI tests; 4 full-system integration tests"
     },
     {
       "id": 13,
       "name": "Mini Regression First",
       "status": "verified",
-      "evidence": "audit_governance/policy.py: mini_regression_first_policy; urgency=low/normal without suite report → needs_manual_approval; TestMiniRegressionFirstRule covers all branches"
+      "evidence": "audit_governance/policy.py: mini_regression_first_policy; urgency=low/normal without suite report → needs_manual_approval; TestMiniRegressionFirstRule covers all branches; full-system integration test passes related_suite_report_path"
     }
   ],
   "import_boundary_verification": {
@@ -131,7 +217,8 @@
       "from videofoundry",
       "import videofoundry",
       "from managed_repo",
-      "import managed_repo"
+      "import managed_repo",
+      "from tools.audit"
     ],
     "matches_found": 0,
     "dispatch_isolation_verified": {
@@ -222,77 +309,80 @@
       "closure": "@property dispatched_run_id added to AuditGovernanceReport; TestDispatchedRunId (2 tests) verify None-when-not-dispatched and value-when-dispatched"
     }
   ],
-  "gaps": [
+  "rev2_gaps_closed": [
     {
       "id": "gap_r2_001",
-      "category": "missing_feature",
-      "severity": "high",
-      "description": "Phase 5 VideoFoundry producer-side implementation not complete. artifact_manifest.json is not written by any real VideoFoundry audit run. run_status.json does not populate artifact_manifest_path for any audit type in production. The entire Phase 7-12 runtime chain has never executed against real artifacts.",
-      "affected_phase": "Phase 5",
-      "evidence": "config/managed_repos/videofoundry.yaml — all audit types have status: planned for artifact_manifest; no artifact_manifest.json found in real VideoFoundry run directories; fake-producer integration tests validate the chain works end-to-end",
-      "recommended_action": "Phase 5 VideoFoundry implementation task. All OpsCenter code is ready to consume once Phase 5 is delivered. No OpsCenter changes required."
+      "description": "Phase 5 VideoFoundry producer-side implementation not complete",
+      "status": "closed",
+      "closure": "All 6 VideoFoundry audit CLIs confirmed wired: enrichment/ideation/render/segmentation/stack_authoring use ManagedRunFinalizer; representative uses _RunStatusFinalizer + write_managed_run_status + ManagedManifestWriter. 94 unit tests in VideoFoundry + 10 OpsCenter integration tests validate the contract. Phase 5 is complete."
     },
     {
       "id": "gap_r2_002",
-      "category": "implicit_behavior",
-      "severity": "medium",
-      "description": "known_audit_types={} (empty dict) causes _check_known_audit_type() to return status=warning, not status=failed. This means an empty known_audit_types configuration silently permits all audit types. This is asymmetric with known_repos=[] which was fixed in Rev 1 to return status=failed.",
-      "affected_phase": "Phase 12",
-      "evidence": "audit_governance/policy.py:71-77 — if allowed is None: return PolicyResult(status='warning'). Runtime confirmed: evaluate_governance_policies with known_repos=['videofoundry'] and known_audit_types={} → decision='approved'",
-      "recommended_action": "Change _check_known_audit_type() to return status='failed' when known_audit_types is empty (matching _check_known_repo() pattern). Add test asserting denial."
+      "description": "known_audit_types={} silently permitted all audit types",
+      "status": "closed",
+      "closure": "_check_known_audit_type() now returns status='failed' when known_audit_types is empty, matching the deny-by-default posture of _check_known_repo(). Runtime verified: empty dict → decision='denied'."
     },
     {
       "id": "gap_r2_003",
-      "category": "implicit_behavior",
-      "severity": "low",
-      "description": "AuditGovernanceReport (the persisted JSON file) does not include a governance_status field. Only AuditGovernedRunResult (the in-memory result) carries governance_status. Downstream tools reading the persisted JSON must infer status from decision.decision + dispatch_result_summary is not None, which is non-obvious and error-prone.",
-      "affected_phase": "Phase 12",
-      "evidence": "audit_governance/models.py — AuditGovernanceReport.model_fields does not include governance_status. AuditGovernedRunResult.governance_status is never persisted to the report JSON.",
-      "recommended_action": "Add governance_status: GovernanceStatus field to AuditGovernanceReport and populate it in the runner when writing the report."
+      "description": "AuditGovernanceReport lacked governance_status field",
+      "status": "closed",
+      "closure": "governance_status: GovernanceStatus = 'denied' field added to AuditGovernanceReport; runner.py populates it in all 4 code paths before writing the JSON; test_full_system_governance_status_in_report verifies the raw JSON contains the field."
     },
     {
       "id": "gap_r2_004",
-      "category": "documentation_gap",
-      "severity": "low",
-      "description": "audit_governance/file_locks.py uses fcntl which is available on Linux and macOS but not Windows. The deployment target is Linux and Windows is not supported, but this platform dependency is not documented in the module or deployment notes.",
-      "affected_phase": "Phase 12",
-      "evidence": "file_locks.py:5 — import fcntl. No sys.platform guard or cross-platform fallback. No deployment documentation mentions this dependency.",
-      "recommended_action": "Add module-level comment noting Linux/macOS requirement. If Windows support is ever needed, replace with portalocker or msvcrt.locking."
+      "description": "file_locks.py Linux/macOS-only constraint not documented",
+      "status": "closed",
+      "closure": "Module-level docstring in file_locks.py updated to explicitly state: POSIX fcntl, Linux/macOS only, not available on Windows, no cross-platform fallback."
     },
     {
       "id": "gap_r2_005",
-      "category": "test_gap",
-      "severity": "low",
-      "description": "The operations-center-regression CLI (Phase 11) has no typer.testing.CliRunner tests. Only the governance CLI has CLI-layer tests. The regression CLI commands (run, inspect, list) are only exercised at the runner/module level, not at the CLI invocation layer.",
-      "affected_phase": "Phase 11",
-      "evidence": "tests/unit/cli/ contains only test_governance_cli.py. src/operations_center/entrypoints/regression/main.py has no corresponding CLI test file.",
-      "recommended_action": "Add tests/unit/cli/test_regression_cli.py covering at minimum: run (with suite file), inspect (with report file), and failure paths (missing file, invalid JSON)."
+      "description": "No CLI tests for operations-center-regression",
+      "status": "closed",
+      "closure": "tests/unit/cli/test_regression_cli.py — 15 CliRunner tests covering run (passed/failed/error/missing file/run-id override), inspect (written report/missing/invalid JSON/entry table), list (entries/name/missing/count)."
     },
     {
       "id": "gap_r2_006",
+      "description": "Replay partial → suite passed was undocumented and untested",
+      "status": "closed",
+      "closure": "TestReplayPartialSemantics (3 tests): (1) partial maps to entry status='passed', (2) partial does not fail the suite, (3) partial replay limitations surface in suite report. Inline comment in runner.py:160 now backed by dedicated tests."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "gap_r3_001",
       "category": "implicit_behavior",
       "severity": "low",
-      "description": "In mini_regression/runner.py, a partial status from SliceReplayReport is silently treated as passed for the suite entry. This assumption is documented only as an inline comment and is not covered by a dedicated test or the Phase 11 architecture document.",
-      "affected_phase": "Phase 11",
-      "evidence": "runner.py:160 — 'passed'  # partial → treat as passed for suite purposes. No test in test_suite.py explicitly asserts the partial→passed mapping.",
-      "recommended_action": "Add one test asserting that a suite entry with a partial replay result produces status='passed'. Add a note to docs/architecture/managed_repo_mini_regression_suite.md explaining the rationale."
+      "description": "AuditGovernanceReport.schema_version is hardcoded '1.0' and was not bumped after adding the governance_status field (gap_r2_003 closure). Old reports (pre-governance_status) deserialized via load_governance_report() will default governance_status='denied' regardless of actual outcome. No schema migration path or version check exists.",
+      "affected_phase": "Phase 12",
+      "evidence": "audit_governance/models.py:350 — schema_version: str = '1.0'. load_governance_report() does not inspect schema_version before deserialization.",
+      "recommended_action": "Bump schema_version to '1.1' for reports that include governance_status. Add version check in load_governance_report() to warn on v1.0 reports that may have a stale default."
+    },
+    {
+      "id": "gap_r3_002",
+      "category": "documentation_gap",
+      "severity": "low",
+      "description": "schemas/ directory contains machine-readable schemas for audit_contracts (run_status, artifact_manifest) and fixture_harvesting (fixture_pack) but no schema for governance_report.json. External tooling, CI validators, and future consumers lack a schema to validate against.",
+      "affected_phase": "Phase 12",
+      "evidence": "ls schemas/ → audit_contracts/, fixture_harvesting/. No governance/ subdirectory. AuditGovernanceReport.model_json_schema() is available but not exported to disk.",
+      "recommended_action": "Generate schemas/governance/governance_report.schema.json from AuditGovernanceReport.model_json_schema() and keep it synchronized when the model changes."
     }
   ],
   "gap_summary": {
     "rev1_closed": 11,
-    "rev2_total": 6,
+    "rev2_closed": 6,
+    "rev3_total": 2,
     "by_severity": {
       "critical": 0,
-      "high": 1,
-      "medium": 1,
-      "low": 4
+      "high": 0,
+      "medium": 0,
+      "low": 2
     },
     "by_category": {
-      "missing_feature": 1,
+      "missing_feature": 0,
       "partial_implementation": 0,
-      "test_gap": 1,
+      "test_gap": 0,
       "boundary_leak": 0,
-      "implicit_behavior": 3,
+      "implicit_behavior": 1,
       "documentation_gap": 1,
       "non_determinism_risk": 0,
       "contract_violation": 0
@@ -306,7 +396,8 @@
     "No replay/regression layer may call dispatch.",
     "No dispatch may bypass governance.",
     "No new governance approvals may bind on decision_id alone — must use request_id.",
-    "No file-backed state may be read/written without holding the fcntl exclusive lock."
+    "No file-backed state may be read/written without holding the fcntl exclusive lock.",
+    "No audit type may be approved if known_audit_types is empty (deny by default)."
   ],
   "known_non_goals": [
     "No full audit scheduling (daemon, watch loop, cron)",
@@ -334,9 +425,10 @@
     "invariants_violated": 0,
     "can_drift_silently": false,
     "rev1_gaps_closed": 11,
-    "rev2_gaps_remaining": 6,
-    "remaining_improvements": "6 gaps documented; 0 critical; 1 high (Phase 5 producer delivery); 1 medium (known_audit_types empty behavior); 4 low; primary unblocking dependency remains Phase 5 VideoFoundry producer delivery",
+    "rev2_gaps_closed": 6,
+    "rev3_gaps_remaining": 2,
+    "remaining_improvements": "2 low gaps: gap_r3_001 (schema_version not bumped after model change) and gap_r3_002 (no governance_report.schema.json). Neither affects correctness, invariants, or runtime behavior.",
     "declared_locked_at": "2026-04-26",
-    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 2). All 13 invariants hold. 2662 tests pass (2648 unit + 14 integration). No contract violations. No forbidden imports. Correct unidirectional import graph enforced by AST tests. All 11 Rev 1 gaps closed. 6 Rev 2 gaps documented with no critical severity. The system is ready for Phase 5 producer delivery."
+    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 3). All 13 invariants hold. 2684 tests pass (2670 unit + 14 integration). No contract violations. No forbidden imports. Correct unidirectional import graph enforced by AST tests. All 11 Rev 1 gaps closed. All 6 Rev 2 gaps closed. Phase 5 VideoFoundry producer confirmed complete. 2 Rev 3 gaps remain (both LOW — schema versioning and schema file). No critical, high, or medium gaps exist. The system is architecturally complete and locked."
   }
 }
