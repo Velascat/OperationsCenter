@@ -1,6 +1,6 @@
-# Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 5)
+# Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 6)
 
-**Verification date:** 2026-04-26 (Rev 5 — post Rev 4 gap-closure pass)
+**Verification date:** 2026-04-26 (Rev 6 — comprehensive re-verification after Rev 5 lockdown)
 **Test suite:** 2733 passing, 4 skipped (live SwitchBoard only), 0 failures, 1 expected warning
 **Scope:** Phases 0–12, Anti-Collapse Invariant, Gap Closure
 **Status:** LOCKED
@@ -18,10 +18,57 @@
 | Rev 3 | 2 | 0C / 0H / 0M / 2L | ✅ Yes |
 | Rev 4 | 2 | 0C / 0H / 1M / 1L | ✅ Yes |
 | Rev 5 | 0 | — | ✅ N/A |
+| Rev 6 | 2 | 0C / 0H / 0M / 2L | ⬅ Current |
 
-**Cumulative: 21 gaps identified across 5 revisions. All 21 closed.**
+**Cumulative: 23 gaps identified across 6 revisions. 21 closed. 2 open (both low).**
 
-No critical, high, medium, or low gaps remain. No invariant violations found.
+No critical, high, or medium gaps remain. No invariant violations found.
+
+---
+
+### Critical Gaps
+
+None.
+
+---
+
+### High Priority Gaps
+
+None.
+
+---
+
+### Medium Gaps
+
+None.
+
+---
+
+### Low Gaps
+
+#### gap_r6_001 — `_check_mini_regression_first` Accepts Any Non-Empty Path String as Evidence
+
+- **Category:** implicit_behavior
+- **Severity:** low
+- **Affected phase:** Phase 11 / Phase 12
+- **Description:** The `_check_mini_regression_first()` governance policy checks only `bool(request.related_suite_report_path)` — i.e., whether the path string is non-empty. It does NOT verify the file exists on disk, is a readable JSON file, or belongs to the correct `repo_id`/`audit_type`. An operator can pass any non-empty string (e.g., `"/fake/path.json"`) to satisfy the evidence check and receive a `passed` verdict. The file path is recorded in the governance report's `policy_results` for audit trail purposes, but no content validation occurs at policy evaluation time.
+- **Evidence:** `audit_governance/policy.py:178` — `has_evidence = bool(request.related_suite_report_path)`. Confirmed by runtime test: `related_suite_report_path='/nonexistent/path/suite_report.json'` returns `status='passed'`.
+- **Design note:** This is likely intentional. The model docstring says `# Evidence context — informational, never approval`. The governance system treats the path as an operator attestation, not a validated file reference. The policy is designed to escalate (not hard-deny) when evidence is absent; it does not verify what was claimed. If an operator provides a false path, this is recorded in the audit trail.
+- **Recommended action:** Add a comment to `_check_mini_regression_first()` explicitly stating that path existence is not validated — this is an operator attestation, not a file validation. Optionally add a warning-only file-existence check that notes a missing file without changing the verdict.
+
+---
+
+#### gap_r6_002 — No JSON Schemas for Phase 8/10/11 Persisted Reports
+
+- **Category:** documentation_gap
+- **Severity:** low
+- **Affected phase:** Phase 8 / Phase 10 / Phase 11
+- **Description:** Three phases write structured reports to disk via `write_*` functions, but none have external JSON schema files. Phase 9 (`fixture_pack.schema.json`) and Phase 12 (`governance_report.schema.json`) have schemas because they are external contracts or compliance artifacts. Phases 8, 10, and 11 are internal pipeline artifacts validated only through their Pydantic models. The absence of schemas means external tooling or future consumers cannot validate these files without importing Python.
+  - `write_calibration_report()` → `BehaviorCalibrationReport` (Phase 8) — no schema
+  - `write_replay_report()` → `SliceReplayReport` (Phase 10) — no schema
+  - `write_suite_report()` → `MiniRegressionSuiteReport` (Phase 11) — no schema
+- **Evidence:** `schemas/` directory contains `audit_contracts/`, `fixture_harvesting/`, `governance/` — no `behavior_calibration/`, `slice_replay/`, or `mini_regression/` subdirectories.
+- **Recommended action:** Generate JSON schemas from `BehaviorCalibrationReport.model_json_schema()`, `SliceReplayReport.model_json_schema()`, and `MiniRegressionSuiteReport.model_json_schema()` into `schemas/behavior_calibration/`, `schemas/slice_replay/`, and `schemas/mini_regression/`. No code change required — documentation artifact only.
 
 ---
 
@@ -29,8 +76,22 @@ No critical, high, medium, or low gaps remain. No invariant violations found.
 
 | ID | Description | Closure |
 |----|-------------|---------|
-| gap_r4_001 | `operations-center-audit run` governance bypass undocumented | Added explicit `WARNING — GOVERNANCE BYPASS` block to `entrypoints/audit/main.py` docstring and to `docs/architecture/managed_repo_audit_dispatch.md`; instructs operators to use `operations-center-governance run` for production dispatch |
-| gap_r4_002 | Five CLI entrypoints lacked CliRunner tests | Added `tests/unit/cli/test_audit_cli.py` (10 tests), `test_artifacts_cli.py` (10), `test_calibration_cli.py` (11), `test_fixtures_cli.py` (9), `test_replay_cli.py` (9) — 49 new tests; CLI layer now fully covered for all 7 entrypoints |
+| gap_r4_001 | `operations-center-audit run` governance bypass undocumented | Added explicit `WARNING — GOVERNANCE BYPASS` block to `entrypoints/audit/main.py` docstring and to `docs/architecture/managed_repo_audit_dispatch.md` |
+| gap_r4_002 | Five CLI entrypoints lacked CliRunner tests | Added 49 new tests across `test_audit_cli.py`, `test_artifacts_cli.py`, `test_calibration_cli.py`, `test_fixtures_cli.py`, `test_replay_cli.py` |
+
+---
+
+### Suggested Follow-Up Tasks (Non-Implementation)
+
+1. **First live VideoFoundry audit run** — Phase 5 code is wired but has never been executed against a real live VF audit. Run `operations-center-governance run` against a live VF instance to validate Phase 5 outputs conform to the contract.
+
+2. **Add comment to `_check_mini_regression_first`** (gap_r6_001) — Document that path existence is an operator attestation, not a file validation. One-line comment only; no behavioral change.
+
+3. **Generate schemas for Phase 8/10/11 reports** (gap_r6_002) — Emit `BehaviorCalibrationReport`, `SliceReplayReport`, and `MiniRegressionSuiteReport` JSON schemas into `schemas/` for tooling and external consumers. No code change required.
+
+4. **CI integration guide** — Document how to wire `operations-center-governance run` into a CI/CD pipeline as a pre-release gate.
+
+5. **Consider adding `source_repo_id` / `source_audit_type` to `MiniRegressionSuiteReport`** — Currently traceability from suite report → repo runs through individual fixture pack entries. A top-level `repo_id` / `audit_type` field would make filtering and indexing easier.
 
 ---
 
@@ -74,8 +135,18 @@ No critical, high, medium, or low gaps remain. No invariant violations found.
 
 | ID | Description | Closure |
 |----|-------------|---------|
-| gap_r3_001 | `AuditGovernanceReport.schema_version` not bumped after adding `governance_status` | Bumped to `"1.1"`; `load_governance_report()` emits `UserWarning` when loading v1.0 reports; schema changelog added to `reports.py` module docstring |
-| gap_r3_002 | No external JSON schema for governance report | `schemas/governance/governance_report.schema.json` generated from `AuditGovernanceReport.model_json_schema()` with `$schema`, `title`, and `description` |
+| gap_r3_001 | `AuditGovernanceReport.schema_version` not bumped after adding `governance_status` | Bumped to `"1.1"`; `UserWarning` on v1.0 load; changelog in `reports.py` docstring |
+| gap_r3_002 | No external JSON schema for governance report | `schemas/governance/governance_report.schema.json` generated |
+
+</details>
+
+<details>
+<summary>Rev 4 (2 gaps, all closed)</summary>
+
+| ID | Description | Closure |
+|----|-------------|---------|
+| gap_r4_001 | `operations-center-audit` CLI governance bypass undocumented | `WARNING — GOVERNANCE BYPASS` block added to CLI docstring and arch doc |
+| gap_r4_002 | Five CLI entrypoints lacked CliRunner tests | 49 new CliRunner tests added across 5 test files |
 
 </details>
 
@@ -141,7 +212,7 @@ Writes artifact_manifest.json  ──────►   Reads + validates manifes
 ### artifact_manifest.json (Phase 2 contract)
 
 - Schema: `schemas/audit_contracts/artifact_manifest.schema.json`
-- Model: `ManagedArtifactManifest` in `audit_contracts/manifest.py`
+- Model: `ManagedArtifactManifest` in `audit_contracts/artifact_manifest.py`
 - Validated by: 119 contract tests
 
 ### artifact_manifest.json → index (Phase 7)
@@ -163,6 +234,14 @@ Writes artifact_manifest.json  ──────►   Reads + validates manifes
 - Fields include: `governance_status` (added v1.1), `dispatched_run_id` (property)
 - `load_governance_report()` emits `UserWarning` on v1.0 reports
 - Validated by: 109 governance tests + 4 full-system integration tests
+
+### Persisted reports without external schemas (gap_r6_002)
+
+These are internal pipeline artifacts. Their Pydantic models serve as their schema.
+
+- `BehaviorCalibrationReport` (Phase 8) — no `schemas/behavior_calibration/` yet
+- `SliceReplayReport` (Phase 10) — no `schemas/slice_replay/` yet
+- `MiniRegressionSuiteReport` (Phase 11) — no `schemas/mini_regression/` yet
 
 ---
 
@@ -214,7 +293,7 @@ End-to-end verified by: `tests/integration/test_full_system_real_flow.py` (4 tes
 
 | Layer | Dispatch-free? | Local? | Deterministic? |
 |-------|---------------|--------|----------------|
-| Phase 9 (fixture harvest) | ✅ Yes | ✅ Yes | ✅ Yes |
+| Phase 9 (fixture harvest) | ✅ Yes | ✅ Yes | ✅ Yes (selector.py comment: "deterministic") |
 | Phase 10 (slice replay) | ✅ Yes | ✅ Yes | ✅ Yes |
 | Phase 11 (mini regression) | ✅ Yes | ✅ Yes | ✅ Yes |
 
@@ -224,22 +303,22 @@ Verified by AST checks: `audit_dispatch` not imported in `slice_replay`, `mini_r
 
 ## Governance Verification
 
-### Policy Evaluation (8 checks)
+### Policy Evaluation (8 checks, evaluated in order)
 
 1. `manual_request_required` — `requested_by` must be non-empty
 2. `known_repo_required` — repo in `known_repos` (empty list → `failed`)
 3. `known_audit_type_required` — audit_type configured (empty dict → `failed`)
 4. `cooldown_policy` — minimum gap between runs enforced
 5. `budget_policy` — per-period run limit enforced
-6. `mini_regression_first_policy` — Phase 11 evidence required for low/normal urgency
+6. `mini_regression_first_policy` — Phase 11 evidence required for low/normal urgency (see gap_r6_001)
 7. `urgent_override_policy` — high/urgent always requires manual approval
 8. `recent_success_policy` — advisory; recent run within cooldown window
 
 ### Governance Bypass (Documented Escape Hatch)
 
-`operations-center-audit run` calls `dispatch_managed_audit()` directly and bypasses all 8 policy checks. This is a documented low-level Phase 6 escape hatch; production dispatch must always use `operations-center-governance run`. The bypass and its implications are documented in:
-- `src/operations_center/entrypoints/audit/main.py` module docstring (`WARNING — GOVERNANCE BYPASS` block)
-- `docs/architecture/managed_repo_audit_dispatch.md` (`WARNING — GOVERNANCE BYPASS` callout)
+`operations-center-audit run` calls `dispatch_managed_audit()` directly, bypassing all 8 policy checks. This is a documented, intentional Phase 6 escape hatch:
+- `src/operations_center/entrypoints/audit/main.py` — `WARNING — GOVERNANCE BYPASS` block in module docstring
+- `docs/architecture/managed_repo_audit_dispatch.md` — matching `WARNING — GOVERNANCE BYPASS` callout
 
 ### File-Backed State Locking
 
@@ -252,7 +331,7 @@ Budget and cooldown state files are protected by `fcntl.flock` exclusive locks. 
 - **v1.0** (pre-Rev 3): no `governance_status` field; `load_governance_report()` emits `UserWarning`
 - **v1.1** (Rev 3+): `governance_status` persisted by runner in all 4 decision paths
 
-### Runner Decision Path Coverage (all 5 `governance_status` values)
+### Runner Decision Path Coverage
 
 | Path | `governance_status` | Evidence |
 |------|---------------------|----------|
@@ -260,6 +339,10 @@ Budget and cooldown state files are protected by `fcntl.flock` exclusive locks. 
 | Non-approved decision (denied/deferred) | `denied` or `deferred` via `status_map` | runner.py:192,211,228,237 |
 | Dispatch raises exception | `dispatch_failed` | runner.py:268,278 |
 | Dispatch succeeds | `approved_and_dispatched` | runner.py:311,322 |
+
+### mini_regression_first_policy Evidence Attestation (gap_r6_001)
+
+The `_check_mini_regression_first()` policy validates `bool(request.related_suite_report_path)` — a non-empty string is accepted as evidence. File existence and content are not validated. This is by design: the field is documented as `# Evidence context — informational, never approval`. The path is recorded in the governance report audit trail for post-hoc verification.
 
 ---
 
@@ -365,7 +448,7 @@ Verified by: 78 harvesting tests (Invariant 9 coverage).
 | 10 | Replay is local and deterministic | ✅ PASS | No dispatch import; no subprocess; 46 tests |
 | 11 | Mini regression does not escalate | ✅ PASS | No dispatch import; 58 tests |
 | 12 | Full audit governance gates heavy runs | ✅ PASS | `run_governed_audit()` enforces all 8 policies; bypass via `operations-center-audit` is documented as intentional escape hatch |
-| 13 | Mini regression first | ✅ PASS | `_check_mini_regression_first()` for low/normal urgency; all branches tested |
+| 13 | Mini regression first | ✅ PASS | `_check_mini_regression_first()` for low/normal urgency; all branches tested (note: evidence is path-presence attestation, not file-validation — gap_r6_001) |
 
 ---
 
@@ -381,15 +464,20 @@ Verified by: 78 harvesting tests (Invariant 9 coverage).
 ✗ CI gate integration (future phase)
 ✗ Distributed lock coordination
 ✗ Windows support for file locking (Linux/macOS only)
+✗ File-existence validation of governance evidence paths (attestation model by design)
 ```
 
 ---
 
 ## Remaining Risks
 
-1. **First live VideoFoundry run (low)** — Phase 5 code is wired but has never executed against a real live audit. Fake-producer integration tests validate the contract. Format differences remain a theoretical risk until first live run completes.
+1. **`mini_regression_first_policy` accepts path attestation without file validation (low, gap_r6_001)** — An operator can supply any non-empty string as `related_suite_report_path` to satisfy the evidence check. The path is recorded for audit purposes but not verified. Not a runtime risk; requires operator intent to circumvent.
 
-2. **fcntl Linux-only (low)** — Documented; not a current deployment risk.
+2. **No JSON schemas for Phase 8/10/11 reports (low, gap_r6_002)** — `BehaviorCalibrationReport`, `SliceReplayReport`, and `MiniRegressionSuiteReport` are persisted to disk but lack external schema files. Internal consumers use the Pydantic models. No runtime risk; tooling and external consumer gap only.
+
+3. **First live VideoFoundry run (low)** — Phase 5 code is wired but has never executed against a real live audit. Fake-producer integration tests validate the contract. Format differences remain a theoretical risk until first live run completes.
+
+4. **fcntl Linux-only (low)** — Documented; not a current deployment risk.
 
 ---
 
@@ -414,15 +502,15 @@ The following rules are declared permanent:
 
 ## Final Lockdown Statement
 
-The managed repo audit system across Phases 0–12 is declared **locked** as of 2026-04-26 (Rev 5).
+The managed repo audit system across Phases 0–12 is declared **locked** as of 2026-04-26 (Rev 6).
 
 **Verification status:**
-- All 13 invariants hold (all ✅ PASS; governance bypass via `operations-center-audit` is a documented, intentional escape hatch)
-- 2733 tests pass (unit + integration + CLI), 0 failures, 1 expected warning
+- All 13 invariants hold (all ✅ PASS)
+- 2733 tests pass (unit + integration + CLI), 0 failures, 4 skipped (live service only), 1 expected warning
 - No forbidden imports found in any source module
 - Correct unidirectional import graph enforced by AST checks in 15 test modules
-- All 21 lifetime gaps closed; 0 open
-- No critical, high, medium, or low gaps remain
+- 21 of 23 lifetime gaps closed; 2 open (both low — no runtime risk)
+- No critical, high, or medium gaps remain
 - No invariant violations
 
-**The system is architecturally complete and gap-free.** All 21 identified gaps across 5 verification revisions have been closed. The only acknowledged risks are low-severity: the first live VF run and fcntl platform limitation — neither affects correctness, contract enforcement, or invariant status.
+**The system is architecturally complete.** The 2 open Rev 6 gaps are a documentation structural note (attestation-vs-validation in one policy check) and a schema coverage gap (3 persisted pipeline artifacts lack external schema files). Neither affects correctness, contract enforcement, or invariant status.
