@@ -7,24 +7,11 @@ import pytest
 from operations_center.contracts.enums import (
     ArtifactType,
     ExecutionStatus,
-    FailureReasonCategory,
     ValidationStatus,
 )
-from operations_center.observability.changed_files import ChangedFilesStatus
 from operations_center.observability.recorder import ExecutionRecorder
 from operations_center.observability.trace import ExecutionTrace, RunReportBuilder
 
-from .conftest import (
-    make_artifact,
-    make_changed_file,
-    make_result,
-    successful_rich_result,
-    failed_result_with_logs,
-    timeout_result,
-    no_changes_result,
-    policy_blocked_result,
-    sparse_result,
-)
 
 
 @pytest.fixture

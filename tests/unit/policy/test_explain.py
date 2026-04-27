@@ -18,14 +18,13 @@ from operations_center.policy.models import (
     PolicyViolation,
     PolicyWarning,
 )
-from operations_center.contracts.enums import RiskLevel, TaskType
+from operations_center.contracts.enums import RiskLevel
 
 from .conftest import (
     make_policy_config,
     make_proposal,
     make_repo_policy,
     remote_decision,
-    local_decision,
 )
 
 

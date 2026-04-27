@@ -14,11 +14,10 @@ from operations_center.openclaw_shell.models import (
 from operations_center.openclaw_shell.service import OpenClawShellService
 
 from ..observability.conftest import (
-    make_artifact,
     make_changed_file,
     make_result,
 )
-from operations_center.contracts.enums import ArtifactType, FailureReasonCategory
+from operations_center.contracts.enums import FailureReasonCategory
 from operations_center.observability.recorder import ExecutionRecorder
 from operations_center.observability.trace import RunReportBuilder
 

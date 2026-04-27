@@ -14,7 +14,6 @@ Partial richness is expected and acceptable:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 

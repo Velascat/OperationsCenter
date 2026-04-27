@@ -7,7 +7,6 @@ configs return error messages containing expected keywords.
 
 from __future__ import annotations
 
-import pytest
 
 from operations_center.policy.models import (
     BranchGuardrail,
@@ -16,7 +15,6 @@ from operations_center.policy.models import (
     PolicyConfig,
     RepoPolicy,
     ReviewRequirement,
-    ToolGuardrail,
     ValidationRequirement,
 )
 from operations_center.policy.validate import validate_config

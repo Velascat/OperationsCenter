@@ -116,7 +116,7 @@ def _findings_for_summary(s: BackendComparisonSummary) -> list[StrategyFinding]:
         ))
         return findings  # don't pile on with weak-evidence findings
 
-    data = {
+    data: dict[str, object] = {
         "sample_size": s.sample_size,
         "success_rate": s.success_rate,
         "failure_rate": s.failure_rate,

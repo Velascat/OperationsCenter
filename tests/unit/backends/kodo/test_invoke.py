@@ -52,7 +52,7 @@ class TestInvocation:
         repo.mkdir()
         kodo = _mock_kodo()
         invoker = _invoker(kodo)
-        capture = invoker.invoke(_prepared(tmp_path))
+        _capture = invoker.invoke(_prepared(tmp_path))
         kodo.run.assert_called_once()
 
     def test_invoke_calls_write_goal_file(self, tmp_path: Path):

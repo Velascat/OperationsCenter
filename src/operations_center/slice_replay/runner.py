@@ -18,9 +18,9 @@ from operations_center.fixture_harvesting.models import FixtureArtifact, Fixture
 from .checks import CHECK_REGISTRY
 from .errors import ReplayInputError
 from .models import (
+    ReportStatus,
     SliceReplayCheck,
     SliceReplayCheckResult,
-    SliceReplayProfile,
     SliceReplayReport,
     SliceReplayRequest,
 )
@@ -59,7 +59,7 @@ def _filter_artifacts(
     return artifacts
 
 
-def _compute_report_status(results: list[SliceReplayCheckResult]) -> str:
+def _compute_report_status(results: list[SliceReplayCheckResult]) -> ReportStatus:
     statuses = {r.status for r in results}
     if not results:
         return "passed"

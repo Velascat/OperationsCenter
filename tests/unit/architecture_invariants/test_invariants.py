@@ -11,10 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from tools.audit.architecture_invariants.baseline import (
-    BaselineComparison,
     compare_to_baseline,
     load_baseline,
     save_baseline,
@@ -408,28 +406,28 @@ class TestLiveRepoClean:
     def test_no_managed_repo_imports_in_src(self):
         findings = check_managed_repo_imports(self._REPO_ROOT)
         assert findings == [], (
-            f"Managed repo import violations found:\n"
+            "Managed repo import violations found:\n"
             + "\n".join(f"  {f.path}:{f.line} — {f.message}" for f in findings)
         )
 
     def test_no_layer_direction_violations(self):
         findings = check_layer_direction(self._REPO_ROOT)
         assert findings == [], (
-            f"Layer direction violations found:\n"
+            "Layer direction violations found:\n"
             + "\n".join(f"  {f.path}:{f.line} — {f.message}" for f in findings)
         )
 
     def test_no_directory_scanning_in_artifact_index(self):
         findings = check_no_directory_scanning(self._REPO_ROOT)
         assert findings == [], (
-            f"Directory scanning violations found:\n"
+            "Directory scanning violations found:\n"
             + "\n".join(f"  {f.path}:{f.line} — {f.evidence}" for f in findings)
         )
 
     def test_anti_collapse_guardrail_intact(self):
         findings = check_anti_collapse_guardrail(self._REPO_ROOT)
         assert findings == [], (
-            f"Anti-collapse guardrail violations found:\n"
+            "Anti-collapse guardrail violations found:\n"
             + "\n".join(f"  {f.path}:{f.line} — {f.message}" for f in findings)
         )
 
@@ -437,6 +435,6 @@ class TestLiveRepoClean:
         report = run_audit(self._REPO_ROOT)
         fail_findings = [f for f in report.findings if f.status == Status.FAIL]
         assert fail_findings == [], (
-            f"Architecture invariant violations:\n"
+            "Architecture invariant violations:\n"
             + "\n".join(f"  [{f.id}] {f.path}:{f.line} — {f.message}" for f in fail_findings)
         )

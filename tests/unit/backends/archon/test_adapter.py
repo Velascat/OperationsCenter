@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 from operations_center.backends.archon.adapter import ArchonBackendAdapter
 from operations_center.backends.archon.invoke import ArchonAdapter, ArchonRunResult

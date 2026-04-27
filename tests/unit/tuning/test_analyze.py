@@ -17,12 +17,10 @@ import pytest
 from operations_center.tuning.analyze import StrategyTuningService
 from operations_center.tuning.routing_models import (
     EvidenceStrength,
-    RoutingTuningProposal,
     StrategyAnalysisReport,
 )
 
 from .conftest import (
-    make_failure,
     make_n_failures,
     make_n_successes,
     make_record,
@@ -225,7 +223,7 @@ class TestRecommendationSeparation:
         """The analysis layer never touches SwitchBoard lane policy directly."""
         import importlib
         analyze_mod = importlib.import_module("operations_center.tuning.analyze")
-        source = getattr(analyze_mod, "__file__", "")
+        _source = getattr(analyze_mod, "__file__", "")
         # just verify the module loads cleanly without error
         assert analyze_mod is not None
 

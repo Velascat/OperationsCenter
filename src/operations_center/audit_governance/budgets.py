@@ -53,7 +53,7 @@ def _load_budget_state_unlocked(
             max_runs=config.max_runs,
             runs_used=0,
         )
-    return AuditBudgetState(**{**state.model_dump(), "max_runs": config.max_runs})
+    return state.model_copy(update={"max_runs": config.max_runs})
 
 
 def load_budget_state(
@@ -100,9 +100,7 @@ def increment_budget_after_dispatch(
     with locked_state_file(path):
         state = _load_budget_state_unlocked(path, repo_id, audit_type, config)
         now = ran_at or datetime.now(UTC)
-        updated = AuditBudgetState(
-            **{**state.model_dump(), "runs_used": state.runs_used + 1, "last_run_at": now}
-        )
+        updated = state.model_copy(update={"runs_used": state.runs_used + 1, "last_run_at": now})
         path.write_text(updated.model_dump_json(indent=2), encoding="utf-8")
     return updated
 

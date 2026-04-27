@@ -11,14 +11,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from operations_center.audit_dispatch import (
     ManagedAuditDispatchRequest,
     dispatch_managed_audit,
 )
 
-from .approvals import validate_manual_approval
 from .budgets import increment_budget_after_dispatch, load_budget_state
 from .cooldowns import load_cooldown_state, update_cooldown_after_dispatch
 from .errors import ManualApprovalError
@@ -33,6 +32,7 @@ from .models import (
     CooldownStateSummary,
     DispatchResultSummary,
     GovernanceConfig,
+    GovernanceStatus,
 )
 from .policy import evaluate_governance_policies, make_governance_decision
 from .reports import write_governance_report
@@ -220,7 +220,7 @@ def run_governed_audit(
             "deferred": "deferred",
             "needs_manual_approval": "needs_manual_approval",
         }
-        gov_status = status_map.get(decision.decision, "denied")
+        gov_status = cast(GovernanceStatus, status_map.get(decision.decision, "denied"))
         report = AuditGovernanceReport(
             request=request,
             decision=decision,

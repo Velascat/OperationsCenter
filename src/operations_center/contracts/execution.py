@@ -19,7 +19,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from .enums import ArtifactType, ExecutionStatus, FailureReasonCategory
+from .enums import ArtifactType, ExecutionStatus, FailureReasonCategory, ValidationStatus
 from .common import ChangedFileRef, ValidationSummary
 
 
@@ -185,7 +185,7 @@ class ExecutionResult(BaseModel):
 
     # Validation
     validation: ValidationSummary = Field(
-        default_factory=lambda: ValidationSummary(status="skipped"),
+        default_factory=lambda: ValidationSummary(status=ValidationStatus.SKIPPED),
     )
 
     # Branch / PR

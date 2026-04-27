@@ -18,7 +18,7 @@ from .models import (
 )
 
 if TYPE_CHECKING:
-    from operations_center.artifact_index.models import IndexedArtifact, ManagedArtifactIndex
+    from operations_center.artifact_index.models import ManagedArtifactIndex
 
 
 # ---------------------------------------------------------------------------

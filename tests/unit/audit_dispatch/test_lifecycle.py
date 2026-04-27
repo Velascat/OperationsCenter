@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from operations_center.audit_dispatch.lifecycle import (
     PostExecutionDiscovery,

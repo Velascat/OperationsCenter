@@ -24,8 +24,6 @@ This CLI does not:
 
 from __future__ import annotations
 
-import json
-import sys
 from pathlib import Path
 
 import typer
@@ -34,7 +32,6 @@ from rich.table import Table
 
 from operations_center.audit_dispatch import (
     AuditDispatchConfigError,
-    DispatchStatus,
     ManagedAuditDispatchRequest,
     RepoLockAlreadyHeldError,
     dispatch_managed_audit,

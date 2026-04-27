@@ -22,7 +22,6 @@ from operations_center.mini_regression import (
     load_mini_regression_suite,
     load_suite_report,
     run_mini_regression_suite,
-    write_suite_report,
 )
 from operations_center.mini_regression.runner import _compute_suite_status
 from operations_center.slice_replay.models import SliceReplayProfile, SliceReplayReport
@@ -474,7 +473,6 @@ _REPLAY_TARGET = "operations_center.mini_regression.runner.run_slice_replay"
 
 
 def _make_partial_replay_report(fixture_pack_path: str) -> SliceReplayReport:
-    from datetime import UTC, datetime
     return SliceReplayReport(
         fixture_pack_id="pack_001",
         fixture_pack_path=fixture_pack_path,

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-from operations_center.contracts.common import ChangedFileRef
 from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory, ValidationStatus
 from operations_center.tuning.compare import compare_backends, compare_by_task_type
 from operations_center.tuning.routing_models import (
@@ -20,7 +19,6 @@ from operations_center.tuning.routing_models import (
 )
 
 from .conftest import (
-    make_failure,
     make_n_failures,
     make_n_successes,
     make_no_changes,
@@ -68,7 +66,7 @@ class TestGrouping:
         assert lanes == {"claude_cli", "aider_local"}
 
     def test_missing_backend_groups_under_unknown(self):
-        record = make_success()
+        _record = make_success()
         record2 = make_record(backend=None, lane="claude_cli")
         summaries = compare_backends([record2])
         assert summaries[0].backend == "unknown"
@@ -205,7 +203,6 @@ class TestChangeEvidenceClass:
 
     def test_not_applicable_excluded_from_rate(self):
         # All policy_blocked → NOT_APPLICABLE → UNKNOWN class
-        from operations_center.contracts.enums import FailureReasonCategory
         records = [
             make_record(
                 status=ExecutionStatus.FAILED,

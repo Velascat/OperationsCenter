@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from operations_center.artifact_index import (
     ManagedArtifactIndex,
@@ -15,7 +14,6 @@ from operations_center.artifact_index import (
 from operations_center.audit_contracts.vocabulary import (
     ArtifactStatus,
     Limitation,
-    Location,
     ManifestStatus,
     RunStatus,
 )
@@ -93,7 +91,7 @@ class TestBuildArtifactIndex:
 
     def test_excluded_paths_retained_at_index_level(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(completed_manifest_file)
-        index = build_artifact_index(manifest, completed_manifest_file)
+        _index = build_artifact_index(manifest, completed_manifest_file)
         # completed_manifest_file fixture has no excluded_paths; use example instead
 
     def test_excluded_paths_from_example(self, example_completed_manifest_path: Path) -> None:
@@ -152,7 +150,6 @@ class TestIndexPathResolution:
         artifact_file.write_text("{}", encoding="utf-8")
 
         manifest_path = bucket_dir / "artifact_manifest.json"
-        import json
         manifest_path.write_text(json.dumps(completed_manifest_payload), encoding="utf-8")
 
         manifest = load_artifact_manifest(manifest_path)
@@ -172,7 +169,6 @@ class TestIndexPathResolution:
         bucket_dir = tmp_path / run_root
         bucket_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = bucket_dir / "artifact_manifest.json"
-        import json
         manifest_path.write_text(json.dumps(completed_manifest_payload), encoding="utf-8")
 
         manifest = load_artifact_manifest(manifest_path)
@@ -197,7 +193,6 @@ class TestIndexPathResolution:
         artifact_file.write_text("{}", encoding="utf-8")
 
         manifest_path = bucket_dir / "artifact_manifest.json"
-        import json
         manifest_path.write_text(json.dumps(completed_manifest_payload), encoding="utf-8")
 
         manifest = load_artifact_manifest(manifest_path)
@@ -215,7 +210,6 @@ class TestIndexPathResolution:
         # Do NOT create the artifact file
 
         manifest_path = bucket_dir / "artifact_manifest.json"
-        import json
         manifest_path.write_text(json.dumps(completed_manifest_payload), encoding="utf-8")
 
         manifest = load_artifact_manifest(manifest_path)
@@ -231,7 +225,6 @@ class TestIndexPathResolution:
         bucket_dir = tmp_path / run_root
         bucket_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = bucket_dir / "artifact_manifest.json"
-        import json
         manifest_path.write_text(json.dumps(completed_manifest_payload), encoding="utf-8")
 
         manifest = load_artifact_manifest(manifest_path)

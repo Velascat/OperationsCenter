@@ -6,7 +6,7 @@ from pathlib import Path
 
 from operations_center.tuning.applier import TuningApplier
 from operations_center.tuning.artifact_writer import TuningArtifactWriter
-from operations_center.tuning.guardrails import AUTO_APPLY_KEYS, TuningGuardrails
+from operations_center.tuning.guardrails import TuningGuardrails
 from operations_center.tuning.loader import TuningArtifactLoader
 from operations_center.tuning.metrics import aggregate_family_metrics
 from operations_center.tuning.models import TuningChange, TuningRunArtifact

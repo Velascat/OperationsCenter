@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from operations_center.audit_contracts.artifact_manifest import (
     ExcludedPath,
@@ -18,7 +17,6 @@ from operations_center.audit_contracts.vocabulary import (
     Location,
     ManifestStatus,
     PathRole,
-    RunStatus,
     ValidFor,
 )
 

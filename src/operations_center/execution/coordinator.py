@@ -22,7 +22,7 @@ from operations_center.backends.factory import CanonicalBackendRegistry
 from operations_center.contracts.common import ValidationSummary
 from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
 from operations_center.contracts.enums import ValidationStatus
-from operations_center.contracts.execution import ExecutionResult
+from operations_center.contracts.execution import ExecutionRequest, ExecutionResult
 from operations_center.observability.models import BackendDetailRef, ExecutionRecord
 from operations_center.observability.service import ExecutionObservabilityService
 from operations_center.observability.trace import ExecutionTrace
@@ -49,7 +49,7 @@ class _DetailRefBuilder(Protocol):
 
 @dataclass(frozen=True)
 class ExecutionRunOutcome:
-    request: object
+    request: ExecutionRequest
     policy_decision: PolicyDecision
     result: ExecutionResult
     record: ExecutionRecord

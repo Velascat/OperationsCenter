@@ -6,9 +6,8 @@ raises an unexpected exception, rather than propagating the exception.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from operations_center.backends.factory import CanonicalBackendRegistry
 from operations_center.contracts.enums import (
@@ -50,9 +49,10 @@ def _bundle() -> ProposalDecisionBundle:
 
 
 def _crashing_adapter(exc: Exception):
-    adapter = MagicMock()
-    adapter.execute.side_effect = exc
-    return adapter
+    class _Crash:
+        def execute(self, request):
+            raise exc
+    return _Crash()
 
 
 def _registry_for(adapter) -> CanonicalBackendRegistry:

@@ -6,11 +6,9 @@ Slice replay execution is monkeypatched — no real fixture packs are read.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from operations_center.entrypoints.replay.main import app

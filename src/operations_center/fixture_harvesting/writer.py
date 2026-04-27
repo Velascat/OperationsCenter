@@ -7,11 +7,10 @@ fixture pack directory. Original artifacts are never modified.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .errors import FixturePackWriteError, UnsafePathError
 from .models import (
@@ -86,7 +85,7 @@ def _write_fixture_artifact(
 
     _assert_safe_destination(dest, artifacts_dir)
 
-    base_kwargs = dict(
+    base_kwargs: dict[str, Any] = dict(
         source_artifact_id=artifact.artifact_id,
         artifact_kind=artifact.artifact_kind,
         source_stage=artifact.source_stage,
@@ -177,8 +176,8 @@ def _build_finding_references(
             continue
         refs.append(FixtureFindingReference(
             source_finding_id=str(fid) if fid else "",
-            severity=getattr(f, "severity", "").value if hasattr(getattr(f, "severity", None), "value") else str(getattr(f, "severity", "")),
-            category=getattr(f, "category", "").value if hasattr(getattr(f, "category", None), "value") else str(getattr(f, "category", "")),
+            severity=getattr(getattr(f, "severity", None), "value", None) or str(getattr(f, "severity", "")),
+            category=getattr(getattr(f, "category", None), "value", None) or str(getattr(f, "category", "")),
             artifact_ids=list(getattr(f, "artifact_ids", [])),
             summary=str(getattr(f, "summary", "")),
         ))

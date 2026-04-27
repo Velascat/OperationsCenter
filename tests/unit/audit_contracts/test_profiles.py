@@ -9,12 +9,10 @@ Verifies the profile:
 
 from __future__ import annotations
 
-import pytest
 
 from operations_center.audit_contracts.profiles import VIDEOFOUNDRY_PROFILE, VideoFoundryProducerProfile
 from operations_center.audit_contracts.vocabulary import (
     GENERIC_ENUMS,
-    Limitation,
     VideoFoundryAuditType,
 )
 
@@ -119,7 +117,6 @@ class TestVideoFoundryPathQuirks:
 class TestBoundaryEnforcement:
     def test_no_videofoundry_imports_in_contract_code(self) -> None:
         import ast
-        import importlib.util
         from pathlib import Path
         contract_dir = Path(__file__).parent.parent.parent.parent / "src" / "operations_center" / "audit_contracts"
         for py_file in contract_dir.rglob("*.py"):

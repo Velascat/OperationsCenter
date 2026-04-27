@@ -15,14 +15,8 @@ from operations_center.observability.models import BackendDetailRef, ExecutionRe
 from operations_center.observability.recorder import ExecutionRecorder
 
 from .conftest import (
-    make_artifact,
     make_changed_file,
     make_result,
-    successful_rich_result,
-    failed_result_with_logs,
-    sparse_result,
-    policy_blocked_result,
-    no_changes_result,
 )
 
 

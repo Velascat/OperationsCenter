@@ -17,7 +17,6 @@ from operations_center.audit_contracts.vocabulary import (
     ConsumerType,
     Limitation,
     Location,
-    PathRole,
     ValidFor,
 )
 

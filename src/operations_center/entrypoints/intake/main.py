@@ -36,7 +36,6 @@ import sys
 import tempfile
 import time
 import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -268,6 +267,7 @@ def _watch_loop_poll(config_path: Path, venv_python: str) -> None:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> int:
+    global QUEUE_DIR
     parser = argparse.ArgumentParser(description="OperationsCenter intake role — operator queue processor")
     parser.add_argument("--config", required=True, type=Path, help="Path to operations_center config YAML")
     parser.add_argument("--queue-dir", type=Path, default=QUEUE_DIR, help="Override queue directory")
@@ -281,7 +281,6 @@ def main() -> int:
         datefmt="%H:%M:%S",
     )
 
-    global QUEUE_DIR
     QUEUE_DIR = args.queue_dir
 
     oc_root = Path(__file__).resolve().parents[4]

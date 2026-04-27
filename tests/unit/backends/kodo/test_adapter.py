@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
 from operations_center.backends.kodo.adapter import KodoBackendAdapter

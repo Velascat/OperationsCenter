@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
 
 from operations_center.backends.kodo.models import KodoArtifactCapture, KodoRunCapture
 from operations_center.backends.kodo.normalize import normalize

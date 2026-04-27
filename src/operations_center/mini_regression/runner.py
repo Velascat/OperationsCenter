@@ -23,6 +23,7 @@ from .models import (
     MiniRegressionSuiteEntry,
     MiniRegressionSuiteReport,
     MiniRegressionSuiteSummary,
+    SuiteStatus,
     make_suite_run_id,
 )
 from .reports import write_suite_report
@@ -52,7 +53,7 @@ def _build_replay_request(
 def _compute_suite_status(
     entry_results: list[MiniRegressionEntryResult],
     stopped_early: bool,
-) -> str:
+) -> SuiteStatus:
     """Determine overall suite status from entry results.
 
     Rules:

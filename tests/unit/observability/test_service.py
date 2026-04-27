@@ -9,11 +9,6 @@ from operations_center.observability.models import BackendDetailRef, ExecutionRe
 from operations_center.observability.service import ExecutionObservabilityService
 from operations_center.observability.trace import ExecutionTrace
 
-from .conftest import (
-    successful_rich_result,
-    failed_result_with_logs,
-    sparse_result,
-)
 
 
 @pytest.fixture

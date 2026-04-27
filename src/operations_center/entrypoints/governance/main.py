@@ -19,12 +19,13 @@ This CLI does NOT:
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from typing import cast
 
 from operations_center.audit_governance import (
     AuditGovernanceRequest,
@@ -36,9 +37,8 @@ from operations_center.audit_governance import (
     make_governance_decision,
     make_manual_approval,
     run_governed_audit,
-    write_governance_report,
 )
-from operations_center.audit_governance.models import AuditGovernanceReport
+from operations_center.audit_governance.models import AuditUrgency
 
 app = typer.Typer(
     help="Full audit governance — approve, deny, and dispatch managed repo audits.",
@@ -77,7 +77,7 @@ def cmd_request(
             audit_type=audit_type,
             requested_by=requested_by,
             requested_reason=reason,
-            urgency=urgency,  # type: ignore[arg-type]
+            urgency=cast(AuditUrgency, urgency),
             related_suite_report_path=suite_report,
         )
     except Exception as exc:
@@ -122,7 +122,7 @@ def cmd_evaluate(
     decision = make_governance_decision(request, policy_results)
 
     color = _status_color(decision.decision)
-    console.print(f"[bold]Governance Evaluation[/bold]")
+    console.print("[bold]Governance Evaluation[/bold]")
     console.print(f"  repo:     {request.repo_id}")
     console.print(f"  type:     {request.audit_type}")
     console.print(f"  urgency:  {request.urgency}")
@@ -259,7 +259,7 @@ def cmd_inspect(
 
     dec = rep.decision
     color = _status_color(dec.decision)
-    console.print(f"[bold]Governance Report[/bold]")
+    console.print("[bold]Governance Report[/bold]")
     console.print(f"  repo:         {rep.request.repo_id}")
     console.print(f"  audit_type:   {rep.request.audit_type}")
     console.print(f"  requested_by: {rep.request.requested_by}")
@@ -281,7 +281,7 @@ def cmd_inspect(
 
     if rep.dispatch_result_summary:
         dr = rep.dispatch_result_summary
-        console.print(f"\n[bold]Dispatch[/bold]")
+        console.print("\n[bold]Dispatch[/bold]")
         console.print(f"  run_id:  {dr.run_id}")
         console.print(f"  status:  {dr.status}")
         if dr.error:

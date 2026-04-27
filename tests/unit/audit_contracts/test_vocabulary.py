@@ -11,16 +11,13 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from operations_center.audit_contracts.vocabulary import (
-    ArtifactStatus,
     ConsumerType,
     GENERIC_ENUMS,
     Limitation,
     Location,
     ManifestStatus,
-    PathRole,
     RunStatus,
     ValidFor,
     VideoFoundryArtifactKind,

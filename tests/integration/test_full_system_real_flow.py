@@ -21,10 +21,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from operations_center.artifact_index import build_artifact_index, load_artifact_manifest
-from operations_center.audit_contracts import ManagedRunStatus
 from operations_center.audit_dispatch.models import DispatchStatus, ManagedAuditDispatchResult
 from operations_center.audit_governance import (
     AuditGovernanceRequest,
@@ -351,7 +349,7 @@ def test_full_system_governance_status_in_report(tmp_path: Path):
         )
 
     from operations_center.audit_governance import load_governance_report
-    gov_report = load_governance_report(Path(gov_result.report_path))
+    _gov_report = load_governance_report(Path(gov_result.report_path))
 
     # The persisted JSON must contain governance_status (gap_r2_003 closure check)
     raw = json.loads(Path(gov_result.report_path).read_text(encoding="utf-8"))

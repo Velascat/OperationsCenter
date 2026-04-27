@@ -13,20 +13,17 @@ Structure:
 
 from __future__ import annotations
 
-import pytest
 
-from operations_center.contracts.enums import LaneName, BackendName, RiskLevel, TaskType
+from operations_center.contracts.enums import RiskLevel, TaskType
 from operations_center.policy.engine import PolicyEngine
 from operations_center.policy.models import (
     PathScopeRule,
-    PolicyConfig,
     PolicyStatus,
     ValidationRequirement,
 )
 
 from .conftest import (
     local_decision,
-    make_decision,
     make_policy_config,
     make_proposal,
     make_repo_policy,

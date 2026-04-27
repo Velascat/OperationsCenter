@@ -17,7 +17,6 @@ This CLI is read-only. It does not:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import typer
@@ -25,7 +24,6 @@ from rich.console import Console
 from rich.table import Table
 
 from operations_center.artifact_index import (
-    ArtifactNotFoundError,
     ArtifactQuery,
     ManifestInvalidError,
     ManifestNotFoundError,
@@ -36,10 +34,7 @@ from operations_center.artifact_index import (
 from operations_center.audit_contracts.vocabulary import (
     ArtifactStatus,
     ConsumerType,
-    Limitation,
     Location,
-    PathRole,
-    ValidFor,
 )
 
 app = typer.Typer(
@@ -80,7 +75,7 @@ def cmd_index(
     console.print(f"  singletons:      {len(index.singleton_artifacts)}")
     console.print(f"  excluded_paths:  {len(index.excluded_paths)}")
     if index.limitations:
-        console.print(f"  limitations:     {', '.join(l.value for l in index.limitations)}")
+        console.print(f"  limitations:     {', '.join(lim.value for lim in index.limitations)}")
     if index.warnings:
         for w in index.warnings:
             console.print(f"  [yellow]warn:[/yellow] {w}")
@@ -147,7 +142,7 @@ def cmd_get(
         ("size_bytes", str(artifact.size_bytes) if artifact.size_bytes is not None else "—"),
         ("consumer_types", ", ".join(c.value for c in artifact.consumer_types) or "—"),
         ("valid_for", ", ".join(v.value for v in artifact.valid_for) or "—"),
-        ("limitations", ", ".join(l.value for l in artifact.limitations) or "—"),
+        ("limitations", ", ".join(lim.value for lim in artifact.limitations) or "—"),
         ("is_repo_singleton", str(artifact.is_repo_singleton)),
         ("is_partial", str(artifact.is_partial)),
         ("description", artifact.description or "—"),

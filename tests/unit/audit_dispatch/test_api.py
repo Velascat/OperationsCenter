@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import ast
 import json
-import os
 import sys
 import textwrap
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -25,7 +24,6 @@ from operations_center.audit_dispatch import (
     FailureKind,
     ManagedAuditDispatchRequest,
     RepoLockAlreadyHeldError,
-    acquire_audit_lock,
     dispatch_managed_audit,
 )
 from operations_center.audit_dispatch.locks import ManagedRepoAuditLockRegistry
@@ -139,7 +137,7 @@ class TestDispatchConfigErrors:
             dispatch_managed_audit(req, config_dir=_CONFIG_DIR, log_dir=tmp_path)
 
     def test_blocked_command_raises_config_error(self, tmp_path: Path) -> None:
-        req = ManagedAuditDispatchRequest(
+        _req = ManagedAuditDispatchRequest(
             repo_id="videofoundry",
             audit_type="representative",
             allow_unverified_command=False,  # representative is verified, but test other type
@@ -157,7 +155,6 @@ class TestDispatchConfigErrors:
 
 class TestDispatchLocking:
     def test_lock_released_after_success(self, tmp_path: Path) -> None:
-        from operations_center.audit_dispatch.locks import _GLOBAL_REGISTRY
 
         # Use a fresh registry for isolation
         registry = ManagedRepoAuditLockRegistry()
@@ -245,7 +242,7 @@ class TestDispatchProcessBehavior:
         """A failing process that writes run_status.json should still have paths resolved."""
         output_dir = tmp_path / "output"
         output_dir.mkdir()
-        bucket = _write_compliant_bucket(output_dir, _RUN_ID)
+        _bucket = _write_compliant_bucket(output_dir, _RUN_ID)
 
         # Command exits 1 but the bucket was pre-written
         prepared = _make_fake_invocation(tmp_path)

@@ -10,12 +10,10 @@ import pytest
 from operations_center.behavior_calibration import (
     AnalysisProfile,
     BehaviorCalibrationInput,
-    BehaviorCalibrationReport,
     analyze_artifacts,
     load_calibration_report,
     write_calibration_report,
 )
-from operations_center.behavior_calibration.errors import ReportWriteError
 
 
 def make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:

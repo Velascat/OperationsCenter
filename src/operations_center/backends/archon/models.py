@@ -12,7 +12,7 @@ ArchonRunCapture includes workflow_events for raw event retention.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -85,8 +85,8 @@ class ArchonRunCapture:
     error_text: str
     workflow_events: list[dict] = field(default_factory=list)
     artifacts: list[ArchonArtifactCapture] = field(default_factory=list)
-    started_at: datetime = field(default_factory=lambda: datetime.utcnow())
-    finished_at: datetime = field(default_factory=lambda: datetime.utcnow())
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    finished_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     duration_ms: int = 0
     timeout_hit: bool = False
 

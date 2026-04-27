@@ -21,13 +21,16 @@ What this service does NOT do:
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from operations_center.observability.models import ExecutionRecord
 from operations_center.observability.service import ExecutionObservabilityService
 from operations_center.observability.trace import ExecutionTrace
 from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
 from operations_center.routing.service import PlanningService
+
+if TYPE_CHECKING:
+    from operations_center.contracts.execution import ExecutionResult
 
 from .models import (
     OperatorContext,

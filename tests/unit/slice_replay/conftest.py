@@ -13,7 +13,6 @@ import pytest
 
 from operations_center.artifact_index import build_artifact_index, load_artifact_manifest
 from operations_center.fixture_harvesting import (
-    CopyPolicy,
     HarvestProfile,
     HarvestRequest,
     harvest_fixtures,

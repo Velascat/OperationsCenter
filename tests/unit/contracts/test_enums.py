@@ -4,12 +4,9 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from operations_center.contracts.enums import (
-    ArtifactType,
     BackendName,
-    ExecutionMode,
     ExecutionStatus,
     FailureReasonCategory,
     LaneName,

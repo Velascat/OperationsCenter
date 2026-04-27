@@ -17,7 +17,6 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from operations_center.audit_toolset import (
     ManagedAuditCommandUnavailableError,
@@ -29,7 +28,7 @@ from operations_center.managed_repos.loader import load_managed_repo_config
 from operations_center.run_identity.errors import RunIdentityError
 from operations_center.run_identity.generator import prepare_managed_audit_invocation
 
-from .errors import AuditDispatchConfigError, RepoLockAlreadyHeldError
+from .errors import AuditDispatchConfigError
 from .executor import ManagedAuditExecutor
 from .lifecycle import discover_post_execution
 from .locks import acquire_audit_lock

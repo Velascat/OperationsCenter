@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from operations_center.audit_contracts.run_status import ManagedRunStatus
 from operations_center.audit_contracts.vocabulary import RunStatus

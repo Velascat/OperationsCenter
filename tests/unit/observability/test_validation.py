@@ -6,7 +6,7 @@ import pytest
 
 from operations_center.contracts.common import ValidationSummary
 from operations_center.contracts.enums import ValidationStatus
-from operations_center.observability.validation import ValidationEvidence, normalize_validation
+from operations_center.observability.validation import normalize_validation
 
 
 def _summary(

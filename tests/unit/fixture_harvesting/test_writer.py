@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from operations_center.artifact_index import build_artifact_index, load_artifact_manifest
 from operations_center.fixture_harvesting import (
@@ -13,17 +12,11 @@ from operations_center.fixture_harvesting import (
     HarvestProfile,
     HarvestRequest,
     harvest_fixtures,
-    load_fixture_pack,
-    select_fixture_artifacts,
-    write_fixture_pack,
-    UnsafePathError,
 )
 
 from .conftest import (
     _base_entry,
     _make_manifest_payload,
-    _missing_entry,
-    _singleton_entry,
     _write_manifest,
 )
 

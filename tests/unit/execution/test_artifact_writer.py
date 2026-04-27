@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from operations_center.contracts.enums import BackendName, LaneName, ExecutionStatus, FailureReasonCategory
 from operations_center.contracts.execution import ExecutionRequest, ExecutionResult

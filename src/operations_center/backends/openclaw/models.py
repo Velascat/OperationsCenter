@@ -17,7 +17,7 @@ changed_files_source values:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -108,8 +108,8 @@ class OpenClawRunCapture:
     artifacts: list[OpenClawArtifactCapture] = field(default_factory=list)
     reported_changed_files: list[dict] = field(default_factory=list)
     changed_files_source: str = "unknown"  # "git_diff" | "event_stream" | "unknown"
-    started_at: datetime = field(default_factory=lambda: datetime.utcnow())
-    finished_at: datetime = field(default_factory=lambda: datetime.utcnow())
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    finished_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     duration_ms: int = 0
     timeout_hit: bool = False
 

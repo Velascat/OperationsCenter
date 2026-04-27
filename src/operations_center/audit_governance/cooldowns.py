@@ -38,7 +38,7 @@ def _load_cooldown_state_unlocked(
         state = AuditCooldownState.model_validate(data)
     except Exception as exc:
         raise CooldownStateError(f"Cannot load cooldown state from {path}: {exc}") from exc
-    return AuditCooldownState(**{**state.model_dump(), "cooldown_seconds": config.cooldown_seconds})
+    return state.model_copy(update={"cooldown_seconds": config.cooldown_seconds})
 
 
 def load_cooldown_state(

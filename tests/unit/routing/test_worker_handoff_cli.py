@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from operations_center.routing.client import HttpLaneRoutingClient
@@ -121,7 +122,7 @@ repos:
     workspace.mkdir()
 
     cmd = [
-        str(REPO_ROOT / ".venv" / "bin" / "python"),
+        sys.executable,
         "-m",
         "operations_center.entrypoints.execute.main",
         "--config",

@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from operations_center.backends.openclaw.models import OpenClawArtifactCapture, OpenClawRunCapture
 from operations_center.backends.openclaw.normalize import normalize

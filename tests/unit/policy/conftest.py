@@ -15,7 +15,6 @@ from operations_center.contracts.enums import (
     BackendName,
     ExecutionMode,
     LaneName,
-    Priority,
     RiskLevel,
     TaskType,
 )

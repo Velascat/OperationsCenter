@@ -221,7 +221,6 @@ class TestIndexDispatchResult:
 class TestNoBoundaryViolation:
     def test_no_managed_repo_imports(self) -> None:
         import ast
-        import sys
         from pathlib import Path
 
         pkg_root = Path(__file__).resolve().parents[3] / "src" / "operations_center" / "artifact_index"
@@ -241,10 +240,9 @@ class TestNoBoundaryViolation:
                         )
 
     def test_no_directory_scanning(self) -> None:
-        import ast
         from pathlib import Path
 
-        FORBIDDEN = {"os.scandir", "os.listdir", "os.walk", "glob.glob", "glob.iglob", "Path.glob", "Path.rglob"}
+        _FORBIDDEN = {"os.scandir", "os.listdir", "os.walk", "glob.glob", "glob.iglob", "Path.glob", "Path.rglob"}
         pkg_root = Path(__file__).resolve().parents[3] / "src" / "operations_center" / "artifact_index"
         for py_file in pkg_root.glob("*.py"):
             source = py_file.read_text(encoding="utf-8")

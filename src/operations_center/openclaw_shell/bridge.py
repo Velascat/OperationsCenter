@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from operations_center.observability.models import ExecutionRecord
 from operations_center.observability.trace import ExecutionTrace
@@ -51,6 +51,9 @@ from .models import (
     ShellStatusSummary,
 )
 from .service import OpenClawShellService
+
+if TYPE_CHECKING:
+    from operations_center.contracts.execution import ExecutionResult
 
 logger = logging.getLogger(__name__)
 

@@ -343,12 +343,10 @@ def check_content(
     Uses Phase 7 retrieval helpers only. Never mutates files.
     """
     from operations_center.artifact_index.retrieval import (
-        get_artifact_by_id,
         read_json_artifact,
         read_text_artifact,
     )
     from operations_center.artifact_index.errors import (
-        ArtifactNotFoundError,
         ArtifactPathUnresolvableError,
     )
 

@@ -17,7 +17,6 @@ This CLI does NOT:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import typer
@@ -72,13 +71,21 @@ def cmd_run(
         console.print(f"[red]Suite definition error:[/red] {exc}")
         raise typer.Exit(code=2) from exc
 
-    request = MiniRegressionRunRequest(
-        suite_definition=suite_def,
-        output_dir=Path(output_dir),
-        fail_fast=fail_fast,
-        include_optional_entries=include_optional,
-        **({"run_id": run_id} if run_id else {}),
-    )
+    if run_id is not None:
+        request = MiniRegressionRunRequest(
+            suite_definition=suite_def,
+            output_dir=Path(output_dir),
+            fail_fast=fail_fast,
+            include_optional_entries=include_optional,
+            run_id=run_id,
+        )
+    else:
+        request = MiniRegressionRunRequest(
+            suite_definition=suite_def,
+            output_dir=Path(output_dir),
+            fail_fast=fail_fast,
+            include_optional_entries=include_optional,
+        )
 
     try:
         report = run_mini_regression_suite(request)
@@ -144,7 +151,7 @@ def cmd_inspect(
         else "red" if rep.status in ("failed", "error")
         else "yellow"
     )
-    console.print(f"[bold]Mini Regression Suite Report[/bold]")
+    console.print("[bold]Mini Regression Suite Report[/bold]")
     console.print(f"  suite:      {rep.suite_name} ({rep.suite_id})")
     console.print(f"  run_id:     {rep.suite_run_id}")
     console.print(f"  status:     [{status_color}]{rep.status}[/{status_color}]")

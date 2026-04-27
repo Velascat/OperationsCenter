@@ -18,7 +18,7 @@ display/log the trace independently.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from operations_center.contracts.execution import ExecutionResult
 
@@ -45,7 +45,7 @@ class ExecutionObservabilityService:
         lane: Optional[str] = None,
         raw_detail_refs: Optional[list[BackendDetailRef]] = None,
         notes: str = "",
-        metadata: Optional[dict[str, str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> tuple[ExecutionRecord, ExecutionTrace]:
         """Record an execution result and build an inspectable trace.
 

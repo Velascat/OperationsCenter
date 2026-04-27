@@ -6,12 +6,10 @@ Suite execution is always monkeypatched — no real replay is invoked.
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from typer.testing import CliRunner
 
 from operations_center.entrypoints.regression.main import app

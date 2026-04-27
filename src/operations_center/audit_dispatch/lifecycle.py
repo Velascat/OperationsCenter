@@ -12,7 +12,7 @@ Discovery path: run_status.json → artifact_manifest_path → artifact_manifest
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from operations_center.audit_toolset import (

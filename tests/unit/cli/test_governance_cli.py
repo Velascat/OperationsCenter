@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from operations_center.audit_dispatch.models import DispatchStatus, ManagedAuditDispatchResult
@@ -306,7 +305,7 @@ class TestCmdRun:
 
 class TestCmdInspect:
     def test_inspect_written_report(self, tmp_path: Path):
-        from operations_center.audit_governance import run_governed_audit, load_governance_report
+        from operations_center.audit_governance import run_governed_audit
 
         req = AuditGovernanceRequest(
             repo_id="videofoundry",

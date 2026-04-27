@@ -19,9 +19,7 @@ import pytest
 from operations_center.audit_governance import (
     AuditBudgetState,
     AuditCooldownState,
-    AuditGovernanceDecision,
     AuditGovernanceRequest,
-    AuditGovernedRunResult,
     AuditManualApproval,
     BudgetConfig,
     CooldownConfig,
@@ -38,9 +36,7 @@ from operations_center.audit_governance import (
     run_governed_audit,
     update_cooldown_after_dispatch,
     validate_manual_approval,
-    write_governance_report,
 )
-from operations_center.audit_governance.models import AuditGovernanceReport
 from operations_center.audit_dispatch.models import DispatchStatus, ManagedAuditDispatchResult
 
 
@@ -609,7 +605,7 @@ class TestGovernedRunner:
         dispatch_mock = MagicMock()
 
         with patch(_DISPATCH_TARGET, dispatch_mock):
-            result = run_governed_audit(req, governance_config=cfg, output_dir=tmp_path / "out")
+            _result = run_governed_audit(req, governance_config=cfg, output_dir=tmp_path / "out")
 
         assert not dispatch_mock.called
 

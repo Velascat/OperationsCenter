@@ -48,7 +48,6 @@ class TestReplayProfiles:
             assert len(PROFILE_CHECKS[profile]) > 0
 
     def test_invalid_profile_raises_on_get_check_specs(self) -> None:
-        from operations_center.slice_replay.errors import ReplayInputError
         from operations_center.slice_replay.profiles import get_check_specs
         with pytest.raises(Exception):
             get_check_specs("not_a_profile")  # type: ignore
@@ -227,7 +226,7 @@ class TestFailureSliceProfile:
             r for r in report.check_results
             if "failure" in r.summary.lower() or "partial" in r.summary.lower()
         ]
-        failed_or_passed = {r.status for r in failure_check_results}
+        _failed_or_passed = {r.status for r in failure_check_results}
         # Either pass (if pack has lims) or fail (if not) — either is correct
         assert len(failure_check_results) > 0
 

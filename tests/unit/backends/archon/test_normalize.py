@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 
-import pytest
 
 from operations_center.backends.archon.models import ArchonArtifactCapture, ArchonRunCapture
 from operations_center.backends.archon.normalize import normalize

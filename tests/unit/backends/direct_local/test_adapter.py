@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from operations_center.backends.direct_local.adapter import DirectLocalBackendAdapter
 from operations_center.config.settings import AiderSettings

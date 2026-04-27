@@ -12,7 +12,10 @@ Never the other direction.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from operations_center.contracts.execution import ExecutionResult
 
 from operations_center.observability.models import ExecutionRecord
 from operations_center.observability.trace import ExecutionTrace
@@ -62,7 +65,6 @@ def status_from_result_only(
     Used when the full observability record is not available.
     Headline and summary are synthesized minimally from result fields.
     """
-    from operations_center.contracts.execution import ExecutionResult
 
     headline = _minimal_headline(result, lane, backend)
     summary = _minimal_summary(result)
@@ -126,7 +128,7 @@ def inspection_from_record(
 
 def _minimal_headline(result: "ExecutionResult", lane: Optional[str], backend: Optional[str]) -> str:
     status = result.status.value.upper()
-    parts = [status]
+    parts: list[str] = [status]
     if backend:
         parts.append(backend)
     if lane:

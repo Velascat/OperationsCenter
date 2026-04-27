@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from operations_center.backends.openclaw.adapter import OpenClawBackendAdapter
 from operations_center.backends.openclaw.models import OpenClawRunCapture

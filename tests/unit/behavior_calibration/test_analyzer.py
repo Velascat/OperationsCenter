@@ -13,8 +13,6 @@ from operations_center.behavior_calibration import (
     AnalysisProfile,
     BehaviorCalibrationInput,
     BehaviorCalibrationReport,
-    CalibrationFinding,
-    CalibrationRecommendation,
     FindingCategory,
     FindingSeverity,
     analyze_artifacts,

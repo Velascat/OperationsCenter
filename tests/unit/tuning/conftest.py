@@ -7,7 +7,6 @@ controlled characteristics for routing strategy analysis tests.
 
 from __future__ import annotations
 
-import pytest
 
 from operations_center.contracts.common import ChangedFileRef, ValidationSummary
 from operations_center.contracts.enums import (

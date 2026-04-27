@@ -11,10 +11,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
-from operations_center.contracts.enums import FailureReasonCategory
-from operations_center.contracts.proposal import TaskProposal
 from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
 from operations_center.planning.proposal_builder import build_proposal
 from operations_center.routing.client import SwitchBoardUnavailableError

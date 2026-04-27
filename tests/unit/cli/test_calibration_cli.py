@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from operations_center.entrypoints.calibration.main import app
@@ -127,7 +126,7 @@ class TestCmdAnalyze:
             patch(_ANALYZE_TARGET, return_value=report),
             patch(_WRITE_REPORT_TARGET, return_value=written_path) as mock_write,
         ):
-            out = _runner.invoke(app, ["analyze", "--manifest", str(mf), "--output-dir", str(tmp_path)])
+            _out = _runner.invoke(app, ["analyze", "--manifest", str(mf), "--output-dir", str(tmp_path)])
         assert mock_write.called
 
     def test_analyze_not_found_exits_code_1(self, tmp_path: Path):

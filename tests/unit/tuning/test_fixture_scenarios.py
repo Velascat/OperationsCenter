@@ -12,8 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from operations_center.contracts.common import ChangedFileRef
-from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
 from operations_center.tuning.analyze import StrategyTuningService
 from operations_center.tuning.routing_models import (
     ChangeEvidenceClass,
@@ -23,8 +21,6 @@ from operations_center.tuning.routing_models import (
 
 from .conftest import (
     make_failure,
-    make_n_successes,
-    make_record,
     make_success,
     make_unknown_changed_files,
 )
@@ -147,7 +143,7 @@ class TestPremiumBackendWins:
 
     def test_kodo_low_reliability_produces_proposal(self):
         report = StrategyTuningService.default().analyze(self._records())
-        kodo_proposals = [
+        _kodo_proposals = [
             p for p in report.recommendations
             if any("kodo" in fid or True for fid in p.source_finding_ids)
         ]

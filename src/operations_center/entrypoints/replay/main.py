@@ -16,7 +16,6 @@ This CLI does NOT:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import typer
@@ -111,7 +110,7 @@ def cmd_inspect(
         raise typer.Exit(code=2) from exc
 
     status_color = "green" if rep.status == "passed" else "red" if rep.status == "failed" else "yellow"
-    console.print(f"[bold]Slice Replay Report[/bold]")
+    console.print("[bold]Slice Replay Report[/bold]")
     console.print(f"  replay_id:  {rep.replay_id}")
     console.print(f"  pack:       {rep.fixture_pack_id}")
     console.print(f"  profile:    {rep.replay_profile.value}")

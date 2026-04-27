@@ -103,8 +103,8 @@ def compare_by_task_type(
 
     groups: dict[tuple[str, str, str], list[ExecutionRecord]] = defaultdict(list)
     for record in records:
-        task_type = record.metadata.get("task_type", "unknown")
-        key = (record.lane or "unknown", record.backend or "unknown", task_type)
+        task_type = str(record.metadata.get("task_type", "unknown"))
+        key: tuple[str, str, str] = (record.lane or "unknown", record.backend or "unknown", task_type)
         groups[key].append(record)
 
     summaries = []
@@ -266,7 +266,7 @@ def _latency_class(
         raw = r.metadata.get("duration_ms")
         if raw is not None:
             try:
-                durations.append(int(raw))
+                durations.append(int(str(raw)))
             except (TypeError, ValueError):
                 pass
 
