@@ -1,6 +1,6 @@
-# Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 7)
+# Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 8)
 
-**Verification date:** 2026-04-26 (Rev 7 — post Rev 6 gap-closure pass)
+**Verification date:** 2026-04-26 (Rev 8 — post Rev 7 confirmation pass)
 **Test suite:** 2733 passing, 4 skipped (live SwitchBoard only), 0 failures, 1 expected warning
 **Scope:** Phases 0–12, Anti-Collapse Invariant, Gap Closure
 **Status:** LOCKED
@@ -20,8 +20,9 @@
 | Rev 5 | 0 | — | ✅ N/A |
 | Rev 6 | 2 | 0C / 0H / 0M / 2L | ✅ Yes |
 | Rev 7 | 0 | — | ✅ N/A |
+| Rev 8 | 0 | — | ✅ N/A |
 
-**Cumulative: 23 gaps identified across 7 revisions. All 23 closed. 0 open.**
+**Cumulative: 23 gaps identified across 8 revisions. All 23 closed. 0 open.**
 
 No critical, high, medium, or low gaps remain. No invariant violations found.
 
@@ -480,7 +481,7 @@ The following rules are declared permanent:
 
 ## Final Lockdown Statement
 
-The managed repo audit system across Phases 0–12 is declared **locked** as of 2026-04-26 (Rev 7).
+The managed repo audit system across Phases 0–12 is declared **locked** as of 2026-04-26 (Rev 8).
 
 **Verification status:**
 - All 13 invariants hold (all ✅ PASS)
@@ -493,4 +494,4 @@ The managed repo audit system across Phases 0–12 is declared **locked** as of 
 - All persisted artifacts have JSON schemas (7 schema files across 6 subdirectories)
 - run_status.json and artifact_manifest.json schemas verified 0-delta against Pydantic models
 
-**The system is architecturally complete and gap-free.** Seven verification passes across this codebase have found and closed 23 gaps; the Rev 7 pass found none. The 4 suggested follow-up tasks are enhancements, not correctness issues.
+**The system is architecturally complete and gap-free.** Eight verification passes across this codebase have found and closed 23 gaps; both Rev 7 and Rev 8 passes found none. The gap detection pass ran 14 checks, all clean. The 3 suggested follow-up tasks are enhancements, not correctness issues.
