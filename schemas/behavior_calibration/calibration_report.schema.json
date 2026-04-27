@@ -1,0 +1,345 @@
+{
+  "$defs": {
+    "AnalysisProfile": {
+      "description": "Explicit analysis profile requested by the caller.",
+      "enum": [
+        "summary",
+        "failure_diagnosis",
+        "coverage_gaps",
+        "artifact_health",
+        "producer_compliance",
+        "recommendation"
+      ],
+      "title": "AnalysisProfile",
+      "type": "string"
+    },
+    "ArtifactIndexSummary": {
+      "description": "High-level summary of a ManagedArtifactIndex.",
+      "properties": {
+        "total_artifacts": {
+          "title": "Total Artifacts",
+          "type": "integer"
+        },
+        "by_kind": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Kind",
+          "type": "object"
+        },
+        "by_location": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Location",
+          "type": "object"
+        },
+        "by_status": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "By Status",
+          "type": "object"
+        },
+        "singleton_count": {
+          "title": "Singleton Count",
+          "type": "integer"
+        },
+        "partial_count": {
+          "title": "Partial Count",
+          "type": "integer"
+        },
+        "excluded_path_count": {
+          "title": "Excluded Path Count",
+          "type": "integer"
+        },
+        "unresolved_path_count": {
+          "title": "Unresolved Path Count",
+          "type": "integer"
+        },
+        "missing_file_count": {
+          "title": "Missing File Count",
+          "type": "integer"
+        },
+        "machine_readable_count": {
+          "title": "Machine Readable Count",
+          "type": "integer"
+        },
+        "warnings_count": {
+          "title": "Warnings Count",
+          "type": "integer"
+        },
+        "errors_count": {
+          "title": "Errors Count",
+          "type": "integer"
+        },
+        "manifest_limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Manifest Limitations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_artifacts",
+        "by_kind",
+        "by_location",
+        "by_status",
+        "singleton_count",
+        "partial_count",
+        "excluded_path_count",
+        "unresolved_path_count",
+        "missing_file_count",
+        "machine_readable_count",
+        "warnings_count",
+        "errors_count",
+        "manifest_limitations"
+      ],
+      "title": "ArtifactIndexSummary",
+      "type": "object"
+    },
+    "CalibrationFinding": {
+      "description": "A single structured observation from artifact analysis.\n\nFindings are descriptive, not prescriptive. They describe what was\nobserved in the artifact index \u2014 they do not prescribe any action.",
+      "properties": {
+        "finding_id": {
+          "description": "Stable identifier for this finding within the report.",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/FindingSeverity"
+        },
+        "category": {
+          "$ref": "#/$defs/FindingCategory"
+        },
+        "summary": {
+          "description": "One-line human-readable description.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "description": "Extended explanation of the finding.",
+          "title": "Detail",
+          "type": "string"
+        },
+        "artifact_ids": {
+          "description": "Artifact IDs related to this finding.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "source": {
+          "description": "Rule or check that produced this finding (e.g. 'check_missing_files').",
+          "title": "Source",
+          "type": "string"
+        },
+        "confidence": {
+          "default": "high",
+          "description": "Confidence in the finding: 'low', 'medium', 'high'.",
+          "title": "Confidence",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "severity",
+        "category",
+        "summary",
+        "source"
+      ],
+      "title": "CalibrationFinding",
+      "type": "object"
+    },
+    "CalibrationRecommendation": {
+      "description": "An advisory tuning suggestion derived from calibration findings.\n\nRecommendations are ADVISORY ONLY. They must not be applied automatically.\nThey require human review before any action is taken.\n\nA recommendation must never directly:\n  - modify managed repo config\n  - modify runtime policy\n  - modify producer artifacts or manifests\n  - modify source code",
+      "properties": {
+        "recommendation_id": {
+          "title": "Recommendation Id",
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/$defs/RecommendationPriority"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "affected_repo_id": {
+          "title": "Affected Repo Id",
+          "type": "string"
+        },
+        "affected_audit_type": {
+          "title": "Affected Audit Type",
+          "type": "string"
+        },
+        "affected_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Artifact Ids",
+          "type": "array"
+        },
+        "suggested_action": {
+          "description": "Descriptive statement of the suggested human action.",
+          "title": "Suggested Action",
+          "type": "string"
+        },
+        "risk": {
+          "default": "low",
+          "description": "Risk level if the suggested action is skipped: 'low', 'medium', 'high'.",
+          "title": "Risk",
+          "type": "string"
+        },
+        "requires_human_review": {
+          "default": true,
+          "description": "Always True. Recommendations are never applied automatically.",
+          "title": "Requires Human Review",
+          "type": "boolean"
+        },
+        "supporting_finding_ids": {
+          "description": "IDs of CalibrationFindings that support this recommendation.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Supporting Finding Ids",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "priority",
+        "summary",
+        "rationale",
+        "affected_repo_id",
+        "affected_audit_type",
+        "suggested_action"
+      ],
+      "title": "CalibrationRecommendation",
+      "type": "object"
+    },
+    "FindingCategory": {
+      "description": "Category of a calibration finding.",
+      "enum": [
+        "missing_artifact",
+        "partial_run",
+        "failed_run",
+        "unresolved_path",
+        "missing_file",
+        "invalid_json",
+        "producer_contract_gap",
+        "coverage_gap",
+        "runtime_failure",
+        "repo_singleton_warning",
+        "noise_exclusion",
+        "unknown"
+      ],
+      "title": "FindingCategory",
+      "type": "string"
+    },
+    "FindingSeverity": {
+      "description": "Severity level of a calibration finding.",
+      "enum": [
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ],
+      "title": "FindingSeverity",
+      "type": "string"
+    },
+    "RecommendationPriority": {
+      "description": "Priority level of a calibration recommendation.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "urgent"
+      ],
+      "title": "RecommendationPriority",
+      "type": "string"
+    }
+  },
+  "description": "Schema for calibration_report.json produced by Phase 8 behavior calibration (write_calibration_report). Advisory analysis output \u2014 never mutates runtime.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "repo_id": {
+      "title": "Repo Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "audit_type": {
+      "title": "Audit Type",
+      "type": "string"
+    },
+    "analysis_profile": {
+      "$ref": "#/$defs/AnalysisProfile"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "artifact_index_summary": {
+      "$ref": "#/$defs/ArtifactIndexSummary"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/CalibrationFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "recommendations": {
+      "items": {
+        "$ref": "#/$defs/CalibrationRecommendation"
+      },
+      "title": "Recommendations",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "repo_id",
+    "run_id",
+    "audit_type",
+    "analysis_profile",
+    "artifact_index_summary"
+  ],
+  "title": "BehaviorCalibrationReport",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

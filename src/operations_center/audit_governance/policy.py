@@ -174,6 +174,12 @@ def _check_mini_regression_first(
 
     For low/normal urgency with no related suite report: needs_manual_approval.
     For high/urgent with no related suite report: still a warning (not hard fail).
+
+    Evidence model: related_suite_report_path is an operator attestation — the
+    policy checks only that the field is non-empty. File existence and content
+    are NOT validated here. The path is recorded in the governance report audit
+    trail for post-hoc verification. This is intentional: the field is marked
+    'Evidence context — informational, never approval' on AuditGovernanceRequest.
     """
     has_evidence = bool(request.related_suite_report_path)
     urgency_requires = request.urgency in require_for_urgency

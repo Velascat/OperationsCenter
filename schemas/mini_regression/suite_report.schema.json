@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "MiniRegressionEntryResult": {
+      "description": "The result of executing one suite entry.",
+      "properties": {
+        "entry_id": {
+          "title": "Entry Id",
+          "type": "string"
+        },
+        "fixture_pack_id": {
+          "title": "Fixture Pack Id",
+          "type": "string"
+        },
+        "fixture_pack_path": {
+          "title": "Fixture Pack Path",
+          "type": "string"
+        },
+        "replay_profile": {
+          "$ref": "#/$defs/SliceReplayProfile"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "error",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "slice_replay_report_path": {
+          "default": "",
+          "description": "Path where the slice replay report was written. Empty if run failed.",
+          "title": "Slice Replay Report Path",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "entry_id",
+        "fixture_pack_id",
+        "fixture_pack_path",
+        "replay_profile",
+        "required",
+        "status",
+        "summary"
+      ],
+      "title": "MiniRegressionEntryResult",
+      "type": "object"
+    },
+    "MiniRegressionSuiteSummary": {
+      "description": "Aggregated counts from a suite run.",
+      "properties": {
+        "total_entries": {
+          "title": "Total Entries",
+          "type": "integer"
+        },
+        "required_entries": {
+          "title": "Required Entries",
+          "type": "integer"
+        },
+        "optional_entries": {
+          "title": "Optional Entries",
+          "type": "integer"
+        },
+        "passed_entries": {
+          "title": "Passed Entries",
+          "type": "integer"
+        },
+        "failed_entries": {
+          "title": "Failed Entries",
+          "type": "integer"
+        },
+        "error_entries": {
+          "title": "Error Entries",
+          "type": "integer"
+        },
+        "skipped_entries": {
+          "title": "Skipped Entries",
+          "type": "integer"
+        },
+        "required_failures": {
+          "title": "Required Failures",
+          "type": "integer"
+        },
+        "optional_failures": {
+          "title": "Optional Failures",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_entries",
+        "required_entries",
+        "optional_entries",
+        "passed_entries",
+        "failed_entries",
+        "error_entries",
+        "skipped_entries",
+        "required_failures",
+        "optional_failures"
+      ],
+      "title": "MiniRegressionSuiteSummary",
+      "type": "object"
+    },
+    "SliceReplayProfile": {
+      "description": "Explicit replay profile \u2014 determines which checks are executed.",
+      "enum": [
+        "fixture_integrity",
+        "manifest_contract",
+        "artifact_readability",
+        "failure_slice",
+        "stage_slice",
+        "metadata_only_slice"
+      ],
+      "title": "SliceReplayProfile",
+      "type": "string"
+    }
+  },
+  "description": "Schema for suite_report.json produced by Phase 11 mini regression suite (write_suite_report). Aggregates Phase 10 slice replay results across a suite definition.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "suite_run_id": {
+      "title": "Suite Run Id",
+      "type": "string"
+    },
+    "suite_id": {
+      "title": "Suite Id",
+      "type": "string"
+    },
+    "suite_name": {
+      "title": "Suite Name",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "ended_at": {
+      "format": "date-time",
+      "title": "Ended At",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "error",
+        "partial"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "entry_results": {
+      "items": {
+        "$ref": "#/$defs/MiniRegressionEntryResult"
+      },
+      "title": "Entry Results",
+      "type": "array"
+    },
+    "summary": {
+      "$ref": "#/$defs/MiniRegressionSuiteSummary"
+    },
+    "report_paths": {
+      "description": "Paths to individual slice replay report files.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Report Paths",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "suite_run_id",
+    "suite_id",
+    "suite_name",
+    "started_at",
+    "ended_at",
+    "status",
+    "summary"
+  ],
+  "title": "MiniRegressionSuiteReport",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

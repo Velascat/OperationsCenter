@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "SliceReplayCheckResult": {
+      "description": "Result of executing a single SliceReplayCheck.",
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "skipped",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "fixture_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fixture Artifact Ids",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "check_id",
+        "status",
+        "summary"
+      ],
+      "title": "SliceReplayCheckResult",
+      "type": "object"
+    },
+    "SliceReplayProfile": {
+      "description": "Explicit replay profile \u2014 determines which checks are executed.",
+      "enum": [
+        "fixture_integrity",
+        "manifest_contract",
+        "artifact_readability",
+        "failure_slice",
+        "stage_slice",
+        "metadata_only_slice"
+      ],
+      "title": "SliceReplayProfile",
+      "type": "string"
+    }
+  },
+  "description": "Schema for slice_replay_report.json produced by Phase 10 slice replay testing (write_replay_report). Local, dispatch-free artifact derived from a fixture pack.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "replay_id": {
+      "title": "Replay Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "fixture_pack_id": {
+      "title": "Fixture Pack Id",
+      "type": "string"
+    },
+    "fixture_pack_path": {
+      "title": "Fixture Pack Path",
+      "type": "string"
+    },
+    "source_repo_id": {
+      "title": "Source Repo Id",
+      "type": "string"
+    },
+    "source_run_id": {
+      "title": "Source Run Id",
+      "type": "string"
+    },
+    "source_audit_type": {
+      "title": "Source Audit Type",
+      "type": "string"
+    },
+    "replay_profile": {
+      "$ref": "#/$defs/SliceReplayProfile"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "error",
+        "partial"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "check_results": {
+      "items": {
+        "$ref": "#/$defs/SliceReplayCheckResult"
+      },
+      "title": "Check Results",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "fixture_pack_id",
+    "fixture_pack_path",
+    "source_repo_id",
+    "source_run_id",
+    "source_audit_type",
+    "replay_profile",
+    "status",
+    "summary"
+  ],
+  "title": "SliceReplayReport",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
