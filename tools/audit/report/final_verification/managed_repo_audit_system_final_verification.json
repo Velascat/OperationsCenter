@@ -1,9 +1,9 @@
 {
   "schema_version": "2.0",
   "report_type": "final_verification",
-  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 9)",
+  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 10)",
   "verification_date": "2026-04-26",
-  "revision": 9,
+  "revision": 10,
   "scope": "Phases 0-12, Anti-Collapse Invariant, Gap Closure",
   "status": "locked",
   "test_suite": {
@@ -167,7 +167,7 @@
     ]
   },
   "gap_detection_pass": {
-    "revision": 9,
+    "revision": 10,
     "checks_performed": 14,
     "checks_clean": 14,
     "checks_with_gaps": 0,
@@ -201,6 +201,7 @@
     "rev7_new": 0,
     "rev8_new": 0,
     "rev9_new": 0,
+    "rev10_new": 0,
     "currently_open": 0,
     "by_severity_open": {
       "critical": 0,
@@ -305,6 +306,6 @@
       "mini_regression_first_policy accepts path attestation without file validation — operator-intent-to-bypass risk only; audit trail records the claimed path; attestation model documented by design"
     ],
     "declared_locked_at": "2026-04-26",
-    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 9). All 13 invariants verified with no violations and no partial statuses. 2733 tests pass (2715 unit + 18 integration), 0 failures, 4 skipped (live service only), 1 expected warning. No forbidden imports. Correct unidirectional import graph enforced by AST checks in 15 test modules. All 23 of 23 lifetime gaps closed. 0 open gaps. Rev 9 gap detection pass: 14 checks, 14 clean, 0 with gaps (third consecutive clean pass — Rev 7, Rev 8, Rev 9). All persisted artifact types have external JSON schemas (7 schema files across 6 subdirectories). The attestation model in mini_regression_first_policy is documented by design. The system is architecturally complete, fully documented, and locked."
+    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 10). All 13 invariants verified with no violations and no partial statuses. 2733 tests pass (2715 unit + 18 integration), 0 failures, 4 skipped (live service only), 1 expected warning. No forbidden imports. Correct unidirectional import graph enforced by AST checks in 15 test modules. All 23 of 23 lifetime gaps closed. 0 open gaps. Rev 10 gap detection pass: 14 checks, 14 clean, 0 with gaps (fourth consecutive clean pass — Rev 7 through Rev 10). All persisted artifact types have external JSON schemas (7 schema files across 6 subdirectories). The attestation model in mini_regression_first_policy is documented by design. The system is architecturally complete, fully documented, and locked."
   }
 }
