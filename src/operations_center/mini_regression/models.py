@@ -65,10 +65,18 @@ class MiniRegressionSuiteDefinition(BaseModel):
     Serialized to / loaded from a JSON file. Entries are ordered and explicit.
     """
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     suite_id: str = Field(description="Stable, path-safe identifier.")
     name: str
     description: str = ""
+    repo_id: str | None = Field(
+        default=None,
+        description="Managed repo this suite targets. None for multi-repo suites.",
+    )
+    audit_type: str | None = Field(
+        default=None,
+        description="Audit type this suite targets. None for multi-type suites.",
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     entries: list[MiniRegressionSuiteEntry] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -147,10 +155,18 @@ class MiniRegressionSuiteReport(BaseModel):
     Written to {output_dir}/{suite_id}/{suite_run_id}/suite_report.json.
     """
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     suite_run_id: str
     suite_id: str
     suite_name: str
+    repo_id: str | None = Field(
+        default=None,
+        description="Managed repo this suite targets. Propagated from suite definition.",
+    )
+    audit_type: str | None = Field(
+        default=None,
+        description="Audit type this suite targets. Propagated from suite definition.",
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime
     ended_at: datetime

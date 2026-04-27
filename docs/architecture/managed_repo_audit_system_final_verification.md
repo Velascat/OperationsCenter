@@ -1,8 +1,8 @@
-# Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 11)
+# Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 12)
 
-**Verification date:** 2026-04-26 (Rev 11 — post Rev 10 confirmation pass)
-**Test suite:** 2733 passing, 4 skipped (live SwitchBoard only), 0 failures, 1 expected warning
-**Scope:** Phases 0–12, Anti-Collapse Invariant, Gap Closure
+**Verification date:** 2026-04-26 (Rev 12 — enhancements 2 + 3 from follow-up list; 6 new tests)
+**Test suite:** 2739 passing, 4 skipped (live SwitchBoard only), 0 failures, 1 expected warning
+**Scope:** Phases 0–12, Anti-Collapse Invariant, Gap Closure, Enhancements
 **Status:** LOCKED
 
 ---
@@ -24,8 +24,9 @@
 | Rev 9 | 0 | — | ✅ N/A |
 | Rev 10 | 0 | — | ✅ N/A |
 | Rev 11 | 0 | — | ✅ N/A |
+| Rev 12 | 0 | — | ✅ N/A |
 
-**Cumulative: 23 gaps identified across 11 revisions. All 23 closed. 0 open.**
+**Cumulative: 23 gaps identified across 12 revisions. All 23 closed. 0 open.**
 
 No critical, high, medium, or low gaps remain. No invariant violations found.
 
@@ -59,9 +60,9 @@ None.
 
 1. **First live VideoFoundry audit run** — Phase 5 code is wired but has never been executed against a live VF audit. Run `operations-center-governance run` against a live VF instance to validate Phase 5 outputs conform to the contract.
 
-2. **CI integration guide** — Document how to wire `operations-center-governance run` into a CI/CD pipeline as a pre-release gate.
+2. ~~**CI integration guide**~~ — **Done (Rev 12).** `docs/architecture/ci_integration_guide.md` covers the full governance flow, exit codes, urgency/approval matrix, cooldown/budget configuration, and the state directory persistence requirement for ephemeral CI environments.
 
-3. **Consider top-level `repo_id`/`audit_type` in `MiniRegressionSuiteReport`** — Currently traceability from suite report back to repo runs through individual fixture pack entries. A top-level field would make filtering and governance correlation easier.
+3. ~~**Consider top-level `repo_id`/`audit_type` in `MiniRegressionSuiteReport`**~~ — **Done (Rev 12).** `repo_id` and `audit_type` added to both `MiniRegressionSuiteDefinition` (v1.1) and `MiniRegressionSuiteReport` (v1.1); propagated by the runner; schema regenerated; 6 new tests added.
 
 4. **Validate governance evidence on load** — The `_check_mini_regression_first()` policy accepts `related_suite_report_path` as operator attestation without file-existence checks. If stricter validation is desired in future, consider an optional `validate_evidence_paths: bool = False` flag in `GovernanceConfig`.
 
@@ -149,11 +150,11 @@ None.
 | Anti-Collapse | Artifacts / Findings / Recommendations | ✅ Complete | incl. Phase 8 |
 | Phase 9 | Fixture Harvesting | ✅ Complete | 78 |
 | Phase 10 | Slice Replay Testing | ✅ Complete | 46 |
-| Phase 11 | Mini Regression Suite | ✅ Complete | 58 (43 unit + 15 CLI) |
+| Phase 11 | Mini Regression Suite | ✅ Complete | 64 (49 unit + 15 CLI) |
 | Phase 12 | Full Audit Governance | ✅ Complete | 109 (91 unit + 18 CLI) |
 | **CLI Tests** | All 7 entrypoints | ✅ Complete | **82** |
 | **Integration** | Chain + Producer + Full-system | ✅ Complete | 18 passing (4 skipped live) |
-| **Total** | | | **2733 passing** |
+| **Total** | | | **2739 passing** |
 
 ---
 
@@ -484,18 +485,20 @@ The following rules are declared permanent:
 
 ## Final Lockdown Statement
 
-The managed repo audit system across Phases 0–12 is declared **locked** as of 2026-04-26 (Rev 11).
+The managed repo audit system across Phases 0–12 is declared **locked** as of 2026-04-26 (Rev 12).
 
 **Verification status:**
 - All 13 invariants hold (all ✅ PASS)
-- 2733 tests pass (unit + integration + CLI), 0 failures, 4 skipped (live service only), 1 expected warning
+- 2739 tests pass (unit + integration + CLI), 0 failures, 4 skipped (live service only), 1 expected warning
 - No forbidden imports found in any source module
 - Correct unidirectional import graph enforced by AST checks in 15 test modules
 - All 23 lifetime gaps closed; 0 open
 - No critical, high, medium, or low gaps remain
 - No invariant violations
 - All persisted artifacts have JSON schemas (7 schema files across 6 subdirectories)
-- run_status.json and artifact_manifest.json schemas verified 0-delta against Pydantic models
-- No source changes since Rev 10; git working tree clean
+- `MiniRegressionSuiteDefinition` and `MiniRegressionSuiteReport` bumped to schema v1.1 with `repo_id`/`audit_type` fields
+- `suite_report.schema.json` regenerated; 0-delta against model
+- CI integration guide published at `docs/architecture/ci_integration_guide.md`
+- Follow-up tasks 2 and 3 completed; only first live VF run remains open
 
-**The system is architecturally complete and gap-free.** Eleven verification passes across this codebase have found and closed 23 gaps; Rev 7 through Rev 11 all found zero new gaps (five consecutive clean passes). The gap detection pass ran 14 checks, all clean. The 3 suggested follow-up tasks are enhancements, not correctness issues.
+**The system is architecturally complete and gap-free.** Twelve verification passes across this codebase have found and closed 23 gaps; Rev 7 through Rev 12 all found zero new gaps (six consecutive clean passes). The two non-correctness follow-up enhancements are now complete. The one remaining open item (first live VideoFoundry run) is operational, not architectural.

@@ -562,3 +562,95 @@ class TestReplayPartialSemantics:
             suite_report = run_mini_regression_suite(request)
 
         assert "partial_run: stopped before completion" in suite_report.limitations
+
+
+# ---------------------------------------------------------------------------
+# Contract 13 — repo_id / audit_type propagation from suite definition
+# ---------------------------------------------------------------------------
+
+class TestRepoAuditTypeFields:
+    """Top-level repo_id and audit_type propagate from suite definition to report."""
+
+    def test_repo_id_and_audit_type_propagated(
+        self, good_pack, tmp_path: Path
+    ):
+        _, pack_dir = good_pack
+        suite = MiniRegressionSuiteDefinition(
+            suite_id="typed_suite",
+            name="Typed Suite",
+            repo_id="videofoundry",
+            audit_type="representative",
+            entries=[
+                MiniRegressionSuiteEntry(
+                    entry_id="e1",
+                    fixture_pack_path=str(pack_dir),
+                    replay_profile=SliceReplayProfile.FIXTURE_INTEGRITY,
+                )
+            ],
+        )
+        request = MiniRegressionRunRequest(
+            suite_definition=suite,
+            output_dir=tmp_path / "out",
+        )
+        report = run_mini_regression_suite(request)
+        assert report.repo_id == "videofoundry"
+        assert report.audit_type == "representative"
+
+    def test_repo_id_and_audit_type_default_none(
+        self, simple_suite: MiniRegressionSuiteDefinition, tmp_path: Path
+    ):
+        """Suite definition without repo_id/audit_type → report fields are None."""
+        request = MiniRegressionRunRequest(
+            suite_definition=simple_suite,
+            output_dir=tmp_path / "out",
+        )
+        report = run_mini_regression_suite(request)
+        assert report.repo_id is None
+        assert report.audit_type is None
+
+    def test_fields_present_in_serialised_json(self, good_pack, tmp_path: Path):
+        """repo_id and audit_type must appear in the written suite_report.json."""
+        _, pack_dir = good_pack
+        suite = MiniRegressionSuiteDefinition(
+            suite_id="json_suite",
+            name="JSON Suite",
+            repo_id="videofoundry",
+            audit_type="enrichment",
+            entries=[
+                MiniRegressionSuiteEntry(
+                    entry_id="e1",
+                    fixture_pack_path=str(pack_dir),
+                    replay_profile=SliceReplayProfile.FIXTURE_INTEGRITY,
+                )
+            ],
+        )
+        request = MiniRegressionRunRequest(
+            suite_definition=suite,
+            output_dir=tmp_path / "out",
+        )
+        report = run_mini_regression_suite(request)
+        raw = json.loads(report.model_dump_json())
+        assert raw["repo_id"] == "videofoundry"
+        assert raw["audit_type"] == "enrichment"
+
+    def test_schema_version_is_1_1(self):
+        """MiniRegressionSuiteReport schema_version must be 1.1 after field addition."""
+        from operations_center.mini_regression.models import MiniRegressionSuiteReport
+        assert MiniRegressionSuiteReport.model_fields["schema_version"].default == "1.1"
+
+    def test_suite_definition_schema_version_is_1_1(self):
+        """MiniRegressionSuiteDefinition schema_version must be 1.1 after field addition."""
+        assert MiniRegressionSuiteDefinition.model_fields["schema_version"].default == "1.1"
+
+    def test_suite_report_schema_delta_zero(self):
+        """suite_report.schema.json must match MiniRegressionSuiteReport fields exactly."""
+        from operations_center.mini_regression.models import MiniRegressionSuiteReport
+        schema_path = (
+            Path(__file__).parents[3]
+            / "schemas"
+            / "mini_regression"
+            / "suite_report.schema.json"
+        )
+        file_fields = set(json.loads(schema_path.read_text()).get("properties", {}).keys())
+        model_fields = set(MiniRegressionSuiteReport.model_json_schema().get("properties", {}).keys())
+        assert file_fields == model_fields, f"Schema delta: {file_fields.symmetric_difference(model_fields)}"

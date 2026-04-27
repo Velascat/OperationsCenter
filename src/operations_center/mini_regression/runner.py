@@ -213,6 +213,8 @@ def run_mini_regression_suite(
         suite_run_id=suite_run_id,
         suite_id=suite.suite_id,
         suite_name=suite.name,
+        repo_id=suite.repo_id,
+        audit_type=suite.audit_type,
         started_at=started_at,
         ended_at=ended_at,
         status=suite_status,

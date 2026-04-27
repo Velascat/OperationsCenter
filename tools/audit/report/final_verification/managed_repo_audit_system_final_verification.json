@@ -1,20 +1,20 @@
 {
   "schema_version": "2.0",
   "report_type": "final_verification",
-  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 11)",
+  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 12)",
   "verification_date": "2026-04-26",
-  "revision": 11,
+  "revision": 12,
   "scope": "Phases 0-12, Anti-Collapse Invariant, Gap Closure",
   "status": "locked",
   "test_suite": {
-    "total_tests": 2733,
-    "passed": 2733,
+    "total_tests": 2739,
+    "passed": 2739,
     "failed": 0,
     "skipped": 4,
     "warnings": 1,
     "skipped_reason": "Live SwitchBoard integration tests — require running service",
     "warning_reason": "UserWarning from test_governance_report_load_invalid_schema_raises loading a v1.0 report — expected and correct",
-    "unit_tests": 2715,
+    "unit_tests": 2721,
     "integration_tests": 18,
     "breakdown": {
       "audit_contracts": 119,
@@ -25,7 +25,7 @@
       "behavior_calibration": 102,
       "fixture_harvesting": 78,
       "slice_replay": 46,
-      "mini_regression": 58,
+      "mini_regression": 64,
       "audit_governance": 109,
       "cli_governance": 18,
       "cli_regression": 15,
@@ -53,7 +53,7 @@
     { "phase": "Anti-Collapse", "name": "Artifacts / Findings / Recommendations Separation", "status": "complete", "test_count": 35, "notes": "GuardrailViolation; forbidden mutation fields; incl. in Phase 8 count" },
     { "phase": "Phase 9", "name": "Fixture Harvesting", "status": "complete", "test_count": 78, "notes": "7 harvest profiles; fixture_pack.schema.json; disk validation" },
     { "phase": "Phase 10", "name": "Slice Replay Testing", "status": "complete", "test_count": 46, "notes": "6 profiles all covered by CHECK_REGISTRY; partial→passed tested; slice_replay_report.schema.json added (gap_r6_002 closed)" },
-    { "phase": "Phase 11", "name": "Mini Regression Suite", "status": "complete", "test_count": 58, "notes": "43 unit + 15 CLI; limitations aggregated; run_id unique; TestReplayPartialSemantics; suite_report.schema.json added (gap_r6_002 closed)" },
+    { "phase": "Phase 11", "name": "Mini Regression Suite", "status": "complete", "test_count": 64, "notes": "49 unit + 15 CLI; limitations aggregated; run_id unique; TestReplayPartialSemantics; suite_report.schema.json added (gap_r6_002 closed); repo_id/audit_type fields added to SuiteDefinition+SuiteReport (schema v1.1, Rev 12)" },
     { "phase": "Phase 12", "name": "Full Audit Governance", "status": "complete", "test_count": 109, "notes": "91 unit + 18 CLI; 8 policy checks; fcntl locking; governance_status persisted; schema v1.1; 4 integration; mini_regression_first attestation model documented in docstring (gap_r6_001 closed)" }
   ],
   "invariants": [
@@ -167,7 +167,7 @@
     ]
   },
   "gap_detection_pass": {
-    "revision": 11,
+    "revision": 12,
     "checks_performed": 14,
     "checks_clean": 14,
     "checks_with_gaps": 0,
@@ -203,6 +203,7 @@
     "rev9_new": 0,
     "rev10_new": 0,
     "rev11_new": 0,
+    "rev12_new": 0,
     "currently_open": 0,
     "by_severity_open": {
       "critical": 0,
@@ -217,19 +218,25 @@
       "id": "followup_001",
       "title": "First live VideoFoundry audit run",
       "description": "Execute operations-center-governance run against a real live VF instance to validate Phase 5 producer outputs conform to the run_status.json and artifact_manifest.json contracts.",
-      "priority": "medium"
+      "priority": "medium",
+      "status": "open"
     },
     {
       "id": "followup_002",
       "title": "CI integration guide",
       "description": "Document how to wire operations-center-governance run into a CI/CD pipeline as a pre-release gate.",
-      "priority": "low"
+      "priority": "low",
+      "status": "done",
+      "closed_in": "Rev 12",
+      "artifact": "docs/architecture/ci_integration_guide.md"
     },
     {
       "id": "followup_003",
-      "title": "Consider top-level repo_id/audit_type in MiniRegressionSuiteReport",
-      "description": "Currently traceability from suite report back to repo runs through individual fixture pack entries. A top-level repo_id/audit_type field would make filtering and indexing easier for governance consumers.",
-      "priority": "low"
+      "title": "Top-level repo_id/audit_type in MiniRegressionSuiteReport",
+      "description": "Added repo_id and audit_type to MiniRegressionSuiteDefinition and MiniRegressionSuiteReport (schema v1.1). Runner propagates from suite definition. suite_report.schema.json regenerated (0-delta). 6 new tests.",
+      "priority": "low",
+      "status": "done",
+      "closed_in": "Rev 12"
     }
   ],
   "all_closed_gaps": [
@@ -307,6 +314,6 @@
       "mini_regression_first_policy accepts path attestation without file validation — operator-intent-to-bypass risk only; audit trail records the claimed path; attestation model documented by design"
     ],
     "declared_locked_at": "2026-04-26",
-    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 11). All 13 invariants verified with no violations and no partial statuses. 2733 tests pass (2715 unit + 18 integration), 0 failures, 4 skipped (live service only), 1 expected warning. No forbidden imports. Correct unidirectional import graph enforced by AST checks in 15 test modules. All 23 of 23 lifetime gaps closed. 0 open gaps. No source changes since Rev 10; git working tree clean. Rev 11 gap detection pass: 14 checks, 14 clean, 0 with gaps (fifth consecutive clean pass — Rev 7 through Rev 11). All persisted artifact types have external JSON schemas (7 schema files across 6 subdirectories). The attestation model in mini_regression_first_policy is documented by design. The system is architecturally complete, fully documented, and locked."
+    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 12). All 13 invariants verified with no violations and no partial statuses. 2739 tests pass (2721 unit + 18 integration), 0 failures, 4 skipped (live service only), 1 expected warning. No forbidden imports. Correct unidirectional import graph enforced by AST checks in 15 test modules. All 23 of 23 lifetime gaps closed. 0 open gaps. Rev 12 gap detection pass: 14 checks, 14 clean, 0 with gaps (sixth consecutive clean pass — Rev 7 through Rev 12). All persisted artifact types have external JSON schemas (7 schema files across 6 subdirectories). Follow-up enhancements 2 (CI guide) and 3 (repo_id/audit_type fields) completed without invariant violation; MiniRegressionSuiteDefinition and MiniRegressionSuiteReport bumped to schema v1.1; suite_report.schema.json regenerated (0-delta). The attestation model in mini_regression_first_policy is documented by design. The system is architecturally complete, fully documented, and locked."
   }
 }

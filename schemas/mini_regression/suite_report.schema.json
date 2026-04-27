@@ -133,10 +133,10 @@
       "type": "string"
     }
   },
-  "description": "Schema for suite_report.json produced by Phase 11 mini regression suite (write_suite_report). Aggregates Phase 10 slice replay results across a suite definition.",
+  "description": "Durable report from a mini regression suite run.\n\nWritten to {output_dir}/{suite_id}/{suite_run_id}/suite_report.json.",
   "properties": {
     "schema_version": {
-      "default": "1.0",
+      "default": "1.1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -151,6 +151,32 @@
     "suite_name": {
       "title": "Suite Name",
       "type": "string"
+    },
+    "repo_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Managed repo this suite targets. Propagated from suite definition.",
+      "title": "Repo Id"
+    },
+    "audit_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Audit type this suite targets. Propagated from suite definition.",
+      "title": "Audit Type"
     },
     "created_at": {
       "format": "date-time",
@@ -218,6 +244,5 @@
     "summary"
   ],
   "title": "MiniRegressionSuiteReport",
-  "type": "object",
-  "$schema": "https://json-schema.org/draft/2020-12/schema"
+  "type": "object"
 }
