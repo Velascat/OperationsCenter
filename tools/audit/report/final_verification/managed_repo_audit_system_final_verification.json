@@ -1,9 +1,9 @@
 {
   "schema_version": "2.0",
   "report_type": "final_verification",
-  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 6)",
+  "title": "Managed Repo Audit System — Final Verification, Gap Analysis, and Lockdown (Rev 7)",
   "verification_date": "2026-04-26",
-  "revision": 6,
+  "revision": 7,
   "scope": "Phases 0-12, Anti-Collapse Invariant, Gap Closure",
   "status": "locked",
   "test_suite": {
@@ -49,12 +49,12 @@
     { "phase": "Phase 5", "name": "VideoFoundry Producer Contract", "status": "complete", "test_count": 6, "notes": "All 6 VF audit CLIs wired: 5 ManagedRunFinalizer + 1 _RunStatusFinalizer+ManagedManifestWriter; verified by integration tests" },
     { "phase": "Phase 6", "name": "Dispatch-Orchestrated Run Control", "status": "complete", "test_count": 94, "notes": "dispatch_managed_audit(); per-repo lock; lifecycle discovery; escape-hatch bypass documented" },
     { "phase": "Phase 7", "name": "Artifact Index + Retrieval", "status": "complete", "test_count": 78, "notes": "load_artifact_manifest(); build_artifact_index(); sole entry point" },
-    { "phase": "Phase 8", "name": "Behavior Calibration", "status": "complete", "test_count": 102, "notes": "Analyzer, rules, guardrails; 35 anti-collapse tests included; no external schema (gap_r6_002)" },
+    { "phase": "Phase 8", "name": "Behavior Calibration", "status": "complete", "test_count": 102, "notes": "Analyzer, rules, guardrails; 35 anti-collapse tests included; calibration_report.schema.json added (gap_r6_002 closed)" },
     { "phase": "Anti-Collapse", "name": "Artifacts / Findings / Recommendations Separation", "status": "complete", "test_count": 35, "notes": "GuardrailViolation; forbidden mutation fields; incl. in Phase 8 count" },
     { "phase": "Phase 9", "name": "Fixture Harvesting", "status": "complete", "test_count": 78, "notes": "7 harvest profiles; fixture_pack.schema.json; disk validation" },
-    { "phase": "Phase 10", "name": "Slice Replay Testing", "status": "complete", "test_count": 46, "notes": "6 profiles all covered by CHECK_REGISTRY; partial→passed tested; no external schema (gap_r6_002)" },
-    { "phase": "Phase 11", "name": "Mini Regression Suite", "status": "complete", "test_count": 58, "notes": "43 unit + 15 CLI; limitations aggregated; run_id unique; TestReplayPartialSemantics; no external schema (gap_r6_002)" },
-    { "phase": "Phase 12", "name": "Full Audit Governance", "status": "complete", "test_count": 109, "notes": "91 unit + 18 CLI; 8 policy checks; fcntl locking; governance_status persisted; schema v1.1; 4 integration; mini_regression_first policy is attestation-based (gap_r6_001)" }
+    { "phase": "Phase 10", "name": "Slice Replay Testing", "status": "complete", "test_count": 46, "notes": "6 profiles all covered by CHECK_REGISTRY; partial→passed tested; slice_replay_report.schema.json added (gap_r6_002 closed)" },
+    { "phase": "Phase 11", "name": "Mini Regression Suite", "status": "complete", "test_count": 58, "notes": "43 unit + 15 CLI; limitations aggregated; run_id unique; TestReplayPartialSemantics; suite_report.schema.json added (gap_r6_002 closed)" },
+    { "phase": "Phase 12", "name": "Full Audit Governance", "status": "complete", "test_count": 109, "notes": "91 unit + 18 CLI; 8 policy checks; fcntl locking; governance_status persisted; schema v1.1; 4 integration; mini_regression_first attestation model documented in docstring (gap_r6_001 closed)" }
   ],
   "invariants": [
     {
@@ -167,10 +167,10 @@
     ]
   },
   "gap_detection_pass": {
-    "revision": 6,
+    "revision": 7,
     "checks_performed": 14,
-    "checks_clean": 12,
-    "checks_with_gaps": 2,
+    "checks_clean": 14,
+    "checks_with_gaps": 0,
     "checks": [
       { "id": 1, "name": "Schema consistency", "status": "clean", "notes": "run_status, artifact_manifest, governance_report schemas all match Pydantic models; governance_report schema_version='1.1' includes governance_status" },
       { "id": 2, "name": "Budget/cooldown period reset", "status": "clean", "notes": "period_start/period_end tracked; period expiration creates fresh state (budgets.py:47); period rollover tested" },
@@ -184,30 +184,11 @@
       { "id": 10, "name": "AST boundary test coverage", "status": "clean", "notes": "15 modules carry AST checks; audit pipeline boundary enforced at runtime and by tests" },
       { "id": 11, "name": "CLI entrypoint test coverage", "status": "clean", "notes": "All 7 entrypoints have CliRunner tests: governance(18), regression(15), audit(10), artifacts(10), calibration(11), fixtures(9), replay(9) = 82 CLI tests total" },
       { "id": 12, "name": "Config file consistency", "status": "clean", "notes": "videofoundry.yaml: 6 audit types; all reference valid commands; no stale entries" },
-      { "id": 13, "name": "mini_regression_first evidence validation", "status": "gap", "gap_id": "gap_r6_001", "notes": "_check_mini_regression_first() validates bool(related_suite_report_path) only; does not verify file exists, is readable, or belongs to correct repo/audit_type; confirmed by runtime test" },
-      { "id": 14, "name": "JSON schema coverage for persisted reports", "status": "gap", "gap_id": "gap_r6_002", "notes": "BehaviorCalibrationReport (Phase 8), SliceReplayReport (Phase 10), MiniRegressionSuiteReport (Phase 11) are persisted to disk but have no JSON schema files; only Phase 9 and Phase 12 have external schemas" }
+      { "id": 13, "name": "mini_regression_first attestation model documentation", "status": "clean", "notes": "gap_r6_001 closed: _check_mini_regression_first() docstring now explicitly documents that related_suite_report_path is an operator attestation; file existence not validated by design; policy.py:178-185" },
+      { "id": 14, "name": "JSON schema coverage for persisted reports", "status": "clean", "notes": "gap_r6_002 closed: schemas/behavior_calibration/calibration_report.schema.json, schemas/slice_replay/slice_replay_report.schema.json, schemas/mini_regression/suite_report.schema.json all generated; all 6 persisted artifact types now have external schemas" }
     ]
   },
-  "gaps": [
-    {
-      "id": "gap_r6_001",
-      "category": "implicit_behavior",
-      "severity": "low",
-      "description": "_check_mini_regression_first() validates only bool(request.related_suite_report_path) — any non-empty string is accepted as evidence. The file is not checked for existence, readability, or repo/audit_type match. An operator can pass any non-empty string to satisfy the policy check. This is likely by design: the model docstring calls related_suite_report_path 'Evidence context — informational, never approval'. The path is recorded in the governance audit trail.",
-      "affected_phase": "Phase 11 / Phase 12",
-      "evidence": "audit_governance/policy.py:178 — has_evidence = bool(request.related_suite_report_path). Confirmed: related_suite_report_path='/nonexistent/path/suite_report.json' returns status='passed' with reason='Related mini regression suite report is present.'",
-      "recommended_action": "Add an inline comment to _check_mini_regression_first() stating: 'Path existence is not validated — this is an operator attestation, not a file reference check. The path is recorded for audit trail purposes.' No behavioral change needed."
-    },
-    {
-      "id": "gap_r6_002",
-      "category": "documentation_gap",
-      "severity": "low",
-      "description": "Three phases write structured reports to disk (write_calibration_report, write_replay_report, write_suite_report) but have no JSON schema files. Phase 9 (fixture_pack.schema.json) and Phase 12 (governance_report.schema.json) have schemas because they are external contracts or compliance artifacts. Phases 8, 10, and 11 are internal pipeline artifacts whose Pydantic models serve as their only schema.",
-      "affected_phase": "Phase 8 / Phase 10 / Phase 11",
-      "evidence": "schemas/ directory contains only audit_contracts/, fixture_harvesting/, and governance/. No schemas/behavior_calibration/, schemas/slice_replay/, or schemas/mini_regression/ directories.",
-      "recommended_action": "Generate JSON schemas from BehaviorCalibrationReport.model_json_schema(), SliceReplayReport.model_json_schema(), and MiniRegressionSuiteReport.model_json_schema() into schemas/behavior_calibration/, schemas/slice_replay/, and schemas/mini_regression/. No code changes required — documentation artifacts only."
-    }
-  ],
+  "gaps": [],
   "gap_summary": {
     "lifetime_total": 23,
     "rev1_closed": 11,
@@ -216,18 +197,16 @@
     "rev4_closed": 2,
     "rev5_new": 0,
     "rev6_new": 2,
-    "rev6_closed": 0,
-    "currently_open": 2,
+    "rev6_closed": 2,
+    "rev7_new": 0,
+    "currently_open": 0,
     "by_severity_open": {
       "critical": 0,
       "high": 0,
       "medium": 0,
-      "low": 2
+      "low": 0
     },
-    "by_category_open": {
-      "implicit_behavior": 1,
-      "documentation_gap": 1
-    }
+    "by_category_open": {}
   },
   "suggested_followup_tasks": [
     {
@@ -238,24 +217,12 @@
     },
     {
       "id": "followup_002",
-      "title": "Document attestation model for mini_regression_first policy (gap_r6_001)",
-      "description": "Add a one-line comment to _check_mini_regression_first() stating that related_suite_report_path is an operator attestation, not a validated file reference.",
-      "priority": "low"
-    },
-    {
-      "id": "followup_003",
-      "title": "Generate JSON schemas for Phase 8/10/11 reports (gap_r6_002)",
-      "description": "Emit BehaviorCalibrationReport, SliceReplayReport, and MiniRegressionSuiteReport JSON schemas from model_json_schema() into schemas/ subdirectories.",
-      "priority": "low"
-    },
-    {
-      "id": "followup_004",
       "title": "CI integration guide",
       "description": "Document how to wire operations-center-governance run into a CI/CD pipeline as a pre-release gate.",
       "priority": "low"
     },
     {
-      "id": "followup_005",
+      "id": "followup_003",
       "title": "Consider top-level repo_id/audit_type in MiniRegressionSuiteReport",
       "description": "Currently traceability from suite report back to repo runs through individual fixture pack entries. A top-level repo_id/audit_type field would make filtering and indexing easier for governance consumers.",
       "priority": "low"
@@ -282,7 +249,9 @@
     { "id": "gap_r3_001", "description": "schema_version not bumped after governance_status added", "revision": 3, "status": "closed", "closure": "Bumped to '1.1'; UserWarning on v1.0 load; changelog in docstring" },
     { "id": "gap_r3_002", "description": "No external JSON schema for governance report", "revision": 3, "status": "closed", "closure": "schemas/governance/governance_report.schema.json generated" },
     { "id": "gap_r4_001", "description": "operations-center-audit run governance bypass undocumented", "revision": 4, "status": "closed", "closure": "WARNING — GOVERNANCE BYPASS block added to CLI docstring and arch doc" },
-    { "id": "gap_r4_002", "description": "Five CLI entrypoints lacked CliRunner tests", "revision": 4, "status": "closed", "closure": "49 new CliRunner tests added across 5 test files; all 7 entrypoints now covered" }
+    { "id": "gap_r4_002", "description": "Five CLI entrypoints lacked CliRunner tests", "revision": 4, "status": "closed", "closure": "49 new CliRunner tests added across 5 test files; all 7 entrypoints now covered" },
+    { "id": "gap_r6_001", "description": "mini_regression_first attestation model undocumented", "revision": 6, "status": "closed", "closure": "Attestation model explicitly documented in _check_mini_regression_first() docstring (policy.py:178-185); by-design behavior confirmed" },
+    { "id": "gap_r6_002", "description": "No JSON schemas for Phase 8/10/11 persisted reports", "revision": 6, "status": "closed", "closure": "schemas/behavior_calibration/calibration_report.schema.json, schemas/slice_replay/slice_replay_report.schema.json, schemas/mini_regression/suite_report.schema.json generated; all 6 persisted artifact types now have external schemas" }
   ],
   "lockdown_rules": [
     "No new code may bypass Phase 1-12 contracts.",
@@ -325,16 +294,15 @@
     "invariants_partial": 0,
     "can_drift_silently": false,
     "lifetime_gaps_identified": 23,
-    "lifetime_gaps_closed": 21,
-    "open_gaps": 2,
-    "open_gap_ids": ["gap_r6_001", "gap_r6_002"],
+    "lifetime_gaps_closed": 23,
+    "open_gaps": 0,
+    "open_gap_ids": [],
     "remaining_risks": [
-      "gap_r6_001 (low, implicit_behavior): mini_regression_first_policy accepts path attestation without file validation — operator-intent-to-bypass risk only; audit trail records the claimed path",
-      "gap_r6_002 (low, documentation_gap): BehaviorCalibrationReport, SliceReplayReport, MiniRegressionSuiteReport lack external JSON schemas — no runtime risk; internal Pydantic models are authoritative",
       "First live VideoFoundry audit run not yet executed (low) — fake-producer integration tests validate the contract",
-      "fcntl file locking is Linux/macOS only (low) — documented"
+      "fcntl file locking is Linux/macOS only (low) — documented",
+      "mini_regression_first_policy accepts path attestation without file validation — operator-intent-to-bypass risk only; audit trail records the claimed path; attestation model documented by design"
     ],
     "declared_locked_at": "2026-04-26",
-    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 6). All 13 invariants verified with no violations and no partial statuses. 2733 tests pass (2715 unit + 18 integration), 0 failures, 4 skipped (live service only), 1 expected warning. No forbidden imports. Correct unidirectional import graph enforced by AST checks in 15 test modules. 21 of 23 lifetime gaps closed. 2 open gaps (both low): one implicit behavior in evidence attestation (no file-exists check in mini_regression_first_policy) and one documentation coverage gap (no external schemas for 3 pipeline report types). Neither gap affects correctness, contract enforcement, runtime behavior, or invariant status. The system is architecturally complete and locked."
+    "declaration": "The managed repo audit system across Phases 0-12 is declared locked as of 2026-04-26 (Rev 7). All 13 invariants verified with no violations and no partial statuses. 2733 tests pass (2715 unit + 18 integration), 0 failures, 4 skipped (live service only), 1 expected warning. No forbidden imports. Correct unidirectional import graph enforced by AST checks in 15 test modules. All 23 of 23 lifetime gaps closed. 0 open gaps. Rev 7 gap detection pass: 14 checks, 14 clean, 0 with gaps. All persisted artifact types have external JSON schemas (7 schema files across 6 subdirectories). The attestation model in mini_regression_first_policy is documented by design. The system is architecturally complete, fully documented, and locked."
   }
 }
