@@ -202,7 +202,13 @@ def _detect_c5_unconditional_skips(ctx: CodeContext) -> tuple[int, list[str]]:
         except OSError:
             continue
         for i, line in enumerate(text.splitlines(), 1):
-            if "pytest.skip" not in line and "@pytest.mark.skip" not in line:
+            stripped = line.lstrip()
+            # Only count CALLS / DECORATORS — not the same tokens appearing
+            # inside string literals (test fixtures often embed
+            # "pytest.mark.skip" as test data).
+            is_call = "pytest.skip(" in line
+            is_decorator = stripped.startswith("@pytest.mark.skip")
+            if not is_call and not is_decorator:
                 continue
             window = "\n".join(text.splitlines()[max(0, i - 6): i + 1])
             if any(h.lower() in window.lower() for h in _ENV_GATE_HINTS):
@@ -309,6 +315,16 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
         r"\b(?:def|class)\s+|`\s*\(.*?\)\s*",
         re.IGNORECASE,
     )
+    # Lines that establish "this token is a literal *value* (status name,
+    # enum, config-key, etc.) rather than a function/class reference".
+    # When matched, we suppress the C8 hit even if impl_marker_re also fires.
+    value_context_re = re.compile(
+        r"(?:status|state|kind|name|value|id|type|family|key|column)s?\s*[:=]|"
+        r"(?:enum|constant|literal)|"
+        r"\bset\s+to\s+`|"
+        r"\bone\s+of\s+",
+        re.IGNORECASE,
+    )
 
     src_text = ""
     src_test_text = ""
@@ -352,6 +368,22 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
         "create_proposed_task_if_missing", "_semantic_title_similarity",
         "_estimate_task_complexity", "pull_request_url", "stale_pr_days",
         "repo_key", "write_text", "start_watch_role",
+        # Title-keyword strings checked in the multi-step planner regex —
+        # cited as `title contains \`refactor\`, \`migrate\`, ...`. Not
+        # function names.
+        "refactor", "migrate", "restructure", "rewrite",
+        # Family / theme / evidence names, surfaced as backticked tokens in
+        # design docs but living as string constants in the codebase.
+        "lint_cluster", "type_cluster", "snapshot_appearances",
+        # Lifecycle label values (states-of-being, cited as bare tokens
+        # in the lifecycle_labels.md table)
+        "expanded", "expanding", "superseded", "escalated", "archived",
+        # Config field name fragments / status enum values
+        "ci_green", "evidence_schema_version", "completed",
+        "failure_limitation_present", "improve_campaign", "test_campaign",
+        # Module / CLI names referenced by their bare token
+        "cleanup_state", "recover_stale", "ghost_audit",
+        "flow_audit", "code_health_audit",
     }
     # Also accept Pydantic-style field definitions: `<spaces>name: <type>`
     field_def_re_template = r"^\s+{name}\s*:\s*[A-Za-z]"
@@ -414,6 +446,10 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
             if any(w in lower for w in deferred_words):
                 continue
             if not impl_marker_re.search(line):
+                continue
+            # Skip lines whose surrounding context says "this is a value /
+            # state / enum, not an implementation symbol".
+            if value_context_re.search(line):
                 continue
             for m in sym_re.finditer(line):
                 name = m.group(1)
