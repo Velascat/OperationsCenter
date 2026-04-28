@@ -161,18 +161,28 @@ class WorkspaceManager:
         # refactor; default is conservative.
         oversized = self._diff_oversized(ws)
         if oversized is not None:
-            n_files, n_lines = oversized
+            n_files, n_lines, file_list = oversized
             logger.warning(
                 "WorkspaceManager.finalize: refusing to commit oversized diff "
                 "for %s — %d files, %d lines (caps: %d files, %d lines)",
                 request.task_branch, n_files, n_lines, self._max_files, self._max_lines,
             )
+            # Detailed reason — surfaces in the Plane comment via _handle_failure
+            # plumbing. Lists the top files so an operator (or a future
+            # auto-split recovery service) can see exactly where kodo went wide
+            # and break the work into focused chunks.
+            top_files = "\n".join(f"  - {f}" for f in file_list[:15])
+            extra = f" (+{len(file_list) - 15} more)" if len(file_list) > 15 else ""
             return result.model_copy(update={
                 "branch_pushed":  False,
+                "failure_category": "scope_too_wide",
                 "failure_reason": (
-                    f"diff exceeded soft cap ({n_files} files, {n_lines} lines "
-                    f"vs caps {self._max_files} / {self._max_lines}); "
-                    f"raise OPS_CENTER_MAX_FILES / OPS_CENTER_MAX_LINES if intended"
+                    f"diff exceeded soft cap: {n_files} files, {n_lines} lines "
+                    f"(caps {self._max_files} / {self._max_lines}). "
+                    f"Suggested next: split into smaller goal tasks scoped to one or "
+                    f"two files each, or raise OPS_CENTER_MAX_FILES / "
+                    f"OPS_CENTER_MAX_LINES if the wide scope is intentional.\n"
+                    f"Top files in this run:\n{top_files}{extra}"
                 ),
             })
 
@@ -204,15 +214,12 @@ class WorkspaceManager:
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
-    def _diff_oversized(self, ws: Path) -> tuple[int, int] | None:
-        """Return (files, lines) when the staged-and-unstaged diff exceeds caps.
+    def _diff_oversized(self, ws: Path) -> tuple[int, int, list[str]] | None:
+        """Return (files, lines, file_list) when the staged diff exceeds caps.
 
-        Returns None when the diff is within bounds. Counts only tracked +
-        modifiable changes; .gitignore'd / locally-excluded paths don't count.
+        Returns None when within bounds. file_list is sorted alphabetically
+        so the comment we write to Plane is deterministic.
         """
-        # First add (so the diff includes new tracked files), then measure with
-        # a stat-only diff against HEAD, then reset to leave commit_all to do
-        # the real work.
         try:
             subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
             proc = subprocess.run(
@@ -226,17 +233,16 @@ class WorkspaceManager:
         except subprocess.CalledProcessError:
             return None
         finally:
-            # Don't leave changes staged — commit_all will re-stage cleanly.
             subprocess.run(["git", "reset"], cwd=ws, capture_output=True)
 
-        n_files = sum(1 for line in files_proc.stdout.splitlines() if line.strip())
-        # shortstat: " 12 files changed, 345 insertions(+), 67 deletions(-)"
+        file_list = sorted(line.strip() for line in files_proc.stdout.splitlines() if line.strip())
+        n_files = len(file_list)
         n_lines = 0
         import re
         for m in re.finditer(r"(\d+)\s+(?:insertion|deletion)", proc.stdout):
             n_lines += int(m.group(1))
         if n_files > self._max_files or n_lines > self._max_lines:
-            return n_files, n_lines
+            return n_files, n_lines, file_list
         return None
 
     def _has_new_commits(self, ws: Path, base_branch: str) -> bool:

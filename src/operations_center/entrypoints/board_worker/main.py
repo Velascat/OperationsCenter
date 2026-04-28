@@ -176,6 +176,31 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
     # Extract goal text from description
     goal_text = _extract_goal(description, title)
 
+    # Improve mode: ask kodo to emit structured suggestions we can turn into
+    # concrete follow-up tasks for the propose lane. Without this prompt, the
+    # improve run is a pure-side-effect analysis that produces no downstream
+    # signal — the duplicate-PR problem we saw with PR #55/#60.
+    if role == "improve":
+        goal_text = (
+            f"{goal_text}\n\n"
+            f"## Output\n"
+            f"Write your analysis to `improve-output.json` in the project root with:\n"
+            f"```json\n"
+            f"{{\n"
+            f'  "summary": "1-2 sentence high-level finding",\n'
+            f'  "suggestions": [\n'
+            f'    {{"title": "concrete actionable change",\n'
+            f'      "rationale": "why this matters",\n'
+            f'      "files": ["path/to/file"],\n'
+            f'      "complexity": "small|medium|large"}}\n'
+            f"  ]\n"
+            f"}}\n"
+            f"```\n"
+            f"Each suggestion should be small enough to implement in a focused PR "
+            f"(complexity:small ≈ <50 LOC, medium ≈ <200 LOC, large flagged for split). "
+            f"Limit to 5 suggestions; pick the highest-impact ones."
+        )
+
     # Derive execution_mode from task_kind (test_campaign → test_campaign, etc.)
     execution_mode = task_kind if task_kind in {"goal", "test_campaign", "improve_campaign"} else task_kind
 
@@ -284,14 +309,35 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
         status  = result.get("status", "unknown")
         needs_verification = result.get("needs_verification", False)
 
-        if success:
+        # Improve mode: harvest structured suggestions from kodo's workspace
+        # before the tempdir is cleaned. _handle_success uses these to spawn
+        # focused Plane tasks that the propose lane can refine and prioritise.
+        improve_suggestions: list[dict] = []
+        if role == "improve" and success:
+            improve_suggestions = _read_improve_output(workspace)
+
+        # The kodo run can succeed but produce nothing shippable — e.g. the
+        # workspace's diff exceeded the soft cap and WorkspaceManager refused
+        # to push. In that case we want the task to be Blocked with the
+        # actionable reason, not silently moved to In Review with no PR.
+        scope_too_wide = (
+            success
+            and result.get("branch_pushed") is False
+            and result.get("failure_category") == "scope_too_wide"
+        )
+
+        if success and not scope_too_wide:
             logger.info("board_worker[%s]: task_id=%s completed status=%s", role, task_id, status)
-            _handle_success(client, issue, role, task_kind, needs_verification, settings)
+            _handle_success(
+                client, issue, role, task_kind, needs_verification, settings,
+                improve_suggestions=improve_suggestions,
+            )
         else:
-            logger.warning("board_worker[%s]: task_id=%s failed status=%s", role, task_id, status)
+            log_reason = "scope_too_wide" if scope_too_wide else status
+            logger.warning("board_worker[%s]: task_id=%s failed status=%s", role, task_id, log_reason)
             _handle_failure(client, issue, role, task_kind, result, settings)
 
-        return success
+        return success and not scope_too_wide
 
 
 # ── Outcome handlers ──────────────────────────────────────────────────────────
@@ -304,7 +350,33 @@ def _fail_task(client, task_id: str, role: str, reason: str) -> None:
         logger.warning("board_worker[%s]: failed to mark task_id=%s blocked — %s", role, task_id, exc)
 
 
-def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verification: bool, settings) -> None:
+def _read_improve_output(workspace: Path) -> list[dict]:
+    """Pull structured suggestions written by kodo to improve-output.json.
+
+    Returns [] when the file is missing or malformed — a missing output is
+    common when kodo improve mode runs against a healthy module and finds
+    nothing actionable. Callers treat that as "no follow-up tasks needed".
+    """
+    out_file = workspace / "improve-output.json"
+    if not out_file.exists():
+        return []
+    try:
+        data = json.loads(out_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("board_worker[improve]: malformed improve-output.json — %s", exc)
+        return []
+    raw = data.get("suggestions") or []
+    if not isinstance(raw, list):
+        return []
+    valid = []
+    for item in raw[:5]:  # cap at 5 — same limit we asked kodo for
+        if isinstance(item, dict) and item.get("title"):
+            valid.append(item)
+    return valid
+
+
+def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verification: bool, settings,
+                    *, improve_suggestions: list[dict] | None = None) -> None:
     task_id = str(issue["id"])
     title   = issue.get("name", "")
     labels  = issue.get("labels", [])
@@ -331,14 +403,33 @@ def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verifi
             client.comment_issue(task_id, "Verification passed")
 
         elif role == "improve":
-            # Improve is analysis-only — no auto-follow-up. The propose lane
-            # already generates concrete tasks from observation collectors;
-            # mirroring those into a "follow-up goal" with the same vague
-            # title produced duplicate PRs that just chew quota. Operators
-            # who want next steps can read the kodo run notes (recorded by
-            # the observability layer) and create a Plane task by hand.
+            # Improve is analysis-only. Instead of mirroring the parent title
+            # as a "follow-up goal" (the duplicate-PR problem), we read the
+            # structured suggestions kodo wrote to improve-output.json and
+            # create one focused goal task per suggestion. The propose lane
+            # picks them up like any other autonomy work.
             client.transition_issue(task_id, _STATE_DONE)
-            client.comment_issue(task_id, "Improvement analysis complete")
+            if improve_suggestions:
+                created_ids = []
+                for suggestion in improve_suggestions:
+                    follow_id = _create_improve_follow_up(
+                        client, issue, settings, suggestion,
+                    )
+                    if follow_id:
+                        created_ids.append(follow_id)
+                client.comment_issue(
+                    task_id,
+                    f"Improvement analysis complete — created {len(created_ids)} "
+                    f"focused follow-up task(s): {', '.join('#' + i for i in created_ids)}"
+                    if created_ids
+                    else "Improvement analysis complete — kodo wrote suggestions but none could be enqueued",
+                )
+            else:
+                client.comment_issue(
+                    task_id,
+                    "Improvement analysis complete — no actionable suggestions emitted "
+                    "(kodo found nothing concrete, or improve-output.json was missing)",
+                )
 
     except Exception as exc:
         logger.warning("board_worker[%s]: post-success transition failed task_id=%s — %s", role, task_id, exc)
@@ -382,6 +473,78 @@ def _handle_failure(client, issue: dict, role: str, task_kind: str, result: dict
             )
     except Exception as exc:
         logger.warning("board_worker[%s]: post-failure transition failed task_id=%s — %s", role, task_id, exc)
+
+
+def _create_improve_follow_up(
+    client, parent: dict, settings, suggestion: dict,
+) -> str | None:
+    """Create a focused goal task from one kodo improve suggestion.
+
+    Carries forward the parent's repo + source provenance, embeds the
+    suggestion's rationale and file scope into the task description so kodo's
+    next run has concrete context. Returns the new task id, or None on error.
+    """
+    parent_id     = str(parent["id"])
+    parent_labels = parent.get("labels", [])
+    repo_key      = _label_value(parent_labels, "repo")
+
+    title       = str(suggestion.get("title", "")).strip()[:80] or "Improve follow-up"
+    rationale   = str(suggestion.get("rationale", "")).strip()
+    files       = suggestion.get("files") or []
+    complexity  = str(suggestion.get("complexity", "")).strip().lower()
+
+    files_block = ""
+    if isinstance(files, list) and files:
+        files_block = "allowed_paths:\n" + "\n".join(f"  - {f}" for f in files[:10] if isinstance(f, str)) + "\n"
+
+    description = (
+        f"## Goal\n{title}\n\n"
+        f"## Rationale\n{rationale or '(none provided)'}\n\n"
+        f"## Execution\n"
+        f"repo: {repo_key}\n"
+        f"mode: goal\n"
+        f"{files_block}"
+    )
+
+    inherited_sources = [
+        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip()
+        for lab in parent_labels
+    ]
+    inherited_sources = [
+        s for s in inherited_sources
+        if s.lower().startswith("source:") and s.lower() != "source: board_worker"
+    ]
+    label_names = [
+        "task-kind: goal",
+        f"repo: {repo_key}",
+        "source: board_worker",
+        "source: improve-suggestion",  # distinct so the propose lane can recognise it
+        *inherited_sources,
+        f"original-task-id: {parent_id}",
+        "handoff-reason: improve_suggestion",
+    ]
+    if complexity in {"small", "medium", "large"}:
+        label_names.append(f"complexity: {complexity}")
+
+    try:
+        issue = client.create_issue(
+            name=title,
+            description=description,
+            state=_STATE_READY,
+            label_names=label_names,
+        )
+        new_id = str(issue.get("id", ""))
+        logger.info(
+            "board_worker[improve]: spawned follow-up task_id=%s title=%r complexity=%s",
+            new_id, title, complexity,
+        )
+        return new_id or None
+    except Exception as exc:
+        logger.warning(
+            "board_worker[improve]: failed to create follow-up for %r — %s",
+            title, exc,
+        )
+        return None
 
 
 def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: str) -> str:
