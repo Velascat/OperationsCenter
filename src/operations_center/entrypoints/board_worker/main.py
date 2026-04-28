@@ -199,6 +199,16 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
         tmp = Path(tmpdir)
 
         # ── Step 1: Planning ──────────────────────────────────────────────
+        # Forward source labels so the policy engine can recognise pre-authorised
+        # lanes (autonomy tier, spec campaigns) and skip its review-by-task-type
+        # check. Without this, every goal/improve task gets policy-blocked.
+        forwarded_labels: list[str] = []
+        for label in labels:
+            name = (label.get("name", "") if isinstance(label, dict) else str(label)).strip()
+            low = name.lower()
+            if low.startswith("source:") or low == "review_required":
+                forwarded_labels.append(name)
+
         plan_cmd = [
             python, "-m", "operations_center.entrypoints.worker.main",
             "--goal",           goal_text,
@@ -210,6 +220,8 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
             "--project-id",     settings.plane.project_id,
             "--task-id",        task_id,
         ]
+        for lbl in forwarded_labels:
+            plan_cmd.extend(["--label", lbl])
 
         plan_proc = subprocess.run(
             plan_cmd, cwd=oc_root, env=env, capture_output=True, text=True,

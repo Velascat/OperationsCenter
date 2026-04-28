@@ -439,6 +439,9 @@ def _validation_req_applies(
     return risk_match and type_match
 
 
+_TRUSTED_SOURCE_LABELS = frozenset({"source: autonomy", "source: spec-campaign"})
+
+
 def _check_review_requirements(
     proposal: TaskProposal,
     policy: RepoPolicy,
@@ -458,11 +461,23 @@ def _check_review_requirements(
         ))
         return
 
+    # Tasks from pre-authorized lanes (autonomy tier, spec campaigns) bypass the
+    # task-type and risk-level review gates — the operator already approved the
+    # category by raising the family's autonomy tier or by registering the
+    # campaign. Explicit `review_required` labels and `autonomous_allowed=False`
+    # still apply, so per-task and per-repo overrides keep working.
+    trusted = bool(_TRUSTED_SOURCE_LABELS.intersection(labels))
+
     needs_review = (
         not rr.autonomous_allowed
-        or risk_value in rr.require_review_for_risk_levels
-        or task_type_value in rr.require_review_for_task_types
         or "review_required" in labels
+        or (
+            not trusted
+            and (
+                risk_value in rr.require_review_for_risk_levels
+                or task_type_value in rr.require_review_for_task_types
+            )
+        )
     )
 
     if needs_review:
