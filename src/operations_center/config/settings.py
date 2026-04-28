@@ -131,6 +131,10 @@ class ReviewerSettings(BaseModel):
     allowed_reviewer_logins: list[str] = Field(default_factory=list)
     # Max kodo self-review+revision cycles before escalating to human
     max_self_review_loops: int = 2
+    # Max kodo revision passes driven by human comments before auto-merging
+    max_human_review_loops: int = 3
+    # Seconds from phase-2 entry before auto-merging (default: 1 day)
+    human_review_timeout_seconds: int = 86400
     # HTML marker appended to every bot-posted comment — belt-and-suspenders filter
     bot_comment_marker: str = "<!-- operations-center:bot -->"
     # When True, autonomy-sourced PRs are merged automatically once CI is green
