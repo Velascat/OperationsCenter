@@ -865,14 +865,31 @@ def _create_improve_follow_up(
         return None
 
 
+_MAX_FOLLOW_UP_RETRIES = 3
+
+
 def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: str) -> str:
-    """Create a follow-up Plane task with full lineage metadata. Returns the new task id."""
+    """Create a follow-up Plane task with full lineage metadata. Returns the new task id.
+
+    Refuses past `_MAX_FOLLOW_UP_RETRIES` (default 3): a chain of test_failure →
+    goal → test_failure → goal would otherwise burn quota on the same goal
+    text indefinitely. When the cap is reached, the parent is left in its
+    current state and we return "" so the caller can short-circuit.
+    """
     parent_id    = str(parent["id"])
     parent_title = parent.get("name", "")
     parent_labels = parent.get("labels", [])
     repo_key     = _label_value(parent_labels, "repo")
     base_branch  = _label_value(parent_labels, "base-branch")
     parent_kind  = _label_value(parent_labels, "task-kind")
+    retry_count  = _retry_count_from_labels(parent_labels)
+
+    if retry_count >= _MAX_FOLLOW_UP_RETRIES:
+        logger.info(
+            "board_worker: refusing follow-up — parent task_id=%s already at retry-count=%d",
+            parent_id, retry_count,
+        )
+        return ""
 
     description = (
         f"## Goal\n{parent_title} — {reason.replace('_', ' ')}\n\n"
@@ -901,6 +918,7 @@ def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: 
         *inherited_sources,
         f"original-task-id: {parent_id}",
         f"handoff-reason: {reason}",
+        f"retry-count: {retry_count + 1}",
     ]
 
     issue = client.create_issue(

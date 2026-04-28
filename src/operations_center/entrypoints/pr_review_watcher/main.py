@@ -350,6 +350,34 @@ def _phase1(
             gh_client.post_comment(owner, repo, pr_number, escalation_body)
         except Exception as exc:
             logger.warning("pr_review_watcher: failed to post escalation comment PR #%d — %s", pr_number, exc)
+        # Tag the corresponding Plane task with `lifecycle: escalated` so the
+        # status pane and downstream services can recognise it as a task
+        # that's exited normal automated flow (auto-promote skips, status
+        # pane can highlight, etc.). Best-effort — the GitHub side is the
+        # source of truth, this is just convenience metadata.
+        plane_task_id = state.get("task_id")
+        if plane_task_id:
+            try:
+                from operations_center.adapters.plane import PlaneClient
+                pc = PlaneClient(
+                    base_url=settings.plane.base_url,
+                    api_token=settings.plane_token(),
+                    workspace_slug=settings.plane.workspace_slug,
+                    project_id=settings.plane.project_id,
+                )
+                try:
+                    issue = pc.fetch_issue(plane_task_id)
+                    existing = [
+                        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip()
+                        for lab in issue.get("labels", [])
+                    ]
+                    existing = [n for n in existing if n]
+                    if "lifecycle: escalated" not in existing:
+                        pc.update_issue_labels(plane_task_id, existing + ["lifecycle: escalated"])
+                finally:
+                    pc.close()
+            except Exception as exc:
+                logger.warning("pr_review_watcher: failed to label Plane task escalated — %s", exc)
         logger.info("pr_review_watcher: PR #%d escalated to human review", pr_number)
 
     _save_state(state_path, state)

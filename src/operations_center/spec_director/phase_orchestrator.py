@@ -214,11 +214,28 @@ class PhaseOrchestrator:
             done_n = sum(1 for i in all_tasks if _status(i) == "done")
             cancelled_n = sum(1 for i in all_tasks if _status(i) == "cancelled")
             for parent in by_phase["parent"]:
-                self._client.transition_issue(str(parent["id"]), "Done")
+                parent_id = str(parent["id"])
+                self._client.transition_issue(parent_id, "Done")
                 self._client.comment_issue(
-                    str(parent["id"]),
+                    parent_id,
                     f"Campaign complete. {done_n} tasks done, {cancelled_n} cancelled.",
                 )
+                # Tag the campaign parent task as archived so any future
+                # processor knows this branch of the work is terminal-and-
+                # frozen — no rewrites, no re-promotion, no further automation.
+                try:
+                    existing = [
+                        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip()
+                        for lab in parent.get("labels", [])
+                    ]
+                    existing = [n for n in existing if n]
+                    if "lifecycle: archived" not in existing:
+                        self._client.update_issue_labels(parent_id, existing + ["lifecycle: archived"])
+                except Exception as exc:
+                    logger.warning(
+                        '{"event": "lifecycle_archive_failed", "task_id": "%s", "error": "%s"}',
+                        parent_id, str(exc),
+                    )
             self._state.mark_complete(campaign_id)
             result.campaigns_completed += 1
             logger.info(
@@ -242,6 +259,12 @@ class PhaseOrchestrator:
         if _has_lifecycle_label(issue, "expanded"):
             logger.info(
                 '{"event": "blocked_rewrite_skipped", "task_id": "%s", "reason": "lifecycle_expanded"}',
+                task_id,
+            )
+            return
+        if _has_lifecycle_label(issue, "archived"):
+            logger.info(
+                '{"event": "blocked_rewrite_skipped", "task_id": "%s", "reason": "lifecycle_archived"}',
                 task_id,
             )
             return
@@ -316,6 +339,24 @@ class PhaseOrchestrator:
 
         new_count = rewrite_count + 1
         rewritten = _set_rewrite_count(rewritten, new_count)
+        # Preserve the previous description in a comment so history is
+        # auditable. Mark the original version as superseded — the task id is
+        # the same, but the *version we replaced* is gone from the
+        # description field. Operators can read the comment to see what was
+        # there before the rewrite, and detectors can spot whether something
+        # rewrote a task that shouldn't have been rewritten.
+        try:
+            self._client.comment_issue(
+                task_id,
+                "lifecycle: superseded — previous description superseded by rewrite "
+                f"attempt {new_count}/{self._max_rewrites}. Original version below "
+                "for traceability:\n\n"
+                "```\n"
+                f"{description[:2000]}\n"
+                "```",
+            )
+        except Exception:
+            pass  # non-fatal — best-effort traceability
         self._client.update_issue_description(task_id, rewritten)
         self._client.transition_issue(task_id, "Ready for AI")
         self._client.comment_issue(

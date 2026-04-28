@@ -112,12 +112,30 @@ def _bootstrap_orphan_campaigns(
             }))
 
 
+_LIFECYCLE_SKIP_PROMOTE = {"lifecycle: expanded", "lifecycle: archived", "lifecycle: escalated"}
+
+
 def _auto_promote_backlog(client: PlaneClient, issues: list[dict]) -> None:
-    """Promote tier-≥2 autonomy tasks from Backlog → Ready for AI each cycle."""
+    """Promote tier-≥2 autonomy tasks from Backlog → Ready for AI each cycle.
+
+    Filters out tasks carrying any lifecycle label that means "don't touch":
+      • expanded   — work already delegated to children
+      • archived   — terminal-and-frozen
+      • escalated  — out of normal automated flow
+    """
     from operations_center.autonomy_tiers.config import (
         get_family_tier, load_tiers_config,
     )
     from operations_center.proposer.backlog_promoter import BacklogPromoterService
+
+    def _has_skip_label(issue: dict) -> bool:
+        for lab in issue.get("labels", []) or []:
+            name = (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+            if name in _LIFECYCLE_SKIP_PROMOTE:
+                return True
+        return False
+
+    filtered = [i for i in issues if not _has_skip_label(i)]
 
     tiers_config = load_tiers_config()
     service = BacklogPromoterService(
@@ -126,7 +144,7 @@ def _auto_promote_backlog(client: PlaneClient, issues: list[dict]) -> None:
         dry_run=False,
     )
     try:
-        result = service.promote(issues=issues)
+        result = service.promote(issues=filtered)
     except Exception as exc:
         logger.error(json.dumps({"event": "auto_promote_failed", "error": str(exc)}))
         return

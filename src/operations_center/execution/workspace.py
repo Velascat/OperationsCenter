@@ -268,9 +268,9 @@ class WorkspaceManager:
             return False
 
     def _commit_message(self, request: ExecutionRequest) -> str:
-        """Derive a short commit / PR title from the request.
+        r"""Derive a short commit / PR title from the request.
 
-        Strips markdown noise (`**bold**`, `\`code\``) and `[Tag] ` prefixes
+        Strips markdown noise (``**bold**``, ``\`code\```) and ``[Tag] `` prefixes
         that goal text often carries from spec-campaign builders. Falls back
         to a stable run-id slug if the goal text is empty or so prompt-shaped
         that no useful title can be extracted.
