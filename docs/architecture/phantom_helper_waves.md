@@ -19,6 +19,21 @@ small high-value first.
 
 ---
 
+## Status
+
+| Wave | State | Helpers | Tests | Audit delta |
+|------|-------|---------|-------|-------------|
+| 1 — small high-value helpers          | ✅ shipped | 5 | 15 | C8 57→53 |
+| 2 — pre-execution validation          | ✅ shipped | 4 | 13 | C8 53→50 |
+| 3 — post-merge regression detection   | ✅ shipped | 3 | 9  | C8 50→? |
+| 4 — multi-step task planning          | ✅ shipped | 4 | 8  | — |
+| 5 — kodo run quality + escalation     | ✅ shipped | 5 | 9  | — |
+| 6 — priority + scheduling scans       | ✅ shipped | 4 | 8  | C8 →43 |
+
+Total after all waves: **C8 57 → 43**, **62 new tests**, all 2943 pass, ruff clean.
+
+---
+
 ## Wave 1 — small high-value helpers ✅ shipped
 
 | Helper | Location | Purpose |
