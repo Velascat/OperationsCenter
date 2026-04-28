@@ -421,6 +421,54 @@ def _phase2(
             _merge_and_done(state, state_path, pr_data, gh_client, owner, repo, settings, reason="human_review_timeout")
             return
 
+    # ── auto-merge-on-CI-green (C-K1) ────────────────────────────────────────
+    # When the repo opts in via RepoSettings.auto_merge_on_ci_green AND the
+    # task carries `source: autonomy`, the reviewer auto-merges the moment CI
+    # passes — without waiting for the 24h timeout. Honors
+    # RepoSettings.ci_ignored_checks (C-K7) so flaky / advisory checks don't
+    # gate the merge.
+    repo_cfg = settings.repos.get(repo_key)
+    if repo_cfg and getattr(repo_cfg, "auto_merge_on_ci_green", False):
+        # Only autonomy-sourced PRs participate — operator-launched runs
+        # should still go through human review.
+        labels_lower = [
+            (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+            for lab in (pr_data.get("labels", []) or [])
+        ]
+        # If labels aren't on the PR, fall back to the PR title prefix or
+        # the linked Plane task source. PRs created by WorkspaceManager
+        # don't carry labels today, so this is a soft check — we infer
+        # autonomy from the branch prefix instead.
+        head_ref = ((pr_data.get("head") or {}).get("ref") or "").lower()
+        is_autonomy = (
+            "source: autonomy" in labels_lower
+            or head_ref.startswith(("goal/", "test/", "improve/"))
+        )
+        if is_autonomy:
+            try:
+                ignored = list(getattr(repo_cfg, "ci_ignored_checks", []) or [])
+                failed = gh_client.get_failed_checks(
+                    owner, repo, pr_number,
+                    pr_data=pr_data,
+                    ignored_checks=ignored,
+                )
+                if not failed:
+                    logger.info(
+                        "pr_review_watcher: PR #%d auto-merging — CI green and "
+                        "auto_merge_on_ci_green=True", pr_number,
+                    )
+                    _merge_and_done(
+                        state, state_path, pr_data, gh_client, owner, repo, settings,
+                        reason="auto_merge_on_ci_green",
+                    )
+                    return
+                logger.debug(
+                    "pr_review_watcher: PR #%d not auto-merged — %d failed check(s) "
+                    "(after ignoring %d)", pr_number, len(failed), len(ignored),
+                )
+            except Exception as exc:
+                logger.debug("pr_review_watcher: CI status check failed PR #%d — %s", pr_number, exc)
+
     # ── 👍 reaction on PR ────────────────────────────────────────────────────
     try:
         reactions = gh_client.get_pr_reactions(owner, repo, pr_number)

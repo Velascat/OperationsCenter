@@ -243,6 +243,29 @@ def _venv_python(oc_root: Path) -> str:
     return str(p) if p.exists() else "python3"
 
 
+_TRANSIENT_CATEGORIES = {"backend_error", "timeout"}
+_TRANSIENT_REASON_PATTERNS = (
+    "connection refused", "connection reset", "timed out", "timeout",
+    "502", "503", "504", "bad gateway", "gateway timeout", "service unavailable",
+    "remote disconnected", "network is unreachable", "temporary failure",
+)
+
+
+def _is_transient_failure(result: dict) -> bool:
+    """Return True when an execution failure looks like a transient blip.
+
+    Conservative match: requires category to be backend_error or timeout
+    AND the reason text to contain a network-shaped phrase. Avoids
+    over-retrying genuine bugs (which surface as backend_error too but
+    with a Python traceback in the reason).
+    """
+    cat = (result.get("failure_category") or "").lower()
+    if cat not in _TRANSIENT_CATEGORIES:
+        return False
+    reason = (result.get("failure_reason") or "").lower()
+    return any(p in reason for p in _TRANSIENT_REASON_PATTERNS)
+
+
 def _process_issue(issue: dict, role: str, config_path: Path, settings, client) -> bool:
     """
     Drive one claimed Plane issue through planning → execution.
@@ -319,11 +342,31 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
         # lanes (autonomy tier, spec campaigns) and skip its review-by-task-type
         # check. Without this, every goal/improve task gets policy-blocked.
         forwarded_labels: list[str] = []
+        # C-K6: when the repo opts in via require_explicit_approval, we DO
+        # NOT forward trusted-source labels — every task on that repo must
+        # pass the full review gate even if its label set would otherwise
+        # qualify for the bypass. Per-repo override of the trust default.
+        explicit_required = bool(getattr(repo_cfg, "require_explicit_approval", False))
         for label in labels:
             name = (label.get("name", "") if isinstance(label, dict) else str(label)).strip()
             low = name.lower()
-            if low.startswith("source:") or low == "review_required":
+            if low == "review_required":
                 forwarded_labels.append(name)
+                continue
+            if low.startswith("source:"):
+                if explicit_required and low in {
+                    "source: autonomy", "source: spec-campaign", "source: board_worker",
+                }:
+                    # Drop the trusted-source label so policy treats the
+                    # task as untrusted. The original Plane labels stay on
+                    # the issue itself — only the proposal carries the
+                    # filtered set.
+                    continue
+                forwarded_labels.append(name)
+        if explicit_required:
+            # Tag the proposal so policy explicitly requires review even
+            # when no other rule would fire (defence in depth).
+            forwarded_labels.append("review_required")
 
         plan_cmd = [
             python, "-m", "operations_center.entrypoints.worker.main",
@@ -392,6 +435,38 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
         success = result.get("success", False)
         status  = result.get("status", "unknown")
         needs_verification = result.get("needs_verification", False)
+
+        # D1: transient kodo retry. Network blips and 502s shouldn't sink a
+        # task — they're not authoritative outcomes. Detect by failure
+        # category + reason shape; retry once with a fresh workspace before
+        # giving up. Capped at 1 to avoid infinite loops.
+        if (not success
+            and _is_transient_failure(result)
+            and not outcome.get("retried")):
+            logger.info(
+                "board_worker[%s]: task_id=%s transient failure (%s) — retrying once",
+                role, task_id, result.get("failure_reason", "")[:80],
+            )
+            # Fresh workspace for the retry — the previous one may have a
+            # half-clone or partial commit state.
+            shutil.rmtree(workspace, ignore_errors=True)
+            workspace.mkdir()
+            retry_result_file = tmp / "result.retry.json"
+            retry_cmd = list(exec_cmd)
+            retry_cmd[retry_cmd.index("--output") + 1] = str(retry_result_file)
+            retry_cmd[retry_cmd.index("--source")  + 1] = f"board_worker_{role}_retry"
+            subprocess.run(retry_cmd, cwd=oc_root, env=env, capture_output=True, text=True)
+            if retry_result_file.exists():
+                outcome = json.loads(retry_result_file.read_text(encoding="utf-8"))
+                outcome["retried"] = True
+                result  = outcome.get("result", {})
+                success = result.get("success", False)
+                status  = result.get("status", "unknown")
+                needs_verification = result.get("needs_verification", False)
+                # Persist the new outcome for downstream readers (artifact
+                # writer, observability) — overwrite original so retry is
+                # the recorded outcome, not the transient blip.
+                result_file.write_text(json.dumps(outcome), encoding="utf-8")
 
         # Improve mode: harvest structured suggestions from kodo's workspace
         # before the tempdir is cleaned. _handle_success uses these to spawn
