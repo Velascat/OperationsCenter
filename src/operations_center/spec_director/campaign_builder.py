@@ -120,6 +120,7 @@ spec_coverage_hint: Goal {goal_index}
         title = f"[{phase_prefix}] {goal_text[:60].strip()}"
         labels = [
             f"task-kind: {task_kind}",
+            f"repo: {repo_key}",
             "source: spec-campaign",
             f"campaign-id: {fm.campaign_id}",
         ]
