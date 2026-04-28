@@ -323,19 +323,41 @@ def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verifi
 
 
 def _handle_failure(client, issue: dict, role: str, task_kind: str, result: dict, settings) -> None:
-    task_id = str(issue["id"])
+    task_id  = str(issue["id"])
+    status   = result.get("status", "unknown")
+    category = result.get("failure_category") or "unknown"
+    reason   = result.get("failure_reason") or "(no reason provided)"
+
+    # Log the full reason — operators want to see this in the worker logs even
+    # when the Plane comment is truncated.
+    logger.warning(
+        "board_worker[%s]: task_id=%s blocked status=%s category=%s reason=%s",
+        role, task_id, status, category, reason,
+    )
 
     try:
         if role == "test":
             follow_id = _create_follow_up(client, issue, settings, follow_kind="goal",
                                            reason="verification_failed")
             client.transition_issue(task_id, _STATE_BLOCKED)
-            client.comment_issue(task_id,
-                f"Verification failed — created follow-up goal task #{follow_id}")
+            client.comment_issue(
+                task_id,
+                f"Verification failed — created follow-up goal task #{follow_id}\n"
+                f"\n"
+                f"- status: {status}\n"
+                f"- category: {category}\n"
+                f"- reason: {reason}",
+            )
         else:
             client.transition_issue(task_id, _STATE_BLOCKED)
-            client.comment_issue(task_id,
-                f"board_worker[{role}] failed — {result.get('failure_category', 'unknown')}")
+            client.comment_issue(
+                task_id,
+                f"board_worker[{role}] failed\n"
+                f"\n"
+                f"- status: {status}\n"
+                f"- category: {category}\n"
+                f"- reason: {reason}",
+            )
     except Exception as exc:
         logger.warning("board_worker[%s]: post-failure transition failed task_id=%s — %s", role, task_id, exc)
 
