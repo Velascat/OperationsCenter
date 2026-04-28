@@ -23,6 +23,7 @@ from operations_center.contracts.routing import LaneDecision
 from operations_center.execution.artifact_writer import RunArtifactWriter
 from operations_center.execution.coordinator import ExecutionCoordinator
 from operations_center.execution.handoff import ExecutionRuntimeContext
+from operations_center.execution.workspace import WorkspaceManager
 from operations_center.planning.models import ProposalDecisionBundle
 
 
@@ -82,8 +83,17 @@ def main() -> int:
         task_branch=args.task_branch,
         goal_file_path=args.goal_file_path,
     )
+    await_review_repos = {
+        rk for rk, rcfg in (settings.repos or {}).items()
+        if getattr(rcfg, "await_review", False)
+    }
+    workspace_manager = WorkspaceManager(
+        github_token=settings.git_token(),
+        await_review_repos=await_review_repos,
+    )
     coordinator = ExecutionCoordinator(
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),
+        workspace_manager=workspace_manager,
     )
 
     try:

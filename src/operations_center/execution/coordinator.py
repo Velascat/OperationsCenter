@@ -31,6 +31,7 @@ from operations_center.policy.engine import PolicyEngine
 from operations_center.policy.models import PolicyDecision, PolicyStatus
 
 from .handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
+from .workspace import WorkspaceManager
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,13 @@ class ExecutionCoordinator:
         policy_engine: PolicyEngine | None = None,
         request_builder: ExecutionRequestBuilder | None = None,
         observability_service: ExecutionObservabilityService | None = None,
+        workspace_manager: WorkspaceManager | None = None,
     ) -> None:
         self._registry = adapter_registry
         self._policy = policy_engine or PolicyEngine.from_defaults()
         self._builder = request_builder or ExecutionRequestBuilder()
         self._observability = observability_service or ExecutionObservabilityService.default()
+        self._workspace = workspace_manager
 
     def execute(
         self,
@@ -94,8 +97,42 @@ class ExecutionCoordinator:
             )
 
         request = self._builder.build(bundle, runtime, policy_decision)
+
+        # Pre-execution: clone the repo into the workspace and create the
+        # task branch. Skipped when no WorkspaceManager is configured (unit
+        # tests that mock adapters do not need a workspace).
+        if self._workspace is not None:
+            try:
+                self._workspace.prepare(request)
+            except Exception as exc:
+                logger.error(
+                    "Workspace prep failed for run %s: %s", request.run_id, exc,
+                )
+                result = _workspace_prep_failed_result(request, exc)
+                record, trace = self._observe(bundle, result, policy_decision)
+                return ExecutionRunOutcome(
+                    request=request,
+                    policy_decision=policy_decision,
+                    result=result,
+                    record=record,
+                    trace=trace,
+                    executed=False,
+                )
+
         adapter = self._registry.for_backend(bundle.decision.selected_backend)
         result, raw_detail_refs, runtime_metadata = self._execute_adapter(adapter, request)
+
+        # Post-execution: commit any pending changes, push the task branch,
+        # optionally open a PR. Failures are logged but non-fatal — the
+        # original adapter result still reports back.
+        if self._workspace is not None and result.success:
+            try:
+                result = self._workspace.finalize(request, result)
+            except Exception as exc:
+                logger.warning(
+                    "Workspace finalize failed for run %s: %s", request.run_id, exc,
+                )
+
         record, trace = self._observe(
             bundle,
             result,
@@ -156,6 +193,19 @@ class ExecutionCoordinator:
             except Exception as exc:
                 logger.warning("Failed to retain backend detail refs for run %s: %s", request.run_id, exc)
         return []
+
+
+def _workspace_prep_failed_result(request, exc: Exception) -> ExecutionResult:
+    return ExecutionResult(
+        run_id=request.run_id,
+        proposal_id=request.proposal_id,
+        decision_id=request.decision_id,
+        status=ExecutionStatus.FAILED,
+        success=False,
+        validation=ValidationSummary(status=ValidationStatus.SKIPPED),
+        failure_category=FailureReasonCategory.BACKEND_ERROR,
+        failure_reason=f"Workspace preparation failed: {exc}",
+    )
 
 
 def _adapter_crash_result(request, exc: Exception) -> ExecutionResult:
