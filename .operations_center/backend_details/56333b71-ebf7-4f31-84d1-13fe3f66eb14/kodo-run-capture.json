@@ -1,0 +1,34 @@
+{
+  "run_id": "56333b71-ebf7-4f31-84d1-13fe3f66eb14",
+  "exit_code": 0,
+  "command": [
+    "/home/dev/Documents/GitHub/OperationsCenter/scripts/kodo-shim",
+    "--goal-file",
+    "/tmp/oc-review-ehkswsuo/workspace/.kodo_goal.md",
+    "--project",
+    "/tmp/oc-review-ehkswsuo/workspace",
+    "--team",
+    "full",
+    "--cycles",
+    "3",
+    "--exchanges",
+    "20",
+    "--orchestrator",
+    "claude-code:opus",
+    "--effort",
+    "standard",
+    "--yes"
+  ],
+  "started_at": "2026-04-28T06:45:17.456578+00:00",
+  "finished_at": "2026-04-28T06:45:37.463553+00:00",
+  "duration_ms": 20006,
+  "timeout_hit": false,
+  "rate_limited": false,
+  "quota_exhausted": false,
+  "artifacts": [
+    {
+      "label": "kodo run log",
+      "artifact_type": "log_excerpt"
+    }
+  ]
+}
