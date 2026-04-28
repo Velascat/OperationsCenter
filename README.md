@@ -507,7 +507,7 @@ The following capabilities were added to close gaps toward full autonomous opera
 - **PR review revision cycle** — every 3 improve cycles, open PRs are checked for `CHANGES_REQUESTED` reviews; `[Revise]` tasks are created with the review comment text as context.
 - **Token/credential expiry detection** — on the first watcher cycle, GitHub and Plane tokens are validated; a 401/403 logs a clear error, writes an escalation event, and aborts the loop.
 - **Success/failure learning** — task outcomes are recorded per proposal category; categories with >70% success are boosted to Ready for AI; categories with <30% are demoted to Backlog.
-- **Scheduled tasks** — `scheduled_tasks:` in config accepts cron expressions; due tasks are created at the start of each propose cycle (requires the optional `croniter` dependency).
+- **Scheduled tasks** — `scheduled_tasks:` in config periodically seeds Plane work-items via simple interval expressions (`every: 1w`, `every: 6h`); each due entry creates a Ready-for-AI task that flows through the normal pipeline. Optional `at: HH:MM` and `on_days: [mon, ...]` for time-of-day / weekday anchors. No cron, no external dependency.
 - **Stale PR TTL** — every 20 improve cycles, PRs older than `stale_pr_days` (default 7) are closed after a rebase attempt; the originating task is requeued to Backlog.
 
 **Session 3 — 8 reliability and throughput improvements:**
@@ -630,7 +630,7 @@ Top-level config options added in the autonomy hardening phase:
 - `escalation.webhook_url: <url>` — POST target for threshold-based escalations
 - `escalation.block_threshold: 5` — same-classification blocks within 24h before escalating
 - `escalation.cooldown_seconds: 3600` — minimum gap between two escalation POSTs for the same classification
-- `scheduled_tasks:` — list of `{cron, title, goal, repo_key, kind}` entries; due tasks are created at the start of each propose cycle (requires `croniter`)
+- `scheduled_tasks:` — list of `{every, title, goal, repo_key, kind}` entries plus optional `at: HH:MM` and `on_days: [mon,...]`. `every` is `<num><unit>` with unit ∈ `m h d w`. Due tasks are created at the start of each propose cycle. State persists to `state/scheduled_tasks_last_run.json`.
 - `cost_per_execution_usd: 0.0` — operator estimate of cost per Kodo task run; enables spend telemetry (0.0 = disabled)
 - `parallel_slots: 1` — number of parallel task-execution threads per watcher lane (1 = serial)
 

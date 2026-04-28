@@ -402,8 +402,23 @@ def main() -> None:
         project_id=settings.plane.project_id,
     )
     try:
+        # Scheduled tasks — periodic Plane work-item seeders. Each entry in
+        # settings.scheduled_tasks is checked for due-ness and any that fire
+        # are created as Ready for AI before the rest of the propose cycle.
+        # See operations_center.scheduled_tasks for schema and runtime.
+        try:
+            from operations_center.scheduled_tasks import ScheduledTaskRunner
+            _sched_runner = ScheduledTaskRunner(client, settings)
+            _sched_created = _sched_runner.tick()
+            if _sched_created:
+                print(
+                    f"\n[scheduled_tasks] created {len(_sched_created)} task(s): "
+                    f"{', '.join('#' + i for i in _sched_created)}"
+                )
+        except Exception as _sched_exc:
+            print(f"\n[scheduled_tasks] runner error (non-fatal): {_sched_exc}")
+
         # Board saturation check: count queued autonomy tasks before creating more.
-        # This mirrors the check in handle_propose_cycle for the watcher path.
         _max_queued = int(os.environ.get("OPERATIONS_CENTER_MAX_QUEUED_AUTONOMY_TASKS", "15"))
         try:
             _all_issues = client.list_issues()

@@ -246,24 +246,23 @@ def _detect_c7_dead_settings(ctx: CodeContext) -> tuple[int, list[str]]:
     fields -= ignored
     samples = []
     for fname in sorted(fields):
-        rx_dot = re.compile(rf"\.{fname}\b")
-        rx_idx = re.compile(rf"""\[['\"]{fname}['\"]\]""")
+        rx_dot    = re.compile(rf"\.{fname}\b")
+        rx_idx    = re.compile(rf"""\[['\"]{fname}['\"]\]""")
+        # `getattr(obj, "field", default)` — common defensive pattern in this
+        # codebase (e.g. autonomy_cycle reads maintenance_windows that way)
+        rx_getattr = re.compile(rf"""getattr\([^)]*?['\"]{fname}['\"]""")
         ref = False
         for f in _py_files(ctx.src_root):
             try:
                 t = f.read_text(errors="replace")
             except OSError:
                 continue
-            # Skip the *definition line itself* but still scan the rest of
-            # settings.py for self-references (settings_file is allowed).
             if f == settings_file:
-                hits_dot = rx_dot.findall(t)
-                hits_idx = rx_idx.findall(t)
-                if hits_dot or hits_idx:
+                if rx_dot.findall(t) or rx_idx.findall(t) or rx_getattr.search(t):
                     ref = True
                     break
                 continue
-            if rx_dot.search(t) or rx_idx.search(t):
+            if rx_dot.search(t) or rx_idx.search(t) or rx_getattr.search(t):
                 ref = True
                 break
         if not ref:
@@ -271,14 +270,105 @@ def _detect_c7_dead_settings(ctx: CodeContext) -> tuple[int, list[str]]:
     return len(samples), samples[:10]
 
 
+def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
+    """Backtick-quoted Python identifiers in design docs that don't exist in src.
+
+    Catches "documented but unimplemented" — design doc claims a function
+    exists, README references it, the actual ``def name`` was never committed
+    (e.g. ScheduledTask's ``_scheduled_tasks_due``).
+
+    Scope is intentionally narrow to keep noise low:
+      • Only ``docs/design/**/*.md``, ``docs/architecture/**/*.md``, README.md
+      • Skip historical / audit / archive subdirs
+      • Only flag snake_case identifiers (function-shaped: most "phantom
+        functions" are snake_case; CamelCase classes overlap with too many
+        third-party types like BaseModel, ConnectError, etc.)
+      • Identifier must be referenced in a "**Files:**" / "Implementation:"
+        / "see ``X``" context — i.e. the doc claims it's an implementation
+        symbol of OURS. Pure prose mentions are too noisy.
+      • Skip if the line context contains "deferred", "out of scope",
+        "not yet implemented", etc.
+      • Skip references to test functions (live in tests/, not src/)
+    """
+    docs_root = ctx.repo_root / "docs"
+    readme    = ctx.repo_root / "README.md"
+    files: list[Path] = [readme] if readme.exists() else []
+
+    # Narrow doc scope — most phantom symbols live in design specs.
+    for sub in ("design", "architecture"):
+        d = docs_root / sub
+        if d.exists():
+            files.extend(d.rglob("*.md"))
+
+    # Snake_case identifiers only (function-shaped). At least 8 chars, at
+    # least one underscore, lowercase only.
+    sym_re = re.compile(r"`(_?[a-z][a-z0-9_]{7,})`")
+    # Lines that establish "this is an implementation symbol in our code"
+    impl_marker_re = re.compile(
+        r"\*\*Files:\*\*|\bImplementation:|see\s+`|defined in `|"
+        r"\b(?:def|class)\s+|`\s*\(.*?\)\s*",
+        re.IGNORECASE,
+    )
+
+    src_text = ""
+    src_test_text = ""
+    for f in _py_files(ctx.src_root):
+        try:
+            src_text += f.read_text(errors="replace") + "\n"
+        except OSError:
+            continue
+    if ctx.tests_root.exists():
+        for f in _py_files(ctx.tests_root):
+            try:
+                src_test_text += f.read_text(errors="replace") + "\n"
+            except OSError:
+                continue
+
+    deferred_words = ("deferred", "out of scope", "not yet implemented", "future:", "deprecated")
+
+    seen: dict[str, tuple[Path, int]] = {}
+    for f in files:
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        rel = str(f.relative_to(ctx.repo_root))
+        # Skip historical / audit subdirs even within docs/architecture
+        if "/history/" in rel or "/audits/" in rel or "/archive/" in rel:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            lower = line.lower()
+            if any(w in lower for w in deferred_words):
+                continue
+            if not impl_marker_re.search(line):
+                continue
+            for m in sym_re.finditer(line):
+                name = m.group(1)
+                if name in seen:
+                    continue
+                if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_text):
+                    continue
+                if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_test_text):
+                    # Live as a test — count as alive.
+                    continue
+                seen[name] = (f, i)
+
+    samples = [
+        f"{path.relative_to(ctx.repo_root)}:{ln}: `{name}` referenced but no def/class"
+        for name, (path, ln) in sorted(seen.items())
+    ]
+    return len(seen), samples[:8]
+
+
 _DETECTORS: list[Detector] = [
-    Detector("C1", "scaffolded-but-unimplemented backends", _detect_c1_stub_backends),
-    Detector("C2", "untagged TODO/FIXME debt",              _detect_c2_untagged_todos),
-    Detector("C3", "orphaned entrypoints",                  _detect_c3_orphaned_entrypoints),
-    Detector("C4", "ruff lint findings",                    _detect_c4_ruff),
-    Detector("C5", "unconditional skipped tests",           _detect_c5_unconditional_skips),
-    Detector("C6", "modules called only from tests",        _detect_c6_test_only_modules),
-    Detector("C7", "dead settings fields",                  _detect_c7_dead_settings),
+    Detector("C1", "scaffolded-but-unimplemented backends",       _detect_c1_stub_backends),
+    Detector("C2", "untagged TODO/FIXME debt",                    _detect_c2_untagged_todos),
+    Detector("C3", "orphaned entrypoints",                        _detect_c3_orphaned_entrypoints),
+    Detector("C4", "ruff lint findings",                          _detect_c4_ruff),
+    Detector("C5", "unconditional skipped tests",                 _detect_c5_unconditional_skips),
+    Detector("C6", "modules called only from tests",              _detect_c6_test_only_modules),
+    Detector("C7", "dead settings fields",                        _detect_c7_dead_settings),
+    Detector("C8", "docs reference a symbol that doesn't exist",  _detect_c8_phantom_symbols),
 ]
 
 

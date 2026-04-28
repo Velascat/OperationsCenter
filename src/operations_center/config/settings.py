@@ -99,11 +99,27 @@ class SpecDirectorSettings(BaseModel):
 
 
 class ScheduledTask(BaseModel):
-    cron: str  # e.g. "0 9 * * 1" (Monday 09:00 UTC)
+    """A periodically-injected Plane task (e.g. weekly dependency audit).
+
+    The propose cycle checks each entry; due tasks are created as Ready for
+    AI and flow through the normal pipeline. This generates the *Plane work
+    item*; it does NOT schedule the autonomy_cycle itself (that runs
+    continuously).
+    """
+    # Base interval. Format: ``<num><unit>`` where unit ∈ {m,h,d,w}.
+    # Examples: "30m", "6h", "1d", "1w". Required.
+    every: str
     title: str
     goal: str
     repo_key: str
     kind: str = "goal"
+    # Optional anchor: only fire when current UTC time matches HH:MM (within
+    # the propose-cycle polling slack). If unset, fires whenever `every`
+    # elapses regardless of time of day.
+    at: str | None = None
+    # Optional weekday gate (lowercase 3-letter abbrev: mon/tue/wed/.../sun).
+    # Empty / None means any day.
+    on_days: list[str] | None = None
 
 
 class MaintenanceWindow(BaseModel):
