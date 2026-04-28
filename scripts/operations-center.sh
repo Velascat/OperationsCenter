@@ -264,7 +264,7 @@ start_watch_role() {
         sleep 30
       done
     " >>"${log_file}" 2>&1 < /dev/null &
-  else
+  elif [[ "${role}" == "propose" ]]; then
     setsid /bin/bash -lc "
       cd '${ROOT_DIR}'
       set -a
@@ -273,9 +273,29 @@ start_watch_role() {
       _child_pid=''
       trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
       while true; do
-        '${VENV_DIR}/bin/python' -m operations_center.entrypoints.worker.main \
+        '${VENV_DIR}/bin/python' -m operations_center.entrypoints.pipeline_trigger.main \
           --config '${CONFIG_PATH}' \
-          --watch \
+          --execute &
+        _child_pid=\$!
+        wait \$_child_pid
+        _exit=\$?
+        [[ ! -f '${pid_file}' ]] && exit 0
+        echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"propose\\\",\\\"exit_code\\\":\$_exit}\"
+        sleep 30
+      done
+    " >>"${log_file}" 2>&1 < /dev/null &
+  else
+    # goal, test, improve — Plane-polling board workers
+    setsid /bin/bash -lc "
+      cd '${ROOT_DIR}'
+      set -a
+      source '${ENV_PATH}'
+      set +a
+      _child_pid=''
+      trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
+      while true; do
+        '${VENV_DIR}/bin/python' -m operations_center.entrypoints.board_worker.main \
+          --config '${CONFIG_PATH}' \
           --role '${role}' \
           --poll-interval-seconds '${poll_interval}' \
           --status-dir '${WATCH_DIR}' &
