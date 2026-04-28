@@ -46,6 +46,8 @@ _HARD_QUOTA_EXHAUSTED_SIGNALS = (
 )
 
 # Fallback team used when codex quota is detected: claude CLI for both roles.
+# Sonnet is the workhorse here — fast for routine work and the smart-worker
+# fallback when Opus is briefly throttled.
 _CLAUDE_FALLBACK_TEAM = {
     "agents": {
         "worker_fast": {
@@ -59,6 +61,39 @@ _CLAUDE_FALLBACK_TEAM = {
         },
     }
 }
+
+# Second-tier fallback used when Sonnet's weekly usage is specifically
+# exhausted on Claude Pro/Max plans. Opus and Haiku each carry their own
+# weekly budget separate from Sonnet, so this team can keep the pipeline
+# moving even when Sonnet is fully consumed for the week. Haiku takes the
+# fast role (where Sonnet was) and is also Opus's fallback in case Opus
+# briefly throttles within its own budget.
+_OPUS_HAIKU_FALLBACK_TEAM = {
+    "agents": {
+        "worker_fast": {
+            "backend": "claude",
+            "model": "haiku",
+        },
+        "worker_smart": {
+            "backend": "claude",
+            "model": "opus",
+            "fallback_model": "haiku",
+        },
+    }
+}
+
+# Phrases that suggest Claude *Sonnet* specifically has hit its weekly cap.
+# Pro/Max plans surface model-tier limits separately from account-level
+# quota, so a Sonnet-only signal lets us route to Opus+Haiku without
+# treating it as account-wide exhaustion (which would correctly stop work).
+_SONNET_EXHAUSTED_SIGNALS = (
+    "sonnet usage limit",
+    "sonnet rate limit",
+    "sonnet weekly",
+    "claude sonnet limit",
+    "claude-3-5-sonnet usage",
+    "claude-3-5-sonnet rate limit",
+)
 
 
 class KodoRunResult:
@@ -136,6 +171,17 @@ class KodoAdapter:
     def is_orchestrator_rate_limited(result: KodoRunResult) -> bool:
         combined = (result.stdout + result.stderr).lower()
         return any(signal in combined for signal in _ORCHESTRATOR_RATE_LIMIT_SIGNALS)
+
+    @staticmethod
+    def _is_sonnet_exhausted(result: KodoRunResult) -> bool:
+        """Return True when the result signals Sonnet (and only Sonnet) is out.
+
+        Used to choose between two claude-team variants: when this fires we
+        retry with Opus+Haiku, because those tiers have separate weekly
+        budgets on Pro/Max plans and may still have headroom.
+        """
+        combined = (result.stdout + result.stderr).lower()
+        return any(signal in combined for signal in _SONNET_EXHAUSTED_SIGNALS)
 
     @staticmethod
     def is_quota_exhausted(result: KodoRunResult) -> bool:
@@ -238,11 +284,49 @@ class KodoAdapter:
         command = self.build_command(goal_file, repo_path, profile=profile, kodo_mode=kodo_mode)
         result = self._run_subprocess(command, cwd=repo_path, timeout=timeout, env=env)
 
+        # Tier 1 fallback: codex quota exhausted → claude (Sonnet primary).
         if result.exit_code != 0 and self._is_codex_quota_error(result):
-            result = self._run_with_claude_fallback(goal_file, repo_path, env=env, profile=profile, kodo_mode=kodo_mode)
+            result = self._run_with_team(
+                _CLAUDE_FALLBACK_TEAM,
+                goal_file, repo_path, env=env, profile=profile, kodo_mode=kodo_mode,
+            )
+
+        # Tier 2 fallback: Sonnet weekly limit hit (or generic claude rate
+        # limit during a Sonnet-using run) → retry with Opus+Haiku. Those
+        # tiers have separate weekly budgets on Pro/Max plans and often
+        # still have headroom when Sonnet is exhausted.
+        if result.exit_code != 0 and (
+            self._is_sonnet_exhausted(result)
+            or self.is_orchestrator_rate_limited(result)
+        ):
+            result = self._run_with_team(
+                _OPUS_HAIKU_FALLBACK_TEAM,
+                goal_file, repo_path, env=env, profile=profile, kodo_mode=kodo_mode,
+            )
 
         return result
 
+    def _run_with_team(
+        self,
+        team: dict,
+        goal_file: Path,
+        repo_path: Path,
+        env: dict[str, str] | None = None,
+        profile: "KodoSettings | None" = None,
+        kodo_mode: str = "goal",
+    ) -> KodoRunResult:
+        """Run kodo with a team override written to .kodo/team.json."""
+        team_override = repo_path / ".kodo" / "team.json"
+        team_override.parent.mkdir(exist_ok=True)
+        team_override.write_text(json.dumps(team, indent=2))
+        try:
+            timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
+            command = self.build_command(goal_file, repo_path, profile=profile, kodo_mode=kodo_mode)
+            return self._run_subprocess(command, cwd=repo_path, timeout=timeout, env=env)
+        finally:
+            team_override.unlink(missing_ok=True)
+
+    # Back-compat shim — older call sites still reference this name.
     def _run_with_claude_fallback(
         self,
         goal_file: Path,
@@ -251,15 +335,10 @@ class KodoAdapter:
         profile: "KodoSettings | None" = None,
         kodo_mode: str = "goal",
     ) -> KodoRunResult:
-        team_override = repo_path / ".kodo" / "team.json"
-        team_override.parent.mkdir(exist_ok=True)
-        team_override.write_text(json.dumps(_CLAUDE_FALLBACK_TEAM, indent=2))
-        try:
-            timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
-            command = self.build_command(goal_file, repo_path, profile=profile, kodo_mode=kodo_mode)
-            return self._run_subprocess(command, cwd=repo_path, timeout=timeout, env=env)
-        finally:
-            team_override.unlink(missing_ok=True)
+        return self._run_with_team(
+            _CLAUDE_FALLBACK_TEAM,
+            goal_file, repo_path, env=env, profile=profile, kodo_mode=kodo_mode,
+        )
 
     @staticmethod
     def command_to_json(command: list[str]) -> str:
