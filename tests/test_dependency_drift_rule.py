@@ -126,3 +126,27 @@ class TestDependencyDriftRule:
         candidates = rule.evaluate([insight])
         assert len(candidates) == 1
         assert candidates[0].confidence == "medium"
+
+    def test_multiple_matching_insights_produce_multiple_candidates(self) -> None:
+        """Two matching persistent insights produce two candidates."""
+        rule = DependencyDriftRule(min_consecutive_runs=2)
+        insight1 = make_insight(
+            dedup_key="dependency_drift_continuity|present|persistent",
+            evidence={"consecutive_snapshots": 3},
+        )
+        insight2 = make_insight(
+            dedup_key="dependency_drift_continuity|present|persistent",
+            evidence={"consecutive_snapshots": 5},
+        )
+        candidates = rule.evaluate([insight1, insight2])
+        assert len(candidates) == 2
+
+    def test_exactly_four_consecutive_is_high_confidence(self) -> None:
+        """Exactly 4 consecutive snapshots → high confidence boundary."""
+        rule = DependencyDriftRule(min_consecutive_runs=2)
+        insight = make_insight(
+            evidence={"consecutive_snapshots": 4},
+        )
+        candidates = rule.evaluate([insight])
+        assert len(candidates) == 1
+        assert candidates[0].confidence == "high"

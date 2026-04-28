@@ -112,3 +112,49 @@ class TestDependencyDriftDeriver:
         assert current.last_seen_at == newer
         assert persistent.first_seen_at == older
         assert persistent.last_seen_at == newer
+
+    def test_mixed_available_not_available_available(self) -> None:
+        """available→not_available→available: all available snapshots counted."""
+        deriver = DependencyDriftDeriver(_normalizer())
+        t1 = datetime(2026, 4, 8, 12, 0, 0, tzinfo=UTC)
+        t2 = datetime(2026, 4, 7, 12, 0, 0, tzinfo=UTC)
+        t3 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        snaps = [
+            _make_snapshot(dependency_drift_status="available", observed_at=t1),
+            _make_snapshot(dependency_drift_status="not_available", observed_at=t2),
+            _make_snapshot(dependency_drift_status="available", observed_at=t3),
+        ]
+        insights = deriver.derive(snaps)
+        # current + persistent (2 available snapshots total across history)
+        assert len(insights) == 2
+        assert any("current" in i.dedup_key for i in insights)
+        persistent = [i for i in insights if "persistent" in i.dedup_key][0]
+        assert persistent.evidence["consecutive_snapshots"] == 2
+
+    def test_two_consecutive_not_available_no_transition(self) -> None:
+        """Two consecutive not_available snapshots: no insights (no transition, not available)."""
+        deriver = DependencyDriftDeriver(_normalizer())
+        t1 = datetime(2026, 4, 8, 12, 0, 0, tzinfo=UTC)
+        t2 = datetime(2026, 4, 7, 12, 0, 0, tzinfo=UTC)
+        snaps = [
+            _make_snapshot(dependency_drift_status="not_available", observed_at=t1),
+            _make_snapshot(dependency_drift_status="not_available", observed_at=t2),
+        ]
+        insights = deriver.derive(snaps)
+        assert insights == []
+
+    def test_three_snapshots_trailing_not_available(self) -> None:
+        """available, available, not_available: persistent counts only the 2 available."""
+        deriver = DependencyDriftDeriver(_normalizer())
+        t1 = datetime(2026, 4, 8, 12, 0, 0, tzinfo=UTC)
+        t2 = datetime(2026, 4, 7, 12, 0, 0, tzinfo=UTC)
+        t3 = datetime(2026, 4, 6, 12, 0, 0, tzinfo=UTC)
+        snaps = [
+            _make_snapshot(dependency_drift_status="available", observed_at=t1),
+            _make_snapshot(dependency_drift_status="available", observed_at=t2),
+            _make_snapshot(dependency_drift_status="not_available", observed_at=t3),
+        ]
+        insights = deriver.derive(snaps)
+        assert len(insights) == 2
+        persistent = [i for i in insights if "persistent" in i.dedup_key][0]
+        assert persistent.evidence["consecutive_snapshots"] == 2

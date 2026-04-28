@@ -103,3 +103,21 @@ class TestDependencyDriftCollector:
         ctx = _make_context(tmp_path)
         with pytest.raises(json.JSONDecodeError):
             DependencyDriftCollector().collect(ctx)
+
+    def test_non_dict_entries_in_statuses_list(self, tmp_path: Path) -> None:
+        """Non-dict entries are filtered by isinstance check in actionable counting."""
+        run_dir = tmp_path / "run1"
+        run_dir.mkdir()
+        data = {
+            "statuses": [
+                "just a string",
+                42,
+                {"package": "real", "notes": "outdated"},
+                None,
+            ],
+        }
+        (run_dir / "dependency_report.json").write_text(json.dumps(data))
+        ctx = _make_context(tmp_path)
+        signal = DependencyDriftCollector().collect(ctx)
+        assert signal.status == "available"
+        assert "actionable_statuses=1" in signal.summary
