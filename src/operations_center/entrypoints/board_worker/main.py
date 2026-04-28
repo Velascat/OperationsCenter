@@ -120,6 +120,29 @@ def _claim_next(client, role: str, settings) -> dict | None:
         logger.warning("board_worker[%s]: failed to list issues", role)
         return None
 
+    # Daily-execution counter per repo: count tasks the worker has touched
+    # today (anything currently in Running / In Review / Done / Blocked
+    # whose updated_at is within the last 24h). Used to enforce
+    # RepoSettings.max_daily_executions.
+    _exec_today: dict[str, int] = {}
+    _now_utc = datetime.now(UTC)
+    _touched_states = {"running", "in review", "done", "blocked"}
+    for issue in issues:
+        st = issue.get("state")
+        st_name = (st.get("name", "") if isinstance(st, dict) else str(st or "")).strip().lower()
+        if st_name not in _touched_states:
+            continue
+        ts_raw = issue.get("updated_at") or ""
+        try:
+            ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if (_now_utc - ts).total_seconds() > 86400:
+            continue
+        rk = _label_value(issue.get("labels", []), "repo")
+        if rk:
+            _exec_today[rk] = _exec_today.get(rk, 0) + 1
+
     candidates = []
     for issue in issues:
         state_obj = issue.get("state")
@@ -132,6 +155,17 @@ def _claim_next(client, role: str, settings) -> dict | None:
             continue
         repo_key = _label_value(labels, "repo")
         if repo_key not in managed_repos:
+            continue
+        # Per-repo quota gate. RepoSettings.max_daily_executions is None /
+        # 0 by default (no cap); a positive int enforces a daily ceiling
+        # against the count we computed above.
+        repo_cfg = settings.repos.get(repo_key)
+        cap = getattr(repo_cfg, "max_daily_executions", None) if repo_cfg else None
+        if cap and _exec_today.get(repo_key, 0) >= int(cap):
+            logger.info(
+                "board_worker[%s]: skipping repo %s — daily quota %d reached (today=%d)",
+                role, repo_key, cap, _exec_today[repo_key],
+            )
             continue
         candidates.append(issue)
 

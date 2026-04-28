@@ -73,7 +73,68 @@ class CandidateProposerIntegrationService:
         except Exception:
             _active_campaign_list = []
 
+        # Back-pressure gate: if the Ready-for-AI queue is already saturated
+        # there's no point generating more proposals — they'd just sink to the
+        # bottom of the queue and add review noise. Honors
+        # Settings.propose_skip_when_ready_count (default 8). 0 disables.
+        _ready_cap = int(getattr(self.settings, "propose_skip_when_ready_count", 0) or 0)
+        _queue_saturated = False
+        _ready_count = 0
+        if _ready_cap > 0:
+            try:
+                _all_issues = self.client.list_issues()
+                _ready_count = sum(
+                    1 for _i in _all_issues
+                    if (str((_i.get("state") or {}).get("name", "")
+                           if isinstance(_i.get("state"), dict) else "").strip().lower())
+                       == "ready for ai"
+                )
+                if _ready_count >= _ready_cap:
+                    _queue_saturated = True
+            except Exception:
+                pass  # if we can't measure the queue, fall through and proceed
+
+        # Honors RepoSettings.propose_enabled — repos with this False are
+        # excluded from proposal generation entirely. Built once so the
+        # per-candidate loop below is a cheap lookup.
+        _propose_disabled_repos = {
+            rk for rk, rcfg in (self.settings.repos or {}).items()
+            if not getattr(rcfg, "propose_enabled", True)
+        }
+
         for candidate in candidates:
+            if _queue_saturated:
+                skipped.append(
+                    SkippedProposalResult(
+                        candidate_id=candidate.candidate_id,
+                        dedup_key=candidate.dedup_key,
+                        family=candidate.family,
+                        reason="ready_queue_saturated",
+                        evidence={"ready_count": _ready_count, "cap": _ready_cap},
+                    )
+                )
+                continue
+
+            # propose_enabled per-repo gate. Resolve the candidate's repo
+            # from provenance — same path the mapper uses.
+            _cand_repo = (
+                getattr(getattr(candidate, "provenance", None), "repo_key", None)
+                or getattr(candidate, "repo_key", None)
+                or ""
+            )
+            if _cand_repo in _propose_disabled_repos:
+                skipped.append(
+                    SkippedProposalResult(
+                        candidate_id=candidate.candidate_id,
+                        dedup_key=candidate.dedup_key,
+                        family=candidate.family,
+                        reason="propose_disabled_for_repo",
+                        evidence={"repo_key": _cand_repo},
+                    )
+                )
+                continue
+
+
             if len(created) >= context.max_create:
                 skipped.append(
                     SkippedProposalResult(

@@ -94,9 +94,15 @@ def main() -> int:
             return int(raw) if raw else None
         except ValueError:
             return None
+    # Bot identity: prefer settings.git.author_name / author_email so commits
+    # attribute correctly per repo workflow. Falls back to a generic identity
+    # when the fields aren't set.
+    bot_name  = getattr(settings.git, "author_name",  None)  or "Operations Center"
+    bot_email = getattr(settings.git, "author_email", None)  or "operations-center@local"
     workspace_manager = WorkspaceManager(
         github_token=settings.git_token(),
         await_review_repos=await_review_repos,
+        bot_identity=(bot_name, bot_email),
         max_files=_env_int("OPS_CENTER_MAX_FILES"),
         max_lines=_env_int("OPS_CENTER_MAX_LINES"),
     )
