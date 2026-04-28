@@ -439,7 +439,11 @@ def _validation_req_applies(
     return risk_match and type_match
 
 
-_TRUSTED_SOURCE_LABELS = frozenset({"source: autonomy", "source: spec-campaign"})
+_TRUSTED_SOURCE_LABELS = frozenset({
+    "source: autonomy",
+    "source: spec-campaign",
+    "source: board_worker",  # follow-up tasks emitted by an already-trusted run
+})
 
 
 def _check_review_requirements(

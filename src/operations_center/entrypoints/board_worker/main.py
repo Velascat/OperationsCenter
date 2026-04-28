@@ -391,10 +391,23 @@ def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: 
         + (f"base_branch: {base_branch}\n" if base_branch else "")
     )
 
+    # Inherit the parent's `source: ...` provenance so policy can recognise the
+    # follow-up as part of an already-trusted lane (autonomy, spec-campaign).
+    # Without this the policy engine review-blocks every follow-up because
+    # `source: board_worker` alone isn't in the trusted set.
+    inherited_sources = [
+        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip()
+        for lab in parent_labels
+    ]
+    inherited_sources = [
+        s for s in inherited_sources
+        if s.lower().startswith("source:") and s.lower() != "source: board_worker"
+    ]
     label_names = [
         f"task-kind: {follow_kind}",
         f"repo: {repo_key}",
         f"source: board_worker",
+        *inherited_sources,
         f"original-task-id: {parent_id}",
         f"handoff-reason: {reason}",
     ]
