@@ -336,8 +336,17 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
         # Skip historical / audit subdirs even within docs/architecture
         if "/history/" in rel or "/audits/" in rel or "/archive/" in rel:
             continue
+        # Track the current heading and whether the *section* is deferred,
+        # so a single tag on the heading suppresses every line in its body.
+        current_section_deferred = False
         for i, line in enumerate(text.splitlines(), 1):
             lower = line.lower()
+            if line.startswith("#"):
+                # New heading — re-evaluate deferred status for this section.
+                current_section_deferred = any(w in lower for w in deferred_words)
+                continue
+            if current_section_deferred:
+                continue
             if any(w in lower for w in deferred_words):
                 continue
             if not impl_marker_re.search(line):

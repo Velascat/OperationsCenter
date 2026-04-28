@@ -1,5 +1,14 @@
 # Autonomy Hardening — 46 Full-Autonomy Gap Improvements
 
+> **Audit note (2026-04-28):** Headings tagged `*[deferred, reviewed YYYY-MM-DD]*`
+> describe features where no cited symbol exists in `src/`. They were
+> mechanically tagged based on the C8 phantom-symbol detector
+> (`docs/architecture/code_health_audit.md`); the tag suppresses the
+> detector and signals this section is design-only, not status-of-shipped.
+> Sections without the tag have at least one cited symbol present in `src/`,
+> meaning the feature is partially or fully implemented — those need
+> individual attention to either reconcile or finish.
+
 This document describes the 46 improvements implemented across five sessions to close the
 gaps toward fully autonomous operation. They are grouped by session, then by theme.
 
@@ -7,7 +16,7 @@ gaps toward fully autonomous operation. They are grouped by session, then by the
 
 ## Session 1 — 8 Proposal and Execution Improvements
 
-### 1. Goal Coherence — `focus_areas` config
+### 1. Goal Coherence — `focus_areas` config  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The proposer would create tasks about anything it found in the codebase, spreading
 kodo's attention across many topics before finishing what mattered.
@@ -28,7 +37,7 @@ focus_areas:
 
 ---
 
-### 2. Dependency Ordering — `depends_on:` parsing
+### 2. Dependency Ordering — `depends_on:` parsing  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Tasks with explicit dependencies would be picked up before their dependencies
 completed, causing wasted executions or conflicts.
@@ -47,7 +56,7 @@ completed, causing wasted executions or conflicts.
 
 ---
 
-### 3. Task Sizing Gate — split oversized findings
+### 3. Task Sizing Gate — split oversized findings  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Decompose tasks targeting files with thousands of lines would exhaust kodo's context
 window before completing, failing with `context_limit`.
@@ -78,7 +87,7 @@ high-priority `[Improve] Post-merge regression detected` tasks for any that fail
 
 ---
 
-### 5. Self-Modification Controls
+### 5. Self-Modification Controls  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The system could propose and automatically execute changes to its own codebase
 (OperationsCenter itself), bypassing the human review that self-modification requires.
@@ -96,7 +105,7 @@ self_repo_key: OperationsCenter
 
 ---
 
-### 7. Better Failure Attribution
+### 7. Better Failure Attribution  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Tasks failing due to context window exhaustion or missing dependencies were
 classified as `validation_failure`, producing follow-up tasks with the wrong remediation.
@@ -166,7 +175,7 @@ the rebased branch is force-pushed. On failure, a `[Rebase] <PR title>` task is 
 
 ---
 
-### 3. Watcher Heartbeat Monitoring
+### 3. Watcher Heartbeat Monitoring  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** If a watcher process died silently, the autonomous loop stopped with no alert.
 
@@ -184,7 +193,7 @@ Wire this into cron or a process monitor for unattended operation.
 
 ---
 
-### 4. Context Handoff for `context_limit` Tasks
+### 4. Context Handoff for `context_limit` Tasks  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When kodo exhausted its context window on a large task, the follow-up task started
 from scratch, hitting the same limit on the same first half of the work.
@@ -228,7 +237,7 @@ Bot logins (`reviewer.bot_logins`) and allowed-reviewer filters (`reviewer.allow
 
 ---
 
-### 7. Token/Credential Expiry Detection
+### 7. Token/Credential Expiry Detection  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Expired API tokens caused every execution to fail with auth errors. The system would
 run for hours burning retries before a human noticed.
@@ -259,7 +268,7 @@ completes. `proposal_success_rate(category)` returns the success rate over the l
 
 ---
 
-### 9. Scheduled Tasks via Cron Expressions
+### 9. Scheduled Tasks via Cron Expressions  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Maintenance work (dependency audits, weekly checks) had to be created manually. There
 was no time-triggered task creation.
@@ -328,7 +337,7 @@ warning is logged so operators have advance notice before hard throttling.
 
 ---
 
-### 2. Pre-Execution Task Validation
+### 2. Pre-Execution Task Validation  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Vague or un-actionable tasks were sent to Kodo, failed, became blocked, and
 triggered an improve triage cycle — costing 2–3 full execution passes to discover the
@@ -365,7 +374,7 @@ these outcomes immediately.
 
 ---
 
-### 4. Workspace Health Monitoring
+### 4. Workspace Health Monitoring  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Bootstrap runs once at task start. If a package was yanked, a tool version
 changed, or the venv was corrupted between task runs, every subsequent task failed with
@@ -383,7 +392,7 @@ task is created so a human is alerted immediately.
 
 ---
 
-### 5. Config Schema Drift Detection
+### 5. Config Schema Drift Detection  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** No mechanism existed to detect when a deployed `config/operations_center.local.yaml`
 was missing keys added in newer versions. Features like `escalation`, `stale_pr_days`,
@@ -427,7 +436,7 @@ cost_per_execution_usd: 0.15   # operator estimate; 0.0 disables recording
 
 ---
 
-### 7. Parallel Execution Within Lanes
+### 7. Parallel Execution Within Lanes  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Each watcher lane handled one task at a time. With 10 lint_fix tasks ready,
 they executed one per poll cycle with sleeping intervals between them. This was the primary
@@ -558,7 +567,7 @@ Duplicate comment side-effects are acceptable — a missed transition is far mor
 
 ---
 
-### S5-3. Per-Task-Kind Running TTL in Reconcile
+### S5-3. Per-Task-Kind Running TTL in Reconcile  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `reconcile_stale_running_issues` used a single generic TTL for all task kinds. A goal task legitimately running a complex refactor (2+ hours) would be killed early; a test task stuck for 4 hours would wait too long before reclamation.
 
@@ -605,7 +614,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 ---
 
-### S5-6. Task Urgency Scoring
+### S5-6. Task Urgency Scoring  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `select_watch_candidate` sorted Ready-for-AI tasks only by priority label (high/medium/low/unset). A post-merge regression fix and a background lint cleanup in the same priority tier were picked in arbitrary board order. No mechanism existed to prefer time-sensitive work over maintenance work.
 
@@ -620,7 +629,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 ---
 
-### S5-7. Board Saturation Backpressure
+### S5-7. Board Saturation Backpressure  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The satiation signal (S1-8) detected when proposals weren't being consumed over multiple cycles, but couldn't directly observe the current board queue depth. A burst `autonomy-cycle --execute` run could flood the board with 30+ tasks when the watcher queue was already backed up, far exceeding what the goal/test lanes could drain in a reasonable time.
 
@@ -676,7 +685,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 ## Session 4 — 10 Reliability and Learning Improvements
 
-### S4-1. Watcher Auto-Restart
+### S4-1. Watcher Auto-Restart  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `watch-all` launched five watchers via `setsid` with no supervisor. A crash (OOM, unhandled exception) left the process dead until the operator manually ran `watch-all` again. Heartbeat detection surfaced the failure but nothing healed it.
 
@@ -686,7 +695,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 ---
 
-### S4-2. Task Staleness Invalidation
+### S4-2. Task Staleness Invalidation  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Autonomy-proposed tasks could sit in Backlog for weeks after the underlying signal was resolved (lint fixed by a PR, type errors removed by a refactor). On execution, Kodo would find nothing to do and the task would fail as a no-op, wasting budget.
 
@@ -728,7 +737,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 ---
 
-### S4-6. Connection Error Exponential Backoff
+### S4-6. Connection Error Exponential Backoff  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Transient network errors (Plane API down, DNS failure, connection refused) hit the bare `except Exception` handler in `run_watch_loop`, which logged `watch_error` and immediately re-slept for `poll_interval_seconds`. During a 10-minute Plane outage, the watcher would log an error every 30–60 seconds — 10–20 noise events before recovery.
 
@@ -738,7 +747,7 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 
 ---
 
-### S4-7. Human Rejection Signal Capture
+### S4-7. Human Rejection Signal Capture  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When a human manually cancelled an autonomy-proposed task, this "no" signal was lost. The feedback loop scan only processed Done tasks with GitHub PRs. The proposer's dedup window (7 days) would eventually expire and the same task would reappear.
 
@@ -793,7 +802,7 @@ kodo_profiles:
 
 ## Session 6 — 10 Autonomous Operation Controls
 
-### S6-1. Maintenance Window Gate
+### S6-1. Maintenance Window Gate  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The system had no way to pause autonomous execution during planned maintenance periods, deploy windows, or overnight freezes without stopping the entire watcher process.
 
@@ -828,7 +837,7 @@ repos:
 
 ---
 
-### S6-3. Auto-Merge on CI Green for Autonomy PRs
+### S6-3. Auto-Merge on CI Green for Autonomy PRs  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Autonomy-sourced PRs required a human 👍 even when CI was fully green. For routine lint/type fixes with 100% acceptance history, the review gate was pure friction.
 
@@ -867,7 +876,7 @@ reviewer:
 
 ---
 
-### S6-6. Pre-Execution Rejection Feedback
+### S6-6. Pre-Execution Rejection Feedback  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When `validate_task_pre_execution` rejected a task, the rejection was not reflected in the proposal success-rate store. Future cycles could keep proposing the same category of un-actionable tasks.
 
@@ -877,7 +886,7 @@ reviewer:
 
 ---
 
-### S6-7. Safe Revert Detection for Post-Merge Regressions
+### S6-7. Safe Revert Detection for Post-Merge Regressions  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `detect_post_merge_regressions` could flag a regression but had no way to know whether a revert was safe — the merged commit may have been built on by subsequent commits, making a naive revert destructive.
 
@@ -912,7 +921,7 @@ python -m operations_center.entrypoints.worker.main audit-export --window-days 3
 
 ---
 
-### S6-10. Board Health Snapshot
+### S6-10. Board Health Snapshot  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Detecting board anomalies (tasks stuck in Running, a classification appearing on 10+ blocked tasks, an entire repo lane going quiet) required manual board inspection. No automated signal existed for systemic board health problems.
 
@@ -933,7 +942,7 @@ python -m operations_center.entrypoints.worker.main board-health --config config
 
 ## Session 7 — 7 Full-Autonomy Infrastructure Gaps
 
-### S7-1. Process Supervisor
+### S7-1. Process Supervisor  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The `watch-all` bash restart loop (S4-1) restarted crashed watchers, but had no independent watchdog that could survive if the shell session died, no structured restart-count tracking, and no manifest-driven process management.
 
@@ -960,7 +969,7 @@ processes:
 
 ---
 
-### S7-2. Credential Rotation Detection
+### S7-2. Credential Rotation Detection  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `validate_credentials` (S2-7) detected invalid tokens (401/403) but had no awareness of upcoming expiry. A GitHub fine-grained PAT expiring at midnight would not be caught until it actually expired, halting all execution.
 
@@ -976,7 +985,7 @@ escalation:
 
 ---
 
-### S7-3. Transcript Failure Classification
+### S7-3. Transcript Failure Classification  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `classify_execution_result` had a coarse `infra_tooling` catch-all for anything that wasn't a context limit, missing dependency, or validation failure. This meant process timeouts, model API errors, and OOM kills all produced the same classification and the same (wrong) follow-up recommendation.
 
@@ -1004,7 +1013,7 @@ A fourth classification, `tool_failure`, covers bash/git/file tool errors distin
 
 ---
 
-### S7-5. Dependency Update Loop
+### S7-5. Dependency Update Loop  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Outdated package dependencies were only detected via the manual `dependency-check` CLI or when a task failed with a missing API. There was no autonomous path to create bounded update tasks for major-version bumps.
 
@@ -1018,7 +1027,7 @@ A fourth classification, `tool_failure`, covers bash/git/file tool errors distin
 
 ---
 
-### S7-6. Cross-Repo Impact Analysis
+### S7-6. Cross-Repo Impact Analysis  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When a task modified a shared interface (a public API module, a protocol definition, a shared utility), the system had no awareness that sibling repos might depend on it. Breaking changes could be merged without any indication that other repos needed updating.
 
@@ -1077,7 +1086,7 @@ repos:
 
 These improvements completed execution feedback depth work, added confidence calibration, quality trend tracking, runtime error ingestion, and several robustness fixes.
 
-### S8-1. Feedback Loop Config Wiring
+### S8-1. Feedback Loop Config Wiring  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The feedback loop scan used a hardcoded `stale_autonomy_backlog_days` value and ignored the config field, so operator tuning had no effect.
 
@@ -1087,7 +1096,7 @@ These improvements completed execution feedback depth work, added confidence cal
 
 ---
 
-### S8-2. ExecutionOutcomeDeriver
+### S8-2. ExecutionOutcomeDeriver  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The execution feedback depth feature was deferred — a `# Deferred: ExecutionOutcomeDeriver` comment existed in `autonomy_cycle/main.py` but no deriver was implemented.
 
@@ -1102,7 +1111,7 @@ Each classification emits a corresponding insight under the `execution_outcome/`
 
 ---
 
-### S8-3. Stale Pruning + Semantic Deduplication
+### S8-3. Stale Pruning + Semantic Deduplication  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem (a):** Stale autonomy backlog pruning ignored the config field (see S8-1).
 
@@ -1114,7 +1123,7 @@ Each classification emits a corresponding insight under the `execution_outcome/`
 
 ---
 
-### S8-4. Goal Decomposition (Multi-Step Planning)
+### S8-4. Goal Decomposition (Multi-Step Planning)  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** `build_multi_step_plan()` was already implemented but not covered by tests and the wiring was not verified end-to-end.
 
@@ -1134,7 +1143,7 @@ Each classification emits a corresponding insight under the `execution_outcome/`
 
 ---
 
-### S8-6. Branch Divergence Detection in Review Loop
+### S8-6. Branch Divergence Detection in Review Loop  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The reviewer watcher only attempted a rebase reactively (when it received a `CHANGES_REQUESTED` review). A PR that fell behind `main` due to other merges would sit stuck until a human noticed.
 
@@ -1182,7 +1191,7 @@ error_ingest:
 
 ---
 
-### S8-9. Explicit Approval Control
+### S8-9. Explicit Approval Control  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Repos that require human sign-off before any merge had no mechanism to prevent the reviewer watcher from timing out and auto-merging. The `auto_merge_on_ci_green` flag controlled automatic CI-green merges but not the 1-day timeout-merge path.
 
@@ -1235,7 +1244,7 @@ Wired into `feedback record` CLI (optional `--family` / `--confidence` args) and
 
 ## Session 9 — 10 structural and observability improvements
 
-### S9-1. Event-Driven Pipeline Trigger
+### S9-1. Event-Driven Pipeline Trigger  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The full pipeline (`observe → insights → decide → propose`) runs on a schedule or manually. When something important happens — a CI failure, a runtime error ingested, a new git push — the system cannot react immediately.
 
@@ -1258,7 +1267,7 @@ python -m operations_center.entrypoints.pipeline_trigger.main \
 
 ---
 
-### S9-2. Execution Environment Pre-Flight Probe
+### S9-2. Execution Environment Pre-Flight Probe  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Before claiming a task, the system validates scope and goal quality, but not whether the tools needed to execute actually exist. A `type_fix` task can be claimed and fail immediately with `dependency_missing` because `ty` isn't installed.
 
@@ -1297,7 +1306,7 @@ Warnings are logged but execution is not blocked — soft signal only, since too
 
 ---
 
-### S9-5. Rejection Reason Extraction
+### S9-5. Rejection Reason Extraction  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When a human rejects a PR, the outcome is recorded as `abandoned` but the comment explaining *why* is discarded. If the same rejection pattern recurs, the system never learns to add that constraint to future proposals.
 
@@ -1320,7 +1329,7 @@ Warnings are logged but execution is not blocked — soft signal only, since too
 
 ---
 
-### S9-6. Budget Allocation by Acceptance Rate
+### S9-6. Budget Allocation by Acceptance Rate  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The daily execution budget is distributed first-come-first-served. High-acceptance-rate families compete for the same budget slots as low-acceptance-rate families. There's no proportional weighting.
 
@@ -1330,7 +1339,7 @@ Warnings are logged but execution is not blocked — soft signal only, since too
 
 ---
 
-### S9-7. Test Coverage Gap Detection
+### S9-7. Test Coverage Gap Detection  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The system detects test regressions and test signal failures, but has no visibility into which code paths have *no tests at all*. Coverage gaps can't be proposed as tasks because the signal doesn't exist.
 
@@ -1367,7 +1376,7 @@ New `GitHubPRClient.update_pr_description()` uses `PATCH /repos/{owner}/{repo}/p
 
 ---
 
-### S9-9. Evidence-Enriched Conflict Avoidance
+### S9-9. Evidence-Enriched Conflict Avoidance  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The three-tier conflict detection uses filename tokens from the proposal title (low fidelity). Proposal evidence_lines often contain actual file paths, giving a more accurate picture of what a task would touch.
 
@@ -1421,7 +1430,7 @@ New `LintClusterRule` in `decision/rules/lint_cluster.py` turns these into `[Ref
 
 ## Session 10 — 10 Learning, Feedback, and Intelligence Improvements
 
-### S10-1: Rejection Patterns Injected into Kodo Prompts
+### S10-1: Rejection Patterns Injected into Kodo Prompts  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The proposer generated task descriptions without knowledge of what human reviewers had previously flagged. When a reviewer rejected a PR for "missing tests", the next proposal for the same family would not mention this concern, leading to repeat rejections.
 
@@ -1431,7 +1440,7 @@ New `LintClusterRule` in `decision/rules/lint_cluster.py` turns these into `[Ref
 
 ---
 
-### S10-2: Question-Asking Mid-Execution (`awaiting_input`)
+### S10-2: Question-Asking Mid-Execution (`awaiting_input`)  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Kodo would silently block or produce low-quality output when it lacked critical information (e.g., which database schema version to target). There was no mechanism to ask the operator a question and resume with the answer.
 
@@ -1445,7 +1454,7 @@ New `LintClusterRule` in `decision/rules/lint_cluster.py` turns these into `[Ref
 
 ---
 
-### S10-3: Reviewer → Goal Re-Run Escalation
+### S10-3: Reviewer → Goal Re-Run Escalation  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When a human reviewer left a comment that Kodo could not address (zero changed files), the system would post "made no changes" indefinitely, burning loop count without progress.
 
@@ -1460,7 +1469,7 @@ A warning is shown to the reviewer after each zero-change attempt indicating how
 
 ---
 
-### S10-4: Campaign/Project Tracking
+### S10-4: Campaign/Project Tracking  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Multi-step plans created by `build_multi_step_plan()` had no aggregate progress view. Operators had to cross-reference three individual Plane tasks to understand where a campaign stood.
 
@@ -1488,7 +1497,7 @@ python -m operations_center.entrypoints.campaign_status.main [--status ...] [--j
 
 ---
 
-### S10-6: Task Complexity Estimate at Proposal Time
+### S10-6: Task Complexity Estimate at Proposal Time  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** The proposer would create high-priority proposals involving 10+ files that kodo could not complete in a single run, wasting execution budget.
 
@@ -1500,7 +1509,7 @@ Thresholds: ≥8 files → high; 3–7 → medium; <3 → low.
 
 ---
 
-### S10-7: Utility Function for Proposal Ranking
+### S10-7: Utility Function for Proposal Ranking  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** Within a cycle, proposals were created in arbitrary iteration order. The highest-value proposal might miss the cycle cap while lower-value ones were created first.
 
@@ -1510,7 +1519,7 @@ Thresholds: ≥8 files → high; 3–7 → medium; <3 → low.
 
 ---
 
-### S10-8: Real-Time CI Webhook
+### S10-8: Real-Time CI Webhook  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** OperationsCenter polled for CI status every N seconds. Between CI completing and the next poll, the reviewer watcher was idle even though action could have been taken immediately.
 
@@ -1524,7 +1533,7 @@ Thresholds: ≥8 files → high; 3–7 → medium; <3 → low.
 
 ---
 
-### S10-9: Cross-Repo Synthesis Deriver
+### S10-9: Cross-Repo Synthesis Deriver  *[deferred, reviewed 2026-04-28 — phantom symbols, no implementation in src/]*
 
 **Problem:** When lint errors, security vulnerabilities, or architecture drift appeared simultaneously in multiple repos, the system proposed per-repo fix tasks with no visibility into the systemic pattern.
 
