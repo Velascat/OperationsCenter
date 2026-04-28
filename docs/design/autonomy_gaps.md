@@ -9,6 +9,34 @@
 > meaning the feature is partially or fully implemented — those need
 > individual attention to either reconcile or finish.
 
+## Architecture name map
+
+This doc was written against an older code shape where each watcher role
+had a top-level `handle_<role>_task()` function and a single
+`run_watch_loop`. The runtime moved to a `board_worker` + `pr_review_watcher`
++ `pipeline_trigger` architecture; many of the function names cited
+throughout this doc no longer exist under those names. They're
+**architecture drift**, not unimplemented features. The C8 audit
+explicitly skips them via its `stale_handlers` set.
+
+| Old name (cited in this doc) | New location |
+|------------------------------|--------------|
+| `handle_goal_task`, `handle_test_task`, `handle_improve_task` | `entrypoints/board_worker/main.py` `_process_issue` (role-dispatched) |
+| `handle_propose_cycle` | `entrypoints/autonomy_cycle/main.py` propose stage + `proposer/candidate_integration.py` |
+| `handle_blocked_triage` | `entrypoints/spec_director/phase_orchestrator.py` `_handle_blocked` |
+| `run_watch_loop` | bash supervisor (`scripts/operations-center.sh start_watch_role`) + Python watchers |
+| `handle_review_revision_scan` | `entrypoints/pr_review_watcher/main.py` Phase 1/2 state machine |
+| `classify_execution_result` | `execution/coordinator.py` outcome handling + `contracts/execution.py` `ExecutionResult` |
+| `select_watch_candidate` | `entrypoints/board_worker/main.py` `_claim_next` |
+| `build_proposal_candidates` | `proposer/candidate_integration.py` `apply_candidates` |
+| `validate_task_pre_execution` | not implemented — see C-K4/C-K5 in `audit_triage_plan.md` |
+| various `handle_*_scan` periodic scans | maintenance CLIs under `entrypoints/maintenance/` |
+
+When reading sections below, treat phantom function names as describing
+**intent**: "the autonomy loop should detect X and create a Y task." The
+*location* of that detection is now distributed across the components
+above rather than concentrated in a single function.
+
 This document describes the 46 improvements implemented across five sessions to close the
 gaps toward fully autonomous operation. They are grouped by session, then by theme.
 

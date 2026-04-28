@@ -326,6 +326,25 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
 
     deferred_words = ("deferred", "out of scope", "not yet implemented", "future:", "deprecated")
 
+    # Stale handler names from the pre-board_worker / pre-pr_review_watcher
+    # architecture. The design doc (autonomy_gaps.md) still cites these but
+    # the runtime moved to a different shape. They're documentation drift
+    # rather than missing implementations — see autonomy_gaps.md's
+    # "Architecture name map" at the top of that file. Skip them globally
+    # so we surface only genuine gaps.
+    stale_handlers = {
+        "handle_goal_task", "handle_test_task", "handle_improve_task",
+        "handle_propose_cycle", "handle_blocked_triage",
+        "handle_feedback_loop_scan", "handle_merge_conflict_scan",
+        "handle_review_revision_scan", "handle_stale_pr_scan",
+        "handle_workspace_health_check", "handle_dependency_update_scan",
+        "handle_stale_autonomy_task_scan",
+        "run_watch_loop", "run_parallel_watch_loop",
+        "classify_execution_result", "select_watch_candidate",
+        "build_proposal_candidates", "validate_task_pre_execution",
+        "_process_human_review",
+    }
+
     seen: dict[str, tuple[Path, int]] = {}
     for f in files:
         try:
@@ -354,6 +373,9 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
             for m in sym_re.finditer(line):
                 name = m.group(1)
                 if name in seen:
+                    continue
+                if name in stale_handlers:
+                    # Documented architecture drift, not a real gap.
                     continue
                 if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_text):
                     continue
