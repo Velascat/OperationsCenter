@@ -147,7 +147,7 @@ class RepoSettings(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     bootstrap_enabled: bool = True
     python_binary: str = "python3"
-    venv_dir: str = ".venv"
+    venv_dir: str | None = ".venv"
     install_dev_command: str | None = None
     token_env: str | None = None
     await_review: bool = False
