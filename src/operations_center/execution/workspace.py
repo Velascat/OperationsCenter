@@ -30,6 +30,21 @@ from operations_center.contracts.execution import ExecutionRequest, ExecutionRes
 logger = logging.getLogger(__name__)
 
 
+# Branch prefixes whose runs should NOT be pushed or PR'd. Improve mode is
+# analysis-only (output is the follow-up goal task, not code). Reviewer self-
+# review writes verdict.json and exits — never code changes. If kodo wrote
+# anything to the workspace it's incidental; we drop it.
+_NO_PUSH_BRANCH_PREFIXES = ("improve/", "review/")
+
+# Paths inside the workspace that must never be committed even if .gitignore
+# isn't updated downstream. Belt-and-suspenders against artifact pollution.
+_LOCAL_EXCLUDE_PATTERNS = (
+    ".operations_center/",
+    ".codex",
+    ".coverage",
+)
+
+
 class WorkspaceManager:
     def __init__(
         self,
@@ -71,6 +86,12 @@ class WorkspaceManager:
             )
 
         self._git.set_identity(ws, self._bot_name, self._bot_email)
+        # Belt-and-suspenders: even if the target repo's .gitignore doesn't
+        # exclude backend artifacts, this local exclude keeps them out of the
+        # commit. Earlier runs without this committed kodo's own stdout.log
+        # back into the repo, producing 25K-LOC garbage PRs.
+        for pattern in _LOCAL_EXCLUDE_PATTERNS:
+            self._git.add_local_exclude(ws, pattern)
         self._git.checkout_base(ws, request.base_branch)
         self._git.create_task_branch(ws, request.task_branch)
         logger.info(
@@ -93,6 +114,18 @@ class WorkspaceManager:
         """
         if not result.success:
             return result
+
+        # Don't push runs whose branch prefix indicates analysis-only work.
+        # Improve mode: kodo analyses and the orchestrator creates a follow-up
+        # goal task — that goal task is what gets shipped, not the improve
+        # workspace. Reviewer self-review: writes verdict.json, never code.
+        if request.task_branch.startswith(_NO_PUSH_BRANCH_PREFIXES):
+            logger.info(
+                "WorkspaceManager.finalize: skipping push for %s (branch prefix "
+                "is analysis-only)", request.task_branch,
+            )
+            return result
+
         ws = Path(request.workspace_path)
         if not (ws / ".git").exists():
             logger.warning("WorkspaceManager.finalize: %s is not a git repo", ws)
@@ -139,8 +172,23 @@ class WorkspaceManager:
             return False
 
     def _commit_message(self, request: ExecutionRequest) -> str:
-        first_line = (request.goal_text or "Operations Center change").strip().splitlines()[0]
-        return first_line[:72] if first_line else f"Operations Center run {request.run_id[:8]}"
+        """Derive a short commit / PR title from the request.
+
+        Strips markdown noise (`**bold**`, `\`code\``) and `[Tag] ` prefixes
+        that goal text often carries from spec-campaign builders. Falls back
+        to a stable run-id slug if the goal text is empty or so prompt-shaped
+        that no useful title can be extracted.
+        """
+        import re
+        text = (request.goal_text or "").strip()
+        first_line = text.splitlines()[0].strip() if text else ""
+        first_line = re.sub(r"^\[\w+\]\s*", "", first_line)        # strip [Impl]/[Test]/[Improve]
+        first_line = re.sub(r"\*\*([^*]+)\*\*", r"\1", first_line)  # **bold** → bold
+        first_line = re.sub(r"`([^`]+)`", r"\1", first_line)        # `code` → code
+        first_line = first_line.strip(" .—-")
+        if not first_line:
+            return f"Operations Center run {request.run_id[:8]}"
+        return first_line[:72]
 
     def _maybe_create_pr(self, request: ExecutionRequest) -> str | None:
         if not self._token:

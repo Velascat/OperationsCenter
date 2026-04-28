@@ -22,6 +22,9 @@ state/
 .worktrees/
 .kodo/
 .claude/scheduled_tasks.lock
+.operations_center/
+.codex
+.coverage
 uv.lock
 scripts/audit_*.py
 scripts/debug_*.py
