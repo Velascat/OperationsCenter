@@ -281,21 +281,16 @@ def main() -> None:
     settings = load_settings(args.config)
 
     # S6-1: Maintenance window gate — skip proposal creation when in window.
+    # Logic extracted to operations_center.maintenance_windows so other
+    # components (escalation, status pane) can ask the same question.
+    from operations_center.maintenance_windows import _in_maintenance_window
     _now_mw = datetime.now(UTC)
-    for _w in getattr(settings, "maintenance_windows", []) or []:
-        _days = list(getattr(_w, "days", []) or [])
-        if _days and _now_mw.weekday() not in _days:
-            continue
-        _start = int(getattr(_w, "start_hour", 0))
-        _end = int(getattr(_w, "end_hour", 0))
-        _h = _now_mw.hour
-        _in_window = (_start <= _h < _end) if _start < _end else (_h >= _start or _h < _end)
-        if _in_window:
-            print(
-                f"[skip] Maintenance window active (hour={_h}, start={_start}, end={_end}). "
-                "Proposal cycle suppressed."
-            )
-            return
+    if _in_maintenance_window(settings, _now_mw):
+        print(
+            f"[skip] Maintenance window active (hour={_now_mw.hour}). "
+            "Proposal cycle suppressed."
+        )
+        return
 
     # --- Stage 1: Observe ---
     repo_path, repo_name = resolve_repo_path(args.repo, settings)

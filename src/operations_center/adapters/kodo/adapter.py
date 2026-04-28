@@ -365,3 +365,33 @@ class KodoAdapter:
             return version or None
         except Exception:
             return None
+
+
+# ── module-level helpers (cited in autonomy_gaps.md) ─────────────────────────
+
+def _get_kodo_version(binary: str | None = None) -> str | None:
+    """Return the kodo binary version string, or None on failure.
+
+    Module-level shim around ``KodoAdapter.get_version`` so callers outside
+    an adapter instance (e.g. capture writers, observability collectors) can
+    record the version that produced an execution. No side effects.
+
+    See `docs/design/autonomy_gaps.md` S6-8 (Kodo Version Attribution).
+    """
+    if binary is None:
+        binary = "kodo"
+    return KodoAdapter.get_version(binary)
+
+
+def _is_quota_exhausted_result(result: KodoRunResult) -> bool:
+    """Return True when a kodo run signals account-level quota exhaustion.
+
+    Module-level shim around ``KodoAdapter.is_quota_exhausted`` so non-
+    adapter callers (the board_worker, the observability layer) can decide
+    whether to circuit-break further runs. Hard quota differs from
+    transient rate limits — see ``_HARD_QUOTA_EXHAUSTED_SIGNALS``.
+
+    See `docs/design/autonomy_gaps.md` S5-5 (Kodo API Quota Exhaustion
+    Detection).
+    """
+    return KodoAdapter.is_quota_exhausted(result)

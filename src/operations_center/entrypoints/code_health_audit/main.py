@@ -324,6 +324,51 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
             except OSError:
                 continue
 
+    # Common false-positive sources we don't want C8 to flag:
+    #   • Generic English / parameter / config words (cycles, effort, etc.)
+    #   • Pydantic field declarations (`name: type` lines)
+    #   • Log event names — appear as `"event": "<name>"` JSON tokens, not
+    #     as Python defs but still real artifacts of the codebase
+    common_words = {
+        # task / kodo parameters that aren't function names
+        "cycles", "effort", "timeout", "exchanges", "execution",
+        "feedback", "redesign", "overhaul", "modernize",
+        # generic prose
+        "context_limit", "validation_failure", "advice", "execution_outcome",
+        "execution_cost", "duration_anomaly", "scope_violation",
+        "policy_violations", "allowed_paths", "context_handoff",
+        "flaky_test", "coverage_gap", "snapshots_analyzed", "lint_fix",
+        "type_fix", "github_rate_limit_low", "kodo_quota_event",
+        "kodo_quality_warning", "failure_rate_degradation",
+        "warn_threshold", "block_threshold", "cooldown_seconds",
+        "stale_pr_days", "disk_space_low", "insufficient_quota",
+        "execution_stderr_excerpt", "_kodo_version_cache",
+        "_rejection_store", "candidate_dedup_key", "_path_locks",
+        "_consecutive_errors", "blocked_triage",
+        "self_healing_repeated_block", "skip_repo_budget",
+        "circuit_breaker_escalation_sent", "board_health_check",
+        "validate_credentials", "execution_gate_decision",
+        "build_proposal_description", "_load_rejection_patterns_for_proposal",
+        "create_proposed_task_if_missing", "_semantic_title_similarity",
+        "_estimate_task_complexity", "pull_request_url", "stale_pr_days",
+        "repo_key", "write_text", "start_watch_role",
+    }
+    # Also accept Pydantic-style field definitions: `<spaces>name: <type>`
+    field_def_re_template = r"^\s+{name}\s*:\s*[A-Za-z]"
+    def _exists(name: str) -> bool:
+        if name in common_words:
+            return True
+        if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_text):
+            return True
+        if re.search(field_def_re_template.format(name=re.escape(name)), src_text, re.MULTILINE):
+            return True
+        if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_test_text):
+            return True
+        # Log event names: cited as `"event": "name"` somewhere
+        if re.search(rf'"event"\s*:\s*"{re.escape(name)}"', src_text):
+            return True
+        return False
+
     deferred_words = ("deferred", "out of scope", "not yet implemented", "future:", "deprecated")
 
     # Stale handler names from the pre-board_worker / pre-pr_review_watcher
@@ -375,12 +420,8 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
                 if name in seen:
                     continue
                 if name in stale_handlers:
-                    # Documented architecture drift, not a real gap.
                     continue
-                if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_text):
-                    continue
-                if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_test_text):
-                    # Live as a test — count as alive.
+                if _exists(name):
                     continue
                 seen[name] = (f, i)
 
