@@ -105,6 +105,7 @@ def main() -> int:
         bot_identity=(bot_name, bot_email),
         max_files=_env_int("OPS_CENTER_MAX_FILES"),
         max_lines=_env_int("OPS_CENTER_MAX_LINES"),
+        repo_settings_lookup=lambda key: (settings.repos or {}).get(key),
     )
     coordinator = ExecutionCoordinator(
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),

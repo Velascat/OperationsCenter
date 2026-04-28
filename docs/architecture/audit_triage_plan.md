@@ -48,17 +48,18 @@ where the implementation cost is small AND the value is concrete.
 
 ### Wire-next bundle (after first batch ships)
 
-| ID | Field(s) | Notes |
-|----|----------|-------|
-| C-K1 | `auto_merge_on_ci_green` | reviewer Phase 1 auto-merge gate |
-| C-K3 | `bootstrap_enabled`, `python_binary`, `venv_dir`, `install_dev_command`, `bootstrap_commands` | execute-pipeline bootstrap chain |
-| C-K4 | `validation_timeout_seconds` | per-repo execution timeout |
-| C-K5 | `skip_baseline_validation` | skip pre-flight validation |
-| C-K6 | `require_explicit_approval` | per-repo opt-out of trusted-source bypass |
-| C-K7 | `ci_ignored_checks` | reviewer ignores these CI checks |
-| C-K8 | `impact_report_paths` | cross-repo impact warning |
-| C-K9 | `open_pr_default` + `push_on_validation_failure` | git workflow knobs |
-| C-K10 | `stale_pr_days` + `stale_autonomy_backlog_days` | TTL thresholds |
+| ID | Field(s) | Status |
+|----|----------|--------|
+| C-K1 | `auto_merge_on_ci_green` | **Shipped** — reviewer Phase 2 auto-merges autonomy PRs when CI green |
+| C-K3 | `bootstrap_enabled`, `python_binary`, `venv_dir`, `install_dev_command`, `bootstrap_commands` | **Shipped** — opt-in bootstrap step in `WorkspaceManager.prepare`; only fires when `install_dev_command` or `bootstrap_commands` is set |
+| C-K6 | `require_explicit_approval` | **Shipped** — board_worker strips trusted-source labels for opt-in repos |
+| C-K7 | `ci_ignored_checks` | **Shipped** — paired with C-K1 |
+| C-K9a | `open_pr_default` | **Shipped** — `WorkspaceManager._maybe_create_pr` honors False to skip PR |
+| C-K10 | `stale_pr_days` + `stale_autonomy_backlog_days` | **Shipped** — `close_stale_prs` and `cleanup_stale_backlog` maintenance CLIs |
+| C-K4 | `validation_timeout_seconds` | **Deferred — needs validation infra** (no baseline-validation step exists today) |
+| C-K5 | `skip_baseline_validation` | **Deferred — needs validation infra** (gates a feature that doesn't exist) |
+| C-K9b | `push_on_validation_failure` | **Deferred — needs validation infra** |
+| C-K8 | `impact_report_paths` | **Deferred** — needs shared-path detection in finalize; standalone task |
 
 ### Defer (depend on bigger features E1–E5)
 

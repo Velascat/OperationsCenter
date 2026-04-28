@@ -31,6 +31,8 @@ operations-center-flow-audit        = "operations_center.entrypoints.flow_audit.
 operations-center-code-health-audit = "operations_center.entrypoints.code_health_audit.main:main"
 operations-center-recover-stale     = "operations_center.entrypoints.maintenance.recover_stale:main"
 operations-center-cleanup-state     = "operations_center.entrypoints.maintenance.cleanup_state:main"
+operations-center-close-stale-prs   = "operations_center.entrypoints.maintenance.close_stale_prs:main"
+operations-center-cleanup-stale-backlog = "operations_center.entrypoints.maintenance.cleanup_stale_backlog:main"
 # Operator one-shots — added 2026-04-28 from audit triage Group B.
 operations-center-autonomy-tiers    = "operations_center.entrypoints.autonomy_tiers.main:main"
 operations-center-ci-monitor        = "operations_center.entrypoints.ci_monitor.main:main"

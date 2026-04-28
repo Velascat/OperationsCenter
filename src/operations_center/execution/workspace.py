@@ -62,6 +62,7 @@ class WorkspaceManager:
         bot_identity: tuple[str, str] = ("Operations Center", "operations-center@local"),
         max_files: int | None = None,
         max_lines: int | None = None,
+        repo_settings_lookup=None,
     ) -> None:
         self._git = git_client or GitClient()
         self._token = github_token
@@ -69,6 +70,10 @@ class WorkspaceManager:
         self._bot_name, self._bot_email = bot_identity
         self._max_files = max_files if max_files is not None else _DEFAULT_MAX_FILES
         self._max_lines = max_lines if max_lines is not None else _DEFAULT_MAX_LINES
+        # Optional: a callable repo_key -> RepoSettings (or None). Used by the
+        # bootstrap step (C-K3) and the open_pr_default gate (C-K9). Decoupled
+        # from the full Settings object so callers can pass a lambda.
+        self._repo_lookup = repo_settings_lookup or (lambda _k: None)
 
     # ── pre-execution ────────────────────────────────────────────────────────
 
@@ -103,6 +108,11 @@ class WorkspaceManager:
         # back into the repo, producing 25K-LOC garbage PRs.
         for pattern in _LOCAL_EXCLUDE_PATTERNS:
             self._git.add_local_exclude(ws, pattern)
+        # C-K3 bootstrap chain — only fires when the repo opts in via
+        # explicit install_dev_command or bootstrap_commands. Default
+        # config (no bootstrap fields set) is a no-op so existing repos
+        # see no behavior change.
+        self._maybe_bootstrap(ws, request)
         # If base_branch is a sandbox like "autonomy-staging" that the operator
         # forgot to create, fail with a clear error rather than a cryptic
         # `git checkout` failure. Plane will surface the reason via the new
@@ -291,6 +301,15 @@ class WorkspaceManager:
             return None
         if request.repo_key not in self._await_review:
             return None
+        # C-K9: per-repo opt-out of automatic PR creation. When False, the
+        # branch is pushed but no PR opens — operator opens it manually.
+        repo_cfg = self._repo_lookup(request.repo_key)
+        if repo_cfg is not None and not getattr(repo_cfg, "open_pr_default", True):
+            logger.info(
+                "WorkspaceManager: skipping PR for %s — open_pr_default=False",
+                request.repo_key,
+            )
+            return None
         try:
             from operations_center.adapters.github_pr import GitHubPRClient
             owner, repo = GitHubPRClient.owner_repo_from_clone_url(request.clone_url)
@@ -309,3 +328,76 @@ class WorkspaceManager:
         except Exception as exc:
             logger.warning("WorkspaceManager: PR creation failed — %s", exc)
             return None
+
+    def _maybe_bootstrap(self, ws: Path, request: ExecutionRequest) -> None:
+        """Run repo-bootstrap (venv setup + dev install) when configured.
+
+        Opt-in: only fires when the repo declares `install_dev_command` or
+        `bootstrap_commands`. Default-shaped configs (no bootstrap fields)
+        are a no-op so adding this code doesn't change existing behavior
+        for any repo that hasn't asked for it.
+
+        Failures are non-fatal: we log a warning and proceed. Kodo still
+        runs against the cloned tree; bootstrap is an enhancer, not a gate.
+        """
+        repo_cfg = self._repo_lookup(request.repo_key)
+        if repo_cfg is None:
+            return
+        if not getattr(repo_cfg, "bootstrap_enabled", True):
+            return
+        custom = getattr(repo_cfg, "bootstrap_commands", None) or []
+        install_cmd = getattr(repo_cfg, "install_dev_command", None)
+        if not custom and not install_cmd:
+            return  # nothing configured — explicit no-op
+
+        # Custom commands take precedence — caller knows their environment.
+        if custom:
+            for cmd in custom:
+                if not isinstance(cmd, str) or not cmd.strip():
+                    continue
+                proc = subprocess.run(
+                    cmd, shell=True, cwd=ws,
+                    capture_output=True, text=True, timeout=600,
+                )
+                if proc.returncode != 0:
+                    logger.warning(
+                        "WorkspaceManager: bootstrap_commands step failed (%s) "
+                        "in %s — %s", cmd, request.repo_key,
+                        (proc.stderr or proc.stdout).strip()[:200],
+                    )
+                    return
+            logger.info(
+                "WorkspaceManager: bootstrap_commands ran (%d step(s)) for %s",
+                len(custom), request.repo_key,
+            )
+            return
+
+        # Standard path: create venv, run install_dev_command.
+        venv_dir = getattr(repo_cfg, "venv_dir", None) or ".venv"
+        python_bin = getattr(repo_cfg, "python_binary", None) or "python3"
+        try:
+            subprocess.run(
+                [python_bin, "-m", "venv", venv_dir],
+                cwd=ws, capture_output=True, text=True, timeout=300, check=True,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            logger.warning(
+                "WorkspaceManager: venv creation failed for %s — %s",
+                request.repo_key, exc,
+            )
+            return
+        proc = subprocess.run(
+            install_cmd, shell=True, cwd=ws,
+            capture_output=True, text=True, timeout=900,
+        )
+        if proc.returncode != 0:
+            logger.warning(
+                "WorkspaceManager: install_dev_command failed for %s — %s",
+                request.repo_key,
+                (proc.stderr or proc.stdout).strip()[:200],
+            )
+            return
+        logger.info(
+            "WorkspaceManager: bootstrapped venv at %s/%s for %s",
+            ws, venv_dir, request.repo_key,
+        )
