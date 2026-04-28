@@ -167,6 +167,16 @@ class WorkspaceManager:
                 "for %s — %d files, %d lines (caps: %d files, %d lines)",
                 request.task_branch, n_files, n_lines, self._max_files, self._max_lines,
             )
+            # Persist the file list so the caller (board_worker) can build
+            # a focused split-task per chunk before the workspace is torn down.
+            try:
+                import json as _json
+                (ws / "scope-too-wide.json").write_text(
+                    _json.dumps({"files": file_list, "n_lines": n_lines}),
+                    encoding="utf-8",
+                )
+            except OSError as exc:
+                logger.warning("WorkspaceManager.finalize: could not persist scope-too-wide.json — %s", exc)
             # Detailed reason — surfaces in the Plane comment via _handle_failure
             # plumbing. Lists the top files so an operator (or a future
             # auto-split recovery service) can see exactly where kodo went wide

@@ -131,9 +131,52 @@ def _claim_next(client, role: str, settings) -> dict | None:
     if not candidates:
         return None
 
-    # oldest first
-    candidates.sort(key=lambda i: i.get("created_at", ""))
+    # Priority order:
+    #   1. improve-suggestions first — they represent recent partially-complete
+    #      analysis that someone (kodo) just identified as worth doing. Picking
+    #      them up while the context is fresh keeps related changes coherent
+    #      and prevents stale suggestions piling up at the bottom of the queue.
+    #   2. then by Plane priority field if set (urgent, high, medium, low, none)
+    #   3. then by created_at — oldest first as a stable tiebreaker.
+    _PRIORITY_ORDER = {"urgent": 0, "high": 1, "medium": 2, "low": 3, "none": 4}
+    def _sort_key(issue: dict) -> tuple:
+        labs = [
+            (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+            for lab in issue.get("labels", [])
+        ]
+        is_improve_suggestion = 0 if "source: improve-suggestion" in labs else 1
+        plane_priority = str(issue.get("priority") or "none").lower()
+        plane_rank = _PRIORITY_ORDER.get(plane_priority, 4)
+        return (is_improve_suggestion, plane_rank, issue.get("created_at", ""))
+
+    candidates.sort(key=_sort_key)
     issue = candidates[0]
+
+    # Ghost-work guard G7: skip tasks whose goal text is too thin for kodo to
+    # do anything meaningful. A 16-minute run on an empty description is pure
+    # quota-burn. We mark the task Blocked with a clear reason so the operator
+    # (or spec_director) can fill in details and re-promote.
+    desc = issue.get("description") or issue.get("description_stripped") or ""
+    title = issue.get("name", "")
+    candidate_goal = _extract_goal(desc, title).strip()
+    _MIN_GOAL_TEXT_CHARS = 40
+    if len(candidate_goal) < _MIN_GOAL_TEXT_CHARS:
+        try:
+            client.transition_issue(str(issue["id"]), _STATE_BLOCKED)
+            client.comment_issue(
+                str(issue["id"]),
+                f"board_worker[{role}] refused to claim — goal text too thin "
+                f"({len(candidate_goal)} chars; minimum {_MIN_GOAL_TEXT_CHARS}). "
+                f"Add concrete description and re-promote to Ready for AI.",
+            )
+        except Exception as exc:
+            logger.warning("board_worker[%s]: empty-goal block failed task_id=%s — %s",
+                            role, issue.get("id"), exc)
+        logger.info(
+            "board_worker[%s]: refused thin task_id=%s title=%r",
+            role, issue.get("id"), title,
+        )
+        return None
     task_id = str(issue["id"])
 
     try:
@@ -316,6 +359,17 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
         if role == "improve" and success:
             improve_suggestions = _read_improve_output(workspace)
 
+        # Scope-too-wide: WorkspaceManager wrote scope-too-wide.json with the
+        # file list. Read it before tempdir cleanup so _handle_failure can
+        # spawn focused split tasks.
+        scope_files: list[str] = []
+        scope_file = workspace / "scope-too-wide.json"
+        if scope_file.exists():
+            try:
+                scope_files = json.loads(scope_file.read_text(encoding="utf-8")).get("files") or []
+            except Exception:
+                pass
+
         # The kodo run can succeed but produce nothing shippable — e.g. the
         # workspace's diff exceeded the soft cap and WorkspaceManager refused
         # to push. In that case we want the task to be Blocked with the
@@ -335,7 +389,10 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
         else:
             log_reason = "scope_too_wide" if scope_too_wide else status
             logger.warning("board_worker[%s]: task_id=%s failed status=%s", role, task_id, log_reason)
-            _handle_failure(client, issue, role, task_kind, result, settings)
+            _handle_failure(
+                client, issue, role, task_kind, result, settings,
+                scope_files=scope_files if scope_too_wide else [],
+            )
 
         return success and not scope_too_wide
 
@@ -435,11 +492,136 @@ def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verifi
         logger.warning("board_worker[%s]: post-success transition failed task_id=%s — %s", role, task_id, exc)
 
 
-def _handle_failure(client, issue: dict, role: str, task_kind: str, result: dict, settings) -> None:
+def _split_files_into_chunks(files: list[str], chunk_size: int = 15, max_chunks: int = 6) -> list[list[str]]:
+    """Group files into roughly-equal chunks, capped at max_chunks total.
+
+    Files are first grouped by top-level directory (so related code stays
+    together), then split into chunks. If grouping produces more than
+    max_chunks, we merge the smallest groups together.
+    """
+    if not files:
+        return []
+    by_top: dict[str, list[str]] = {}
+    for f in files:
+        top = f.split("/", 1)[0] if "/" in f else "."
+        by_top.setdefault(top, []).append(f)
+    groups = sorted(by_top.values(), key=len, reverse=True)
+    chunks: list[list[str]] = []
+    for group in groups:
+        for i in range(0, len(group), chunk_size):
+            chunks.append(group[i : i + chunk_size])
+    while len(chunks) > max_chunks and len(chunks) >= 2:
+        # Merge the two smallest chunks until we're under the cap
+        chunks.sort(key=len)
+        merged = chunks[0] + chunks[1]
+        chunks = [merged] + chunks[2:]
+    return chunks
+
+
+def _retry_count_from_labels(labels: list) -> int:
+    for lab in labels:
+        name = (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+        if name.startswith("retry-count:"):
+            try:
+                return int(name.split(":", 1)[1].strip())
+            except ValueError:
+                return 0
+    return 0
+
+
+def _create_split_followups(client, parent: dict, settings, file_list: list[str], reason: str) -> list[str]:
+    """Spawn smaller goal tasks scoped to file subsets after a scope_too_wide block.
+
+    Caps total split depth at 2 (parent retry-count >= 2 → no further split,
+    just block) so a confused kodo can't fork unboundedly.
+    """
+    parent_id     = str(parent["id"])
+    parent_title  = parent.get("name", "")
+    parent_labels = parent.get("labels", [])
+    repo_key      = _label_value(parent_labels, "repo")
+    retry_count   = _retry_count_from_labels(parent_labels)
+
+    if retry_count >= 2:
+        logger.info(
+            "board_worker: not splitting task_id=%s — retry-count=%d already exhausted",
+            parent_id, retry_count,
+        )
+        return []
+
+    chunks = _split_files_into_chunks(file_list)
+    if not chunks:
+        return []
+
+    inherited_sources = [
+        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip()
+        for lab in parent_labels
+    ]
+    inherited_sources = [
+        s for s in inherited_sources
+        if s.lower().startswith("source:") and s.lower() != "source: board_worker"
+    ]
+
+    created: list[str] = []
+    for idx, chunk in enumerate(chunks, start=1):
+        title = f"[split {idx}/{len(chunks)}] {parent_title}"[:80]
+        files_block = "allowed_paths:\n" + "\n".join(f"  - {f}" for f in chunk) + "\n"
+        description = (
+            f"## Goal\n{parent_title}\n\n"
+            f"This is split {idx} of {len(chunks)} from a scope_too_wide retry of "
+            f"task #{parent_id}. Restrict changes to the listed files.\n\n"
+            f"## Execution\n"
+            f"repo: {repo_key}\n"
+            f"mode: goal\n"
+            f"{files_block}"
+        )
+        labels = [
+            "task-kind: goal",
+            f"repo: {repo_key}",
+            "source: board_worker",
+            "source: scope-split",
+            *inherited_sources,
+            f"original-task-id: {parent_id}",
+            f"handoff-reason: {reason}",
+            f"retry-count: {retry_count + 1}",
+        ]
+        try:
+            new_issue = client.create_issue(
+                name=title, description=description,
+                state=_STATE_READY, label_names=labels,
+            )
+            new_id = str(new_issue.get("id", ""))
+            if new_id:
+                created.append(new_id)
+        except Exception as exc:
+            logger.warning("board_worker: split create_issue failed — %s", exc)
+    logger.info(
+        "board_worker: split task_id=%s into %d chunks (retry-count=%d → %d)",
+        parent_id, len(created), retry_count, retry_count + 1,
+    )
+    return created
+
+
+def _handle_failure(
+    client, issue: dict, role: str, task_kind: str, result: dict, settings,
+    *, scope_files: list[str] | None = None,
+) -> None:
     task_id  = str(issue["id"])
     status   = result.get("status", "unknown")
     category = result.get("failure_category") or "unknown"
     reason   = result.get("failure_reason") or "(no reason provided)"
+
+    # Scope-too-wide auto-recovery: if we have the file list, spawn focused
+    # split tasks instead of leaving the operator to do it manually. The
+    # parent task itself still moves to Blocked so the original entry has a
+    # clean terminal state.
+    split_ids: list[str] = []
+    if category == "scope_too_wide" and scope_files:
+        try:
+            split_ids = _create_split_followups(
+                client, issue, settings, scope_files, reason="scope_too_wide_split",
+            )
+        except Exception as exc:
+            logger.warning("board_worker: scope-split spawn failed — %s", exc)
 
     # Log the full reason — operators want to see this in the worker logs even
     # when the Plane comment is truncated.
@@ -463,13 +645,17 @@ def _handle_failure(client, issue: dict, role: str, task_kind: str, result: dict
             )
         else:
             client.transition_issue(task_id, _STATE_BLOCKED)
+            split_block = ""
+            if split_ids:
+                split_block = f"\n\nAuto-split into {len(split_ids)} focused task(s): {', '.join('#' + i for i in split_ids)}"
             client.comment_issue(
                 task_id,
                 f"board_worker[{role}] failed\n"
                 f"\n"
                 f"- status: {status}\n"
                 f"- category: {category}\n"
-                f"- reason: {reason}",
+                f"- reason: {reason}"
+                f"{split_block}",
             )
     except Exception as exc:
         logger.warning("board_worker[%s]: post-failure transition failed task_id=%s — %s", role, task_id, exc)
