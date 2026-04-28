@@ -491,6 +491,98 @@ def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verifi
     except Exception as exc:
         logger.warning("board_worker[%s]: post-success transition failed task_id=%s — %s", role, task_id, exc)
 
+    # If this task is a scope-split child, check whether all siblings are now
+    # Done — if so, close the parent that's been sitting in Blocked since the
+    # split fired. Without this hook the parent never reaches a clean
+    # terminal state even after all the work it represents has shipped.
+    try:
+        _maybe_close_split_parent(client, issue)
+    except Exception as exc:
+        logger.warning("board_worker: close-parent check failed for task_id=%s — %s", task_id, exc)
+
+
+def _maybe_close_split_parent(client, completed_issue: dict) -> None:
+    """Close the parent of a scope-split when its last child completes.
+
+    No-op when the just-completed task isn't a scope-split child, the parent
+    can't be found, the parent isn't Blocked (already terminal in some way),
+    or any sibling besides this one is still pending.
+    """
+    labels = completed_issue.get("labels", [])
+    label_names_lower = [
+        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+        for lab in labels
+    ]
+    if "source: scope-split" not in label_names_lower:
+        return
+    parent_id = _label_value(labels, "original-task-id")
+    if not parent_id:
+        return
+
+    try:
+        all_issues = client.list_issues()
+    except Exception:
+        return
+
+    this_task_id = str(completed_issue.get("id", ""))
+    parent: dict | None = None
+    siblings: list[dict] = []
+    for iss in all_issues:
+        iss_id = str(iss.get("id", ""))
+        if iss_id == parent_id:
+            parent = iss
+            continue
+        if _label_value(iss.get("labels", []), "original-task-id") == parent_id:
+            # Restrict to scope-split siblings — other follow-ups (improve
+            # suggestions etc.) may share the parent_id and shouldn't gate
+            # closure.
+            sib_labels_lower = [
+                (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+                for lab in iss.get("labels", [])
+            ]
+            if "source: scope-split" in sib_labels_lower:
+                siblings.append(iss)
+
+    if parent is None:
+        return
+    parent_state = (parent.get("state") or {}).get("name", "")
+    if parent_state.lower() != "blocked":
+        return  # Already closed, or in some other state we shouldn't touch
+
+    # Every other split sibling must already be in Done (the just-completed
+    # one we treat as Done since we just transitioned it; but we still verify
+    # via Plane state to be defensive against a missed transition).
+    other = [s for s in siblings if str(s.get("id", "")) != this_task_id]
+    other_done = all(
+        (s.get("state") or {}).get("name", "").strip().lower() == "done"
+        for s in other
+    )
+    if not other_done:
+        return
+    # Verify this one too — defensive, in case the prior transition_issue
+    # call lost the race somehow.
+    this_state = (completed_issue.get("state") or {}).get("name", "").strip().lower()
+    # `completed_issue` was hydrated *before* the success transition so it
+    # may still show "running"; trust the side effect we just performed.
+    if this_state and this_state not in ("done", "running", "ready for ai"):
+        return
+
+    n_total = len(siblings) + 1  # +1 for the just-completed task itself
+    try:
+        client.transition_issue(parent_id, _STATE_DONE)
+        client.comment_issue(
+            parent_id,
+            f"Auto-closed: all {n_total} scope-split children completed.",
+        )
+        logger.info(
+            "board_worker: closed parent task_id=%s after %d split children Done",
+            parent_id, n_total,
+        )
+    except Exception as exc:
+        logger.warning(
+            "board_worker: failed to close parent task_id=%s — %s", parent_id, exc,
+        )
+
 
 def _split_files_into_chunks(files: list[str], chunk_size: int = 15, max_chunks: int = 6) -> list[list[str]]:
     """Group files into roughly-equal chunks, capped at max_chunks total.
