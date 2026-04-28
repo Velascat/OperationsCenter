@@ -30,6 +30,15 @@ def _parse_source_family(description: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def _family_from_labels(label_names: list[str]) -> str | None:
+    """Fallback for tasks whose source_family is in labels rather than description."""
+    for name in label_names:
+        lower = name.strip().lower()
+        if lower.startswith("source-family:"):
+            return lower.split(":", 1)[1].strip()
+    return None
+
+
 def _parse_recorded_tier(description: str) -> int | None:
     m = _AUTONOMY_TIER_RE.search(description)
     return int(m.group(1)) if m else None
@@ -107,17 +116,23 @@ class BacklogPromoterService:
         self._get_tier = get_tier
         self.dry_run = dry_run
 
-    def promote(self, *, family_filter: str | None = None) -> BacklogPromoteResult:
+    def promote(
+        self,
+        *,
+        family_filter: str | None = None,
+        issues: list[dict[str, Any]] | None = None,
+    ) -> BacklogPromoteResult:
         result = BacklogPromoteResult(
             generated_at=datetime.now(UTC),
             dry_run=self.dry_run,
         )
 
-        try:
-            issues = self._client.list_issues()
-        except Exception as exc:
-            result.errors.append(f"Failed to list Plane issues: {exc}")
-            return result
+        if issues is None:
+            try:
+                issues = self._client.list_issues()
+            except Exception as exc:
+                result.errors.append(f"Failed to list Plane issues: {exc}")
+                return result
 
         for issue in issues:
             task_id = str(issue.get("id", ""))
@@ -133,7 +148,7 @@ class BacklogPromoterService:
                 continue
 
             description = str(issue.get("description") or issue.get("description_stripped") or "")
-            family = _parse_source_family(description)
+            family = _parse_source_family(description) or _family_from_labels(_issue_label_names(issue))
 
             if family is None:
                 result.skipped.append(SkippedTask(

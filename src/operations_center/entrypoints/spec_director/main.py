@@ -38,6 +38,106 @@ def _count_state(issues: list[dict], state_name: str) -> int:
     )
 
 
+def _bootstrap_orphan_campaigns(
+    settings: Any,
+    client: PlaneClient,
+    all_issues: list[dict],
+    state_mgr: CampaignStateManager,
+) -> None:
+    """Create initial Plane tasks for active campaigns that have none.
+
+    A campaign is "orphaned" if it appears in state/campaigns/active.json but no
+    Plane work-item carries its `campaign-id: <id>` label. This happens when a
+    campaign record is written outside the normal BrainstormService flow (e.g.
+    pasted into active.json, recovered from spec front-matter, etc.).
+    """
+    from operations_center.spec_director.models import SpecFrontMatter
+
+    by_campaign: dict[str, int] = {}
+    for issue in all_issues:
+        for label in issue.get("labels", []) or []:
+            name = label.get("name", "") if isinstance(label, dict) else str(label)
+            if name.lower().startswith("campaign-id:"):
+                cid = name.split(":", 1)[1].strip()
+                by_campaign[cid] = by_campaign.get(cid, 0) + 1
+
+    active = state_mgr.load()
+    builder = CampaignBuilder(
+        client=client,
+        project_id=settings.plane.project_id,
+        max_tasks=settings.spec_director.max_tasks_per_campaign,
+    )
+    for campaign in active.active_campaigns():
+        if by_campaign.get(campaign.campaign_id, 0) > 0:
+            continue
+        spec_path = _SPECS_DIR / f"{campaign.slug}.md"
+        if not spec_path.exists():
+            logger.warning(json.dumps({
+                "event": "orphan_campaign_no_spec", "slug": campaign.slug,
+            }))
+            continue
+        try:
+            spec_text = spec_path.read_text(encoding="utf-8")
+            fm = SpecFrontMatter.from_spec_text(spec_text)
+        except Exception as exc:
+            logger.error(json.dumps({
+                "event": "orphan_campaign_parse_failed",
+                "slug": campaign.slug, "error": str(exc),
+            }))
+            continue
+        repo_key = fm.repos[0] if fm.repos else ""
+        repo_cfg = settings.repos.get(repo_key) if settings.repos else None
+        if repo_cfg is None:
+            logger.warning(json.dumps({
+                "event": "orphan_campaign_unknown_repo",
+                "slug": campaign.slug, "repo": repo_key,
+            }))
+            continue
+        try:
+            task_ids = builder.build(
+                spec_text=spec_text,
+                repo_key=repo_key,
+                base_branch=repo_cfg.default_branch,
+            )
+            logger.info(json.dumps({
+                "event": "orphan_campaign_bootstrapped",
+                "campaign_id": campaign.campaign_id,
+                "slug": campaign.slug,
+                "tasks_created": len(task_ids),
+            }))
+        except Exception as exc:
+            logger.error(json.dumps({
+                "event": "orphan_campaign_bootstrap_failed",
+                "slug": campaign.slug, "error": str(exc),
+            }))
+
+
+def _auto_promote_backlog(client: PlaneClient, issues: list[dict]) -> None:
+    """Promote tier-≥2 autonomy tasks from Backlog → Ready for AI each cycle."""
+    from operations_center.autonomy_tiers.config import (
+        get_family_tier, load_tiers_config,
+    )
+    from operations_center.proposer.backlog_promoter import BacklogPromoterService
+
+    tiers_config = load_tiers_config()
+    service = BacklogPromoterService(
+        plane_client=client,
+        get_tier=lambda family: get_family_tier(family, tiers_config),
+        dry_run=False,
+    )
+    try:
+        result = service.promote(issues=issues)
+    except Exception as exc:
+        logger.error(json.dumps({"event": "auto_promote_failed", "error": str(exc)}))
+        return
+    if result.promoted:
+        logger.info(json.dumps({
+            "event": "auto_promote_backlog",
+            "count": len(result.promoted),
+            "families": sorted({t.family for t in result.promoted}),
+        }))
+
+
 def run_once(settings: Any, client: PlaneClient) -> None:
     sd = settings.spec_director
     if not sd.enabled:
@@ -55,6 +155,15 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     except Exception as exc:
         logger.error(json.dumps({"event": "spec_board_fetch_failed", "error": str(exc)}))
         return
+
+    # Step 1.5: Bootstrap orphan campaigns — campaigns registered in state but with
+    # zero backing Plane tasks (e.g. autonomously-spawned campaigns whose builder
+    # step never ran).  Without this, PhaseOrchestrator has nothing to advance.
+    _bootstrap_orphan_campaigns(settings, client, all_issues, state_mgr)
+
+    # Step 1.7: Auto-promote Backlog → Ready for AI for tasks whose family tier ≥ 2.
+    # Tier bumps in autonomy_tiers.json apply to existing Backlog tasks via this hook.
+    _auto_promote_backlog(client, all_issues)
 
     # Step 2: Phase orchestration — advance phases, unblock tasks, detect completions
     orch = PhaseOrchestrator(

@@ -16,10 +16,12 @@ _DEFAULT_FAMILY_TIERS: dict[str, int] = {
     # style families auto-execute by default
     "lint_fix": 2,
     "todo_accumulation": 1,  # style risk but new family; keep at 1 until track record shows
+    # observability families auto-execute — read-only / additive coverage work,
+    # no production-runtime behavior change
+    "observation_coverage": 2,
+    "test_visibility": 2,
+    "dependency_drift_followup": 2,
     # logic families require human promotion
-    "observation_coverage": 1,
-    "test_visibility": 1,
-    "dependency_drift_followup": 1,
     "execution_health_followup": 1,
     "backlog_promotion": 1,
     "type_fix": 1,  # logic risk; keep at 1 until track record shows safe to auto-run
