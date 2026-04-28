@@ -34,7 +34,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -443,7 +442,6 @@ def _read_improve_output(workspace: Path) -> list[dict]:
 def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verification: bool, settings,
                     *, improve_suggestions: list[dict] | None = None) -> None:
     task_id = str(issue["id"])
-    title   = issue.get("name", "")
     labels  = issue.get("labels", [])
     repo_key = _label_value(labels, "repo")
     await_review = (settings.repos.get(repo_key) and settings.repos[repo_key].await_review) if repo_key else False
@@ -881,7 +879,6 @@ def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: 
     parent_labels = parent.get("labels", [])
     repo_key     = _label_value(parent_labels, "repo")
     base_branch  = _label_value(parent_labels, "base-branch")
-    parent_kind  = _label_value(parent_labels, "task-kind")
     retry_count  = _retry_count_from_labels(parent_labels)
 
     if retry_count >= _MAX_FOLLOW_UP_RETRIES:
@@ -914,7 +911,7 @@ def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: 
     label_names = [
         f"task-kind: {follow_kind}",
         f"repo: {repo_key}",
-        f"source: board_worker",
+        "source: board_worker",
         *inherited_sources,
         f"original-task-id: {parent_id}",
         f"handoff-reason: {reason}",

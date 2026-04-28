@@ -24,6 +24,13 @@ operations-center-fixtures = "operations_center.entrypoints.fixtures.main:app"
 operations-center-replay = "operations_center.entrypoints.replay.main:app"
 operations-center-regression = "operations_center.entrypoints.regression.main:app"
 operations-center-governance = "operations_center.entrypoints.governance.main:app"
+# Audit + maintenance trinity (added 2026-04-28). See docs/architecture/
+# {ghost_work,flow,code_health}_audit.md for the catalogs each scanner enforces.
+operations-center-ghost-audit       = "operations_center.entrypoints.ghost_audit.main:main"
+operations-center-flow-audit        = "operations_center.entrypoints.flow_audit.main:main"
+operations-center-code-health-audit = "operations_center.entrypoints.code_health_audit.main:main"
+operations-center-recover-stale     = "operations_center.entrypoints.maintenance.recover_stale:main"
+operations-center-cleanup-state     = "operations_center.entrypoints.maintenance.cleanup_state:main"
 
 [project.optional-dependencies]
 dev = [

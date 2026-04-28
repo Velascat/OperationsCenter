@@ -80,7 +80,7 @@ def _detect_f3_proposal_dupes(ctx: FlowContext) -> tuple[int, list[str]]:
             (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
             for lab in issue.get("labels", [])
         ]
-        family = next((l.split(":", 1)[1].strip() for l in labels if l.startswith("source-family:")), "")
+        family = next((lab.split(":", 1)[1].strip() for lab in labels if lab.startswith("source-family:")), "")
         key = f"{family}|{title_norm}"
         by_key.setdefault(key, []).append(issue)
     samples = []
