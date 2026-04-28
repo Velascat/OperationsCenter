@@ -44,6 +44,12 @@ def _campaign_id_from_issue(issue: dict) -> str | None:
     return None
 
 
+def _has_lifecycle_label(issue: dict, value: str) -> bool:
+    """Check for `lifecycle: <value>` label (e.g. lifecycle: expanded)."""
+    target = f"lifecycle: {value}".lower()
+    return any(lbl.strip().lower() == target for lbl in _labels(issue))
+
+
 def _task_kind(issue: dict) -> str:
     for lbl in _labels(issue):
         if lbl.strip().lower().startswith("task-kind:"):
@@ -225,6 +231,21 @@ class PhaseOrchestrator:
 
     def _handle_blocked(self, issue: dict, result: PhaseOrchestrationResult) -> None:
         task_id = str(issue["id"])
+
+        # Lifecycle guard: a task carrying `lifecycle: expanded` has been
+        # decomposed into children whose own runs do the real work. Don't
+        # call kodo to rewrite its description — the parent is intentionally
+        # quiescent and waiting for its children to finish (then the
+        # board_worker auto-closes it). Without this guard the orchestrator
+        # generates ghost rewrites against meta-tasks. See
+        # docs/architecture/ghost_work_audit.md G12.
+        if _has_lifecycle_label(issue, "expanded"):
+            logger.info(
+                '{"event": "blocked_rewrite_skipped", "task_id": "%s", "reason": "lifecycle_expanded"}',
+                task_id,
+            )
+            return
+
         try:
             full = self._client.fetch_issue(task_id)
             description = str(

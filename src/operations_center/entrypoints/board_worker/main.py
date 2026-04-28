@@ -49,6 +49,14 @@ _STATE_DONE       = "Done"
 _STATE_BLOCKED    = "Blocked"
 _STATE_REVIEW     = "In Review"
 
+# Lifecycle marker — applied to a task whose work has been delegated to
+# spawned children (scope-split, future decomposition modes). Any service
+# that re-processes Blocked tasks (spec_director's blocked-rewrite, the
+# auto-promote loop, future recovery services) must skip tasks carrying
+# this label so we don't generate ghost work on a meta-task whose real
+# work is already happening downstream.
+_LIFECYCLE_EXPANDED = "lifecycle: expanded"
+
 # task-kind labels claimed per role
 _ROLE_KINDS: dict[str, list[str]] = {
     "goal":    ["goal"],
@@ -686,11 +694,43 @@ def _create_split_followups(client, parent: dict, settings, file_list: list[str]
                 created.append(new_id)
         except Exception as exc:
             logger.warning("board_worker: split create_issue failed — %s", exc)
+    # Mark the parent so triage / rewrite loops don't pick at it. Without
+    # this, spec_director.phase_orchestrator._handle_blocked would later
+    # call kodo to "rewrite" the parent description and re-queue it,
+    # producing exactly the kind of ghost work this audit is trying to
+    # eliminate.
+    if created:
+        _add_label(client, parent, _LIFECYCLE_EXPANDED)
+
     logger.info(
         "board_worker: split task_id=%s into %d chunks (retry-count=%d → %d)",
         parent_id, len(created), retry_count, retry_count + 1,
     )
     return created
+
+
+def _add_label(client, issue: dict, new_label: str) -> None:
+    """Append `new_label` to an issue's label set if not already present.
+
+    Plane's update_issue_labels replaces the set, so we read existing
+    labels first. Failures are non-fatal — at worst the parent stays
+    un-marked and a downstream service might re-process; the next cycle
+    of board_worker can re-apply.
+    """
+    existing = [
+        (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip()
+        for lab in issue.get("labels", [])
+    ]
+    existing = [name for name in existing if name]
+    if new_label in existing:
+        return
+    try:
+        client.update_issue_labels(str(issue["id"]), existing + [new_label])
+    except Exception as exc:
+        logger.warning(
+            "board_worker: failed to add label %r to task_id=%s — %s",
+            new_label, issue.get("id"), exc,
+        )
 
 
 def _handle_failure(

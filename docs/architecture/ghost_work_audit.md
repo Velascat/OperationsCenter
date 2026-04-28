@@ -34,6 +34,7 @@ when in fact the loop is spinning.
 | G9 | Workspace tempdir leaks | `/tmp/oc-*` accumulates when kodo subprocess outlives the supervisor | Bash supervisor only kills its direct child Python process | **Mitigated** | Already addressed via `start_new_session=True` and `os.killpg` in `KodoAdapter._run_subprocess`; documented here for traceability |
 | G10 | Follow-up loops with same scope | Same goal text re-tried until quota exhausted | No retry counter | **Fixed** | `retry-count: N` label on follow-ups; `_create_split_followups` refuses past depth 2 |
 | G11 | PR titles are prompt slices | "Review the following pull-request diff for correctness, style, and poten" as a PR title | `_commit_message` was raw `goal_text[:72]` | **Fixed** | Title sanitiser strips `[Tag]`, `**bold**`, `` `code` ``, prompt-shaped prefixes |
+| G12 | Triage rewrites a meta-task whose work is already happening | A scope-split parent in Blocked gets its description rewritten by `phase_orchestrator._handle_blocked` and re-queued, generating a fresh kodo run for work the children are already shipping | Blocked-task rewriter doesn't know about parent/child relationships | **Fixed** | New `lifecycle: expanded` label applied to the parent when `_create_split_followups` spawns children; `_handle_blocked` and any future blocked-task processor must skip tasks carrying this label. Generic mechanism — extensible to any future decomposition pattern (campaign expansion, manual decomposition, etc.) |
 
 ## Classification
 

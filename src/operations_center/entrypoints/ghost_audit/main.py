@@ -130,6 +130,34 @@ def _detect_g10_runaway_followups(ctx: AuditContext) -> tuple[int, list[str]]:
     return len(samples), samples[:5]
 
 
+def _detect_g12_expanded_rewrite(ctx: AuditContext) -> tuple[int, list[str]]:
+    """Blocked-rewrite events that fired against a `lifecycle: expanded` task.
+
+    Should be zero — _handle_blocked checks the label and skips. A nonzero
+    count means the guard regressed or someone added a new blocked-task
+    processor that doesn't honour the label.
+    """
+    expanded_ids: set[str] = set()
+    for issue in ctx.plane_issues:
+        labels = [
+            (lab.get("name", "") if isinstance(lab, dict) else str(lab)).strip().lower()
+            for lab in issue.get("labels", [])
+        ]
+        if "lifecycle: expanded" in labels:
+            expanded_ids.add(str(issue.get("id", "")))
+    if not expanded_ids:
+        return 0, []
+    samples = []
+    for _log, line in _log_lines_since(ctx):
+        if "blocked_task_unblocked" not in line and "blocked_rewrite_failed" not in line:
+            continue
+        for tid in expanded_ids:
+            if tid and tid in line:
+                samples.append(line.strip()[:140])
+                break
+    return len(samples), samples[:5]
+
+
 def _detect_workspace_pollution(ctx: AuditContext) -> tuple[int, list[str]]:
     """Open PRs touching .operations_center/ — should be zero with the .gitignore fix."""
     # Best-effort: read recent log lines mentioning a PR with .operations_center
@@ -142,12 +170,13 @@ def _detect_workspace_pollution(ctx: AuditContext) -> tuple[int, list[str]]:
 
 
 _DETECTORS: list[Detector] = [
-    Detector("G1", "workspace pollution", "fixed", _detect_workspace_pollution),
-    Detector("G4", "oversized diff (scope_too_wide)", "fixed", _detect_g4_oversized),
-    Detector("G5", "policy-blocked task burned kodo time", "fixed", _detect_g5_policy_blocked),
-    Detector("G7", "claim-refused thin goal", "fixed", _detect_g7_thin_goal),
-    Detector("G8", "stale Running task", "fixed", _detect_g8_stale_running),
-    Detector("G10", "runaway follow-up loop", "fixed", _detect_g10_runaway_followups),
+    Detector("G1",  "workspace pollution",                "fixed", _detect_workspace_pollution),
+    Detector("G4",  "oversized diff (scope_too_wide)",    "fixed", _detect_g4_oversized),
+    Detector("G5",  "policy-blocked task burned kodo time","fixed", _detect_g5_policy_blocked),
+    Detector("G7",  "claim-refused thin goal",            "fixed", _detect_g7_thin_goal),
+    Detector("G8",  "stale Running task",                 "fixed", _detect_g8_stale_running),
+    Detector("G10", "runaway follow-up loop",             "fixed", _detect_g10_runaway_followups),
+    Detector("G12", "rewrite of expanded meta-task",      "fixed", _detect_g12_expanded_rewrite),
 ]
 
 
