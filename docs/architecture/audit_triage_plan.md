@@ -1,96 +1,151 @@
 # Audit Triage Plan
 
-Proposed treatment for every finding across the three audit catalogs
-(`ghost_work_audit`, `flow_audit`, `code_health_audit`). Each item lists
-intent, cost (**S** ≤ 30 min, **M** ≤ 2 h, **L** > 2 h), and dependencies.
-We walk through and pick.
+Live state across all three audits. Updated 2026-04-28 after the
+scheduled-tasks feature shipped.
+
+```
+ghost_audit       12 patterns   total: 5    (all historical, pre-fix)
+flow_audit         5 detectors  total: 0    open gaps
+code_health_audit  8 patterns   total: 190  (mostly C7 settings + C8 phantoms)
+```
 
 ---
 
-## Group A — Delete (lowest risk, highest signal)
+## Group A — Delete
 
-Keep moving by clearing weight first. Nothing here is structurally needed.
-
-| ID | Action | Cost | Notes |
-|----|--------|------|-------|
-| A1 | **Delete `backends/openclaw/`** (1,100 LOC) | S | Raises `NotImplementedError`; factory only wires when a runner is passed; never passed in production. If you want OpenClaw later, the kodo backend is the model and re-scaffolding from kodo is faster than reading 1,100 LOC of stubs. |
-| A2 | **Delete `backends/archon/`** (957 LOC) | S | Same shape as A1 — full scaffolding, no live use. |
-| A3 | **Delete `openclaw_shell/`** (801 LOC) | S | Only consumer is the openclaw backend (A1). Falls with A1. |
-| A4 | **Delete dead settings fields** | M | 42 fields C7 found. Need to triage each — *kill* the ones that were never wired (most), *implement* the few that are real knobs (see Group C). |
-
-**Proposed cut for A4**: I show you the 42 fields, you mark each `kill / wire / keep-for-future`, I apply the cut. ~10 min of your time.
+| ID | Action | Cost | Status |
+|----|--------|------|--------|
+| A1 | Delete `backends/openclaw/` (1,100 LOC stub) | S | **Held — keep for future use** |
+| A2 | Delete `backends/archon/` (957 LOC stub) | S | **Held — keep for future use** |
+| A3 | Delete `openclaw_shell/` (801 LOC) | S | **Held — falls with A1** |
+| A4 | Triage 35 dead settings fields | M | **In progress** — see C7 catalog below |
 
 ---
 
-## Group B — Wire up orphans (small surface)
+## Group B — Wire orphans
 
-| ID | Action | Cost | Notes |
-|----|--------|------|-------|
-| B1 | Add `autonomy_tiers` to `pyproject.toml` console_scripts | S | Real implementation exists. Currently no way to invoke it. Just add an entry. |
-| B2 | `ci_monitor` — wire OR delete | S | Need to glance at it first. If it's a useful one-shot CLI, wire it; if it's dead, delete it. |
-| B3 | Wire `code_health_audit` into a recurring CI job | M | Run on PR / nightly, fail if `total_findings` regresses. Pure mechanical — Github Actions yaml. |
-
----
-
-## Group C — Implement the knob (settings fields that should be alive)
-
-These are the *kept* fields from A4 — config values that were designed-in
-and should be honored. Two of them shape behavior visibly:
-
-| ID | Action | Cost | Notes |
-|----|--------|------|-------|
-| C-K1 | Honor `RepoSettings.auto_merge_on_ci_green` in `pr_review_watcher` | M | Currently the field is dead; reviewer never auto-merges based on CI. Plumb it to gate Phase 1 LGTM → merge on `ci_status=success`. |
-| C-K2 | Honor `git.author_name` / `git.author_email` in `WorkspaceManager._bot_identity` | S | We hardcoded `"Operations Center"` / `"operations-center@local"`. Read from settings instead so commits attribute correctly. |
-| C-K3 | Honor `RepoSettings.bootstrap_enabled` in execute pipeline | M | Currently bootstrap is always attempted. Field exists, just unused. |
-
-(Other fields TBD during the A4 triage.)
+| ID | Action | Cost | Status |
+|----|--------|------|--------|
+| B1 | Add `autonomy_tiers` to `pyproject.toml` console_scripts | S | Pending |
+| B2 | `ci_monitor` — wire OR delete | S | Pending |
+| B3 | Wire `code_health_audit` into a CI job | M | Pending |
 
 ---
 
-## Group D — Flow gaps with concrete fixes (medium effort)
+## Group C — Implement the knob (selected from C7)
 
-| ID | Action | Cost | Notes |
-|----|--------|------|-------|
-| D1 | **F2** transient kodo retry | M | Detect transient categories (network timeout, 502, 429 not yet quota'd); retry once with fresh workspace before Blocked. ~50 LOC in `WorkspaceManager` + a settings knob `transient_retry_count: int = 1`. |
-| D2 | **F4** quota-aware throttling | S | Pre-claim check: if today's run count for repo ≥ `max_daily_executions`, skip claim and log. Field already exists; just wire the consumer. |
-| D3 | **F8** Ready-queue back-pressure | S | Lower default `propose_skip_when_ready_count` from 8 → 5 (current default already there, just tighten). Surface in flow_audit when exceeded. |
-| D4 | **F12** stall alerting | M | Watchdog already detects heartbeat staleness; needs a notification path. Simplest: status pane shows a red banner if any role's heartbeat is > 10 min old. Bigger: write a structured alert to `state/alerts/` that an external integration can read. |
+Settings fields that should be alive. Picked from the 35 dead C7 fields
+where the implementation cost is small AND the value is concrete.
+
+### Wire-now batch (this Option 1 bundle)
+
+| ID | Field | Class | Wire to |
+|----|-------|-------|---------|
+| C-K2 | `author_name` + `author_email` | `GitSettings` | `WorkspaceManager._bot_identity` reads from settings |
+| D2-wire | `max_daily_executions` | `RepoSettings` | board_worker `_claim_next` quota check |
+| D3-wire | `propose_skip_when_ready_count` | `Settings` | propose lane skips when Ready ≥ N |
+| C-K-prop | `propose_enabled` | `RepoSettings` | propose lane skips repos with this False |
+
+### Wire-next bundle (after first batch ships)
+
+| ID | Field(s) | Notes |
+|----|----------|-------|
+| C-K1 | `auto_merge_on_ci_green` | reviewer Phase 1 auto-merge gate |
+| C-K3 | `bootstrap_enabled`, `python_binary`, `venv_dir`, `install_dev_command`, `bootstrap_commands` | execute-pipeline bootstrap chain |
+| C-K4 | `validation_timeout_seconds` | per-repo execution timeout |
+| C-K5 | `skip_baseline_validation` | skip pre-flight validation |
+| C-K6 | `require_explicit_approval` | per-repo opt-out of trusted-source bypass |
+| C-K7 | `ci_ignored_checks` | reviewer ignores these CI checks |
+| C-K8 | `impact_report_paths` | cross-repo impact warning |
+| C-K9 | `open_pr_default` + `push_on_validation_failure` | git workflow knobs |
+| C-K10 | `stale_pr_days` + `stale_autonomy_backlog_days` | TTL thresholds |
+
+### Defer (depend on bigger features E1–E5)
+
+| ID | Field(s) | Depends on |
+|----|----------|-----------|
+| C-D1 | `auto_merge_success_rate_threshold` | E5 reviewer trust ramp-up |
+| C-D2 | `parallel_slots`, `max_concurrent_kodo`, `min_kodo_available_mb` | concurrency-control feature |
+| C-D3 | `focus_areas` | propose tuning |
+| C-D4 | All `SpecDirectorSettings` fields | spec_director enhancements |
+| C-D5 | `EscalationSettings.block_threshold`, `credential_expiry_warn_days` | F12 alerting |
+
+### Keep (future-proofing)
+
+`GitSettings.provider`, `sign_commits`, `signing_key` — placeholders for non-default git workflows.
+
+---
+
+## Group D — Flow gaps with concrete fixes
+
+| ID | Action | Cost | Status |
+|----|--------|------|--------|
+| D1 | **F2** transient kodo retry | M | Pending |
+| D2 | **F4** quota-aware throttling consumer | S | Pending — wires `max_daily_executions` |
+| D3 | **F8** Ready-queue back-pressure | S | Pending — wires `propose_skip_when_ready_count` |
+| D4 | **F12** stall alerting | M | Pending |
 
 ---
 
 ## Group E — Bigger features (large effort, real value)
 
-| ID | Action | Cost | Notes |
-|----|--------|------|-------|
-| E1 | **F5** task dependencies | L | `depends-on: <task_id>` label honored by `_claim_next` (skip when dep not Done). Needed for ordering; foundational for E5. |
-| E2 | **F6** campaign progress panel | L | Status-pane card sourced from `state/campaigns/active.json` + Plane child counts. Burndown bar per campaign. |
-| E3 | **F9** per-task cost accounting | L | Wrap kodo invocation in a token-counting recorder; aggregate per family / per repo. Foundation for budget enforcement. |
-| E4 | **F10** intent verification (different model for review) | L | Phase 1 self-review currently uses the same model that wrote the code. Make reviewer use one tier up (Sonnet → Opus, etc.). Real friction without human bottleneck. |
-| E5 | **F15** reviewer trust ramp-up | L | Track LGTM-then-clean ratio per repo in `state/reviewer_trust/`. Gate `auto_merge_on_ci_green` behind it. Depends on E3 partly. |
+| ID | Action | Cost |
+|----|--------|------|
+| E1 | **F5** task dependencies (`depends-on:` label) | L |
+| E2 | **F6** campaign progress panel | L |
+| E3 | **F9** per-task cost accounting | L |
+| E4 | **F10** intent verification (different model for review) | L |
+| E5 | **F15** reviewer trust ramp-up | L |
 
 ---
 
-## Recommended sequence
+## Group F — Documentation reconciliation (NEW — from C8)
 
-1. **A1, A2, A3** — delete the three dead backends (~2,800 LOC out). Zero risk.
-2. **A4 triage** — walk the 42 dead settings fields together; mark kill/wire/keep. I apply the cut.
-3. **B1, B2** — quick wire-ups for the orphaned entrypoints.
-4. **C-K2** — `author_name`/`author_email` (smallest of the knobs).
-5. **D2, D3** — quota throttling + back-pressure (small wins).
-6. **D1** — transient retry (medium).
-7. **D4** — alerting (medium).
-8. **C-K1** — auto-merge-on-CI (medium).
-9. **C-K3** — bootstrap_enabled (medium).
-10. **B3** — code_health audit in CI (medium).
-11. **E1, E2, E3** — bigger features, schedule individually.
+The phantom-symbol detector flagged **151 references in design docs to
+functions that don't exist**. Almost all in `docs/design/autonomy_gaps.md`,
+which turns out to be aspirational rather than status. Per-section triage:
 
-Steps 1–5 are ~half a day's work and cut the catalog by ~70%. Steps
-6–10 are another half day. E1–E5 are project-sized.
+| ID | Action | Cost | Status |
+|----|--------|------|--------|
+| F-A | Walk autonomy_gaps.md and mark each section: **shipped** / **deferred [reviewed YYYY-MM-DD]** / **delete** | M | Pending — would dramatically cut C8 noise |
+| F-B | For each "deferred" section, ensure no README claim says it works | S | Bundled with F-A |
+| F-C | Implement any sections marked "ship" via the normal triage | varies | Per-section |
+
+Recommended cadence: walk autonomy_gaps.md once, mark every section, then
+treat C8 count as a regression detector going forward (any new doc that
+adds phantom symbols shows up).
 
 ---
 
-## What to do right now
+## Recommended sequence (updated)
+
+1. **A4 wire-now batch** — 4 fields (`author_name`/`author_email`/`propose_skip_when_ready_count`/`max_daily_executions`/`propose_enabled`) wired in one commit
+2. **B1, B2** — orphaned entrypoints
+3. **D2, D3** — flow gaps that just need consumers (already covered by A4 batch)
+4. **D1, D4** — transient retry + alerting
+5. **C-K1, C-K3, C-K4, C-K9** — auto-merge + bootstrap chain + validation timeout + git workflow knobs
+6. **F-A** — walk autonomy_gaps.md, mark sections
+7. **B3** — code_health audit in CI
+8. **E1–E5** — bigger features, scheduled individually
+
+Steps 1–4 = ~half a day. 5–7 = another half day. E1–E5 are
+project-sized.
+
+---
+
+## What's already shipped (since this plan was written)
+
+- ✅ Lifecycle vocabulary: `expanded`, `superseded`, `escalated`, `archived`
+- ✅ Flow-audit fixes: F1 (stale Running recovery), F11 (retry counter), F13 (state cleanup)
+- ✅ Maintenance tools: `recover_stale`, `cleanup_state` CLIs, wired in `pyproject.toml`
+- ✅ Trinity of audit CLIs: `ghost_audit`, `flow_audit`, `code_health_audit`
+- ✅ Scheduled task seeder (no cron, finished)
+- ✅ Phantom-symbol detector (C8) — found the gap that was hiding scheduled_tasks
+
+---
+
+## What to do next
 
 Pick a row. I'll implement it, run the audits to confirm, commit, then
-we move to the next. If you want to batch (e.g. "do all of group A,
-then check in"), say so and I'll bundle.
+we move to the next. If you want to batch (e.g. "do the wire-now batch
+now"), say so and I'll bundle.
