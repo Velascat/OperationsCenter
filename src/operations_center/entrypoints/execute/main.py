@@ -83,13 +83,22 @@ def main() -> int:
         task_branch=args.task_branch,
         goal_file_path=args.goal_file_path,
     )
+    import os as _os
     await_review_repos = {
         rk for rk, rcfg in (settings.repos or {}).items()
         if getattr(rcfg, "await_review", False)
     }
+    def _env_int(name: str) -> int | None:
+        raw = _os.environ.get(name, "").strip()
+        try:
+            return int(raw) if raw else None
+        except ValueError:
+            return None
     workspace_manager = WorkspaceManager(
         github_token=settings.git_token(),
         await_review_repos=await_review_repos,
+        max_files=_env_int("OPS_CENTER_MAX_FILES"),
+        max_lines=_env_int("OPS_CENTER_MAX_LINES"),
     )
     coordinator = ExecutionCoordinator(
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),

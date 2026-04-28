@@ -146,6 +146,14 @@ class ReviewerSettings(BaseModel):
 class RepoSettings(BaseModel):
     clone_url: str
     default_branch: str
+    # When set, autonomy-generated PRs target this branch instead of
+    # default_branch. Useful while building trust in the loop: work
+    # accumulates on a sandbox branch (e.g. "autonomy-staging") and a human
+    # cherry-picks or merges to main when ready. None = autonomy targets
+    # default_branch directly. Only applies to autonomy / spec-campaign /
+    # board_worker sources; reviewer self-review and operator-launched runs
+    # ignore this.
+    sandbox_base_branch: str | None = None
     validation_commands: list[str] = Field(default_factory=list)
     allowed_base_branches: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)

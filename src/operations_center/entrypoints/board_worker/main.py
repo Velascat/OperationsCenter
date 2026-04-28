@@ -180,9 +180,16 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
     execution_mode = task_kind if task_kind in {"goal", "test_campaign", "improve_campaign"} else task_kind
 
     repo_path  = _repo_local_path(settings, repo_key)
-    clone_url  = settings.repos[repo_key].clone_url if repo_key in settings.repos else f"file://{repo_path}"
-    base_branch = _label_value(labels, "base-branch") or (
-        settings.repos[repo_key].default_branch if repo_key in settings.repos else "main"
+    repo_cfg   = settings.repos.get(repo_key)
+    clone_url  = repo_cfg.clone_url if repo_cfg else f"file://{repo_path}"
+    # Precedence for base_branch:
+    #   1. explicit per-task override label "base-branch: X"
+    #   2. repo's sandbox_base_branch (autonomy work targets staging, not main)
+    #   3. repo's default_branch
+    base_branch = (
+        _label_value(labels, "base-branch")
+        or (repo_cfg.sandbox_base_branch if repo_cfg and repo_cfg.sandbox_base_branch else None)
+        or (repo_cfg.default_branch if repo_cfg else "main")
     )
 
     oc_root  = Path(__file__).resolve().parents[4]
@@ -324,11 +331,14 @@ def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verifi
             client.comment_issue(task_id, "Verification passed")
 
         elif role == "improve":
-            follow_id = _create_follow_up(client, issue, settings, follow_kind="goal",
-                                           reason="improvement_applied")
+            # Improve is analysis-only — no auto-follow-up. The propose lane
+            # already generates concrete tasks from observation collectors;
+            # mirroring those into a "follow-up goal" with the same vague
+            # title produced duplicate PRs that just chew quota. Operators
+            # who want next steps can read the kodo run notes (recorded by
+            # the observability layer) and create a Plane task by hand.
             client.transition_issue(task_id, _STATE_DONE)
-            client.comment_issue(task_id,
-                f"Improvement analysis complete — follow-up task #{follow_id}")
+            client.comment_issue(task_id, "Improvement analysis complete")
 
     except Exception as exc:
         logger.warning("board_worker[%s]: post-success transition failed task_id=%s — %s", role, task_id, exc)

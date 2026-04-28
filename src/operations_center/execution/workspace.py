@@ -44,6 +44,13 @@ _LOCAL_EXCLUDE_PATTERNS = (
     ".coverage",
 )
 
+# Soft limits on the size of a single autonomy commit. A diff that exceeds
+# either threshold is almost always kodo going wide unintentionally — the
+# 25K-LOC PR #56 was the spark for adding this guard. Operators can bump
+# the env vars when intentionally large refactors are expected.
+_DEFAULT_MAX_FILES = 50
+_DEFAULT_MAX_LINES = 2000
+
 
 class WorkspaceManager:
     def __init__(
@@ -53,11 +60,15 @@ class WorkspaceManager:
         github_token: str | None = None,
         await_review_repos: set[str] | None = None,
         bot_identity: tuple[str, str] = ("Operations Center", "operations-center@local"),
+        max_files: int | None = None,
+        max_lines: int | None = None,
     ) -> None:
         self._git = git_client or GitClient()
         self._token = github_token
         self._await_review = set(await_review_repos or [])
         self._bot_name, self._bot_email = bot_identity
+        self._max_files = max_files if max_files is not None else _DEFAULT_MAX_FILES
+        self._max_lines = max_lines if max_lines is not None else _DEFAULT_MAX_LINES
 
     # ── pre-execution ────────────────────────────────────────────────────────
 
@@ -92,6 +103,19 @@ class WorkspaceManager:
         # back into the repo, producing 25K-LOC garbage PRs.
         for pattern in _LOCAL_EXCLUDE_PATTERNS:
             self._git.add_local_exclude(ws, pattern)
+        # If base_branch is a sandbox like "autonomy-staging" that the operator
+        # forgot to create, fail with a clear error rather than a cryptic
+        # `git checkout` failure. Plane will surface the reason via the new
+        # failure-reason plumbing.
+        try:
+            self._git.verify_remote_branch_exists(ws, request.base_branch)
+        except Exception as exc:
+            raise RuntimeError(
+                f"base_branch {request.base_branch!r} does not exist on origin — "
+                f"if this is a sandbox branch (sandbox_base_branch in config), "
+                f"create it on origin first (e.g. `git push origin main:{request.base_branch}`). "
+                f"Underlying: {exc}"
+            ) from exc
         self._git.checkout_base(ws, request.base_branch)
         self._git.create_task_branch(ws, request.task_branch)
         logger.info(
@@ -131,6 +155,27 @@ class WorkspaceManager:
             logger.warning("WorkspaceManager.finalize: %s is not a git repo", ws)
             return result
 
+        # Pre-flight diff cap: refuse to commit a diff that's almost certainly
+        # kodo going wide. Operators set OPS_CENTER_MAX_FILES /
+        # OPS_CENTER_MAX_LINES higher when intentionally shipping a large
+        # refactor; default is conservative.
+        oversized = self._diff_oversized(ws)
+        if oversized is not None:
+            n_files, n_lines = oversized
+            logger.warning(
+                "WorkspaceManager.finalize: refusing to commit oversized diff "
+                "for %s — %d files, %d lines (caps: %d files, %d lines)",
+                request.task_branch, n_files, n_lines, self._max_files, self._max_lines,
+            )
+            return result.model_copy(update={
+                "branch_pushed":  False,
+                "failure_reason": (
+                    f"diff exceeded soft cap ({n_files} files, {n_lines} lines "
+                    f"vs caps {self._max_files} / {self._max_lines}); "
+                    f"raise OPS_CENTER_MAX_FILES / OPS_CENTER_MAX_LINES if intended"
+                ),
+            })
+
         # Commit anything kodo left in the working tree
         if self._git.changed_files(ws):
             commit_message = self._commit_message(request)
@@ -158,6 +203,41 @@ class WorkspaceManager:
         })
 
     # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _diff_oversized(self, ws: Path) -> tuple[int, int] | None:
+        """Return (files, lines) when the staged-and-unstaged diff exceeds caps.
+
+        Returns None when the diff is within bounds. Counts only tracked +
+        modifiable changes; .gitignore'd / locally-excluded paths don't count.
+        """
+        # First add (so the diff includes new tracked files), then measure with
+        # a stat-only diff against HEAD, then reset to leave commit_all to do
+        # the real work.
+        try:
+            subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
+            proc = subprocess.run(
+                ["git", "diff", "--cached", "--shortstat"],
+                cwd=ws, capture_output=True, text=True, check=True,
+            )
+            files_proc = subprocess.run(
+                ["git", "diff", "--cached", "--name-only"],
+                cwd=ws, capture_output=True, text=True, check=True,
+            )
+        except subprocess.CalledProcessError:
+            return None
+        finally:
+            # Don't leave changes staged — commit_all will re-stage cleanly.
+            subprocess.run(["git", "reset"], cwd=ws, capture_output=True)
+
+        n_files = sum(1 for line in files_proc.stdout.splitlines() if line.strip())
+        # shortstat: " 12 files changed, 345 insertions(+), 67 deletions(-)"
+        n_lines = 0
+        import re
+        for m in re.finditer(r"(\d+)\s+(?:insertion|deletion)", proc.stdout):
+            n_lines += int(m.group(1))
+        if n_files > self._max_files or n_lines > self._max_lines:
+            return n_files, n_lines
+        return None
 
     def _has_new_commits(self, ws: Path, base_branch: str) -> bool:
         proc = subprocess.run(
