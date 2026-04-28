@@ -44,4 +44,18 @@ jobs:
       - name: Install dependencies
         run: pip install -e .[dev]
       - name: Run tests
-        run: pytest -q
+        run: pytest
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-test-report
+          path: reports/junit.xml
+          retention-days: 30
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: reports/coverage.xml
+          retention-days: 30

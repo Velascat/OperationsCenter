@@ -1,0 +1,2880 @@
+
+  🦉 kodo v0.4.272 — autonomous multi-agent coding
+  https://github.com/ikamensh/kodo
+
+  Project: /tmp/oc-improve-c_cfeuif/workspace
+  Run dir: /home/dev/.kodo/runs/20260428_055615
+Running intake (non-interactive)...
+
+  ⠋ Analyzing project and creating plan... 0s
+  ⠙ Analyzing project and creating plan... 0s
+  ⠹ Analyzing project and creating plan... 0s
+  ⠸ Analyzing project and creating plan... 0s
+  ⠼ Analyzing project and creating plan... 0s
+  ⠴ Analyzing project and creating plan... 0s
+  ⠦ Analyzing project and creating plan... 0s
+  ⠧ Analyzing project and creating plan... 0s
+  ⠇ Analyzing project and creating plan... 0s
+  ⠏ Analyzing project and creating plan... 1s
+  ⠋ Analyzing project and creating plan... 1s
+  ⠙ Analyzing project and creating plan... 1s
+  ⠹ Analyzing project and creating plan... 1s
+  ⠸ Analyzing project and creating plan... 1s
+  ⠼ Analyzing project and creating plan... 1s
+  ⠴ Analyzing project and creating plan... 1s
+  ⠦ Analyzing project and creating plan... 1s
+  ⠧ Analyzing project and creating plan... 1s
+  ⠇ Analyzing project and creating plan... 1s
+  ⠏ Analyzing project and creating plan... 2s
+  ⠋ Analyzing project and creating plan... 2s
+  ⠙ Analyzing project and creating plan... 2s
+  ⠹ Analyzing project and creating plan... 2s
+  ⠸ Analyzing project and creating plan... 2s
+  ⠼ Analyzing project and creating plan... 2s
+  ⠴ Analyzing project and creating plan... 2s
+  ⠦ Analyzing project and creating plan... 2s
+  ⠧ Analyzing project and creating plan... 2s
+  ⠇ Analyzing project and creating plan... 2s
+  ⠏ Analyzing project and creating plan... 3s
+  ⠋ Analyzing project and creating plan... 3s
+  ⠙ Analyzing project and creating plan... 3s
+  ⠹ Analyzing project and creating plan... 3s
+  ⠸ Analyzing project and creating plan... 3s
+  ⠼ Analyzing project and creating plan... 3s
+  ⠴ Analyzing project and creating plan... 3s
+  ⠦ Analyzing project and creating plan... 3s
+  ⠧ Analyzing project and creating plan... 3s
+  ⠇ Analyzing project and creating plan... 3s
+  ⠏ Analyzing project and creating plan... 4s
+  ⠋ Analyzing project and creating plan... 4s
+  ⠙ Analyzing project and creating plan... 4s
+  ⠹ Analyzing project and creating plan... 4s
+  ⠸ Analyzing project and creating plan... 4s
+  ⠼ Analyzing project and creating plan... 4s
+  ⠴ Analyzing project and creating plan... 4s
+  ⠦ Analyzing project and creating plan... 4s
+  ⠧ Analyzing project and creating plan... 4s
+  ⠇ Analyzing project and creating plan... 4s
+  ⠏ Analyzing project and creating plan... 5s
+  ⠋ Analyzing project and creating plan... 5s
+  ⠙ Analyzing project and creating plan... 5s
+  ⠹ Analyzing project and creating plan... 5s
+  ⠸ Analyzing project and creating plan... 5s
+  ⠼ Analyzing project and creating plan... 5s
+  ⠴ Analyzing project and creating plan... 5s
+  ⠦ Analyzing project and creating plan... 5s
+  ⠧ Analyzing project and creating plan... 5s
+  ⠇ Analyzing project and creating plan... 5s
+  ⠏ Analyzing project and creating plan... 6s
+  ⠋ Analyzing project and creating plan... 6s
+  ⠙ Analyzing project and creating plan... 6s
+  ⠹ Analyzing project and creating plan... 6s
+  ⠸ Analyzing project and creating plan... 6s
+  ⠼ Analyzing project and creating plan... 6s
+  ⠴ Analyzing project and creating plan... 6s
+  ⠦ Analyzing project and creating plan... 6s
+  ⠧ Analyzing project and creating plan... 6s
+  ⠇ Analyzing project and creating plan... 6s
+  ⠏ Analyzing project and creating plan... 7s
+  ⠋ Analyzing project and creating plan... 7s
+  ⠙ Analyzing project and creating plan... 7s
+  ⠹ Analyzing project and creating plan... 7s
+  ⠸ Analyzing project and creating plan... 7s
+  ⠼ Analyzing project and creating plan... 7s
+  ⠴ Analyzing project and creating plan... 7s
+  ⠦ Analyzing project and creating plan... 7s
+  ⠧ Analyzing project and creating plan... 7s
+  ⠇ Analyzing project and creating plan... 7s
+  ⠏ Analyzing project and creating plan... 8s
+  ⠋ Analyzing project and creating plan... 8s
+  ⠙ Analyzing project and creating plan... 8s
+  ⠹ Analyzing project and creating plan... 8s
+  ⠸ Analyzing project and creating plan... 8s
+  ⠼ Analyzing project and creating plan... 8s
+  ⠴ Analyzing project and creating plan... 8s
+  ⠦ Analyzing project and creating plan... 8s
+  ⠧ Analyzing project and creating plan... 8s
+  ⠇ Analyzing project and creating plan... 8s
+  ⠏ Analyzing project and creating plan... 9s
+  ⠋ Analyzing project and creating plan... 9s
+  ⠙ Analyzing project and creating plan... 9s
+  ⠹ Analyzing project and creating plan... 9s
+  ⠸ Analyzing project and creating plan... 9s
+  ⠼ Analyzing project and creating plan... 9s
+  ⠴ Analyzing project and creating plan... 9s
+  ⠦ Analyzing project and creating plan... 9s
+  ⠧ Analyzing project and creating plan... 9s
+  ⠇ Analyzing project and creating plan... 9s
+  ⠏ Analyzing project and creating plan... 10s
+  ⠋ Analyzing project and creating plan... 10s
+  ⠙ Analyzing project and creating plan... 10s
+  ⠹ Analyzing project and creating plan... 10s
+  ⠸ Analyzing project and creating plan... 10s
+  ⠼ Analyzing project and creating plan... 10s
+  ⠴ Analyzing project and creating plan... 10s
+  ⠦ Analyzing project and creating plan... 10s
+  ⠧ Analyzing project and creating plan... 10s
+  ⠇ Analyzing project and creating plan... 10s
+  ⠏ Analyzing project and creating plan... 11s
+  ⠋ Analyzing project and creating plan... 11s
+  ⠙ Analyzing project and creating plan... 11s
+  ⠹ Analyzing project and creating plan... 11s
+  ⠸ Analyzing project and creating plan... 11s
+  ⠼ Analyzing project and creating plan... 11s
+  ⠴ Analyzing project and creating plan... 11s
+  ⠦ Analyzing project and creating plan... 11s
+  ⠧ Analyzing project and creating plan... 11s
+  ⠇ Analyzing project and creating plan... 12s
+  ⠏ Analyzing project and creating plan... 12s
+  ⠋ Analyzing project and creating plan... 12s
+  ⠙ Analyzing project and creating plan... 12s
+  ⠹ Analyzing project and creating plan... 12s
+  ⠸ Analyzing project and creating plan... 12s
+  ⠼ Analyzing project and creating plan... 12s
+  ⠴ Analyzing project and creating plan... 12s
+  ⠦ Analyzing project and creating plan... 12s
+  ⠧ Analyzing project and creating plan... 12s
+  ⠇ Analyzing project and creating plan... 13s
+  ⠏ Analyzing project and creating plan... 13s
+  ⠋ Analyzing project and creating plan... 13s
+  ⠙ Analyzing project and creating plan... 13s
+  ⠹ Analyzing project and creating plan... 13s
+  ⠸ Analyzing project and creating plan... 13s
+  ⠼ Analyzing project and creating plan... 13s
+  ⠴ Analyzing project and creating plan... 13s
+  ⠦ Analyzing project and creating plan... 13s
+  ⠧ Analyzing project and creating plan... 13s
+  ⠇ Analyzing project and creating plan... 14s
+  ⠏ Analyzing project and creating plan... 14s
+  ⠋ Analyzing project and creating plan... 14s
+  ⠙ Analyzing project and creating plan... 14s
+  ⠹ Analyzing project and creating plan... 14s
+  ⠸ Analyzing project and creating plan... 14s
+  ⠼ Analyzing project and creating plan... 14s
+  ⠴ Analyzing project and creating plan... 14s
+  ⠦ Analyzing project and creating plan... 14s
+  ⠧ Analyzing project and creating plan... 14s
+  ⠇ Analyzing project and creating plan... 15s
+  ⠏ Analyzing project and creating plan... 15s
+  ⠋ Analyzing project and creating plan... 15s
+  ⠙ Analyzing project and creating plan... 15s
+  ⠹ Analyzing project and creating plan... 15s
+  ⠸ Analyzing project and creating plan... 15s
+  ⠼ Analyzing project and creating plan... 15s
+  ⠴ Analyzing project and creating plan... 15s
+  ⠦ Analyzing project and creating plan... 15s
+  ⠧ Analyzing project and creating plan... 15s
+  ⠇ Analyzing project and creating plan... 16s
+  ⠏ Analyzing project and creating plan... 16s
+  ⠋ Analyzing project and creating plan... 16s
+  ⠙ Analyzing project and creating plan... 16s
+  ⠹ Analyzing project and creating plan... 16s
+  ⠸ Analyzing project and creating plan... 16s
+  ⠼ Analyzing project and creating plan... 16s
+  ⠴ Analyzing project and creating plan... 16s
+  ⠦ Analyzing project and creating plan... 16s
+  ⠧ Analyzing project and creating plan... 16s
+  ⠇ Analyzing project and creating plan... 17s
+  ⠏ Analyzing project and creating plan... 17s
+  ⠋ Analyzing project and creating plan... 17s
+  ⠙ Analyzing project and creating plan... 17s
+  ⠹ Analyzing project and creating plan... 17s
+  ⠸ Analyzing project and creating plan... 17s
+  ⠼ Analyzing project and creating plan... 17s
+  ⠴ Analyzing project and creating plan... 17s
+  ⠦ Analyzing project and creating plan... 17s
+  ⠧ Analyzing project and creating plan... 17s
+  ⠇ Analyzing project and creating plan... 18s
+  ⠏ Analyzing project and creating plan... 18s
+  ⠋ Analyzing project and creating plan... 18s
+  ⠙ Analyzing project and creating plan... 18s
+  ⠹ Analyzing project and creating plan... 18s
+  ⠸ Analyzing project and creating plan... 18s
+  ⠼ Analyzing project and creating plan... 18s
+  ⠴ Analyzing project and creating plan... 18s
+  ⠦ Analyzing project and creating plan... 18s
+  ⠧ Analyzing project and creating plan... 18s
+  ⠇ Analyzing project and creating plan... 19s
+  ⠏ Analyzing project and creating plan... 19s
+  ⠋ Analyzing project and creating plan... 19s
+  ⠙ Analyzing project and creating plan... 19s
+  ⠹ Analyzing project and creating plan... 19s
+  ⠸ Analyzing project and creating plan... 19s
+  ⠼ Analyzing project and creating plan... 19s
+  ⠴ Analyzing project and creating plan... 19s
+  ⠦ Analyzing project and creating plan... 19s
+  ⠧ Analyzing project and creating plan... 19s
+  ⠇ Analyzing project and creating plan... 20s
+  ⠏ Analyzing project and creating plan... 20s
+  ⠋ Analyzing project and creating plan... 20s
+  ⠙ Analyzing project and creating plan... 20s
+  ⠹ Analyzing project and creating plan... 20s
+  ⠸ Analyzing project and creating plan... 20s
+  ⠼ Analyzing project and creating plan... 20s
+  ⠴ Analyzing project and creating plan... 20s
+  ⠦ Analyzing project and creating plan... 20s
+  ⠧ Analyzing project and creating plan... 20s
+  ⠇ Analyzing project and creating plan... 21s
+  ⠏ Analyzing project and creating plan... 21s
+  ⠋ Analyzing project and creating plan... 21s
+  ⠙ Analyzing project and creating plan... 21s
+  ⠹ Analyzing project and creating plan... 21s
+  ⠸ Analyzing project and creating plan... 21s
+  ⠼ Analyzing project and creating plan... 21s
+  ⠴ Analyzing project and creating plan... 21s
+  ⠦ Analyzing project and creating plan... 21s
+  ⠧ Analyzing project and creating plan... 21s
+  ⠇ Analyzing project and creating plan... 22s
+  ⠏ Analyzing project and creating plan... 22s
+  ⠋ Analyzing project and creating plan... 22s
+  ⠙ Analyzing project and creating plan... 22s
+  ⠹ Analyzing project and creating plan... 22s
+  ⠸ Analyzing project and creating plan... 22s
+  ⠼ Analyzing project and creating plan... 22s
+  ⠴ Analyzing project and creating plan... 22s
+  ⠦ Analyzing project and creating plan... 22s
+  ⠧ Analyzing project and creating plan... 22s
+  ⠇ Analyzing project and creating plan... 23s
+  ⠏ Analyzing project and creating plan... 23s
+  ⠋ Analyzing project and creating plan... 23s
+  ⠙ Analyzing project and creating plan... 23s
+  ⠹ Analyzing project and creating plan... 23s
+  ⠸ Analyzing project and creating plan... 23s
+  ⠼ Analyzing project and creating plan... 23s
+  ⠴ Analyzing project and creating plan... 23s
+  ⠦ Analyzing project and creating plan... 23s
+  ⠧ Analyzing project and creating plan... 23s
+  ⠇ Analyzing project and creating plan... 24s
+  ⠏ Analyzing project and creating plan... 24s
+  ⠋ Analyzing project and creating plan... 24s
+  ⠙ Analyzing project and creating plan... 24s
+  ⠹ Analyzing project and creating plan... 24s
+  ⠸ Analyzing project and creating plan... 24s
+  ⠼ Analyzing project and creating plan... 24s
+  ⠴ Analyzing project and creating plan... 24s
+  ⠦ Analyzing project and creating plan... 24s
+  ⠧ Analyzing project and creating plan... 24s
+  ⠇ Analyzing project and creating plan... 25s
+  ⠏ Analyzing project and creating plan... 25s
+  ⠋ Analyzing project and creating plan... 25s
+  ⠙ Analyzing project and creating plan... 25s
+  ⠹ Analyzing project and creating plan... 25s
+  ⠸ Analyzing project and creating plan... 25s
+  ⠼ Analyzing project and creating plan... 25s
+  ⠴ Analyzing project and creating plan... 25s
+  ⠦ Analyzing project and creating plan... 25s
+  ⠧ Analyzing project and creating plan... 25s
+  ⠇ Analyzing project and creating plan... 26s
+  ⠏ Analyzing project and creating plan... 26s
+  ⠋ Analyzing project and creating plan... 26s
+  ⠙ Analyzing project and creating plan... 26s
+  ⠹ Analyzing project and creating plan... 26s
+  ⠸ Analyzing project and creating plan... 26s
+  ⠼ Analyzing project and creating plan... 26s
+  ⠴ Analyzing project and creating plan... 26s
+  ⠦ Analyzing project and creating plan... 26s
+  ⠧ Analyzing project and creating plan... 26s
+  ⠇ Analyzing project and creating plan... 27s
+  ⠏ Analyzing project and creating plan... 27s
+  ⠋ Analyzing project and creating plan... 27s
+  ⠙ Analyzing project and creating plan... 27s
+  ⠹ Analyzing project and creating plan... 27s
+  ⠸ Analyzing project and creating plan... 27s
+  ⠼ Analyzing project and creating plan... 27s
+  ⠴ Analyzing project and creating plan... 27s
+  ⠦ Analyzing project and creating plan... 27s
+  ⠧ Analyzing project and creating plan... 28s
+  ⠇ Analyzing project and creating plan... 28s
+  ⠏ Analyzing project and creating plan... 28s
+  ⠋ Analyzing project and creating plan... 28s
+  ⠙ Analyzing project and creating plan... 28s
+  ⠹ Analyzing project and creating plan... 28s
+  ⠸ Analyzing project and creating plan... 28s
+  ⠼ Analyzing project and creating plan... 28s
+  ⠴ Analyzing project and creating plan... 28s
+  ⠦ Analyzing project and creating plan... 28s
+  ⠧ Analyzing project and creating plan... 29s
+  ⠇ Analyzing project and creating plan... 29s
+  ⠏ Analyzing project and creating plan... 29s
+  ⠋ Analyzing project and creating plan... 29s
+  ⠙ Analyzing project and creating plan... 29s
+  ⠹ Analyzing project and creating plan... 29s
+  ⠸ Analyzing project and creating plan... 29s
+  ⠼ Analyzing project and creating plan... 29s
+  ⠴ Analyzing project and creating plan... 29s
+  ⠦ Analyzing project and creating plan... 29s
+  ⠧ Analyzing project and creating plan... 30s
+  ⠇ Analyzing project and creating plan... 30s
+  ⠏ Analyzing project and creating plan... 30s
+  ⠋ Analyzing project and creating plan... 30s
+  ⠙ Analyzing project and creating plan... 30s
+  ⠹ Analyzing project and creating plan... 30s
+  ⠸ Analyzing project and creating plan... 30s
+  ⠼ Analyzing project and creating plan... 30s
+  ⠴ Analyzing project and creating plan... 30s
+  ⠦ Analyzing project and creating plan... 30s
+  ⠧ Analyzing project and creating plan... 31s
+  ⠇ Analyzing project and creating plan... 31s
+  ⠏ Analyzing project and creating plan... 31s
+  ⠋ Analyzing project and creating plan... 31s
+  ⠙ Analyzing project and creating plan... 31s
+  ⠹ Analyzing project and creating plan... 31s
+  ⠸ Analyzing project and creating plan... 31s
+  ⠼ Analyzing project and creating plan... 31s
+  ⠴ Analyzing project and creating plan... 31s
+  ⠦ Analyzing project and creating plan... 31s
+  ⠧ Analyzing project and creating plan... 32s
+  ⠇ Analyzing project and creating plan... 32s
+  ⠏ Analyzing project and creating plan... 32s
+  ⠋ Analyzing project and creating plan... 32s
+  ⠙ Analyzing project and creating plan... 32s
+  ⠹ Analyzing project and creating plan... 32s
+  ⠸ Analyzing project and creating plan... 32s
+  ⠼ Analyzing project and creating plan... 32s
+  ⠴ Analyzing project and creating plan... 32s
+  ⠦ Analyzing project and creating plan... 32s
+  ⠧ Analyzing project and creating plan... 33s
+  ⠇ Analyzing project and creating plan... 33s
+  ⠏ Analyzing project and creating plan... 33s
+  ⠋ Analyzing project and creating plan... 33s
+  ⠙ Analyzing project and creating plan... 33s
+  ⠹ Analyzing project and creating plan... 33s
+  ⠸ Analyzing project and creating plan... 33s
+  ⠼ Analyzing project and creating plan... 33s
+  ⠴ Analyzing project and creating plan... 33s
+  ⠦ Analyzing project and creating plan... 33s
+  ⠧ Analyzing project and creating plan... 34s
+  ⠇ Analyzing project and creating plan... 34s
+  ⠏ Analyzing project and creating plan... 34s
+  ⠋ Analyzing project and creating plan... 34s
+  ⠙ Analyzing project and creating plan... 34s
+  ⠹ Analyzing project and creating plan... 34s
+  ⠸ Analyzing project and creating plan... 34s
+  ⠼ Analyzing project and creating plan... 34s
+  ⠴ Analyzing project and creating plan... 34s
+  ⠦ Analyzing project and creating plan... 34s
+  ⠧ Analyzing project and creating plan... 35s
+  ⠇ Analyzing project and creating plan... 35s
+  ⠏ Analyzing project and creating plan... 35s
+  ⠋ Analyzing project and creating plan... 35s
+  ⠙ Analyzing project and creating plan... 35s
+  ⠹ Analyzing project and creating plan... 35s
+  ⠸ Analyzing project and creating plan... 35s
+  ⠼ Analyzing project and creating plan... 35s
+  ⠴ Analyzing project and creating plan... 35s
+  ⠦ Analyzing project and creating plan... 35s
+  ⠧ Analyzing project and creating plan... 36s
+  ⠇ Analyzing project and creating plan... 36s
+  ⠏ Analyzing project and creating plan... 36s
+  ⠋ Analyzing project and creating plan... 36s
+  ⠙ Analyzing project and creating plan... 36s
+  ⠹ Analyzing project and creating plan... 36s
+  ⠸ Analyzing project and creating plan... 36s
+  ⠼ Analyzing project and creating plan... 36s
+  ⠴ Analyzing project and creating plan... 36s
+  ⠦ Analyzing project and creating plan... 36s
+  ⠧ Analyzing project and creating plan... 37s
+  ⠇ Analyzing project and creating plan... 37s
+  ⠏ Analyzing project and creating plan... 37s
+  ⠋ Analyzing project and creating plan... 37s
+  ⠙ Analyzing project and creating plan... 37s
+  ⠹ Analyzing project and creating plan... 37s
+  ⠸ Analyzing project and creating plan... 37s
+  ⠼ Analyzing project and creating plan... 37s
+  ⠴ Analyzing project and creating plan... 37s
+  ⠦ Analyzing project and creating plan... 37s
+  ⠧ Analyzing project and creating plan... 38s
+  ⠇ Analyzing project and creating plan... 38s
+  ⠏ Analyzing project and creating plan... 38s
+  ⠋ Analyzing project and creating plan... 38s
+  ⠙ Analyzing project and creating plan... 38s
+  ⠹ Analyzing project and creating plan... 38s
+  ⠸ Analyzing project and creating plan... 38s
+  ⠼ Analyzing project and creating plan... 38s
+  ⠴ Analyzing project and creating plan... 38s
+  ⠦ Analyzing project and creating plan... 38s
+  ⠧ Analyzing project and creating plan... 39s
+  ⠇ Analyzing project and creating plan... 39s
+  ⠏ Analyzing project and creating plan... 39s
+  ⠋ Analyzing project and creating plan... 39s
+  ⠙ Analyzing project and creating plan... 39s
+  ⠹ Analyzing project and creating plan... 39s
+  ⠸ Analyzing project and creating plan... 39s
+  ⠼ Analyzing project and creating plan... 39s
+  ⠴ Analyzing project and creating plan... 39s
+  ⠦ Analyzing project and creating plan... 39s
+  ⠧ Analyzing project and creating plan... 40s
+  ⠇ Analyzing project and creating plan... 40s
+  ⠏ Analyzing project and creating plan... 40s
+  ⠋ Analyzing project and creating plan... 40s
+  ⠙ Analyzing project and creating plan... 40s
+  ⠹ Analyzing project and creating plan... 40s
+  ⠸ Analyzing project and creating plan... 40s
+  ⠼ Analyzing project and creating plan... 40s
+  ⠴ Analyzing project and creating plan... 40s
+  ⠦ Analyzing project and creating plan... 40s
+  ⠧ Analyzing project and creating plan... 41s
+  ⠇ Analyzing project and creating plan... 41s
+  ⠏ Analyzing project and creating plan... 41s
+  ⠋ Analyzing project and creating plan... 41s
+  ⠙ Analyzing project and creating plan... 41s
+  ⠹ Analyzing project and creating plan... 41s
+  ⠸ Analyzing project and creating plan... 41s
+  ⠼ Analyzing project and creating plan... 41s
+  ⠴ Analyzing project and creating plan... 41s
+  ⠦ Analyzing project and creating plan... 41s
+  ⠧ Analyzing project and creating plan... 42s
+  ⠇ Analyzing project and creating plan... 42s
+  ⠏ Analyzing project and creating plan... 42s
+  ⠋ Analyzing project and creating plan... 42s
+  ⠙ Analyzing project and creating plan... 42s
+  ⠹ Analyzing project and creating plan... 42s
+  ⠸ Analyzing project and creating plan... 42s
+  ⠼ Analyzing project and creating plan... 42s
+  ⠴ Analyzing project and creating plan... 42s
+  ⠦ Analyzing project and creating plan... 42s
+  ⠧ Analyzing project and creating plan... 43s
+  ⠇ Analyzing project and creating plan... 43s
+  ⠏ Analyzing project and creating plan... 43s
+  ⠋ Analyzing project and creating plan... 43s
+  ⠙ Analyzing project and creating plan... 43s
+  ⠹ Analyzing project and creating plan... 43s
+  ⠸ Analyzing project and creating plan... 43s
+  ⠼ Analyzing project and creating plan... 43s
+  ⠴ Analyzing project and creating plan... 43s
+  ⠦ Analyzing project and creating plan... 44s
+  ⠧ Analyzing project and creating plan... 44s
+  ⠇ Analyzing project and creating plan... 44s
+  ⠏ Analyzing project and creating plan... 44s
+  ⠋ Analyzing project and creating plan... 44s
+  ⠙ Analyzing project and creating plan... 44s
+  ⠹ Analyzing project and creating plan... 44s
+  ⠸ Analyzing project and creating plan... 44s
+  ⠼ Analyzing project and creating plan... 44s
+  ⠴ Analyzing project and creating plan... 44s
+  ⠦ Analyzing project and creating plan... 45s
+  ⠧ Analyzing project and creating plan... 45s
+  ⠇ Analyzing project and creating plan... 45s
+  ⠏ Analyzing project and creating plan... 45s
+  ⠋ Analyzing project and creating plan... 45s
+  ⠙ Analyzing project and creating plan... 45s
+  ⠹ Analyzing project and creating plan... 45s
+  ⠸ Analyzing project and creating plan... 45s
+  ⠼ Analyzing project and creating plan... 45s
+  ⠴ Analyzing project and creating plan... 45s
+  ⠦ Analyzing project and creating plan... 46s
+  ⠧ Analyzing project and creating plan... 46s
+  ⠇ Analyzing project and creating plan... 46s
+  ⠏ Analyzing project and creating plan... 46s
+  ⠋ Analyzing project and creating plan... 46s
+  ⠙ Analyzing project and creating plan... 46s
+  ⠹ Analyzing project and creating plan... 46s
+  ⠸ Analyzing project and creating plan... 46s
+  ⠼ Analyzing project and creating plan... 46s
+  ⠴ Analyzing project and creating plan... 46s
+  ⠦ Analyzing project and creating plan... 47s
+  ⠧ Analyzing project and creating plan... 47s
+  ⠇ Analyzing project and creating plan... 47s
+  ⠏ Analyzing project and creating plan... 47s
+  ⠋ Analyzing project and creating plan... 47s
+  ⠙ Analyzing project and creating plan... 47s
+  ⠹ Analyzing project and creating plan... 47s
+  ⠸ Analyzing project and creating plan... 47s
+  ⠼ Analyzing project and creating plan... 47s
+  ⠴ Analyzing project and creating plan... 47s
+  ⠦ Analyzing project and creating plan... 48s
+  ⠧ Analyzing project and creating plan... 48s
+  ⠇ Analyzing project and creating plan... 48s
+  ⠏ Analyzing project and creating plan... 48s
+  ⠋ Analyzing project and creating plan... 48s
+  ⠙ Analyzing project and creating plan... 48s
+  ⠹ Analyzing project and creating plan... 48s
+  ⠸ Analyzing project and creating plan... 48s
+  ⠼ Analyzing project and creating plan... 48s
+  ⠴ Analyzing project and creating plan... 48s
+  ⠦ Analyzing project and creating plan... 49s
+  ⠧ Analyzing project and creating plan... 49s
+  ⠇ Analyzing project and creating plan... 49s
+  ⠏ Analyzing project and creating plan... 49s
+  ⠋ Analyzing project and creating plan... 49s
+  ⠙ Analyzing project and creating plan... 49s
+  ⠹ Analyzing project and creating plan... 49s
+  ⠸ Analyzing project and creating plan... 49s
+  ⠼ Analyzing project and creating plan... 49s
+  ⠴ Analyzing project and creating plan... 49s
+  ⠦ Analyzing project and creating plan... 50s
+  ⠧ Analyzing project and creating plan... 50s
+  ⠇ Analyzing project and creating plan... 50s
+  ⠏ Analyzing project and creating plan... 50s
+  ⠋ Analyzing project and creating plan... 50s
+  ⠙ Analyzing project and creating plan... 50s
+  ⠹ Analyzing project and creating plan... 50s
+  ⠸ Analyzing project and creating plan... 50s
+  ⠼ Analyzing project and creating plan... 50s
+  ⠴ Analyzing project and creating plan... 50s
+  ⠦ Analyzing project and creating plan... 51s
+  ⠧ Analyzing project and creating plan... 51s
+  ⠇ Analyzing project and creating plan... 51s
+  ⠏ Analyzing project and creating plan... 51s
+  ⠋ Analyzing project and creating plan... 51s
+  ⠙ Analyzing project and creating plan... 51s
+  ⠹ Analyzing project and creating plan... 51s
+  ⠸ Analyzing project and creating plan... 51s
+  ⠼ Analyzing project and creating plan... 51s
+  ⠴ Analyzing project and creating plan... 51s
+  ⠦ Analyzing project and creating plan... 52s
+  ⠧ Analyzing project and creating plan... 52s
+  ⠇ Analyzing project and creating plan... 52s
+  ⠏ Analyzing project and creating plan... 52s
+  ⠋ Analyzing project and creating plan... 52s
+  ⠙ Analyzing project and creating plan... 52s
+  ⠹ Analyzing project and creating plan... 52s
+  ⠸ Analyzing project and creating plan... 52s
+  ⠼ Analyzing project and creating plan... 52s
+  ⠴ Analyzing project and creating plan... 52s
+  ⠦ Analyzing project and creating plan... 53s
+  ⠧ Analyzing project and creating plan... 53s
+  ⠇ Analyzing project and creating plan... 53s
+  ⠏ Analyzing project and creating plan... 53s
+  ⠋ Analyzing project and creating plan... 53s
+  ⠙ Analyzing project and creating plan... 53s
+  ⠹ Analyzing project and creating plan... 53s
+  ⠸ Analyzing project and creating plan... 53s
+  ⠼ Analyzing project and creating plan... 53s
+  ⠴ Analyzing project and creating plan... 53s
+  ⠦ Analyzing project and creating plan... 54s
+  ⠧ Analyzing project and creating plan... 54s
+  ⠇ Analyzing project and creating plan... 54s
+  ⠏ Analyzing project and creating plan... 54s
+  ⠋ Analyzing project and creating plan... 54s
+  ⠙ Analyzing project and creating plan... 54s
+  ⠹ Analyzing project and creating plan... 54s
+  ⠸ Analyzing project and creating plan... 54s
+  ⠼ Analyzing project and creating plan... 54s
+  ⠴ Analyzing project and creating plan... 54s
+  ⠦ Analyzing project and creating plan... 55s
+  ⠧ Analyzing project and creating plan... 55s
+  ⠇ Analyzing project and creating plan... 55s
+  ⠏ Analyzing project and creating plan... 55s
+  ⠋ Analyzing project and creating plan... 55s
+  ⠙ Analyzing project and creating plan... 55s
+  ⠹ Analyzing project and creating plan... 55s
+  ⠸ Analyzing project and creating plan... 55s
+  ⠼ Analyzing project and creating plan... 55s
+  ⠴ Analyzing project and creating plan... 55s
+  ⠦ Analyzing project and creating plan... 56s
+  ⠧ Analyzing project and creating plan... 56s
+  ⠇ Analyzing project and creating plan... 56s
+  ⠏ Analyzing project and creating plan... 56s
+  ⠋ Analyzing project and creating plan... 56s
+  ⠙ Analyzing project and creating plan... 56s
+  ⠹ Analyzing project and creating plan... 56s
+  ⠸ Analyzing project and creating plan... 56s
+  ⠼ Analyzing project and creating plan... 56s
+  ⠴ Analyzing project and creating plan... 56s
+  ⠦ Analyzing project and creating plan... 57s
+  ⠧ Analyzing project and creating plan... 57s
+  ⠇ Analyzing project and creating plan... 57s
+  ⠏ Analyzing project and creating plan... 57s
+  ⠋ Analyzing project and creating plan... 57s
+  ⠙ Analyzing project and creating plan... 57s
+  ⠹ Analyzing project and creating plan... 57s
+  ⠸ Analyzing project and creating plan... 57s
+  ⠼ Analyzing project and creating plan... 57s
+  ⠴ Analyzing project and creating plan... 57s
+  ⠦ Analyzing project and creating plan... 58s
+  ⠧ Analyzing project and creating plan... 58s
+  ⠇ Analyzing project and creating plan... 58s
+  ⠏ Analyzing project and creating plan... 58s
+  ⠋ Analyzing project and creating plan... 58s
+  ⠙ Analyzing project and creating plan... 58s
+  ⠹ Analyzing project and creating plan... 58s
+  ⠸ Analyzing project and creating plan... 58s
+  ⠼ Analyzing project and creating plan... 58s
+  ⠴ Analyzing project and creating plan... 58s
+  ⠦ Analyzing project and creating plan... 59s
+  ⠧ Analyzing project and creating plan... 59s
+  ⠇ Analyzing project and creating plan... 59s
+  ⠏ Analyzing project and creating plan... 59s
+  ⠋ Analyzing project and creating plan... 59s
+  ⠙ Analyzing project and creating plan... 59s
+  ⠹ Analyzing project and creating plan... 59s
+  ⠸ Analyzing project and creating plan... 59s
+  ⠼ Analyzing project and creating plan... 59s
+  ⠴ Analyzing project and creating plan... 59s
+  ⠦ Analyzing project and creating plan... 60s
+  ⠧ Analyzing project and creating plan... 60s
+  ⠇ Analyzing project and creating plan... 60s
+  ⠏ Analyzing project and creating plan... 60s
+  ⠋ Analyzing project and creating plan... 60s
+  ⠙ Analyzing project and creating plan... 60s
+  ⠹ Analyzing project and creating plan... 60s
+  ⠸ Analyzing project and creating plan... 60s
+  ⠼ Analyzing project and creating plan... 60s
+  ⠴ Analyzing project and creating plan... 60s
+  ⠦ Analyzing project and creating plan... 61s
+  ⠧ Analyzing project and creating plan... 61s
+  ⠇ Analyzing project and creating plan... 61s
+  ⠏ Analyzing project and creating plan... 61s
+  ⠋ Analyzing project and creating plan... 61s
+  ⠙ Analyzing project and creating plan... 61s
+  ⠹ Analyzing project and creating plan... 61s
+  ⠸ Analyzing project and creating plan... 61s
+  ⠼ Analyzing project and creating plan... 61s
+  ⠴ Analyzing project and creating plan... 62s
+  ⠦ Analyzing project and creating plan... 62s
+  ⠧ Analyzing project and creating plan... 62s
+  ⠇ Analyzing project and creating plan... 62s
+  ⠏ Analyzing project and creating plan... 62s
+  ⠋ Analyzing project and creating plan... 62s
+  ⠙ Analyzing project and creating plan... 62s
+  ⠹ Analyzing project and creating plan... 62s
+  ⠸ Analyzing project and creating plan... 62s
+  ⠼ Analyzing project and creating plan... 62s
+  ⠴ Analyzing project and creating plan... 63s
+  ⠦ Analyzing project and creating plan... 63s
+  ⠧ Analyzing project and creating plan... 63s
+  ⠇ Analyzing project and creating plan... 63s
+  ⠏ Analyzing project and creating plan... 63s
+  ⠋ Analyzing project and creating plan... 63s
+  ⠙ Analyzing project and creating plan... 63s
+  ⠹ Analyzing project and creating plan... 63s
+  ⠸ Analyzing project and creating plan... 63s
+  ⠼ Analyzing project and creating plan... 63s
+  ⠴ Analyzing project and creating plan... 64s
+  ⠦ Analyzing project and creating plan... 64s
+  ⠧ Analyzing project and creating plan... 64s
+  ⠇ Analyzing project and creating plan... 64s
+  ⠏ Analyzing project and creating plan... 64s
+  ⠋ Analyzing project and creating plan... 64s
+  ⠙ Analyzing project and creating plan... 64s
+  ⠹ Analyzing project and creating plan... 64s
+  ⠸ Analyzing project and creating plan... 64s
+  ⠼ Analyzing project and creating plan... 64s
+  ⠴ Analyzing project and creating plan... 65s
+  ⠦ Analyzing project and creating plan... 65s
+  ⠧ Analyzing project and creating plan... 65s
+  ⠇ Analyzing project and creating plan... 65s
+  ⠏ Analyzing project and creating plan... 65s
+  ⠋ Analyzing project and creating plan... 65s
+  ⠙ Analyzing project and creating plan... 65s
+  ⠹ Analyzing project and creating plan... 65s
+  ⠸ Analyzing project and creating plan... 65s
+  ⠼ Analyzing project and creating plan... 65s
+  ⠴ Analyzing project and creating plan... 66s
+  ⠦ Analyzing project and creating plan... 66s
+  ⠧ Analyzing project and creating plan... 66s
+  ⠇ Analyzing project and creating plan... 66s
+  ⠏ Analyzing project and creating plan... 66s
+  ⠋ Analyzing project and creating plan... 66s
+  ⠙ Analyzing project and creating plan... 66s
+  ⠹ Analyzing project and creating plan... 66s
+  ⠸ Analyzing project and creating plan... 66s
+  ⠼ Analyzing project and creating plan... 66s
+  ⠴ Analyzing project and creating plan... 67s
+  ⠦ Analyzing project and creating plan... 67s
+  ⠧ Analyzing project and creating plan... 67s
+  ⠇ Analyzing project and creating plan... 67s
+  ⠏ Analyzing project and creating plan... 67s
+  ⠋ Analyzing project and creating plan... 67s
+  ⠙ Analyzing project and creating plan... 67s
+  ⠹ Analyzing project and creating plan... 67s
+  ⠸ Analyzing project and creating plan... 67s
+  ⠼ Analyzing project and creating plan... 67s
+  ⠴ Analyzing project and creating plan... 68s
+  ⠦ Analyzing project and creating plan... 68s
+  ⠧ Analyzing project and creating plan... 68s
+  ⠇ Analyzing project and creating plan... 68s
+  ⠏ Analyzing project and creating plan... 68s
+  ⠋ Analyzing project and creating plan... 68s
+  ⠙ Analyzing project and creating plan... 68s
+  ⠹ Analyzing project and creating plan... 68s
+  ⠸ Analyzing project and creating plan... 68s
+  ⠼ Analyzing project and creating plan... 68s
+  ⠴ Analyzing project and creating plan... 69s
+  ⠦ Analyzing project and creating plan... 69s
+  ⠧ Analyzing project and creating plan... 69s
+  ⠇ Analyzing project and creating plan... 69s
+  ⠏ Analyzing project and creating plan... 69s
+  ⠋ Analyzing project and creating plan... 69s
+  ⠙ Analyzing project and creating plan... 69s
+  ⠹ Analyzing project and creating plan... 69s
+  ⠸ Analyzing project and creating plan... 69s
+  ⠼ Analyzing project and creating plan... 69s
+  ⠴ Analyzing project and creating plan... 70s
+  ⠦ Analyzing project and creating plan... 70s
+  ⠧ Analyzing project and creating plan... 70s
+  ⠇ Analyzing project and creating plan... 70s
+  ⠏ Analyzing project and creating plan... 70s
+  ⠋ Analyzing project and creating plan... 70s
+  ⠙ Analyzing project and creating plan... 70s
+  ⠹ Analyzing project and creating plan... 70s
+  ⠸ Analyzing project and creating plan... 70s
+  ⠼ Analyzing project and creating plan... 70s
+  ⠴ Analyzing project and creating plan... 71s
+  ⠦ Analyzing project and creating plan... 71s
+  ⠧ Analyzing project and creating plan... 71s
+  ⠇ Analyzing project and creating plan... 71s
+  ⠏ Analyzing project and creating plan... 71s
+  ⠋ Analyzing project and creating plan... 71s
+  ⠙ Analyzing project and creating plan... 71s
+  ⠹ Analyzing project and creating plan... 71s
+  ⠸ Analyzing project and creating plan... 71s
+  ⠼ Analyzing project and creating plan... 71s
+  ⠴ Analyzing project and creating plan... 72s
+  ⠦ Analyzing project and creating plan... 72s
+  ⠧ Analyzing project and creating plan... 72s
+  ⠇ Analyzing project and creating plan... 72s
+  ⠏ Analyzing project and creating plan... 72s
+  ⠋ Analyzing project and creating plan... 72s
+  ⠙ Analyzing project and creating plan... 72s
+  ⠹ Analyzing project and creating plan... 72s
+  ⠸ Analyzing project and creating plan... 72s
+  ⠼ Analyzing project and creating plan... 72s
+  ⠴ Analyzing project and creating plan... 73s
+  ⠦ Analyzing project and creating plan... 73s
+  ⠧ Analyzing project and creating plan... 73s
+  ⠇ Analyzing project and creating plan... 73s
+  ⠏ Analyzing project and creating plan... 73s
+  ⠋ Analyzing project and creating plan... 73s
+  ⠙ Analyzing project and creating plan... 73s
+  ⠹ Analyzing project and creating plan... 73s
+  ⠸ Analyzing project and creating plan... 73s
+  ⠼ Analyzing project and creating plan... 73s
+  ⠴ Analyzing project and creating plan... 74s
+  ⠦ Analyzing project and creating plan... 74s
+  ⠧ Analyzing project and creating plan... 74s
+  ⠇ Analyzing project and creating plan... 74s
+  ⠏ Analyzing project and creating plan... 74s
+  ⠋ Analyzing project and creating plan... 74s
+  ⠙ Analyzing project and creating plan... 74s
+  ⠹ Analyzing project and creating plan... 74s
+  ⠸ Analyzing project and creating plan... 74s
+  ⠼ Analyzing project and creating plan... 74s
+  ⠴ Analyzing project and creating plan... 75s
+  ⠦ Analyzing project and creating plan... 75s
+  ⠧ Analyzing project and creating plan... 75s
+  ⠇ Analyzing project and creating plan... 75s
+  ⠏ Analyzing project and creating plan... 75s
+  ⠋ Analyzing project and creating plan... 75s
+  ⠙ Analyzing project and creating plan... 75s
+  ⠹ Analyzing project and creating plan... 75s
+  ⠸ Analyzing project and creating plan... 75s
+  ⠼ Analyzing project and creating plan... 75s
+  ⠴ Analyzing project and creating plan... 76s
+  ⠦ Analyzing project and creating plan... 76s
+  ⠧ Analyzing project and creating plan... 76s
+  ⠇ Analyzing project and creating plan... 76s
+  ⠏ Analyzing project and creating plan... 76s
+  ⠋ Analyzing project and creating plan... 76s
+  ⠙ Analyzing project and creating plan... 76s
+  ⠹ Analyzing project and creating plan... 76s
+  ⠸ Analyzing project and creating plan... 76s
+  ⠼ Analyzing project and creating plan... 76s
+  ⠴ Analyzing project and creating plan... 77s
+  ⠦ Analyzing project and creating plan... 77s
+  ⠧ Analyzing project and creating plan... 77s
+  ⠇ Analyzing project and creating plan... 77s
+  ⠏ Analyzing project and creating plan... 77s
+  ⠋ Analyzing project and creating plan... 77s
+  ⠙ Analyzing project and creating plan... 77s
+  ⠹ Analyzing project and creating plan... 77s
+  ⠸ Analyzing project and creating plan... 77s
+  ⠼ Analyzing project and creating plan... 77s
+  ⠴ Analyzing project and creating plan... 78s
+  ⠦ Analyzing project and creating plan... 78s
+  ⠧ Analyzing project and creating plan... 78s
+  ⠇ Analyzing project and creating plan... 78s
+  ⠏ Analyzing project and creating plan... 78s
+  ⠋ Analyzing project and creating plan... 78s
+  ⠙ Analyzing project and creating plan... 78s
+  ⠹ Analyzing project and creating plan... 78s
+  ⠸ Analyzing project and creating plan... 78s
+  ⠼ Analyzing project and creating plan... 79s
+  ⠴ Analyzing project and creating plan... 79s
+  ⠦ Analyzing project and creating plan... 79s
+  ⠧ Analyzing project and creating plan... 79s
+  ⠇ Analyzing project and creating plan... 79s
+  ⠏ Analyzing project and creating plan... 79s
+  ⠋ Analyzing project and creating plan... 79s
+  ⠙ Analyzing project and creating plan... 79s
+  ⠹ Analyzing project and creating plan... 79s
+  ⠸ Analyzing project and creating plan... 79s
+  ⠼ Analyzing project and creating plan... 80s
+  ⠴ Analyzing project and creating plan... 80s
+  ⠦ Analyzing project and creating plan... 80s
+  ⠧ Analyzing project and creating plan... 80s
+  ⠇ Analyzing project and creating plan... 80s
+  ⠏ Analyzing project and creating plan... 80s
+  ⠋ Analyzing project and creating plan... 80s
+  ⠙ Analyzing project and creating plan... 80s
+  ⠹ Analyzing project and creating plan... 80s
+  ⠸ Analyzing project and creating plan... 80s
+  ⠼ Analyzing project and creating plan... 81s
+  ⠴ Analyzing project and creating plan... 81s
+  ⠦ Analyzing project and creating plan... 81s
+  ⠧ Analyzing project and creating plan... 81s
+  ⠇ Analyzing project and creating plan... 81s
+  ⠏ Analyzing project and creating plan... 81s
+  ⠋ Analyzing project and creating plan... 81s
+  ⠙ Analyzing project and creating plan... 81s
+  ⠹ Analyzing project and creating plan... 81s
+  ⠸ Analyzing project and creating plan... 81s
+  ⠼ Analyzing project and creating plan... 82s
+  ⠴ Analyzing project and creating plan... 82s
+  ⠦ Analyzing project and creating plan... 82s
+  ⠧ Analyzing project and creating plan... 82s
+  ⠇ Analyzing project and creating plan... 82s
+  ⠏ Analyzing project and creating plan... 82s
+  ⠋ Analyzing project and creating plan... 82s
+  ⠙ Analyzing project and creating plan... 82s
+  ⠹ Analyzing project and creating plan... 82s
+  ⠸ Analyzing project and creating plan... 82s
+  ⠼ Analyzing project and creating plan... 83s
+  ⠴ Analyzing project and creating plan... 83s
+  ⠦ Analyzing project and creating plan... 83s
+  ⠧ Analyzing project and creating plan... 83s
+  ⠇ Analyzing project and creating plan... 83s
+  ⠏ Analyzing project and creating plan... 83s
+  ⠋ Analyzing project and creating plan... 83s
+  ⠙ Analyzing project and creating plan... 83s
+  ⠹ Analyzing project and creating plan... 83s
+  ⠸ Analyzing project and creating plan... 83s
+  ⠼ Analyzing project and creating plan... 84s
+  ⠴ Analyzing project and creating plan... 84s
+  ⠦ Analyzing project and creating plan... 84s
+  ⠧ Analyzing project and creating plan... 84s
+  ⠇ Analyzing project and creating plan... 84s
+  ⠏ Analyzing project and creating plan... 84s
+  ⠋ Analyzing project and creating plan... 84s
+  ⠙ Analyzing project and creating plan... 84s
+  ⠹ Analyzing project and creating plan... 84s
+  ⠸ Analyzing project and creating plan... 84s
+  ⠼ Analyzing project and creating plan... 85s
+  ⠴ Analyzing project and creating plan... 85s
+  ⠦ Analyzing project and creating plan... 85s
+  ⠧ Analyzing project and creating plan... 85s
+  ⠇ Analyzing project and creating plan... 85s
+  ⠏ Analyzing project and creating plan... 85s
+  ⠋ Analyzing project and creating plan... 85s
+  ⠙ Analyzing project and creating plan... 85s
+  ⠹ Analyzing project and creating plan... 85s
+  ⠸ Analyzing project and creating plan... 85s
+  ⠼ Analyzing project and creating plan... 86s
+  ⠴ Analyzing project and creating plan... 86s
+  ⠦ Analyzing project and creating plan... 86s
+  ⠧ Analyzing project and creating plan... 86s
+  ⠇ Analyzing project and creating plan... 86s
+  ⠏ Analyzing project and creating plan... 86s
+  ⠋ Analyzing project and creating plan... 86s
+  ⠙ Analyzing project and creating plan... 86s
+  ⠹ Analyzing project and creating plan... 86s
+  ⠸ Analyzing project and creating plan... 86s
+  ⠼ Analyzing project and creating plan... 87s
+  ⠴ Analyzing project and creating plan... 87s
+  ⠦ Analyzing project and creating plan... 87s
+  ⠧ Analyzing project and creating plan... 87s
+  ⠇ Analyzing project and creating plan... 87s
+  ⠏ Analyzing project and creating plan... 87s
+  ⠋ Analyzing project and creating plan... 87s
+  ⠙ Analyzing project and creating plan... 87s
+  ⠹ Analyzing project and creating plan... 87s
+  ⠸ Analyzing project and creating plan... 87s
+  ⠼ Analyzing project and creating plan... 88s
+  ⠴ Analyzing project and creating plan... 88s
+  ⠦ Analyzing project and creating plan... 88s
+  ⠧ Analyzing project and creating plan... 88s
+  ⠇ Analyzing project and creating plan... 88s
+  ⠏ Analyzing project and creating plan... 88s
+  ⠋ Analyzing project and creating plan... 88s
+  ⠙ Analyzing project and creating plan... 88s
+  ⠹ Analyzing project and creating plan... 88s
+  ⠸ Analyzing project and creating plan... 88s
+  ⠼ Analyzing project and creating plan... 89s
+  ⠴ Analyzing project and creating plan... 89s
+  ⠦ Analyzing project and creating plan... 89s
+  ⠧ Analyzing project and creating plan... 89s
+  ⠇ Analyzing project and creating plan... 89s
+  ⠏ Analyzing project and creating plan... 89s
+  ⠋ Analyzing project and creating plan... 89s
+  ⠙ Analyzing project and creating plan... 89s
+  ⠹ Analyzing project and creating plan... 89s
+  ⠸ Analyzing project and creating plan... 89s
+  ⠼ Analyzing project and creating plan... 90s
+  ⠴ Analyzing project and creating plan... 90s
+  ⠦ Analyzing project and creating plan... 90s
+  ⠧ Analyzing project and creating plan... 90s
+  ⠇ Analyzing project and creating plan... 90s
+  ⠏ Analyzing project and creating plan... 90s
+  ⠋ Analyzing project and creating plan... 90s
+  ⠙ Analyzing project and creating plan... 90s
+  ⠹ Analyzing project and creating plan... 90s
+  ⠸ Analyzing project and creating plan... 90s
+  ⠼ Analyzing project and creating plan... 91s
+  ⠴ Analyzing project and creating plan... 91s
+  ⠦ Analyzing project and creating plan... 91s
+  ⠧ Analyzing project and creating plan... 91s
+  ⠇ Analyzing project and creating plan... 91s
+  ⠏ Analyzing project and creating plan... 91s
+  ⠋ Analyzing project and creating plan... 91s
+  ⠙ Analyzing project and creating plan... 91s
+  ⠹ Analyzing project and creating plan... 91s
+  ⠸ Analyzing project and creating plan... 91s
+  ⠼ Analyzing project and creating plan... 92s
+  ⠴ Analyzing project and creating plan... 92s
+  ⠦ Analyzing project and creating plan... 92s
+  ⠧ Analyzing project and creating plan... 92s
+  ⠇ Analyzing project and creating plan... 92s
+  ⠏ Analyzing project and creating plan... 92s
+  ⠋ Analyzing project and creating plan... 92s
+  ⠙ Analyzing project and creating plan... 92s
+  ⠹ Analyzing project and creating plan... 92s
+  ⠸ Analyzing project and creating plan... 92s
+  ⠼ Analyzing project and creating plan... 93s
+  ⠴ Analyzing project and creating plan... 93s
+  ⠦ Analyzing project and creating plan... 93s
+  ⠧ Analyzing project and creating plan... 93s
+  ⠇ Analyzing project and creating plan... 93s
+  ⠏ Analyzing project and creating plan... 93s
+  ⠋ Analyzing project and creating plan... 93s
+  ⠙ Analyzing project and creating plan... 93s
+  ⠹ Analyzing project and creating plan... 93s
+  ⠸ Analyzing project and creating plan... 94s
+  ⠼ Analyzing project and creating plan... 94s
+  ⠴ Analyzing project and creating plan... 94s
+  ⠦ Analyzing project and creating plan... 94s
+  ⠧ Analyzing project and creating plan... 94s
+  ⠇ Analyzing project and creating plan... 94s
+  ⠏ Analyzing project and creating plan... 94s
+  ⠋ Analyzing project and creating plan... 94s
+  ⠙ Analyzing project and creating plan... 94s
+  ⠹ Analyzing project and creating plan... 94s
+  ⠸ Analyzing project and creating plan... 95s
+  ⠼ Analyzing project and creating plan... 95s
+  ⠴ Analyzing project and creating plan... 95s
+  ⠦ Analyzing project and creating plan... 95s
+  ⠧ Analyzing project and creating plan... 95s
+  ⠇ Analyzing project and creating plan... 95s
+  ⠏ Analyzing project and creating plan... 95s
+  ⠋ Analyzing project and creating plan... 95s
+  ⠙ Analyzing project and creating plan... 95s
+  ⠹ Analyzing project and creating plan... 95s
+  ⠸ Analyzing project and creating plan... 96s
+  ⠼ Analyzing project and creating plan... 96s
+  ⠴ Analyzing project and creating plan... 96s
+  ⠦ Analyzing project and creating plan... 96s
+  ⠧ Analyzing project and creating plan... 96s
+  ⠇ Analyzing project and creating plan... 96s
+  ⠏ Analyzing project and creating plan... 96s
+  ⠋ Analyzing project and creating plan... 96s
+  ⠙ Analyzing project and creating plan... 96s
+  ⠹ Analyzing project and creating plan... 96s
+  ⠸ Analyzing project and creating plan... 97s
+  ⠼ Analyzing project and creating plan... 97s
+  ⠴ Analyzing project and creating plan... 97s
+  ⠦ Analyzing project and creating plan... 97s
+  ⠧ Analyzing project and creating plan... 97s
+  ⠇ Analyzing project and creating plan... 97s
+  ⠏ Analyzing project and creating plan... 97s
+  ⠋ Analyzing project and creating plan... 97s
+  ⠙ Analyzing project and creating plan... 97s
+  ⠹ Analyzing project and creating plan... 97s
+  ⠸ Analyzing project and creating plan... 98s
+  ⠼ Analyzing project and creating plan... 98s
+  ⠴ Analyzing project and creating plan... 98s
+  ⠦ Analyzing project and creating plan... 98s
+  ⠧ Analyzing project and creating plan... 98s
+  ⠇ Analyzing project and creating plan... 98s
+  ⠏ Analyzing project and creating plan... 98s
+  ⠋ Analyzing project and creating plan... 98s
+  ⠙ Analyzing project and creating plan... 98s
+  ⠹ Analyzing project and creating plan... 98s
+  ⠸ Analyzing project and creating plan... 99s
+  ⠼ Analyzing project and creating plan... 99s
+  ⠴ Analyzing project and creating plan... 99s
+  ⠦ Analyzing project and creating plan... 99s
+  ⠧ Analyzing project and creating plan... 99s
+  ⠇ Analyzing project and creating plan... 99s
+  ⠏ Analyzing project and creating plan... 99s
+  ⠋ Analyzing project and creating plan... 99s
+  ⠙ Analyzing project and creating plan... 99s
+  ⠹ Analyzing project and creating plan... 99s
+  ⠸ Analyzing project and creating plan... 100s
+  ⠼ Analyzing project and creating plan... 100s
+  ⠴ Analyzing project and creating plan... 100s
+  ⠦ Analyzing project and creating plan... 100s
+  ⠧ Analyzing project and creating plan... 100s
+  ⠇ Analyzing project and creating plan... 100s
+  ⠏ Analyzing project and creating plan... 100s
+  ⠋ Analyzing project and creating plan... 100s
+  ⠙ Analyzing project and creating plan... 100s
+  ⠹ Analyzing project and creating plan... 100s
+  ⠸ Analyzing project and creating plan... 101s
+  ⠼ Analyzing project and creating plan... 101s
+  ⠴ Analyzing project and creating plan... 101s
+  ⠦ Analyzing project and creating plan... 101s
+  ⠧ Analyzing project and creating plan... 101s
+  ⠇ Analyzing project and creating plan... 101s
+  ⠏ Analyzing project and creating plan... 101s
+  ⠋ Analyzing project and creating plan... 101s
+  ⠙ Analyzing project and creating plan... 101s
+  ⠹ Analyzing project and creating plan... 101s
+  ⠸ Analyzing project and creating plan... 102s
+  ⠼ Analyzing project and creating plan... 102s
+  ⠴ Analyzing project and creating plan... 102s
+  ⠦ Analyzing project and creating plan... 102s
+  ⠧ Analyzing project and creating plan... 102s
+  ⠇ Analyzing project and creating plan... 102s
+  ⠏ Analyzing project and creating plan... 102s
+  ⠋ Analyzing project and creating plan... 102s
+  ⠙ Analyzing project and creating plan... 102s
+  ⠹ Analyzing project and creating plan... 102s
+  ⠸ Analyzing project and creating plan... 103s
+  ⠼ Analyzing project and creating plan... 103s
+  ⠴ Analyzing project and creating plan... 103s
+  ⠦ Analyzing project and creating plan... 103s
+  ⠧ Analyzing project and creating plan... 103s
+  ⠇ Analyzing project and creating plan... 103s
+  ⠏ Analyzing project and creating plan... 103s
+  ⠋ Analyzing project and creating plan... 103s
+  ⠙ Analyzing project and creating plan... 103s
+  ⠹ Analyzing project and creating plan... 103s
+  ⠸ Analyzing project and creating plan... 104s
+  ⠼ Analyzing project and creating plan... 104s
+  ⠴ Analyzing project and creating plan... 104s
+  ⠦ Analyzing project and creating plan... 104s
+  ⠧ Analyzing project and creating plan... 104s
+  ⠇ Analyzing project and creating plan... 104s
+  ⠏ Analyzing project and creating plan... 104s
+  ⠋ Analyzing project and creating plan... 104s
+  ⠙ Analyzing project and creating plan... 104s
+  ⠹ Analyzing project and creating plan... 104s
+  ⠸ Analyzing project and creating plan... 105s
+  ⠼ Analyzing project and creating plan... 105s
+  ⠴ Analyzing project and creating plan... 105s
+  ⠦ Analyzing project and creating plan... 105s
+  ⠧ Analyzing project and creating plan... 105s
+  ⠇ Analyzing project and creating plan... 105s
+  ⠏ Analyzing project and creating plan... 105s
+  ⠋ Analyzing project and creating plan... 105s
+  ⠙ Analyzing project and creating plan... 105s
+  ⠹ Analyzing project and creating plan... 105s
+  ⠸ Analyzing project and creating plan... 106s
+  ⠼ Analyzing project and creating plan... 106s
+  ⠴ Analyzing project and creating plan... 106s
+  ⠦ Analyzing project and creating plan... 106s
+  ⠧ Analyzing project and creating plan... 106s
+  ⠇ Analyzing project and creating plan... 106s
+  ⠏ Analyzing project and creating plan... 106s
+  ⠋ Analyzing project and creating plan... 106s
+  ⠙ Analyzing project and creating plan... 106s
+  ⠹ Analyzing project and creating plan... 106s
+  ⠸ Analyzing project and creating plan... 107s
+  ⠼ Analyzing project and creating plan... 107s
+  ⠴ Analyzing project and creating plan... 107s
+  ⠦ Analyzing project and creating plan... 107s
+  ⠧ Analyzing project and creating plan... 107s
+  ⠇ Analyzing project and creating plan... 107s
+  ⠏ Analyzing project and creating plan... 107s
+  ⠋ Analyzing project and creating plan... 107s
+  ⠙ Analyzing project and creating plan... 107s
+  ⠹ Analyzing project and creating plan... 107s
+  ⠸ Analyzing project and creating plan... 108s
+  ⠼ Analyzing project and creating plan... 108s
+  ⠴ Analyzing project and creating plan... 108s
+  ⠦ Analyzing project and creating plan... 108s
+  ⠧ Analyzing project and creating plan... 108s
+  ⠇ Analyzing project and creating plan... 108s
+  ⠏ Analyzing project and creating plan... 108s
+  ⠋ Analyzing project and creating plan... 108s
+  ⠙ Analyzing project and creating plan... 108s
+  ⠹ Analyzing project and creating plan... 109s
+  ⠸ Analyzing project and creating plan... 109s
+  ⠼ Analyzing project and creating plan... 109s
+  ⠴ Analyzing project and creating plan... 109s
+  ⠦ Analyzing project and creating plan... 109s
+  ⠧ Analyzing project and creating plan... 109s
+  ⠇ Analyzing project and creating plan... 109s
+  ⠏ Analyzing project and creating plan... 109s
+  ⠋ Analyzing project and creating plan... 109s
+  ⠙ Analyzing project and creating plan... 109s
+  ⠹ Analyzing project and creating plan... 110s
+  ⠸ Analyzing project and creating plan... 110s
+  ⠼ Analyzing project and creating plan... 110s
+  ⠴ Analyzing project and creating plan... 110s
+  ⠦ Analyzing project and creating plan... 110s
+  ⠧ Analyzing project and creating plan... 110s
+  ⠇ Analyzing project and creating plan... 110s
+  ⠏ Analyzing project and creating plan... 110s
+  ⠋ Analyzing project and creating plan... 110s
+  ⠙ Analyzing project and creating plan... 110s
+  ⠹ Analyzing project and creating plan... 111s
+  ⠸ Analyzing project and creating plan... 111s
+  ⠼ Analyzing project and creating plan... 111s
+  ⠴ Analyzing project and creating plan... 111s
+  ⠦ Analyzing project and creating plan... 111s
+  ⠧ Analyzing project and creating plan... 111s
+  ⠇ Analyzing project and creating plan... 111s
+  ⠏ Analyzing project and creating plan... 111s
+  ⠋ Analyzing project and creating plan... 111s
+  ⠙ Analyzing project and creating plan... 111s
+  ⠹ Analyzing project and creating plan... 112s
+  ⠸ Analyzing project and creating plan... 112s
+  ⠼ Analyzing project and creating plan... 112s
+  ⠴ Analyzing project and creating plan... 112s
+  ⠦ Analyzing project and creating plan... 112s
+  ⠧ Analyzing project and creating plan... 112s
+  ⠇ Analyzing project and creating plan... 112s
+  ⠏ Analyzing project and creating plan... 112s
+  ⠋ Analyzing project and creating plan... 112s
+  ⠙ Analyzing project and creating plan... 112s
+  ⠹ Analyzing project and creating plan... 113s
+  ⠸ Analyzing project and creating plan... 113s
+  ⠼ Analyzing project and creating plan... 113s
+  ⠴ Analyzing project and creating plan... 113s
+  ⠦ Analyzing project and creating plan... 113s
+  ⠧ Analyzing project and creating plan... 113s
+  ⠇ Analyzing project and creating plan... 113s
+  ⠏ Analyzing project and creating plan... 113s
+  ⠋ Analyzing project and creating plan... 113s
+  ⠙ Analyzing project and creating plan... 113s
+  ⠹ Analyzing project and creating plan... 114s
+  ⠸ Analyzing project and creating plan... 114s
+  ⠼ Analyzing project and creating plan... 114s
+  ⠴ Analyzing project and creating plan... 114s
+  ⠦ Analyzing project and creating plan... 114s
+  ⠧ Analyzing project and creating plan... 114s
+  ⠇ Analyzing project and creating plan... 114s
+  ⠏ Analyzing project and creating plan... 114s
+  ⠋ Analyzing project and creating plan... 114s
+  ⠙ Analyzing project and creating plan... 114s
+  ⠹ Analyzing project and creating plan... 115s
+  ⠸ Analyzing project and creating plan... 115s
+  ⠼ Analyzing project and creating plan... 115s
+  ⠴ Analyzing project and creating plan... 115s
+  ⠦ Analyzing project and creating plan... 115s
+  ⠧ Analyzing project and creating plan... 115s
+  ⠇ Analyzing project and creating plan... 115s
+  ⠏ Analyzing project and creating plan... 115s
+  ⠋ Analyzing project and creating plan... 115s
+  ⠙ Analyzing project and creating plan... 115s
+  ⠹ Analyzing project and creating plan... 116s
+  ⠸ Analyzing project and creating plan... 116s
+  ⠼ Analyzing project and creating plan... 116s
+  ⠴ Analyzing project and creating plan... 116s
+  ⠦ Analyzing project and creating plan... 116s
+  ⠧ Analyzing project and creating plan... 116s
+  ⠇ Analyzing project and creating plan... 116s
+  ⠏ Analyzing project and creating plan... 116s
+  ⠋ Analyzing project and creating plan... 116s
+  ⠙ Analyzing project and creating plan... 116s
+  ⠹ Analyzing project and creating plan... 117s
+  ⠸ Analyzing project and creating plan... 117s
+  ⠼ Analyzing project and creating plan... 117s
+  ⠴ Analyzing project and creating plan... 117s
+  ⠦ Analyzing project and creating plan... 117s
+  ⠧ Analyzing project and creating plan... 117s
+  ⠇ Analyzing project and creating plan... 117s
+  ⠏ Analyzing project and creating plan... 117s
+  ⠋ Analyzing project and creating plan... 117s
+  ⠙ Analyzing project and creating plan... 117s
+  ⠹ Analyzing project and creating plan... 118s
+  ⠸ Analyzing project and creating plan... 118s
+  ⠼ Analyzing project and creating plan... 118s
+  ⠴ Analyzing project and creating plan... 118s
+  ⠦ Analyzing project and creating plan... 118s
+  ⠧ Analyzing project and creating plan... 118s
+  ⠇ Analyzing project and creating plan... 118s
+  ⠏ Analyzing project and creating plan... 118s
+  ⠋ Analyzing project and creating plan... 118s
+  ⠙ Analyzing project and creating plan... 118s
+  ⠹ Analyzing project and creating plan... 119s
+  ⠸ Analyzing project and creating plan... 119s
+  ⠼ Analyzing project and creating plan... 119s
+  ⠴ Analyzing project and creating plan... 119s
+  ⠦ Analyzing project and creating plan... 119s
+  ⠧ Analyzing project and creating plan... 119s
+  ⠇ Analyzing project and creating plan... 119s
+  ⠏ Analyzing project and creating plan... 119s
+  ⠋ Analyzing project and creating plan... 119s
+  ⠙ Analyzing project and creating plan... 119s
+  ⠹ Analyzing project and creating plan... 120s
+  ⠸ Analyzing project and creating plan... 120s
+  ⠼ Analyzing project and creating plan... 120s
+  ⠴ Analyzing project and creating plan... 120s
+  ⠦ Analyzing project and creating plan... 120s
+  ⠧ Analyzing project and creating plan... 120s
+  ⠇ Analyzing project and creating plan... 120s
+  ⠏ Analyzing project and creating plan... 120s
+  ⠋ Analyzing project and creating plan... 120s
+  ⠙ Analyzing project and creating plan... 120s
+  ⠹ Analyzing project and creating plan... 121s
+  ⠸ Analyzing project and creating plan... 121s
+  ⠼ Analyzing project and creating plan... 121s
+  ⠴ Analyzing project and creating plan... 121s
+  ⠦ Analyzing project and creating plan... 121s
+  ⠧ Analyzing project and creating plan... 121s
+  ⠇ Analyzing project and creating plan... 121s
+  ⠏ Analyzing project and creating plan... 121s
+  ⠋ Analyzing project and creating plan... 121s
+  ⠙ Analyzing project and creating plan... 121s
+  ⠹ Analyzing project and creating plan... 122s
+  ⠸ Analyzing project and creating plan... 122s
+  ⠼ Analyzing project and creating plan... 122s
+  ⠴ Analyzing project and creating plan... 122s
+  ⠦ Analyzing project and creating plan... 122s
+  ⠧ Analyzing project and creating plan... 122s
+  ⠇ Analyzing project and creating plan... 122s
+  ⠏ Analyzing project and creating plan... 122s
+  ⠋ Analyzing project and creating plan... 122s
+  ⠙ Analyzing project and creating plan... 122s
+  ⠹ Analyzing project and creating plan... 123s
+  ⠸ Analyzing project and creating plan... 123s
+  ⠼ Analyzing project and creating plan... 123s
+  ⠴ Analyzing project and creating plan... 123s
+  ⠦ Analyzing project and creating plan... 123s
+  ⠧ Analyzing project and creating plan... 123s
+  ⠇ Analyzing project and creating plan... 123s
+  ⠏ Analyzing project and creating plan... 123s
+  ⠋ Analyzing project and creating plan... 123s
+  ⠙ Analyzing project and creating plan... 124s
+  ⠹ Analyzing project and creating plan... 124s
+  ⠸ Analyzing project and creating plan... 124s
+  ⠼ Analyzing project and creating plan... 124s
+  ⠴ Analyzing project and creating plan... 124s
+  ⠦ Analyzing project and creating plan... 124s
+  ⠧ Analyzing project and creating plan... 124s
+  ⠇ Analyzing project and creating plan... 124s
+  ⠏ Analyzing project and creating plan... 124s
+  ⠋ Analyzing project and creating plan... 124s
+  ⠙ Analyzing project and creating plan... 125s
+  ⠹ Analyzing project and creating plan... 125s
+  ⠸ Analyzing project and creating plan... 125s
+  ⠼ Analyzing project and creating plan... 125s
+  ⠴ Analyzing project and creating plan... 125s
+  ⠦ Analyzing project and creating plan... 125s
+  ⠧ Analyzing project and creating plan... 125s
+  ⠇ Analyzing project and creating plan... 125s
+  ⠏ Analyzing project and creating plan... 125s
+  ⠋ Analyzing project and creating plan... 125s
+  ⠙ Analyzing project and creating plan... 126s
+  ⠹ Analyzing project and creating plan... 126s
+  ⠸ Analyzing project and creating plan... 126s
+  ⠼ Analyzing project and creating plan... 126s
+  ⠴ Analyzing project and creating plan... 126s
+  ⠦ Analyzing project and creating plan... 126s
+  ⠧ Analyzing project and creating plan... 126s
+  ⠇ Analyzing project and creating plan... 126s
+  ⠏ Analyzing project and creating plan... 126s
+  ⠋ Analyzing project and creating plan... 126s
+  ⠙ Analyzing project and creating plan... 127s
+  ⠹ Analyzing project and creating plan... 127s
+  ⠸ Analyzing project and creating plan... 127s
+  ⠼ Analyzing project and creating plan... 127s
+  ⠴ Analyzing project and creating plan... 127s
+  ⠦ Analyzing project and creating plan... 127s
+  ⠧ Analyzing project and creating plan... 127s
+  ⠇ Analyzing project and creating plan... 127s
+  ⠏ Analyzing project and creating plan... 127s
+  ⠋ Analyzing project and creating plan... 127s
+  ⠙ Analyzing project and creating plan... 128s
+  ⠹ Analyzing project and creating plan... 128s
+  ⠸ Analyzing project and creating plan... 128s
+  ⠼ Analyzing project and creating plan... 128s
+  ⠴ Analyzing project and creating plan... 128s
+  ⠦ Analyzing project and creating plan... 128s
+  ⠧ Analyzing project and creating plan... 128s
+  ⠇ Analyzing project and creating plan... 128s
+  ⠏ Analyzing project and creating plan... 128s
+  ⠋ Analyzing project and creating plan... 128s
+  ⠙ Analyzing project and creating plan... 129s
+  ⠹ Analyzing project and creating plan... 129s
+  ⠸ Analyzing project and creating plan... 129s
+  ⠼ Analyzing project and creating plan... 129s
+  ⠴ Analyzing project and creating plan... 129s
+  ⠦ Analyzing project and creating plan... 129s
+  ⠧ Analyzing project and creating plan... 129s
+  ⠇ Analyzing project and creating plan... 129s
+  ⠏ Analyzing project and creating plan... 129s
+  ⠋ Analyzing project and creating plan... 129s
+  ⠙ Analyzing project and creating plan... 130s
+  ⠹ Analyzing project and creating plan... 130s
+  ⠸ Analyzing project and creating plan... 130s
+  ⠼ Analyzing project and creating plan... 130s
+  ⠴ Analyzing project and creating plan... 130s
+  ⠦ Analyzing project and creating plan... 130s
+  ⠧ Analyzing project and creating plan... 130s
+  ⠇ Analyzing project and creating plan... 130s
+  ⠏ Analyzing project and creating plan... 130s
+  ⠋ Analyzing project and creating plan... 130s
+  ⠙ Analyzing project and creating plan... 131s
+  ⠹ Analyzing project and creating plan... 131s
+  ⠸ Analyzing project and creating plan... 131s
+  ⠼ Analyzing project and creating plan... 131s
+  ⠴ Analyzing project and creating plan... 131s
+  ⠦ Analyzing project and creating plan... 131s
+  ⠧ Analyzing project and creating plan... 131s
+  ⠇ Analyzing project and creating plan... 131s
+  ⠏ Analyzing project and creating plan... 131s
+  ⠋ Analyzing project and creating plan... 131s
+  ⠙ Analyzing project and creating plan... 132s
+  ⠹ Analyzing project and creating plan... 132s
+  ⠸ Analyzing project and creating plan... 132s
+  ⠼ Analyzing project and creating plan... 132s
+  ⠴ Analyzing project and creating plan... 132s
+  ⠦ Analyzing project and creating plan... 132s
+  ⠧ Analyzing project and creating plan... 132s
+  ⠇ Analyzing project and creating plan... 132s
+  ⠏ Analyzing project and creating plan... 132s
+  ⠋ Analyzing project and creating plan... 132s
+  ⠙ Analyzing project and creating plan... 133s
+  ⠹ Analyzing project and creating plan... 133s
+  ⠸ Analyzing project and creating plan... 133s
+  ⠼ Analyzing project and creating plan... 133s
+  ⠴ Analyzing project and creating plan... 133s
+  ⠦ Analyzing project and creating plan... 133s
+  ⠧ Analyzing project and creating plan... 133s
+  ⠇ Analyzing project and creating plan... 133s
+  ⠏ Analyzing project and creating plan... 133s
+  ⠋ Analyzing project and creating plan... 133s
+  ⠙ Analyzing project and creating plan... 134s
+  ⠹ Analyzing project and creating plan... 134s
+  ⠸ Analyzing project and creating plan... 134s
+  ⠼ Analyzing project and creating plan... 134s
+  ⠴ Analyzing project and creating plan... 134s
+  ⠦ Analyzing project and creating plan... 134s
+  ⠧ Analyzing project and creating plan... 134s
+  ⠇ Analyzing project and creating plan... 134s
+  ⠏ Analyzing project and creating plan... 134s
+  ⠋ Analyzing project and creating plan... 134s
+  ⠙ Analyzing project and creating plan... 135s
+  ⠹ Analyzing project and creating plan... 135s
+  ⠸ Analyzing project and creating plan... 135s
+  ⠼ Analyzing project and creating plan... 135s
+  ⠴ Analyzing project and creating plan... 135s
+  ⠦ Analyzing project and creating plan... 135s
+  ⠧ Analyzing project and creating plan... 135s
+  ⠇ Analyzing project and creating plan... 135s
+  ⠏ Analyzing project and creating plan... 135s
+  ⠋ Analyzing project and creating plan... 135s
+  ⠙ Analyzing project and creating plan... 136s
+  ⠹ Analyzing project and creating plan... 136s
+  ⠸ Analyzing project and creating plan... 136s
+  ⠼ Analyzing project and creating plan... 136s
+  ⠴ Analyzing project and creating plan... 136s
+  ⠦ Analyzing project and creating plan... 136s
+  ⠧ Analyzing project and creating plan... 136s
+  ⠇ Analyzing project and creating plan... 136s
+  ⠏ Analyzing project and creating plan... 136s
+  ⠋ Analyzing project and creating plan... 136s
+  ⠙ Analyzing project and creating plan... 137s
+  ⠹ Analyzing project and creating plan... 137s
+  ⠸ Analyzing project and creating plan... 137s
+  ⠼ Analyzing project and creating plan... 137s
+  ⠴ Analyzing project and creating plan... 137s
+  ⠦ Analyzing project and creating plan... 137s
+  ⠧ Analyzing project and creating plan... 137s
+  ⠇ Analyzing project and creating plan... 137s
+  ⠏ Analyzing project and creating plan... 137s
+  ⠋ Analyzing project and creating plan... 137s
+  ⠙ Analyzing project and creating plan... 138s
+  ⠹ Analyzing project and creating plan... 138s
+  ⠸ Analyzing project and creating plan... 138s
+  ⠼ Analyzing project and creating plan... 138s
+  ⠴ Analyzing project and creating plan... 138s
+  ⠦ Analyzing project and creating plan... 138s
+  ⠧ Analyzing project and creating plan... 138s
+  ⠇ Analyzing project and creating plan... 138s
+  ⠏ Analyzing project and creating plan... 138s
+  ⠋ Analyzing project and creating plan... 138s
+  ⠙ Analyzing project and creating plan... 139s
+  ⠹ Analyzing project and creating plan... 139s
+  ⠸ Analyzing project and creating plan... 139s
+  ⠼ Analyzing project and creating plan... 139s
+  ⠴ Analyzing project and creating plan... 139s
+  ⠦ Analyzing project and creating plan... 139s
+  ⠧ Analyzing project and creating plan... 139s
+  ⠇ Analyzing project and creating plan... 139s
+  ⠏ Analyzing project and creating plan... 139s
+  ⠋ Analyzing project and creating plan... 139s
+  ⠙ Analyzing project and creating plan... 140s
+  ⠹ Analyzing project and creating plan... 140s
+  ⠸ Analyzing project and creating plan... 140s
+  ⠼ Analyzing project and creating plan... 140s
+  ⠴ Analyzing project and creating plan... 140s
+  ⠦ Analyzing project and creating plan... 140s
+  ⠧ Analyzing project and creating plan... 140s
+  ⠇ Analyzing project and creating plan... 140s
+  ⠏ Analyzing project and creating plan... 140s
+  ⠋ Analyzing project and creating plan... 141s
+  ⠙ Analyzing project and creating plan... 141s
+  ⠹ Analyzing project and creating plan... 141s
+  ⠸ Analyzing project and creating plan... 141s
+  ⠼ Analyzing project and creating plan... 141s
+  ⠴ Analyzing project and creating plan... 141s
+  ⠦ Analyzing project and creating plan... 141s
+  ⠧ Analyzing project and creating plan... 141s
+  ⠇ Analyzing project and creating plan... 141s
+  ⠏ Analyzing project and creating plan... 141s
+  ⠋ Analyzing project and creating plan... 142s
+  ⠙ Analyzing project and creating plan... 142s
+  ⠹ Analyzing project and creating plan... 142s
+  ⠸ Analyzing project and creating plan... 142s
+  ⠼ Analyzing project and creating plan... 142s
+  ⠴ Analyzing project and creating plan... 142s
+  ⠦ Analyzing project and creating plan... 142s
+  ⠧ Analyzing project and creating plan... 142s
+  ⠇ Analyzing project and creating plan... 142s
+  ⠏ Analyzing project and creating plan... 142s
+  ⠋ Analyzing project and creating plan... 143s
+  ⠙ Analyzing project and creating plan... 143s
+  ⠹ Analyzing project and creating plan... 143s
+  ⠸ Analyzing project and creating plan... 143s
+  ⠼ Analyzing project and creating plan... 143s
+  ⠴ Analyzing project and creating plan... 143s
+  ⠦ Analyzing project and creating plan... 143s
+  ⠧ Analyzing project and creating plan... 143s
+  ⠇ Analyzing project and creating plan... 143s
+  ⠏ Analyzing project and creating plan... 143s
+  ⠋ Analyzing project and creating plan... 144s
+  ⠙ Analyzing project and creating plan... 144s
+  ⠹ Analyzing project and creating plan... 144s
+  ⠸ Analyzing project and creating plan... 144s
+  ⠼ Analyzing project and creating plan... 144s
+  ⠴ Analyzing project and creating plan... 144s
+  ⠦ Analyzing project and creating plan... 144s
+  ⠧ Analyzing project and creating plan... 144s
+  ⠇ Analyzing project and creating plan... 144s
+  ⠏ Analyzing project and creating plan... 144s
+  ⠋ Analyzing project and creating plan... 145s
+  ⠙ Analyzing project and creating plan... 145s
+  ⠹ Analyzing project and creating plan... 145s
+  ⠸ Analyzing project and creating plan... 145s
+  ⠼ Analyzing project and creating plan... 145s
+  ⠴ Analyzing project and creating plan... 145s
+  ⠦ Analyzing project and creating plan... 145s
+  ⠧ Analyzing project and creating plan... 145s
+  ⠇ Analyzing project and creating plan... 145s
+  ⠏ Analyzing project and creating plan... 145s
+  ⠋ Analyzing project and creating plan... 146s
+  ⠙ Analyzing project and creating plan... 146s
+  ⠹ Analyzing project and creating plan... 146s
+  ⠸ Analyzing project and creating plan... 146s
+  ⠼ Analyzing project and creating plan... 146s
+  ⠴ Analyzing project and creating plan... 146s
+  ⠦ Analyzing project and creating plan... 146s
+  ⠧ Analyzing project and creating plan... 146s
+  ⠇ Analyzing project and creating plan... 146s
+  ⠏ Analyzing project and creating plan... 146s
+  ⠋ Analyzing project and creating plan... 147s
+  ⠙ Analyzing project and creating plan... 147s
+  ⠹ Analyzing project and creating plan... 147s
+  ⠸ Analyzing project and creating plan... 147s
+  ⠼ Analyzing project and creating plan... 147s
+  ⠴ Analyzing project and creating plan... 147s
+  ⠦ Analyzing project and creating plan... 147s
+  ⠧ Analyzing project and creating plan... 147s
+  ⠇ Analyzing project and creating plan... 147s
+  ⠏ Analyzing project and creating plan... 147s
+  ⠋ Analyzing project and creating plan... 148s
+  ⠙ Analyzing project and creating plan... 148s
+  ⠹ Analyzing project and creating plan... 148s
+  ⠸ Analyzing project and creating plan... 148s
+  ⠼ Analyzing project and creating plan... 148s
+  ⠴ Analyzing project and creating plan... 148s
+  ⠦ Analyzing project and creating plan... 148s
+  ⠧ Analyzing project and creating plan... 148s
+  ⠇ Analyzing project and creating plan... 148s
+  ⠏ Analyzing project and creating plan... 148s
+  ⠋ Analyzing project and creating plan... 149s
+  ⠙ Analyzing project and creating plan... 149s
+  ⠹ Analyzing project and creating plan... 149s
+  ⠸ Analyzing project and creating plan... 149s
+  ⠼ Analyzing project and creating plan... 149s
+  ⠴ Analyzing project and creating plan... 149s
+  ⠦ Analyzing project and creating plan... 149s
+  ⠧ Analyzing project and creating plan... 149s
+  ⠇ Analyzing project and creating plan... 149s
+  ⠏ Analyzing project and creating plan... 149s
+  ⠋ Analyzing project and creating plan... 150s
+  ⠙ Analyzing project and creating plan... 150s
+  ⠹ Analyzing project and creating plan... 150s
+  ⠸ Analyzing project and creating plan... 150s
+  ⠼ Analyzing project and creating plan... 150s
+  ⠴ Analyzing project and creating plan... 150s
+  ⠦ Analyzing project and creating plan... 150s
+  ⠧ Analyzing project and creating plan... 150s
+  ⠇ Analyzing project and creating plan... 150s
+  ⠏ Analyzing project and creating plan... 150s
+  ⠋ Analyzing project and creating plan... 151s
+  ⠙ Analyzing project and creating plan... 151s
+  ⠹ Analyzing project and creating plan... 151s
+  ⠸ Analyzing project and creating plan... 151s
+  ⠼ Analyzing project and creating plan... 151s
+  ⠴ Analyzing project and creating plan... 151s
+  ⠦ Analyzing project and creating plan... 151s
+  ⠧ Analyzing project and creating plan... 151s
+  ⠇ Analyzing project and creating plan... 151s
+  ⠏ Analyzing project and creating plan... 151s
+  ⠋ Analyzing project and creating plan... 152s
+  ⠙ Analyzing project and creating plan... 152s
+  ⠹ Analyzing project and creating plan... 152s
+  ⠸ Analyzing project and creating plan... 152s
+  ⠼ Analyzing project and creating plan... 152s
+  ⠴ Analyzing project and creating plan... 152s
+  ⠦ Analyzing project and creating plan... 152s
+  ⠧ Analyzing project and creating plan... 152s
+  ⠇ Analyzing project and creating plan... 152s
+  ⠏ Analyzing project and creating plan... 152s
+  ⠋ Analyzing project and creating plan... 153s
+  ⠙ Analyzing project and creating plan... 153s
+  ⠹ Analyzing project and creating plan... 153s
+  ⠸ Analyzing project and creating plan... 153s
+  ⠼ Analyzing project and creating plan... 153s
+  ⠴ Analyzing project and creating plan... 153s
+  ⠦ Analyzing project and creating plan... 153s
+  ⠧ Analyzing project and creating plan... 153s
+  ⠇ Analyzing project and creating plan... 153s
+  ⠏ Analyzing project and creating plan... 153s
+  ⠋ Analyzing project and creating plan... 154s
+  ⠙ Analyzing project and creating plan... 154s
+  ⠹ Analyzing project and creating plan... 154s
+  ⠸ Analyzing project and creating plan... 154s
+  ⠼ Analyzing project and creating plan... 154s
+  ⠴ Analyzing project and creating plan... 154s
+  ⠦ Analyzing project and creating plan... 154s
+  ⠧ Analyzing project and creating plan... 154s
+  ⠇ Analyzing project and creating plan... 154s
+  ⠏ Analyzing project and creating plan... 154s
+  ⠋ Analyzing project and creating plan... 155s
+  ⠙ Analyzing project and creating plan... 155s
+  ⠹ Analyzing project and creating plan... 155s
+  ⠸ Analyzing project and creating plan... 155s
+  ⠼ Analyzing project and creating plan... 155s
+  ⠴ Analyzing project and creating plan... 155s
+  ⠦ Analyzing project and creating plan... 155s
+  ⠧ Analyzing project and creating plan... 155s
+  ⠇ Analyzing project and creating plan... 155s
+  ⠏ Analyzing project and creating plan... 156s
+  ⠋ Analyzing project and creating plan... 156s
+  ⠙ Analyzing project and creating plan... 156s
+  ⠹ Analyzing project and creating plan... 156s
+  ⠸ Analyzing project and creating plan... 156s
+  ⠼ Analyzing project and creating plan... 156s
+  ⠴ Analyzing project and creating plan... 156s
+  ⠦ Analyzing project and creating plan... 156s
+  ⠧ Analyzing project and creating plan... 156s
+  ⠇ Analyzing project and creating plan... 156s
+  ⠏ Analyzing project and creating plan... 157s
+  ⠋ Analyzing project and creating plan... 157s
+  ⠙ Analyzing project and creating plan... 157s
+  ⠹ Analyzing project and creating plan... 157s
+  ⠸ Analyzing project and creating plan... 157s
+  ⠼ Analyzing project and creating plan... 157s
+  ⠴ Analyzing project and creating plan... 157s
+  ⠦ Analyzing project and creating plan... 157s
+  ⠧ Analyzing project and creating plan... 157s
+  ⠇ Analyzing project and creating plan... 157s
+  ⠏ Analyzing project and creating plan... 158s
+  ⠋ Analyzing project and creating plan... 158s
+  ⠙ Analyzing project and creating plan... 158s
+  ⠹ Analyzing project and creating plan... 158s
+  ⠸ Analyzing project and creating plan... 158s
+  ⠼ Analyzing project and creating plan... 158s
+  ⠴ Analyzing project and creating plan... 158s
+  ⠦ Analyzing project and creating plan... 158s
+  ⠧ Analyzing project and creating plan... 158s
+  ⠇ Analyzing project and creating plan... 158s
+  ⠏ Analyzing project and creating plan... 159s
+  ⠋ Analyzing project and creating plan... 159s
+  ⠙ Analyzing project and creating plan... 159s
+  ⠹ Analyzing project and creating plan... 159s
+  ⠸ Analyzing project and creating plan... 159s
+  ⠼ Analyzing project and creating plan... 159s
+  ⠴ Analyzing project and creating plan... 159s
+  ⠦ Analyzing project and creating plan... 159s
+  ⠧ Analyzing project and creating plan... 159s
+  ⠇ Analyzing project and creating plan... 159s
+  ⠏ Analyzing project and creating plan... 160s
+  ⠋ Analyzing project and creating plan... 160s
+  ⠙ Analyzing project and creating plan... 160s
+  ⠹ Analyzing project and creating plan... 160s
+  ⠸ Analyzing project and creating plan... 160s
+  ⠼ Analyzing project and creating plan... 160s
+  ⠴ Analyzing project and creating plan... 160s
+  ⠦ Analyzing project and creating plan... 160s
+  ⠧ Analyzing project and creating plan... 160s
+  ⠇ Analyzing project and creating plan... 160s
+  ⠏ Analyzing project and creating plan... 161s
+  ⠋ Analyzing project and creating plan... 161s
+  ⠙ Analyzing project and creating plan... 161s
+  ⠹ Analyzing project and creating plan... 161s
+  ⠸ Analyzing project and creating plan... 161s
+  ⠼ Analyzing project and creating plan... 161s
+  ⠴ Analyzing project and creating plan... 161s
+  ⠦ Analyzing project and creating plan... 161s
+  ⠧ Analyzing project and creating plan... 161s
+  ⠇ Analyzing project and creating plan... 161s
+  ⠏ Analyzing project and creating plan... 162s
+  ⠋ Analyzing project and creating plan... 162s
+  ⠙ Analyzing project and creating plan... 162s
+  ⠹ Analyzing project and creating plan... 162s
+  ⠸ Analyzing project and creating plan... 162s
+  ⠼ Analyzing project and creating plan... 162s
+  ⠴ Analyzing project and creating plan... 162s
+  ⠦ Analyzing project and creating plan... 162s
+  ⠧ Analyzing project and creating plan... 162s
+  ⠇ Analyzing project and creating plan... 162s
+  ⠏ Analyzing project and creating plan... 163s
+  ⠋ Analyzing project and creating plan... 163s
+  ⠙ Analyzing project and creating plan... 163s
+  ⠹ Analyzing project and creating plan... 163s
+  ⠸ Analyzing project and creating plan... 163s
+  ⠼ Analyzing project and creating plan... 163s
+  ⠴ Analyzing project and creating plan... 163s
+  ⠦ Analyzing project and creating plan... 163s
+  ⠧ Analyzing project and creating plan... 163s
+  ⠇ Analyzing project and creating plan... 163s
+  ⠏ Analyzing project and creating plan... 164s
+  ⠋ Analyzing project and creating plan... 164s
+  ⠙ Analyzing project and creating plan... 164s
+  ⠹ Analyzing project and creating plan... 164s
+  ⠸ Analyzing project and creating plan... 164s
+  ⠼ Analyzing project and creating plan... 164s
+  ⠴ Analyzing project and creating plan... 164s
+  ⠦ Analyzing project and creating plan... 164s
+  ⠧ Analyzing project and creating plan... 164s
+  ⠇ Analyzing project and creating plan... 164s
+  ⠏ Analyzing project and creating plan... 165s
+  ⠋ Analyzing project and creating plan... 165s
+  ⠙ Analyzing project and creating plan... 165s
+  ⠹ Analyzing project and creating plan... 165s
+  ⠸ Analyzing project and creating plan... 165s
+  ⠼ Analyzing project and creating plan... 165s
+  ⠴ Analyzing project and creating plan... 165s
+  ⠦ Analyzing project and creating plan... 165s
+  ⠧ Analyzing project and creating plan... 165s
+  ⠇ Analyzing project and creating plan... 165s
+  ⠏ Analyzing project and creating plan... 166s
+  ⠋ Analyzing project and creating plan... 166s
+  ⠙ Analyzing project and creating plan... 166s
+  ⠹ Analyzing project and creating plan... 166s
+  ⠸ Analyzing project and creating plan... 166s
+  ⠼ Analyzing project and creating plan... 166s
+  ⠴ Analyzing project and creating plan... 166s
+  ⠦ Analyzing project and creating plan... 166s
+  ⠧ Analyzing project and creating plan... 166s
+  ⠇ Analyzing project and creating plan... 166s
+  ⠏ Analyzing project and creating plan... 167s
+  ⠋ Analyzing project and creating plan... 167s
+  ⠙ Analyzing project and creating plan... 167s
+  ⠹ Analyzing project and creating plan... 167s
+  ⠸ Analyzing project and creating plan... 167s
+  ⠼ Analyzing project and creating plan... 167s
+  ⠴ Analyzing project and creating plan... 167s
+  ⠦ Analyzing project and creating plan... 167s
+  ⠧ Analyzing project and creating plan... 167s
+  ⠇ Analyzing project and creating plan... 167s
+  ⠏ Analyzing project and creating plan... 168s
+  ⠋ Analyzing project and creating plan... 168s
+  ⠙ Analyzing project and creating plan... 168s
+  ⠹ Analyzing project and creating plan... 168s
+  ⠸ Analyzing project and creating plan... 168s
+  ⠼ Analyzing project and creating plan... 168s
+  ⠴ Analyzing project and creating plan... 168s
+  ⠦ Analyzing project and creating plan... 168s
+  ⠧ Analyzing project and creating plan... 168s
+  ⠇ Analyzing project and creating plan... 168s
+  ⠏ Analyzing project and creating plan... 169s
+  ⠋ Analyzing project and creating plan... 169s
+  ⠙ Analyzing project and creating plan... 169s
+  ⠹ Analyzing project and creating plan... 169s
+  ⠸ Analyzing project and creating plan... 169s
+  ⠼ Analyzing project and creating plan... 169s
+  ⠴ Analyzing project and creating plan... 169s
+  ⠦ Analyzing project and creating plan... 169s
+  ⠧ Analyzing project and creating plan... 169s
+  ⠇ Analyzing project and creating plan... 169s
+  ⠏ Analyzing project and creating plan... 170s
+  ⠋ Analyzing project and creating plan... 170s
+  ⠙ Analyzing project and creating plan... 170s
+  ⠹ Analyzing project and creating plan... 170s
+  ⠸ Analyzing project and creating plan... 170s
+  ⠼ Analyzing project and creating plan... 170s
+  ⠴ Analyzing project and creating plan... 170s
+  ⠦ Analyzing project and creating plan... 170s
+  ⠧ Analyzing project and creating plan... 170s
+  ⠇ Analyzing project and creating plan... 170s
+  ⠏ Analyzing project and creating plan... 171s
+  ⠋ Analyzing project and creating plan... 171s
+  ⠙ Analyzing project and creating plan... 171s
+  ⠹ Analyzing project and creating plan... 171s
+  ⠸ Analyzing project and creating plan... 171s
+  ⠼ Analyzing project and creating plan... 171s
+  ⠴ Analyzing project and creating plan... 171s
+  ⠦ Analyzing project and creating plan... 171s
+  ⠧ Analyzing project and creating plan... 171s
+  ⠇ Analyzing project and creating plan... 171s
+  ⠏ Analyzing project and creating plan... 172s
+  ⠋ Analyzing project and creating plan... 172s
+  ⠙ Analyzing project and creating plan... 172s
+  ⠹ Analyzing project and creating plan... 172s
+  ⠸ Analyzing project and creating plan... 172s
+  ⠼ Analyzing project and creating plan... 172s
+  ⠴ Analyzing project and creating plan... 172s
+  ⠦ Analyzing project and creating plan... 172s
+  ⠧ Analyzing project and creating plan... 172s
+  ⠇ Analyzing project and creating plan... 172s
+  ⠏ Analyzing project and creating plan... 173s
+  ⠋ Analyzing project and creating plan... 173s
+  ⠙ Analyzing project and creating plan... 173s
+  ⠹ Analyzing project and creating plan... 173s
+  ⠸ Analyzing project and creating plan... 173s
+  ⠼ Analyzing project and creating plan... 173s
+  ⠴ Analyzing project and creating plan... 173s
+  ⠦ Analyzing project and creating plan... 173s
+  ⠧ Analyzing project and creating plan... 173s
+  ⠇ Analyzing project and creating plan... 174s
+  ⠏ Analyzing project and creating plan... 174s
+  ⠋ Analyzing project and creating plan... 174s
+  ⠙ Analyzing project and creating plan... 174s
+  ⠹ Analyzing project and creating plan... 174s
+  ⠸ Analyzing project and creating plan... 174s
+  ⠼ Analyzing project and creating plan... 174s
+  ⠴ Analyzing project and creating plan... 174s
+  ⠦ Analyzing project and creating plan... 174s
+  ⠧ Analyzing project and creating plan... 174s
+  ⠇ Analyzing project and creating plan... 175s
+  ⠏ Analyzing project and creating plan... 175s
+  ⠋ Analyzing project and creating plan... 175s
+  ⠙ Analyzing project and creating plan... 175s
+  ⠹ Analyzing project and creating plan... 175s
+  ⠸ Analyzing project and creating plan... 175s
+  ⠼ Analyzing project and creating plan... 175s
+  ⠴ Analyzing project and creating plan... 175s
+  ⠦ Analyzing project and creating plan... 175s
+  ⠧ Analyzing project and creating plan... 175s
+  ⠇ Analyzing project and creating plan... 176s
+  ⠏ Analyzing project and creating plan... 176s
+  ⠋ Analyzing project and creating plan... 176s
+  ⠙ Analyzing project and creating plan... 176s
+  ⠹ Analyzing project and creating plan... 176s
+  ⠸ Analyzing project and creating plan... 176s
+  ⠼ Analyzing project and creating plan... 176s
+  ⠴ Analyzing project and creating plan... 176s
+  ⠦ Analyzing project and creating plan... 176s
+  ⠧ Analyzing project and creating plan... 176s
+  ⠇ Analyzing project and creating plan... 177s
+  ⠏ Analyzing project and creating plan... 177s
+  ⠋ Analyzing project and creating plan... 177s
+  ⠙ Analyzing project and creating plan... 177s
+  ⠹ Analyzing project and creating plan... 177s
+  ⠸ Analyzing project and creating plan... 177s
+  ⠼ Analyzing project and creating plan... 177s
+  ⠴ Analyzing project and creating plan... 177s
+  ⠦ Analyzing project and creating plan... 177s
+  ⠧ Analyzing project and creating plan... 177s
+  ⠇ Analyzing project and creating plan... 178s
+  ⠏ Analyzing project and creating plan... 178s
+  ⠋ Analyzing project and creating plan... 178s
+  ⠙ Analyzing project and creating plan... 178s
+  ⠹ Analyzing project and creating plan... 178s
+  ⠸ Analyzing project and creating plan... 178s
+  ⠼ Analyzing project and creating plan... 178s
+  ⠴ Analyzing project and creating plan... 178s
+  ⠦ Analyzing project and creating plan... 178s
+  ⠧ Analyzing project and creating plan... 178s
+  ⠇ Analyzing project and creating plan... 179s
+  ⠏ Analyzing project and creating plan... 179s
+  ⠋ Analyzing project and creating plan... 179s
+  ⠙ Analyzing project and creating plan... 179s
+  ⠹ Analyzing project and creating plan... 179s
+  ⠸ Analyzing project and creating plan... 179s
+  ⠼ Analyzing project and creating plan... 179s
+  ⠴ Analyzing project and creating plan... 179s
+  ⠦ Analyzing project and creating plan... 179s
+  ⠧ Analyzing project and creating plan... 179s
+  ⠇ Analyzing project and creating plan... 180s
+  ⠏ Analyzing project and creating plan... 180s
+  ⠋ Analyzing project and creating plan... 180s
+  ⠙ Analyzing project and creating plan... 180s
+  ⠹ Analyzing project and creating plan... 180s
+  ⠸ Analyzing project and creating plan... 180s
+  ⠼ Analyzing project and creating plan... 180s
+  ⠴ Analyzing project and creating plan... 180s
+  ⠦ Analyzing project and creating plan... 180s
+  ⠧ Analyzing project and creating plan... 180s
+  ⠇ Analyzing project and creating plan... 181s
+  ⠏ Analyzing project and creating plan... 181s
+  ⠋ Analyzing project and creating plan... 181s
+  ⠙ Analyzing project and creating plan... 181s
+  ⠹ Analyzing project and creating plan... 181s
+  ⠸ Analyzing project and creating plan... 181s
+  ⠼ Analyzing project and creating plan... 181s
+  ⠴ Analyzing project and creating plan... 181s
+  ⠦ Analyzing project and creating plan... 181s
+  ⠧ Analyzing project and creating plan... 181s
+  ⠇ Analyzing project and creating plan... 182s
+  ⠏ Analyzing project and creating plan... 182s
+  ⠋ Analyzing project and creating plan... 182s
+  ⠙ Analyzing project and creating plan... 182s
+  ⠹ Analyzing project and creating plan... 182s
+  ⠸ Analyzing project and creating plan... 182s
+  ⠼ Analyzing project and creating plan... 182s
+  ⠴ Analyzing project and creating plan... 182s
+  ⠦ Analyzing project and creating plan... 182s
+  ⠧ Analyzing project and creating plan... 182s
+  ⠇ Analyzing project and creating plan... 183s
+  ⠏ Analyzing project and creating plan... 183s
+  ⠋ Analyzing project and creating plan... 183s
+  ⠙ Analyzing project and creating plan... 183s
+  ⠹ Analyzing project and creating plan... 183s
+  ⠸ Analyzing project and creating plan... 183s
+  ⠼ Analyzing project and creating plan... 183s
+  ⠴ Analyzing project and creating plan... 183s
+  ⠦ Analyzing project and creating plan... 183s
+  ⠧ Analyzing project and creating plan... 183s
+  ⠇ Analyzing project and creating plan... 184s
+  ⠏ Analyzing project and creating plan... 184s
+  ⠋ Analyzing project and creating plan... 184s
+  ⠙ Analyzing project and creating plan... 184s
+  ⠹ Analyzing project and creating plan... 184s
+  ⠸ Analyzing project and creating plan... 184s
+  ⠼ Analyzing project and creating plan... 184s
+  ⠴ Analyzing project and creating plan... 184s
+  ⠦ Analyzing project and creating plan... 184s
+  ⠧ Analyzing project and creating plan... 184s
+  ⠇ Analyzing project and creating plan... 185s
+  ⠏ Analyzing project and creating plan... 185s
+  ⠋ Analyzing project and creating plan... 185s
+  ⠙ Analyzing project and creating plan... 185s
+  ⠹ Analyzing project and creating plan... 185s
+  ⠸ Analyzing project and creating plan... 185s
+  ⠼ Analyzing project and creating plan... 185s
+  ⠴ Analyzing project and creating plan... 185s
+  ⠦ Analyzing project and creating plan... 185s
+  ⠧ Analyzing project and creating plan... 185s
+  ⠇ Analyzing project and creating plan... 186s
+  ⠏ Analyzing project and creating plan... 186s
+  ⠋ Analyzing project and creating plan... 186s
+  ⠙ Analyzing project and creating plan... 186s
+  ⠹ Analyzing project and creating plan... 186s
+  ⠸ Analyzing project and creating plan... 186s
+  ⠼ Analyzing project and creating plan... 186s
+  ⠴ Analyzing project and creating plan... 186s
+  ⠦ Analyzing project and creating plan... 186s
+  ⠧ Analyzing project and creating plan... 186s
+  ⠇ Analyzing project and creating plan... 187s
+  ⠏ Analyzing project and creating plan... 187s
+  ⠋ Analyzing project and creating plan... 187s
+  ⠙ Analyzing project and creating plan... 187s
+  ⠹ Analyzing project and creating plan... 187s
+  ⠸ Analyzing project and creating plan... 187s
+  ⠼ Analyzing project and creating plan... 187s
+  ⠴ Analyzing project and creating plan... 187s
+  ⠦ Analyzing project and creating plan... 187s
+  ⠧ Analyzing project and creating plan... 187s
+  ⠇ Analyzing project and creating plan... 188s
+  ⠏ Analyzing project and creating plan... 188s
+  ⠋ Analyzing project and creating plan... 188s
+  ⠙ Analyzing project and creating plan... 188s
+  ⠹ Analyzing project and creating plan... 188s
+  ⠸ Analyzing project and creating plan... 188s
+  ⠼ Analyzing project and creating plan... 188s
+  ⠴ Analyzing project and creating plan... 188s
+  ⠦ Analyzing project and creating plan... 188s
+  ⠧ Analyzing project and creating plan... 188s
+  ⠇ Analyzing project and creating plan... 189s
+  ⠏ Analyzing project and creating plan... 189s
+  ⠋ Analyzing project and creating plan... 189s
+  ⠙ Analyzing project and creating plan... 189s
+  ⠹ Analyzing project and creating plan... 189s
+  ⠸ Analyzing project and creating plan... 189s
+  ⠼ Analyzing project and creating plan... 189s
+  ⠴ Analyzing project and creating plan... 189s
+  ⠦ Analyzing project and creating plan... 189s
+  ⠧ Analyzing project and creating plan... 189s
+  ⠇ Analyzing project and creating plan... 190s
+  ⠏ Analyzing project and creating plan... 190s
+  ⠋ Analyzing project and creating plan... 190s
+  ⠙ Analyzing project and creating plan... 190s
+  ⠹ Analyzing project and creating plan... 190s
+  ⠸ Analyzing project and creating plan... 190s
+  ⠼ Analyzing project and creating plan... 190s
+  ⠴ Analyzing project and creating plan... 190s
+  ⠦ Analyzing project and creating plan... 190s
+  ⠧ Analyzing project and creating plan... 191s
+  ⠇ Analyzing project and creating plan... 191s
+  ⠏ Analyzing project and creating plan... 191s
+  ⠋ Analyzing project and creating plan... 191s
+  ⠙ Analyzing project and creating plan... 191s
+  ⠹ Analyzing project and creating plan... 191s
+  ⠸ Analyzing project and creating plan... 191s
+  ⠼ Analyzing project and creating plan... 191s
+  ⠴ Analyzing project and creating plan... 191s
+  ⠦ Analyzing project and creating plan... 191s
+  ⠧ Analyzing project and creating plan... 192s
+  ⠇ Analyzing project and creating plan... 192s
+  ⠏ Analyzing project and creating plan... 192s
+  ⠋ Analyzing project and creating plan... 192s
+  ⠙ Analyzing project and creating plan... 192s
+  ⠹ Analyzing project and creating plan... 192s
+  ⠸ Analyzing project and creating plan... 192s
+  ⠼ Analyzing project and creating plan... 192s
+  ⠴ Analyzing project and creating plan... 192s
+  ⠦ Analyzing project and creating plan... 192s
+  ⠧ Analyzing project and creating plan... 193s
+  ⠇ Analyzing project and creating plan... 193s
+  ⠏ Analyzing project and creating plan... 193s
+  ⠋ Analyzing project and creating plan... 193s
+  ⠙ Analyzing project and creating plan... 193s
+  ⠹ Analyzing project and creating plan... 193s
+  ⠸ Analyzing project and creating plan... 193s
+  ⠼ Analyzing project and creating plan... 193s
+  ⠴ Analyzing project and creating plan... 193s
+  ⠦ Analyzing project and creating plan... 193s
+  ⠧ Analyzing project and creating plan... 194s
+  ⠇ Analyzing project and creating plan... 194s
+  ⠏ Analyzing project and creating plan... 194s
+  ⠋ Analyzing project and creating plan... 194s
+  ⠙ Analyzing project and creating plan... 194s
+  ⠹ Analyzing project and creating plan... 194s
+  ⠸ Analyzing project and creating plan... 194s
+  ⠼ Analyzing project and creating plan... 194s
+  ⠴ Analyzing project and creating plan... 194s
+  ⠦ Analyzing project and creating plan... 194s
+  ⠧ Analyzing project and creating plan... 195s
+  ⠇ Analyzing project and creating plan... 195s
+  ⠏ Analyzing project and creating plan... 195s
+  ⠋ Analyzing project and creating plan... 195s
+  ⠙ Analyzing project and creating plan... 195s
+  ⠹ Analyzing project and creating plan... 195s
+  ⠸ Analyzing project and creating plan... 195s
+  ⠼ Analyzing project and creating plan... 195s
+  ⠴ Analyzing project and creating plan... 195s
+  ⠦ Analyzing project and creating plan... 195s
+  ⠧ Analyzing project and creating plan... 196s
+  ⠇ Analyzing project and creating plan... 196s
+  ⠏ Analyzing project and creating plan... 196s
+  ⠋ Analyzing project and creating plan... 196s
+  ⠙ Analyzing project and creating plan... 196s
+  ⠹ Analyzing project and creating plan... 196s
+  ⠸ Analyzing project and creating plan... 196s
+  ⠼ Analyzing project and creating plan... 196s
+  ⠴ Analyzing project and creating plan... 196s
+  ⠦ Analyzing project and creating plan... 196s
+  ⠧ Analyzing project and creating plan... 197s
+  ⠇ Analyzing project and creating plan... 197s
+  ⠏ Analyzing project and creating plan... 197s
+  ⠋ Analyzing project and creating plan... 197s
+  ⠙ Analyzing project and creating plan... 197s
+  ⠹ Analyzing project and creating plan... 197s
+  ⠸ Analyzing project and creating plan... 197s
+  ⠼ Analyzing project and creating plan... 197s
+  ⠴ Analyzing project and creating plan... 197s
+  ⠦ Analyzing project and creating plan... 197s
+  ⠧ Analyzing project and creating plan... 198s
+  ⠇ Analyzing project and creating plan... 198s
+  ⠏ Analyzing project and creating plan... 198s
+  ⠋ Analyzing project and creating plan... 198s
+  ⠙ Analyzing project and creating plan... 198s
+  ⠹ Analyzing project and creating plan... 198s
+  ⠸ Analyzing project and creating plan... 198s
+  ⠼ Analyzing project and creating plan... 198s
+  ⠴ Analyzing project and creating plan... 198s
+  ⠦ Analyzing project and creating plan... 198s
+  ⠧ Analyzing project and creating plan... 199s
+  ⠇ Analyzing project and creating plan... 199s
+  ⠏ Analyzing project and creating plan... 199s
+  ⠋ Analyzing project and creating plan... 199s
+  ⠙ Analyzing project and creating plan... 199s
+  ⠹ Analyzing project and creating plan... 199s
+  ⠸ Analyzing project and creating plan... 199s
+  ⠼ Analyzing project and creating plan... 199s
+  ⠴ Analyzing project and creating plan... 199s
+  ⠦ Analyzing project and creating plan... 199s
+  ⠧ Analyzing project and creating plan... 200s
+  ⠇ Analyzing project and creating plan... 200s
+  ⠏ Analyzing project and creating plan... 200s
+  ⠋ Analyzing project and creating plan... 200s
+  ⠙ Analyzing project and creating plan... 200s
+  ⠹ Analyzing project and creating plan... 200s
+  ⠸ Analyzing project and creating plan... 200s
+  ⠼ Analyzing project and creating plan... 200s
+  ⠴ Analyzing project and creating plan... 200s
+  ⠦ Analyzing project and creating plan... 200s
+  ⠧ Analyzing project and creating plan... 201s
+  ⠇ Analyzing project and creating plan... 201s
+  ⠏ Analyzing project and creating plan... 201s
+  ⠋ Analyzing project and creating plan... 201s
+  ⠙ Analyzing project and creating plan... 201s
+  ⠹ Analyzing project and creating plan... 201s
+  ⠸ Analyzing project and creating plan... 201s
+  ⠼ Analyzing project and creating plan... 201s
+  ⠴ Analyzing project and creating plan... 201s
+  ⠦ Analyzing project and creating plan... 201s
+  ⠧ Analyzing project and creating plan... 202s
+  ⠇ Analyzing project and creating plan... 202s
+  ⠏ Analyzing project and creating plan... 202s
+  ⠋ Analyzing project and creating plan... 202s
+  ⠙ Analyzing project and creating plan... 202s
+  ⠹ Analyzing project and creating plan... 202s
+  ⠸ Analyzing project and creating plan... 202s
+  ⠼ Analyzing project and creating plan... 202s
+  ⠴ Analyzing project and creating plan... 202s
+  ⠦ Analyzing project and creating plan... 202s
+  ⠧ Analyzing project and creating plan... 203s
+  ⠇ Analyzing project and creating plan... 203s
+  ⠏ Analyzing project and creating plan... 203s
+  ⠋ Analyzing project and creating plan... 203s
+  ⠙ Analyzing project and creating plan... 203s
+  ⠹ Analyzing project and creating plan... 203s
+  ⠸ Analyzing project and creating plan... 203s
+  ⠼ Analyzing project and creating plan... 203s
+  ⠴ Analyzing project and creating plan... 203s
+  ⠦ Analyzing project and creating plan... 203s
+  ⠧ Analyzing project and creating plan... 204s
+  ⠇ Analyzing project and creating plan... 204s
+  ⠏ Analyzing project and creating plan... 204s
+  ⠋ Analyzing project and creating plan... 204s
+  ⠙ Analyzing project and creating plan... 204s
+  ⠹ Analyzing project and creating plan... 204s
+  ⠸ Analyzing project and creating plan... 204s
+  ⠼ Analyzing project and creating plan... 204s
+  ⠴ Analyzing project and creating plan... 204s
+  ⠦ Analyzing project and creating plan... 204s
+  ⠧ Analyzing project and creating plan... 205s
+  ⠇ Analyzing project and creating plan... 205s
+  ⠏ Analyzing project and creating plan... 205s
+  ⠋ Analyzing project and creating plan... 205s
+  ⠙ Analyzing project and creating plan... 205s
+  ⠹ Analyzing project and creating plan... 205s
+  ⠸ Analyzing project and creating plan... 205s
+  ⠼ Analyzing project and creating plan... 205s
+  ⠴ Analyzing project and creating plan... 205s
+  ⠦ Analyzing project and creating plan... 206s
+  ⠧ Analyzing project and creating plan... 206s
+  ⠇ Analyzing project and creating plan... 206s
+  ⠏ Analyzing project and creating plan... 206s
+  ⠋ Analyzing project and creating plan... 206s
+  ⠙ Analyzing project and creating plan... 206s
+  ⠹ Analyzing project and creating plan... 206s
+  ⠸ Analyzing project and creating plan... 206s
+  ⠼ Analyzing project and creating plan... 206s
+  ⠴ Analyzing project and creating plan... 206s
+  ⠦ Analyzing project and creating plan... 207s
+  ⠧ Analyzing project and creating plan... 207s
+  ⠇ Analyzing project and creating plan... 207s
+  ⠏ Analyzing project and creating plan... 207s
+  ⠋ Analyzing project and creating plan... 207s
+  ⠙ Analyzing project and creating plan... 207s
+  ⠹ Analyzing project and creating plan... 207s
+  ⠸ Analyzing project and creating plan... 207s
+  ⠼ Analyzing project and creating plan... 207s
+  ⠴ Analyzing project and creating plan... 207s
+  ⠦ Analyzing project and creating plan... 208s
+  ⠧ Analyzing project and creating plan... 208s
+  ⠇ Analyzing project and creating plan... 208s
+  ⠏ Analyzing project and creating plan... 208s
+  ⠋ Analyzing project and creating plan... 208s
+  ⠙ Analyzing project and creating plan... 208s
+  ⠹ Analyzing project and creating plan... 208s
+  ⠸ Analyzing project and creating plan... 208s
+  ⠼ Analyzing project and creating plan... 208s
+  ⠴ Analyzing project and creating plan... 208s
+  ⠦ Analyzing project and creating plan... 209s
+  ⠧ Analyzing project and creating plan... 209s
+  ⠇ Analyzing project and creating plan... 209s
+  ⠏ Analyzing project and creating plan... 209s
+  ⠋ Analyzing project and creating plan... 209s
+  ⠙ Analyzing project and creating plan... 209s
+  ⠹ Analyzing project and creating plan... 209s
+  ⠸ Analyzing project and creating plan... 209s
+  ⠼ Analyzing project and creating plan... 209s
+  ⠴ Analyzing project and creating plan... 209s
+  ⠦ Analyzing project and creating plan... 210s
+  ⠧ Analyzing project and creating plan... 210s
+  ⠇ Analyzing project and creating plan... 210s
+  ⠏ Analyzing project and creating plan... 210s
+  ⠋ Analyzing project and creating plan... 210s
+  ⠙ Analyzing project and creating plan... 210s
+  ⠹ Analyzing project and creating plan... 210s
+  ⠸ Analyzing project and creating plan... 210s
+  ⠼ Analyzing project and creating plan... 210s
+  ⠴ Analyzing project and creating plan... 210s
+  ⠦ Analyzing project and creating plan... 211s
+  ⠧ Analyzing project and creating plan... 211s
+  ⠇ Analyzing project and creating plan... 211s
+  ⠏ Analyzing project and creating plan... 211s
+  ⠋ Analyzing project and creating plan... 211s
+  ⠙ Analyzing project and creating plan... 211s
+  ⠹ Analyzing project and creating plan... 211s
+  ⠸ Analyzing project and creating plan... 211s
+  ⠼ Analyzing project and creating plan... 211s
+  ⠴ Analyzing project and creating plan... 211s
+  ⠦ Analyzing project and creating plan... 212s
+  ⠧ Analyzing project and creating plan... 212s
+  ⠇ Analyzing project and creating plan... 212s
+  ⠏ Analyzing project and creating plan... 212s
+  ⠋ Analyzing project and creating plan... 212s
+  ⠙ Analyzing project and creating plan... 212s
+  ⠹ Analyzing project and creating plan... 212s
+  ⠸ Analyzing project and creating plan... 212s
+  ⠼ Analyzing project and creating plan... 212s
+  ⠴ Analyzing project and creating plan... 212s
+  ⠦ Analyzing project and creating plan... 213s
+  ⠧ Analyzing project and creating plan... 213s
+  ⠇ Analyzing project and creating plan... 213s
+  ⠏ Analyzing project and creating plan... 213s
+  ⠋ Analyzing project and creating plan... 213s
+  ⠙ Analyzing project and creating plan... 213s
+  ⠹ Analyzing project and creating plan... 213s
+  ⠸ Analyzing project and creating plan... 213s
+  ⠼ Analyzing project and creating plan... 213s
+  ⠴ Analyzing project and creating plan... 213s
+  ⠦ Analyzing project and creating plan... 214s
+  ⠧ Analyzing project and creating plan... 214s
+  ⠇ Analyzing project and creating plan... 214s
+  ⠏ Analyzing project and creating plan... 214s
+  ⠋ Analyzing project and creating plan... 214s
+  ⠙ Analyzing project and creating plan... 214s
+  ⠹ Analyzing project and creating plan... 214s
+  ⠸ Analyzing project and creating plan... 214s
+  ⠼ Analyzing project and creating plan... 214s
+  ⠴ Analyzing project and creating plan... 214s
+  ⠦ Analyzing project and creating plan... 215s
+  ⠧ Analyzing project and creating plan... 215s
+  ⠇ Analyzing project and creating plan... 215s
+  ⠏ Analyzing project and creating plan... 215s
+  ⠋ Analyzing project and creating plan... 215s
+  ⠙ Analyzing project and creating plan... 215s
+  ⠹ Analyzing project and creating plan... 215s
+  ⠸ Analyzing project and creating plan... 215s
+  ⠼ Analyzing project and creating plan... 215s
+  ⠴ Analyzing project and creating plan... 215s
+  ⠦ Analyzing project and creating plan... 216s
+  ⠧ Analyzing project and creating plan... 216s
+  ⠇ Analyzing project and creating plan... 216s
+  ⠏ Analyzing project and creating plan... 216s
+  ⠋ Analyzing project and creating plan... 216s
+  ⠙ Analyzing project and creating plan... 216s
+  ⠹ Analyzing project and creating plan... 216s
+  ⠸ Analyzing project and creating plan... 216s
+  ⠼ Analyzing project and creating plan... 216s
+  ⠴ Analyzing project and creating plan... 216s
+  ⠦ Analyzing project and creating plan... 217s
+  ⠧ Analyzing project and creating plan... 217s
+  ⠇ Analyzing project and creating plan... 217s
+  ⠏ Analyzing project and creating plan... 217s
+  ⠋ Analyzing project and creating plan... 217s
+  ⠙ Analyzing project and creating plan... 217s
+  ⠹ Analyzing project and creating plan... 217s
+  ⠸ Analyzing project and creating plan... 217s
+  ⠼ Analyzing project and creating plan... 217s
+  ⠴ Analyzing project and creating plan... 217s
+  ⠦ Analyzing project and creating plan... 218s
+  ⠧ Analyzing project and creating plan... 218s
+  ⠇ Analyzing project and creating plan... 218s
+  ⠏ Analyzing project and creating plan... 218s
+  ⠋ Analyzing project and creating plan... 218s
+  ⠙ Analyzing project and creating plan... 218s
+  ⠹ Analyzing project and creating plan... 218s
+  ⠸ Analyzing project and creating plan... 218s
+  ⠼ Analyzing project and creating plan... 218s
+  ⠴ Analyzing project and creating plan... 218s
+  ⠦ Analyzing project and creating plan... 219s
+  ⠧ Analyzing project and creating plan... 219s
+  ⠇ Analyzing project and creating plan... 219s
+  ⠏ Analyzing project and creating plan... 219s
+  ⠋ Analyzing project and creating plan... 219s
+  ⠙ Analyzing project and creating plan... 219s
+  ⠹ Analyzing project and creating plan... 219s
+  ⠸ Analyzing project and creating plan... 219s
+  ⠼ Analyzing project and creating plan... 219s
+  ⠴ Analyzing project and creating plan... 219s
+  ⠦ Analyzing project and creating plan... 220s
+  ⠧ Analyzing project and creating plan... 220s
+  ⠇ Analyzing project and creating plan... 220s
+  ⠏ Analyzing project and creating plan... 220s
+  ⠋ Analyzing project and creating plan... 220s
+  ⠙ Analyzing project and creating plan... 220s
+  ⠹ Analyzing project and creating plan... 220s
+  ⠸ Analyzing project and creating plan... 220s
+  ⠼ Analyzing project and creating plan... 220s
+  ⠴ Analyzing project and creating plan... 220s
+  ⠦ Analyzing project and creating plan... 221s
+  ⠧ Analyzing project and creating plan... 221s
+  ⠇ Analyzing project and creating plan... 221s
+  ⠏ Analyzing project and creating plan... 221s
+  ⠋ Analyzing project and creating plan... 221s
+  ⠙ Analyzing project and creating plan... 221s
+  ⠹ Analyzing project and creating plan... 221s
+  ⠸ Analyzing project and creating plan... 221s
+  ⠼ Analyzing project and creating plan... 221s
+  ⠴ Analyzing project and creating plan... 222s
+  ⠦ Analyzing project and creating plan... 222s
+  ⠧ Analyzing project and creating plan... 222s
+  ⠇ Analyzing project and creating plan... 222s
+  ⠏ Analyzing project and creating plan... 222s
+  ⠋ Analyzing project and creating plan... 222s
+  ⠙ Analyzing project and creating plan... 222s
+  ⠹ Analyzing project and creating plan... 222s
+  ⠸ Analyzing project and creating plan... 222s
+  ⠼ Analyzing project and creating plan... 222s
+  ⠴ Analyzing project and creating plan... 223s
+  ⠦ Analyzing project and creating plan... 223s
+  ⠧ Analyzing project and creating plan... 223s
+  ⠇ Analyzing project and creating plan... 223s
+  ⠏ Analyzing project and creating plan... 223s
+  ⠋ Analyzing project and creating plan... 223s
+  ⠙ Analyzing project and creating plan... 223s
+  ⠹ Analyzing project and creating plan... 223s
+  ⠸ Analyzing project and creating plan... 223s
+  ⠼ Analyzing project and creating plan... 223s
+  ⠴ Analyzing project and creating plan... 224s
+  ⠦ Analyzing project and creating plan... 224s
+  ⠧ Analyzing project and creating plan... 224s
+  ⠇ Analyzing project and creating plan... 224s
+  ⠏ Analyzing project and creating plan... 224s
+  ⠋ Analyzing project and creating plan... 224s
+  ⠙ Analyzing project and creating plan... 224s
+  ⠹ Analyzing project and creating plan... 224s
+  ⠸ Analyzing project and creating plan... 224s
+  ⠼ Analyzing project and creating plan... 224s
+  ⠴ Analyzing project and creating plan... 225s
+  ⠦ Analyzing project and creating plan... 225s
+  ⠧ Analyzing project and creating plan... 225s
+  ⠇ Analyzing project and creating plan... 225s
+  ⠏ Analyzing project and creating plan... 225s
+  ⠋ Analyzing project and creating plan... 225s
+  ⠙ Analyzing project and creating plan... 225s
+  ⠹ Analyzing project and creating plan... 225s
+  ⠸ Analyzing project and creating plan... 225s
+                                                                                
+The goal plan has been written to `/home/dev/.kodo/runs/20260428_055615/goal-plan.json` with 4 stages:
+
+1. **Structured test reporting in CI** — Add JUnit XML generation, increase verbosity from `-q` to `-v --tb=short --durations=10`, upload artifacts in GitHub Actions
+2. **Add coverage metrics pipeline** — Install pytest-cov, configure coverage measurement, generate coverage.xml, set thresholds
+3. **Categorize tests with pytest markers** — Define domain markers (unit, observer, insights, decision, e2e), apply to all test files, enable subset runs
+4. **Enhance CheckSignalCollector parsing** — Extend the observer's collector to parse JUnit XML for richer signal data (test counts, failure details, durations), with proper fallback
+
+Each stage builds on the previous: first we produce structured output, then add coverage data, then organize tests by domain, and finally teach the observer to consume the richer reports.
+
+
+  ⠋ Identifying parallelism... 0s
+  ⠙ Identifying parallelism... 0s
+  ⠹ Identifying parallelism... 0s
+  ⠸ Identifying parallelism... 0s
+  ⠼ Identifying parallelism... 0s
+  ⠴ Identifying parallelism... 0s
+  ⠦ Identifying parallelism... 0s
+  ⠧ Identifying parallelism... 0s
+  ⠇ Identifying parallelism... 0s
+  ⠏ Identifying parallelism... 1s
+  ⠋ Identifying parallelism... 1s
+  ⠙ Identifying parallelism... 1s
+  ⠹ Identifying parallelism... 1s
+  ⠸ Identifying parallelism... 1s
+  ⠼ Identifying parallelism... 1s
+  ⠴ Identifying parallelism... 1s
+  ⠦ Identifying parallelism... 1s
+  ⠧ Identifying parallelism... 1s
+  ⠇ Identifying parallelism... 1s
+  ⠏ Identifying parallelism... 2s
+  ⠋ Identifying parallelism... 2s
+  ⠙ Identifying parallelism... 2s
+  ⠹ Identifying parallelism... 2s
+  ⠸ Identifying parallelism... 2s
+  ⠼ Identifying parallelism... 2s
+  ⠴ Identifying parallelism... 2s
+  ⠦ Identifying parallelism... 2s
+  ⠧ Identifying parallelism... 2s
+  ⠇ Identifying parallelism... 2s
+  ⠏ Identifying parallelism... 3s
+  ⠋ Identifying parallelism... 3s
+  ⠙ Identifying parallelism... 3s
+  ⠹ Identifying parallelism... 3s
+  ⠸ Identifying parallelism... 3s
+  ⠼ Identifying parallelism... 3s
+  ⠴ Identifying parallelism... 3s
+  ⠦ Identifying parallelism... 3s
+  ⠧ Identifying parallelism... 3s
+  ⠇ Identifying parallelism... 3s
+  ⠏ Identifying parallelism... 4s
+  ⠋ Identifying parallelism... 4s
+  ⠙ Identifying parallelism... 4s
+  ⠹ Identifying parallelism... 4s
+  ⠸ Identifying parallelism... 4s
+  ⠼ Identifying parallelism... 4s
+  ⠴ Identifying parallelism... 4s
+  ⠦ Identifying parallelism... 4s
+  ⠧ Identifying parallelism... 4s
+  ⠇ Identifying parallelism... 4s
+  ⠏ Identifying parallelism... 5s
+  ⠋ Identifying parallelism... 5s
+  ⠙ Identifying parallelism... 5s
+  ⠹ Identifying parallelism... 5s
+  ⠸ Identifying parallelism... 5s
+  ⠼ Identifying parallelism... 5s
+  ⠴ Identifying parallelism... 5s
+  ⠦ Identifying parallelism... 5s
+  ⠧ Identifying parallelism... 5s
+  ⠇ Identifying parallelism... 5s
+  ⠏ Identifying parallelism... 6s
+  ⠋ Identifying parallelism... 6s
+  ⠙ Identifying parallelism... 6s
+  ⠹ Identifying parallelism... 6s
+  ⠸ Identifying parallelism... 6s
+  ⠼ Identifying parallelism... 6s
+  ⠴ Identifying parallelism... 6s
+  ⠦ Identifying parallelism... 6s
+  ⠧ Identifying parallelism... 6s
+  ⠇ Identifying parallelism... 6s
+  ⠏ Identifying parallelism... 7s
+  ⠋ Identifying parallelism... 7s
+  ⠙ Identifying parallelism... 7s
+  ⠹ Identifying parallelism... 7s
+  ⠸ Identifying parallelism... 7s
+  ⠼ Identifying parallelism... 7s
+  ⠴ Identifying parallelism... 7s
+  ⠦ Identifying parallelism... 7s
+  ⠧ Identifying parallelism... 7s
+  ⠇ Identifying parallelism... 7s
+  ⠏ Identifying parallelism... 8s
+  ⠋ Identifying parallelism... 8s
+  ⠙ Identifying parallelism... 8s
+  ⠹ Identifying parallelism... 8s
+  ⠸ Identifying parallelism... 8s
+  ⠼ Identifying parallelism... 8s
+  ⠴ Identifying parallelism... 8s
+  ⠦ Identifying parallelism... 8s
+  ⠧ Identifying parallelism... 8s
+  ⠇ Identifying parallelism... 8s
+  ⠏ Identifying parallelism... 9s
+  ⠋ Identifying parallelism... 9s
+  ⠙ Identifying parallelism... 9s
+  ⠹ Identifying parallelism... 9s
+  ⠸ Identifying parallelism... 9s
+  ⠼ Identifying parallelism... 9s
+  ⠴ Identifying parallelism... 9s
+  ⠦ Identifying parallelism... 9s
+  ⠧ Identifying parallelism... 9s
+  ⠇ Identifying parallelism... 9s
+  ⠏ Identifying parallelism... 10s
+  ⠋ Identifying parallelism... 10s
+  ⠙ Identifying parallelism... 10s
+  ⠹ Identifying parallelism... 10s
+  ⠸ Identifying parallelism... 10s
+  ⠼ Identifying parallelism... 10s
+  ⠴ Identifying parallelism... 10s
+  ⠦ Identifying parallelism... 10s
+  ⠧ Identifying parallelism... 10s
+  ⠇ Identifying parallelism... 10s
+  ⠏ Identifying parallelism... 11s
+  ⠋ Identifying parallelism... 11s
+  ⠙ Identifying parallelism... 11s
+  ⠹ Identifying parallelism... 11s
+  ⠸ Identifying parallelism... 11s
+  ⠼ Identifying parallelism... 11s
+  ⠴ Identifying parallelism... 11s
+  ⠦ Identifying parallelism... 11s
+  ⠧ Identifying parallelism... 11s
+  ⠇ Identifying parallelism... 11s
+  ⠏ Identifying parallelism... 12s
+  ⠋ Identifying parallelism... 12s
+  ⠙ Identifying parallelism... 12s
+  ⠹ Identifying parallelism... 12s
+  ⠸ Identifying parallelism... 12s
+  ⠼ Identifying parallelism... 12s
+  ⠴ Identifying parallelism... 12s
+  ⠦ Identifying parallelism... 12s
+  ⠧ Identifying parallelism... 12s
+  ⠇ Identifying parallelism... 12s
+  ⠏ Identifying parallelism... 13s
+  ⠋ Identifying parallelism... 13s
+  ⠙ Identifying parallelism... 13s
+  ⠹ Identifying parallelism... 13s
+  ⠸ Identifying parallelism... 13s
+  ⠼ Identifying parallelism... 13s
+  ⠴ Identifying parallelism... 13s
+  ⠦ Identifying parallelism... 13s
+  ⠧ Identifying parallelism... 13s
+  ⠇ Identifying parallelism... 13s
+  ⠏ Identifying parallelism... 14s
+  ⠋ Identifying parallelism... 14s
+  ⠙ Identifying parallelism... 14s
+  ⠹ Identifying parallelism... 14s
+  ⠸ Identifying parallelism... 14s
+  ⠼ Identifying parallelism... 14s
+  ⠴ Identifying parallelism... 14s
+  ⠦ Identifying parallelism... 14s
+  ⠧ Identifying parallelism... 14s
+  ⠇ Identifying parallelism... 14s
+  ⠏ Identifying parallelism... 15s
+  ⠋ Identifying parallelism... 15s
+  ⠙ Identifying parallelism... 15s
+  ⠹ Identifying parallelism... 15s
+  ⠸ Identifying parallelism... 15s
+  ⠼ Identifying parallelism... 15s
+  ⠴ Identifying parallelism... 15s
+  ⠦ Identifying parallelism... 15s
+  ⠧ Identifying parallelism... 15s
+  ⠇ Identifying parallelism... 16s
+  ⠏ Identifying parallelism... 16s
+  ⠋ Identifying parallelism... 16s
+  ⠙ Identifying parallelism... 16s
+  ⠹ Identifying parallelism... 16s
+  ⠸ Identifying parallelism... 16s
+  ⠼ Identifying parallelism... 16s
+  ⠴ Identifying parallelism... 16s
+  ⠦ Identifying parallelism... 16s
+  ⠧ Identifying parallelism... 16s
+  ⠇ Identifying parallelism... 17s
+  ⠏ Identifying parallelism... 17s
+  ⠋ Identifying parallelism... 17s
+  ⠙ Identifying parallelism... 17s
+  ⠹ Identifying parallelism... 17s
+  ⠸ Identifying parallelism... 17s
+  ⠼ Identifying parallelism... 17s
+  ⠴ Identifying parallelism... 17s
+  ⠦ Identifying parallelism... 17s
+  ⠧ Identifying parallelism... 17s
+  ⠇ Identifying parallelism... 18s
+  ⠏ Identifying parallelism... 18s
+  ⠋ Identifying parallelism... 18s
+  ⠙ Identifying parallelism... 18s
+  ⠹ Identifying parallelism... 18s
+  ⠸ Identifying parallelism... 18s
+  ⠼ Identifying parallelism... 18s
+  ⠴ Identifying parallelism... 18s
+  ⠦ Identifying parallelism... 18s
+  ⠧ Identifying parallelism... 18s
+  ⠇ Identifying parallelism... 19s
+  ⠏ Identifying parallelism... 19s
+  ⠋ Identifying parallelism... 19s
+  ⠙ Identifying parallelism... 19s
+  ⠹ Identifying parallelism... 19s
+  ⠸ Identifying parallelism... 19s
+  ⠼ Identifying parallelism... 19s
+  ⠴ Identifying parallelism... 19s
+  ⠦ Identifying parallelism... 19s
+  ⠧ Identifying parallelism... 19s
+  ⠇ Identifying parallelism... 20s
+  ⠏ Identifying parallelism... 20s
+  ⠋ Identifying parallelism... 20s
+  ⠙ Identifying parallelism... 20s
+  ⠹ Identifying parallelism... 20s
+  ⠸ Identifying parallelism... 20s
+  ⠼ Identifying parallelism... 20s
+  ⠴ Identifying parallelism... 20s
+  ⠦ Identifying parallelism... 20s
+  ⠧ Identifying parallelism... 20s
+  ⠇ Identifying parallelism... 21s
+  ⠏ Identifying parallelism... 21s
+  ⠋ Identifying parallelism... 21s
+  ⠙ Identifying parallelism... 21s
+  ⠹ Identifying parallelism... 21s
+  ⠸ Identifying parallelism... 21s
+  ⠼ Identifying parallelism... 21s
+  ⠴ Identifying parallelism... 21s
+  ⠦ Identifying parallelism... 21s
+  ⠧ Identifying parallelism... 21s
+  ⠇ Identifying parallelism... 22s
+  ⠏ Identifying parallelism... 22s
+  ⠋ Identifying parallelism... 22s
+  ⠙ Identifying parallelism... 22s
+  ⠹ Identifying parallelism... 22s
+  ⠸ Identifying parallelism... 22s
+  ⠼ Identifying parallelism... 22s
+  ⠴ Identifying parallelism... 22s
+  ⠦ Identifying parallelism... 22s
+  ⠧ Identifying parallelism... 22s
+  ⠇ Identifying parallelism... 23s
+  ⠏ Identifying parallelism... 23s
+  ⠋ Identifying parallelism... 23s
+  ⠙ Identifying parallelism... 23s
+  ⠹ Identifying parallelism... 23s
+  ⠸ Identifying parallelism... 23s
+  ⠼ Identifying parallelism... 23s
+  ⠴ Identifying parallelism... 23s
+  ⠦ Identifying parallelism... 23s
+  ⠧ Identifying parallelism... 23s
+  ⠇ Identifying parallelism... 24s
+  ⠏ Identifying parallelism... 24s
+  ⠋ Identifying parallelism... 24s
+  ⠙ Identifying parallelism... 24s
+  ⠹ Identifying parallelism... 24s
+  ⠸ Identifying parallelism... 24s
+  ⠼ Identifying parallelism... 24s
+  ⠴ Identifying parallelism... 24s
+  ⠦ Identifying parallelism... 24s
+  ⠧ Identifying parallelism... 24s
+  ⠇ Identifying parallelism... 25s
+  ⠏ Identifying parallelism... 25s
+  ⠋ Identifying parallelism... 25s
+  ⠙ Identifying parallelism... 25s
+  ⠹ Identifying parallelism... 25s
+  ⠸ Identifying parallelism... 25s
+  ⠼ Identifying parallelism... 25s
+  ⠴ Identifying parallelism... 25s
+  ⠦ Identifying parallelism... 25s
+  ⠧ Identifying parallelism... 25s
+  ⠇ Identifying parallelism... 26s
+  ⠏ Identifying parallelism... 26s
+  ⠋ Identifying parallelism... 26s
+  ⠙ Identifying parallelism... 26s
+  ⠹ Identifying parallelism... 26s
+  ⠸ Identifying parallelism... 26s
+  ⠼ Identifying parallelism... 26s
+  ⠴ Identifying parallelism... 26s
+  ⠦ Identifying parallelism... 26s
+  ⠧ Identifying parallelism... 26s
+  ⠇ Identifying parallelism... 27s
+  ⠏ Identifying parallelism... 27s
+  ⠋ Identifying parallelism... 27s
+  ⠙ Identifying parallelism... 27s
+  ⠹ Identifying parallelism... 27s
+  ⠸ Identifying parallelism... 27s
+  ⠼ Identifying parallelism... 27s
+  ⠴ Identifying parallelism... 27s
+  ⠦ Identifying parallelism... 27s
+  ⠧ Identifying parallelism... 27s
+  ⠇ Identifying parallelism... 28s
+  ⠏ Identifying parallelism... 28s
+  ⠋ Identifying parallelism... 28s
+  ⠙ Identifying parallelism... 28s
+  ⠹ Identifying parallelism... 28s
+  ⠸ Identifying parallelism... 28s
+  ⠼ Identifying parallelism... 28s
+  ⠴ Identifying parallelism... 28s
+  ⠦ Identifying parallelism... 28s
+  ⠧ Identifying parallelism... 28s
+  ⠇ Identifying parallelism... 29s
+  ⠏ Identifying parallelism... 29s
+  ⠋ Identifying parallelism... 29s
+  ⠙ Identifying parallelism... 29s
+  ⠹ Identifying parallelism... 29s
+  ⠸ Identifying parallelism... 29s
+  ⠼ Identifying parallelism... 29s
+  ⠴ Identifying parallelism... 29s
+  ⠦ Identifying parallelism... 29s
+  ⠧ Identifying parallelism... 29s
+  ⠇ Identifying parallelism... 30s
+  ⠏ Identifying parallelism... 30s
+  ⠋ Identifying parallelism... 30s
+  ⠙ Identifying parallelism... 30s
+  ⠹ Identifying parallelism... 30s
+  ⠸ Identifying parallelism... 30s
+  ⠼ Identifying parallelism... 30s
+  ⠴ Identifying parallelism... 30s
+  ⠦ Identifying parallelism... 30s
+  ⠧ Identifying parallelism... 30s
+  ⠇ Identifying parallelism... 31s
+  ⠏ Identifying parallelism... 31s
+  ⠋ Identifying parallelism... 31s
+  ⠙ Identifying parallelism... 31s
+  ⠹ Identifying parallelism... 31s
+  ⠸ Identifying parallelism... 31s
+  ⠼ Identifying parallelism... 31s
+  ⠴ Identifying parallelism... 31s
+  ⠦ Identifying parallelism... 31s
+  ⠧ Identifying parallelism... 31s
+  ⠇ Identifying parallelism... 32s
+  ⠏ Identifying parallelism... 32s
+  ⠋ Identifying parallelism... 32s
+  ⠙ Identifying parallelism... 32s
+  ⠹ Identifying parallelism... 32s
+  ⠸ Identifying parallelism... 32s
+  ⠼ Identifying parallelism... 32s
+  ⠴ Identifying parallelism... 32s
+  ⠦ Identifying parallelism... 32s
+  ⠧ Identifying parallelism... 33s
+  ⠇ Identifying parallelism... 33s
+  ⠏ Identifying parallelism... 33s
+  ⠋ Identifying parallelism... 33s
+  ⠙ Identifying parallelism... 33s
+  ⠹ Identifying parallelism... 33s
+  ⠸ Identifying parallelism... 33s
+  ⠼ Identifying parallelism... 33s
+  ⠴ Identifying parallelism... 33s
+  ⠦ Identifying parallelism... 33s
+  ⠧ Identifying parallelism... 34s
+  ⠇ Identifying parallelism... 34s
+  ⠏ Identifying parallelism... 34s
+  ⠋ Identifying parallelism... 34s
+  ⠙ Identifying parallelism... 34s
+  ⠹ Identifying parallelism... 34s
+  ⠸ Identifying parallelism... 34s
+  ⠼ Identifying parallelism... 34s
+  ⠴ Identifying parallelism... 34s
+  ⠦ Identifying parallelism... 34s
+  ⠧ Identifying parallelism... 35s
+  ⠇ Identifying parallelism... 35s
+  ⠏ Identifying parallelism... 35s
+  ⠋ Identifying parallelism... 35s
+  ⠙ Identifying parallelism... 35s
+  ⠹ Identifying parallelism... 35s
+  ⠸ Identifying parallelism... 35s
+  ⠼ Identifying parallelism... 35s
+  ⠴ Identifying parallelism... 35s
+  ⠦ Identifying parallelism... 35s
+  ⠧ Identifying parallelism... 36s
+  ⠇ Identifying parallelism... 36s
+  ⠏ Identifying parallelism... 36s
+  ⠋ Identifying parallelism... 36s
+  ⠙ Identifying parallelism... 36s
+  ⠹ Identifying parallelism... 36s
+  ⠸ Identifying parallelism... 36s
+  ⠼ Identifying parallelism... 36s
+  ⠴ Identifying parallelism... 36s
+  ⠦ Identifying parallelism... 36s
+  ⠧ Identifying parallelism... 37s
+  ⠇ Identifying parallelism... 37s
+  ⠏ Identifying parallelism... 37s
+  ⠋ Identifying parallelism... 37s
+  ⠙ Identifying parallelism... 37s
+  ⠹ Identifying parallelism... 37s
+  ⠸ Identifying parallelism... 37s
+  ⠼ Identifying parallelism... 37s
+  ⠴ Identifying parallelism... 37s
+  ⠦ Identifying parallelism... 37s
+  ⠧ Identifying parallelism... 38s
+  ⠇ Identifying parallelism... 38s
+  ⠏ Identifying parallelism... 38s
+  ⠋ Identifying parallelism... 38s
+  ⠙ Identifying parallelism... 38s
+  ⠹ Identifying parallelism... 38s
+  ⠸ Identifying parallelism... 38s
+  ⠼ Identifying parallelism... 38s
+  ⠴ Identifying parallelism... 38s
+  ⠦ Identifying parallelism... 38s
+  ⠧ Identifying parallelism... 39s
+  ⠇ Identifying parallelism... 39s
+  ⠏ Identifying parallelism... 39s
+  ⠋ Identifying parallelism... 39s
+  ⠙ Identifying parallelism... 39s
+  ⠹ Identifying parallelism... 39s
+  ⠸ Identifying parallelism... 39s
+  ⠼ Identifying parallelism... 39s
+  ⠴ Identifying parallelism... 39s
+  ⠦ Identifying parallelism... 39s
+  ⠧ Identifying parallelism... 40s
+  ⠇ Identifying parallelism... 40s
+  ⠏ Identifying parallelism... 40s
+  ⠋ Identifying parallelism... 40s
+  ⠙ Identifying parallelism... 40s
+  ⠹ Identifying parallelism... 40s
+  ⠸ Identifying parallelism... 40s
+  ⠼ Identifying parallelism... 40s
+  ⠴ Identifying parallelism... 40s
+  ⠦ Identifying parallelism... 40s
+  ⠧ Identifying parallelism... 41s
+  ⠇ Identifying parallelism... 41s
+  ⠏ Identifying parallelism... 41s
+  ⠋ Identifying parallelism... 41s
+  ⠙ Identifying parallelism... 41s
+  ⠹ Identifying parallelism... 41s
+  ⠸ Identifying parallelism... 41s
+  ⠼ Identifying parallelism... 41s
+  ⠴ Identifying parallelism... 41s
+  ⠦ Identifying parallelism... 41s
+  ⠧ Identifying parallelism... 42s
+  ⠇ Identifying parallelism... 42s
+  ⠏ Identifying parallelism... 42s
+  ⠋ Identifying parallelism... 42s
+  ⠙ Identifying parallelism... 42s
+  ⠹ Identifying parallelism... 42s
+  ⠸ Identifying parallelism... 42s
+  ⠼ Identifying parallelism... 42s
+  ⠴ Identifying parallelism... 42s
+  ⠦ Identifying parallelism... 42s
+  ⠧ Identifying parallelism... 43s
+  ⠇ Identifying parallelism... 43s
+  ⠏ Identifying parallelism... 43s
+  ⠋ Identifying parallelism... 43s
+  ⠙ Identifying parallelism... 43s
+  ⠹ Identifying parallelism... 43s
+  ⠸ Identifying parallelism... 43s
+  ⠼ Identifying parallelism... 43s
+  ⠴ Identifying parallelism... 43s
+  ⠦ Identifying parallelism... 43s
+  ⠧ Identifying parallelism... 44s
+  ⠇ Identifying parallelism... 44s
+  ⠏ Identifying parallelism... 44s
+  ⠋ Identifying parallelism... 44s
+  ⠙ Identifying parallelism... 44s
+  ⠹ Identifying parallelism... 44s
+  ⠸ Identifying parallelism... 44s
+  ⠼ Identifying parallelism... 44s
+  ⠴ Identifying parallelism... 44s
+  ⠦ Identifying parallelism... 44s
+  ⠧ Identifying parallelism... 45s
+  ⠇ Identifying parallelism... 45s
+  ⠏ Identifying parallelism... 45s
+                                                                                
+Goal plan read from /home/dev/.kodo/runs/20260428_055615/goal-plan.json
+  4 stages:
+    1. Structured test reporting in CI [persist]
+    2. Add coverage metrics pipeline [persist]
+    3. Categorize tests with pytest markers [parallel group 1] [persist]
+    4. Enhance CheckSignalCollector parsing [parallel group 1] [persist]
+
+  ┌──────────────────────────────────────────────────────────┐
+  │                     READY TO LAUNCH                      │
+  ├──────────────────────────────────────────────────────────┤
+  │ Project:      /tmp/oc-improve-c_cfeuif/workspace         │
+  │ Goal:         ## Goal
+Improve test signal visibility for operati... │
+  │ Stages:       4                                          │
+  │                 1. Structured test reporting in CI       │
+  │                 2. Add coverage metrics pipeline         │
+  │                 3. Categorize tests with pytest markers  │
+  │                 4. Enhance CheckSignalCollector parsing  │
+  │ Team:         full — Full team (Codex + Claude Code): w… │
+  │ Orchestrator: claude-code (opus)                         │
+  │ Exchanges:    20/cycle, 3 cycles                         │
+  └──────────────────────────────────────────────────────────┘
+
+  Team: full
+  Orchestrator: 🤖 claude-code (opus)
+  Agents:
+    worker_fast (codex / gpt-5.4)
+    worker_smart (claude code / opus)
+    architect (claude code / opus)
+    tester (claude code / sonnet)
+  Log: /home/dev/.kodo/runs/20260428_055615/log.jsonl
+
+
+  [2m[  271.9s][0m [orchestrator] === STAGE 1/4: Structured test reporting in CI ===
+
+  [2m[  271.9s][0m [orchestrator] === CYCLE 1/3 (stage 1) ===
+  [2m[  274.1s][0m 🤖 [orchestrator] starting cycle...
+  [2m[  376.7s][0m 🔧 [orchestrator] → [36mtester[0m: Verify the structured test reporting changes for Stage 1/4. Here's what was changed:
+
+1. **pyproject...
+  [2m[  418.7s][0m ✅ [[36mtester[0m] done (40.5s) | session: 1,718 tokens
+  [2m[  418.9s][0m   [summarizer] using truncation (no LLM backend available)
+  [2m[  418.9s][0m [tester] summary: All checks pass. Here's a complete summary of the verification:
+  [2m[  430.2s][0m 📝 [auto-commit] dispatching worker_fast to commit...
+  [2m[  494.5s][0m 📝 [auto-commit] worker_fast finished
+  [2m[  494.5s][0m 🎉 [orchestrator] goal_done: Stage 1/4 complete: Structured test reporting in CI.
+
+Changes made to 3 files:
+1. **pyproject.toml** — Added `addopts = "-v --tb=short --durations=10 --junitxml=reports/junit.xml"` to pytest config, e
+  [2m[  499.5s][0m ✅ [orchestrator] cycle done: Stage 1/4 complete: Structured test reporting in CI.
+
+Changes made to 3 files:
+1. **pyproject.toml** — Added `addopts = "-v --tb=short --durations=10 --junitxml=reports/junit.xml"` to pytest config, e
+  [2m[  500.4s][0m [orchestrator] Stage 1 (Structured test reporting in CI) completed in 1 cycle
+
+  [2m[  500.4s][0m [orchestrator] === STAGE 2/4: Add coverage metrics pipeline ===
+
+  [2m[  500.4s][0m [orchestrator] === CYCLE 1/2 (stage 2) ===
+  [2m[  507.3s][0m 🤖 [orchestrator] starting cycle...
+  [2m[  817.0s][0m 🔧 [orchestrator] → [36mtester[0m: Verify Stage 2 (coverage metrics pipeline) is correctly implemented. Check these acceptance criteria...
+  [2m[  936.2s][0m ✅ [[36mtester[0m] done (119.0s) | session: 3,612 tokens
+  [2m[  936.3s][0m [tester] summary: All checks complete. Here's the full verification summary for Stage 2:
+  [2m[  946.2s][0m 📝 [auto-commit] dispatching worker_fast to commit...
+  [2m[  998.6s][0m 📝 [auto-commit] worker_fast finished
+  [2m[  998.6s][0m 🎉 [orchestrator] goal_done: Stage 2/4 complete: Coverage metrics pipeline added.
+
+Changes made to 2 files:
+1. **pyproject.toml** — Added `pytest-cov>=6.0` to dev dependencies. Extended `addopts` with `--cov=operations_center --c
+  [2m[ 1003.4s][0m ✅ [orchestrator] cycle done: Stage 2/4 complete: Coverage metrics pipeline added.
+
+Changes made to 2 files:
+1. **pyproject.toml** — Added `pytest-cov>=6.0` to dev dependencies. Extended `addopts` with `--cov=operations_center --c
+  [2m[ 1004.0s][0m [orchestrator] Stage 2 (Add coverage metrics pipeline) completed in 1 cycle
+
+  [2m[ 1004.0s][0m ────────────────────────────────────────
+  [2m[ 1004.0s][0m [1mPARALLEL GROUP: 3:Categorize tests with pytest markers, 4:Enhance CheckSignalCollector parsing[0m
+  [2m[ 1004.4s][0m [orchestrator] Worktree for stage 3: /tmp/kodo-stage-3-ru1r0dfk
+  [2m[ 1004.5s][0m [orchestrator] Worktree for stage 4: /tmp/kodo-stage-4-3lzsv__q
+
+  [2m[ 1004.5s][0m [orchestrator] === STAGE 4/4: Enhance CheckSignalCollector parsing ===
+
+  [2m[ 1004.5s][0m [orchestrator] === STAGE 3/4: Categorize tests with pytest markers ===
+
+  [2m[ 1004.5s][0m [orchestrator] === CYCLE 1/1 (stage 3) ===
+
+  [2m[ 1004.5s][0m [orchestrator] === CYCLE 1/1 (stage 4) ===
+  [2m[ 1009.6s][0m 🤖 [orchestrator] starting cycle...
+  [2m[ 1009.6s][0m 🤖 [orchestrator] starting cycle...
+  [2m[ 1043.6s][0m 🔧 [orchestrator] → [36mworker_smart[0m: Enhance CheckSignalCollector to parse JUnit XML reports for richer signal extraction. Here's what ne...
+  [2m[ 1068.9s][0m 🔧 [orchestrator] → [36mworker_smart[0m: Stage 3: Categorize tests with pytest markers. Here's what to do:
+
+**1. Register custom markers in p...
+  [2m[ 1163.1s][0m ✅ [[36mworker_smart[0m] done (116.6s) | session: 5,467 tokens
+  [2m[ 1163.2s][0m [worker_smart] summary: All 18 tests pass — 8 new XML tests and 10 existing tests. Here's a summary of what was done:
+  [2m[ 1171.6s][0m 🔧 [orchestrator] → [36mtester[0m: Verify Stage 4 implementation: CheckSignalCollector JUnit XML parsing enhancement.
+
+**What to check:...
+  [2m[ 1595.7s][0m ✅ [[36mtester[0m] done (419.6s) | session: 2,326 tokens
+  [2m[ 1595.7s][0m [tester] summary: All checks are complete. Here's the full report:
+  [2m[ 1605.7s][0m 📝 [auto-commit] dispatching worker_fast to commit...
+  [2m[ 1627.0s][0m ⚠️ [[36mworker_smart[0m] done (554.7s) | session: 7,506 tokens
+  [2m[ 1627.0s][0m ⚠️  [[36mworker_smart[0m] error: [2mYou're out of extra usage · resets 4:20am (America/New_York)[0m
+  [2m[ 1627.1s][0m [worker_smart] summary: You're out of extra usage · resets 4:20am (America/New_York)
+  [2m[ 1628.8s][0m ⚠️  [orchestrator] Claude Code error: You're out of extra usage · resets 4:20am (America/New_York)
+  [2m[ 1629.3s][0m [orchestrator] Stage 3 (Categorize tests with pytest markers) — cycle limit reached after 1 cycle
+  [2m[ 1683.0s][0m 📝 [auto-commit] worker_fast finished
+  [2m[ 1683.0s][0m 🎉 [orchestrator] goal_done: Stage 4/4 complete: Enhanced CheckSignalCollector with JUnit XML parsing.
+
+**Changes made to 3 files:**
+
+1. **`src/operations_center/observer/models.py`** — Added 5 optional fields to `CheckSignal`: `
+  [2m[ 1684.2s][0m ✅ [orchestrator] cycle done: Stage 4/4 complete: Enhanced CheckSignalCollector with JUnit XML parsing.
+
+**Changes made to 3 files:**
+
+1. **`src/operations_center/observer/models.py`** — Added 5 optional fields to `CheckSignal`: `
+  [2m[ 1685.1s][0m [orchestrator] Stage 4 (Enhance CheckSignalCollector parsing) completed in 1 cycle
+  [2m[ 1686.2s][0m [persist] Stage 'Enhance CheckSignalCollector parsing': committed worktree changes
+  [2m[ 1687.8s][0m [persist] Stage 'Enhance CheckSignalCollector parsing': refusing to merge — main repo has uncommitted changes. Commit or stash them first.
+Dirty files:
+M .github/workflows/ci.yml
+ M .gitignore
+ M pyproject.toml
+?? .codex
+?? .coverage
+?? .kodo_goal.md
+?? docs/specs/execution-module-test-coverage.md
+
+  ┌────────────────────────────────────────────────────────────────────┐
+  │ 📊 FINAL STATS                                                     │
+  │ Agent                Bucket       #    Cost    In   Out   Time Err │
+  ├────────────────────────────────────────────────────────────────────┤
+  │ tester               CC Sub       3   $0.55    34    6k  9m39s   0 │
+  │ worker_fast_auto_co~ Codex        3       -  487k    6k  3m14s   0 │
+  │ worker_smart         CC Sub       2   $0.82    27   13k 11m11s   1 │
+  │ orchestrator         CC Sub           $1.04                        │
+  ├────────────────────────────────────────────────────────────────────┤
+  │ Total                             8   $2.42             28m10s     │
+  │   API:   -      Virtual: $2.42    Wall: 28m10s                     │
+  └────────────────────────────────────────────────────────────────────┘
+    Virtual = Claude Code's API cost estimate. Not charged on Max/Pro subscriptions.
+
+==================================================
+Done: 3/4 stages completed, 4 cycles, 60 exchanges, $1.0434, 28m10s
+  + Stage 1: Structured test reporting in CI — Stage 1/4 complete: Structured test reporting in CI.
+
+Changes made to 3 files:
+1. **pyproject.toml** — Added `addopts = 
+  + Stage 2: Add coverage metrics pipeline — Stage 2/4 complete: Coverage metrics pipeline added.
+
+Changes made to 2 files:
+1. **pyproject.toml** — Added `pytest-cov
+  - Stage 3: Categorize tests with pytest markers — [Claude Code error] You're out of extra usage · resets 4:20am (America/New_York)
+  + Stage 4: Enhance CheckSignalCollector parsing — Stage 4/4 complete: Enhanced CheckSignalCollector with JUnit XML parsing.
+
+**Changes made to 3 files:**
+
+1. **`src/opera
+  Stage 4/4 complete: Enhanced CheckSignalCollector with JUnit XML parsing.
+
+**Changes made to 3 files:**
+
+1. **`src/operations_center/observer/models.py`** — Added 5 optional fields to `CheckSignal`: `fail_count`, `skip_count`, `error_count` (int | None), `total_duration` (float | None), and `failure
+
+  View run: uv run python -m kodo.viewer /home/dev/.kodo/runs/20260428_055615/log.jsonl
+
