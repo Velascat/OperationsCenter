@@ -56,13 +56,27 @@ After running, triage in this order:
 | Ghost work (G1–GN) | `docs/architecture/ghost_work_audit.md` |
 | Flow gaps (F1–FN) | `docs/architecture/flow_audit.md` |
 
-## Why no scheduler?
+## How the cadence is enforced
 
-OC deliberately has no cron / scheduled task runner. Audits surface
-work into Plane; the autonomy loop runs against Plane. Putting audits
-on a timer would couple autonomy cadence to wall-clock cadence, which
-is the wrong dependency. The operator decides when to refresh the
-audit signal — typically weekly, but more often after a big change.
+OC has no cron daemon. Instead the propose cycle is the scheduler:
+each cycle, `scheduled_tasks` entries in
+`config/operations_center.local.yaml` are checked, and any whose
+`every` interval has elapsed (gated by optional `at:` and `on_days:`)
+get seeded as Ready-for-AI Plane tasks.
+
+This file ships with one entry: a Monday 13:00 UTC weekly task titled
+`"Weekly audit triage"` whose goal text tells the operator (or
+eventually the executor) to run the three CLIs above and triage their
+output. The `await_review: true` setting means the seeded task waits
+for a human label before any code change happens — the schedule fires
+the *reminder*, not the *fix*.
+
+To pause the cadence, comment out or remove the entry from
+`scheduled_tasks:` in the local config. To shift the day/time,
+change `on_days:` and `at:`. The
+`state/scheduled_tasks_last_run.json` file remembers when each
+schedule last fired so renames restart the clock and missed cycles
+don't fire-storm on resume.
 
 ## Related
 

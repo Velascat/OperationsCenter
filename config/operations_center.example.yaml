@@ -116,6 +116,27 @@ repos:
 #   bot_comment_marker: "<!-- operations-center:bot -->"
 
 # ---------------------------------------------------------------------------
+# Scheduled tasks — periodic Plane work-item seeders
+# ---------------------------------------------------------------------------
+# Each entry creates one Ready-for-AI task at the configured cadence.
+# The propose cycle is the scheduler — there is no separate cron daemon.
+# `every` is required (<num><unit>, unit in m/h/d/w); `at` (HH:MM UTC) and
+# `on_days` (mon/tue/.../sun) are optional gates. See
+# src/operations_center/scheduled_tasks/runner.py for the implementation
+# and docs/operator/weekly_audits.md for the audit-cadence runbook.
+#
+# scheduled_tasks:
+#   - every:    1w
+#     at:       "13:00"
+#     on_days:  [mon]
+#     title:    "Weekly audit triage"
+#     repo_key: OperationsCenter
+#     kind:     goal
+#     goal: |
+#       Run custodian-sweep + ghost_audit + flow_audit and triage results.
+#       See docs/operator/weekly_audits.md for the full runbook.
+
+# ---------------------------------------------------------------------------
 # Artifact storage root
 # ---------------------------------------------------------------------------
 report_root: tools/report/kodo_plane
