@@ -1,19 +1,19 @@
 """
-contracts — OperationsCenter's internal subtype of the ECP envelope.
+contracts — OperationsCenter's internal subtype of the CxRP envelope.
 
 The canonical cross-repo wire contract is **CxRP**
 (``cxrp.contracts``). The classes here are OperationsCenter's *internal*
 Pydantic representation: they layer narrower types (``LaneName``,
 ``BackendName``, structured ``TaskTarget``/``BranchPolicy``/
-``ValidationProfile``) on top of ECP's open envelope so adapters and
+``ValidationProfile``) on top of CxRP's open envelope so adapters and
 policy can rely on stricter shapes within OC.
 
 At repo boundaries (HTTP between OC ↔ SwitchBoard, JSON written for
-OperatorConsole, run artifacts) these models are translated to ECP shape
-via ``operations_center.contracts.ecp_mapper``. The wire format is ECP;
+OperatorConsole, run artifacts) these models are translated to CxRP shape
+via ``operations_center.contracts.cxrp_mapper``. The wire format is CxRP;
 this module is the OC-internal subtype.
 
-Canonical wire format:  ECP v0.2 (https://github.com/Velascat/CxRP)
+Canonical wire format:  CxRP v0.2 (https://github.com/Velascat/CxRP)
 Internal owner:         OperationsCenter (Pydantic; this package)
 """
 

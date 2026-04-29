@@ -1,25 +1,25 @@
 """Bidirectional mappers between OperationsCenter's internal Pydantic
-contracts and the canonical ECP v0.2 envelope.
+contracts and the canonical CxRP v0.2 envelope.
 
-OC's internal types (Pydantic) carry richer constraints than ECP's wire
+OC's internal types (Pydantic) carry richer constraints than CxRP's wire
 envelope: typed enums, structured ``TaskTarget``/``BranchPolicy``/
-``ValidationProfile`` objects, etc. ECP defines the *envelope* — abstract
+``ValidationProfile`` objects, etc. CxRP defines the *envelope* — abstract
 ``lane`` category plus open-string ``executor``/``backend`` and free-form
 ``input_payload``. These mappers translate at the wire boundary so that
-inter-repo communication uses ECP shape.
+inter-repo communication uses CxRP shape.
 
 Mapping conventions:
 
-* OC ``selected_lane`` (e.g. ``claude_cli``) → ECP ``executor``
-* OC ``selected_backend`` (e.g. ``kodo``)   → ECP ``backend``
-* ECP abstract ``lane`` is derived from the OC lane name.
+* OC ``selected_lane`` (e.g. ``claude_cli``) → CxRP ``executor``
+* OC ``selected_backend`` (e.g. ``kodo``)   → CxRP ``backend``
+* CxRP abstract ``lane`` is derived from the OC lane name.
 * OC's rich ``ExecutionArtifact`` (id, label, content, size) collapses
-  to ECP ``Artifact`` (kind, uri, description, metadata) — id/label/size
+  to CxRP ``Artifact`` (kind, uri, description, metadata) — id/label/size
   travel in ``metadata``.
 * OC's ``ValidationSummary``/``ChangedFileRef`` lists travel in
   ``ExecutionResult.diagnostics``.
 
-Inverse helpers (``from_ecp_*``) are intentionally minimal — only the
+Inverse helpers (``from_cxrp_*``) are intentionally minimal — only the
 fields downstream OC needs at the consume boundary are reconstructed.
 """
 
@@ -28,16 +28,16 @@ from __future__ import annotations
 from typing import Any
 
 from cxrp.contracts import (
-    Artifact as EcpArtifact,
-    ExecutionLimits as EcpExecutionLimits,
-    ExecutionRequest as EcpExecutionRequest,
-    ExecutionResult as EcpExecutionResult,
-    LaneAlternative as EcpLaneAlternative,
-    LaneDecision as EcpLaneDecision,
-    TaskProposal as EcpTaskProposal,
+    Artifact as CxrpArtifact,
+    ExecutionLimits as CxrpExecutionLimits,
+    ExecutionRequest as CxrpExecutionRequest,
+    ExecutionResult as CxrpExecutionResult,
+    LaneAlternative as CxrpLaneAlternative,
+    LaneDecision as CxrpLaneDecision,
+    TaskProposal as CxrpTaskProposal,
 )
 from cxrp.vocabulary.lane import LaneType
-from cxrp.vocabulary.status import ExecutionStatus as EcpExecutionStatus
+from cxrp.vocabulary.status import ExecutionStatus as CxrpExecutionStatus
 
 from .enums import BackendName, LaneName
 from .execution import ExecutionRequest, ExecutionResult
@@ -58,15 +58,15 @@ def _category_for(oc_lane_value: str) -> LaneType:
     return _OC_LANE_TO_ECP_CATEGORY.get(oc_lane_value, LaneType.CODING_AGENT)
 
 
-def to_ecp_task_proposal(oc: TaskProposal) -> EcpTaskProposal:
-    """Translate an OC TaskProposal into the ECP v0.2 envelope."""
+def to_cxrp_task_proposal(oc: TaskProposal) -> CxrpTaskProposal:
+    """Translate an OC TaskProposal into the CxRP v0.2 envelope."""
     target_payload: dict[str, Any] = {
         "$payload_schema": CODING_AGENT_TARGET_SCHEMA_ID,
         "repo_key": oc.target.repo_key,
         "clone_url": oc.target.clone_url,
         "base_branch": oc.target.base_branch,
     }
-    return EcpTaskProposal(
+    return CxrpTaskProposal(
         proposal_id=oc.proposal_id,
         created_at=oc.proposed_at,
         metadata={
@@ -86,12 +86,12 @@ def to_ecp_task_proposal(oc: TaskProposal) -> EcpTaskProposal:
     )
 
 
-def to_ecp_lane_decision(
+def to_cxrp_lane_decision(
     oc: LaneDecision, *, extra_metadata: dict[str, Any] | None = None
-) -> EcpLaneDecision:
-    """Translate an OC LaneDecision into ECP envelope shape.
+) -> CxrpLaneDecision:
+    """Translate an OC LaneDecision into CxRP envelope shape.
 
-    Mirrors switchboard.adapters.ecp_mapper but lives here so OC's own
+    Mirrors switchboard.adapters.cxrp_mapper but lives here so OC's own
     audit/observability code can emit the same wire shape.
     """
     metadata: dict[str, Any] = {
@@ -100,7 +100,7 @@ def to_ecp_lane_decision(
     if extra_metadata:
         metadata.update(extra_metadata)
 
-    return EcpLaneDecision(
+    return CxrpLaneDecision(
         decision_id=oc.decision_id,
         proposal_id=oc.proposal_id,
         created_at=oc.decided_at,
@@ -111,17 +111,17 @@ def to_ecp_lane_decision(
         rationale=oc.rationale or "",
         confidence=oc.confidence,
         alternatives=[
-            EcpLaneAlternative(lane=_category_for(alt.value), executor=alt.value)
+            CxrpLaneAlternative(lane=_category_for(alt.value), executor=alt.value)
             for alt in oc.alternatives_considered
         ],
     )
 
 
-def from_ecp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
-    """Reconstruct an OC ``LaneDecision`` from an ECP wire payload.
+def from_cxrp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
+    """Reconstruct an OC ``LaneDecision`` from an CxRP wire payload.
 
     Used at the OC consume boundary (``HttpLaneRoutingClient``) to accept
-    SwitchBoard's ECP-shaped ``/route`` response. Narrows ECP's
+    SwitchBoard's CxRP-shaped ``/route`` response. Narrows CxRP's
     open-string ``executor``/``backend`` back into OC's ``LaneName``/
     ``BackendName`` ``Literal`` constraints; raises ``ValueError`` if the
     incoming executor or backend is not one OC recognises.
@@ -130,7 +130,7 @@ def from_ecp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
     backend = payload.get("backend")
     if executor is None or backend is None:
         raise ValueError(
-            "ECP LaneDecision missing executor/backend; "
+            "CxRP LaneDecision missing executor/backend; "
             "OC requires both to narrow into LaneName/BackendName."
         )
     metadata = payload.get("metadata") or {}
@@ -150,13 +150,13 @@ def from_ecp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
     )
 
 
-def to_ecp_execution_request(oc: ExecutionRequest, *, executor: str, backend: str) -> EcpExecutionRequest:
-    """Translate an OC ExecutionRequest into ECP shape.
+def to_cxrp_execution_request(oc: ExecutionRequest, *, executor: str, backend: str) -> CxrpExecutionRequest:
+    """Translate an OC ExecutionRequest into CxRP shape.
 
     OC's request is rich (workspace paths, branches, validation commands).
-    Those fields land in ECP's ``input_payload`` under the
+    Those fields land in CxRP's ``input_payload`` under the
     ``coding_agent_input/v0.2`` payload schema. Boundary-universal caps
-    (file count, timeout) become ECP ``limits``.
+    (file count, timeout) become CxRP ``limits``.
     """
     input_payload: dict[str, Any] = {
         "goal_text": oc.goal_text,
@@ -170,7 +170,7 @@ def to_ecp_execution_request(oc: ExecutionRequest, *, executor: str, backend: st
         "allowed_paths": list(oc.allowed_paths),
         "validation_commands": list(oc.validation_commands),
     }
-    return EcpExecutionRequest(
+    return CxrpExecutionRequest(
         request_id=oc.run_id,
         proposal_id=oc.proposal_id,
         lane_decision_id=oc.decision_id,
@@ -183,7 +183,7 @@ def to_ecp_execution_request(oc: ExecutionRequest, *, executor: str, backend: st
         input_payload=input_payload,
         input_payload_schema=CODING_AGENT_INPUT_SCHEMA_ID,
         constraints=[oc.constraints_text] if oc.constraints_text else [],
-        limits=EcpExecutionLimits(
+        limits=CxrpExecutionLimits(
             max_changed_files=oc.max_changed_files,
             timeout_seconds=oc.timeout_seconds,
             require_clean_validation=oc.require_clean_validation,
@@ -191,19 +191,19 @@ def to_ecp_execution_request(oc: ExecutionRequest, *, executor: str, backend: st
     )
 
 
-def _ecp_status_for(oc_status_value: str) -> EcpExecutionStatus:
-    return EcpExecutionStatus(oc_status_value)
+def _ecp_status_for(oc_status_value: str) -> CxrpExecutionStatus:
+    return CxrpExecutionStatus(oc_status_value)
 
 
-def to_ecp_execution_result(oc: ExecutionResult) -> EcpExecutionResult:
-    """Translate an OC ExecutionResult into ECP shape.
+def to_cxrp_execution_result(oc: ExecutionResult) -> CxrpExecutionResult:
+    """Translate an OC ExecutionResult into CxRP shape.
 
-    OC's rich ``ExecutionArtifact`` collapses to ECP ``Artifact``. Heavy
+    OC's rich ``ExecutionArtifact`` collapses to CxRP ``Artifact``. Heavy
     sub-objects (validation summary, changed-file refs, telemetry) move
     into ``diagnostics`` so the envelope stays small.
     """
-    artifacts: list[EcpArtifact] = [
-        EcpArtifact(
+    artifacts: list[CxrpArtifact] = [
+        CxrpArtifact(
             kind=art.artifact_type.value,
             uri=art.uri or "",
             description=art.label,
@@ -224,7 +224,7 @@ def to_ecp_execution_result(oc: ExecutionResult) -> EcpExecutionResult:
         "failure_reason": oc.failure_reason,
         "changed_files_count": len(oc.changed_files),
     }
-    return EcpExecutionResult(
+    return CxrpExecutionResult(
         result_id=oc.run_id,
         created_at=oc.completed_at,
         metadata={"proposal_id": oc.proposal_id, "decision_id": oc.decision_id},

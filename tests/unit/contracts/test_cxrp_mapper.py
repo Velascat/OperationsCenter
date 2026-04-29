@@ -1,7 +1,7 @@
-"""Phase 3: OC's contracts produce wire payloads conforming to ECP v0.2.
+"""Phase 3: OC's contracts produce wire payloads conforming to CxRP v0.2.
 
-Tests assert each OC→ECP mapper emits a shape that validates against the
-canonical ECP JSON Schema, and that lane-specific payloads validate
+Tests assert each OC→CxRP mapper emits a shape that validates against the
+canonical CxRP JSON Schema, and that lane-specific payloads validate
 against the named per-lane payload schema.
 """
 
@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 from cxrp.contracts import (
-    ExecutionResult as EcpExecutionResult,
-    TaskProposal as EcpTaskProposal,
+    ExecutionResult as CxrpExecutionResult,
+    TaskProposal as CxrpTaskProposal,
 )
 from cxrp.validation.json_schema import validate_contract, validate_payload
 from cxrp.vocabulary.lane import LaneType
@@ -26,12 +26,12 @@ from operations_center.contracts.common import (
     ValidationProfile,
     ValidationSummary,
 )
-from operations_center.contracts.ecp_mapper import (
+from operations_center.contracts.cxrp_mapper import (
     CODING_AGENT_INPUT_SCHEMA_ID,
-    to_ecp_execution_request,
-    to_ecp_execution_result,
-    to_ecp_lane_decision,
-    to_ecp_task_proposal,
+    to_cxrp_execution_request,
+    to_cxrp_execution_result,
+    to_cxrp_lane_decision,
+    to_cxrp_task_proposal,
 )
 from operations_center.contracts.enums import (
     ArtifactType,
@@ -50,7 +50,7 @@ from operations_center.contracts.routing import LaneDecision
 
 
 def _serialize_envelope(contract) -> dict:
-    """Render an ECP dataclass tree to a wire-shaped dict.
+    """Render an CxRP dataclass tree to a wire-shaped dict.
 
     Mirrors BaseContract.to_dict() but recursively unwraps nested
     dataclasses and Enum values so the result is JSON-shape compatible.
@@ -68,7 +68,7 @@ def _serialize_envelope(contract) -> dict:
     return payload
 
 
-def _serialize_result(result: EcpExecutionResult) -> dict:
+def _serialize_result(result: CxrpExecutionResult) -> dict:
     payload = result.to_dict()
     payload["status"] = (
         payload["status"].value if hasattr(payload["status"], "value") else payload["status"]
@@ -169,29 +169,29 @@ def _make_result(request: ExecutionRequest) -> ExecutionResult:
 # ----------------------------------------------------------------------
 
 
-def test_to_ecp_task_proposal_returns_ecp_envelope():
-    ecp = to_ecp_task_proposal(_make_proposal())
-    assert isinstance(ecp, EcpTaskProposal)
-    assert ecp.contract_kind == "task_proposal"
-    assert ecp.schema_version == "0.2"
+def test_to_cxrp_task_proposal_returns_ecp_envelope():
+    cxrp = to_cxrp_task_proposal(_make_proposal())
+    assert isinstance(cxrp, CxrpTaskProposal)
+    assert cxrp.contract_kind == "task_proposal"
+    assert cxrp.schema_version == "0.2"
 
 
 def test_ecp_task_proposal_validates_against_schema():
-    ecp = to_ecp_task_proposal(_make_proposal())
-    validate_contract("task_proposal", ecp.to_dict())
+    cxrp = to_cxrp_task_proposal(_make_proposal())
+    validate_contract("task_proposal", cxrp.to_dict())
 
 
 def test_ecp_task_proposal_carries_layered_vocabulary():
-    ecp = to_ecp_task_proposal(_make_proposal())
-    assert ecp.task_type == "bug_fix"
-    assert ecp.execution_mode == "goal"
-    assert ecp.priority == "normal"
-    assert ecp.risk_level == "low"
+    cxrp = to_cxrp_task_proposal(_make_proposal())
+    assert cxrp.task_type == "bug_fix"
+    assert cxrp.execution_mode == "goal"
+    assert cxrp.priority == "normal"
+    assert cxrp.risk_level == "low"
 
 
 def test_ecp_task_proposal_target_uses_well_known_payload_schema():
-    ecp = to_ecp_task_proposal(_make_proposal())
-    target = ecp.target
+    cxrp = to_cxrp_task_proposal(_make_proposal())
+    target = cxrp.target
     assert target is not None
     assert target["$payload_schema"] == "coding_agent_target/v0.2"
     assert target["repo_key"] == "velascat/api-service"
@@ -202,22 +202,22 @@ def test_ecp_task_proposal_target_uses_well_known_payload_schema():
 # ----------------------------------------------------------------------
 
 
-def test_to_ecp_lane_decision_separates_category_from_executor_backend():
-    ecp = to_ecp_lane_decision(_make_decision("p-1"))
-    assert ecp.lane == LaneType.CODING_AGENT
-    assert ecp.executor == "claude_cli"
-    assert ecp.backend == "kodo"
+def test_to_cxrp_lane_decision_separates_category_from_executor_backend():
+    cxrp = to_cxrp_lane_decision(_make_decision("p-1"))
+    assert cxrp.lane == LaneType.CODING_AGENT
+    assert cxrp.executor == "claude_cli"
+    assert cxrp.backend == "kodo"
 
 
 def test_ecp_lane_decision_validates_against_schema():
-    ecp = to_ecp_lane_decision(_make_decision("p-1"))
-    validate_contract("lane_decision", _serialize_envelope(ecp))
+    cxrp = to_cxrp_lane_decision(_make_decision("p-1"))
+    validate_contract("lane_decision", _serialize_envelope(cxrp))
 
 
 def test_ecp_lane_decision_alternatives_become_structured():
-    ecp = to_ecp_lane_decision(_make_decision("p-1"))
-    assert len(ecp.alternatives) == 1
-    assert ecp.alternatives[0].executor == "codex_cli"
+    cxrp = to_cxrp_lane_decision(_make_decision("p-1"))
+    assert len(cxrp.alternatives) == 1
+    assert cxrp.alternatives[0].executor == "codex_cli"
 
 
 # ----------------------------------------------------------------------
@@ -225,27 +225,27 @@ def test_ecp_lane_decision_alternatives_become_structured():
 # ----------------------------------------------------------------------
 
 
-def test_to_ecp_execution_request_validates_against_schema():
+def test_to_cxrp_execution_request_validates_against_schema():
     req = _make_request("p-1", "d-1")
-    ecp = to_ecp_execution_request(req, executor="claude_cli", backend="kodo")
-    payload = ecp.to_dict()
+    cxrp = to_cxrp_execution_request(req, executor="claude_cli", backend="kodo")
+    payload = cxrp.to_dict()
     payload["lane"] = payload["lane"].value if hasattr(payload["lane"], "value") else payload["lane"]
     validate_contract("execution_request", payload)
 
 
 def test_execution_request_input_payload_validates_against_lane_schema():
     req = _make_request("p-1", "d-1")
-    ecp = to_ecp_execution_request(req, executor="claude_cli", backend="kodo")
-    assert ecp.input_payload_schema == CODING_AGENT_INPUT_SCHEMA_ID
-    validate_payload(ecp.input_payload_schema, ecp.input_payload)
+    cxrp = to_cxrp_execution_request(req, executor="claude_cli", backend="kodo")
+    assert cxrp.input_payload_schema == CODING_AGENT_INPUT_SCHEMA_ID
+    validate_payload(cxrp.input_payload_schema, cxrp.input_payload)
 
 
 def test_execution_request_limits_are_universal():
-    ecp = to_ecp_execution_request(_make_request("p", "d"), executor="claude_cli", backend="kodo")
-    assert ecp.limits is not None
-    assert ecp.limits.max_changed_files == 25
-    assert ecp.limits.timeout_seconds == 600
-    assert ecp.limits.require_clean_validation is True
+    cxrp = to_cxrp_execution_request(_make_request("p", "d"), executor="claude_cli", backend="kodo")
+    assert cxrp.limits is not None
+    assert cxrp.limits.max_changed_files == 25
+    assert cxrp.limits.timeout_seconds == 600
+    assert cxrp.limits.require_clean_validation is True
 
 
 # ----------------------------------------------------------------------
@@ -253,25 +253,25 @@ def test_execution_request_limits_are_universal():
 # ----------------------------------------------------------------------
 
 
-def test_to_ecp_execution_result_validates_against_schema():
+def test_to_cxrp_execution_result_validates_against_schema():
     req = _make_request("p", "d")
     result = _make_result(req)
-    ecp = to_ecp_execution_result(result)
-    validate_contract("execution_result", _serialize_result(ecp))
+    cxrp = to_cxrp_execution_result(result)
+    validate_contract("execution_result", _serialize_result(cxrp))
 
 
 def test_ecp_execution_result_status_uses_canonical_spelling():
     req = _make_request("p", "d")
     result = _make_result(req)
-    ecp = to_ecp_execution_result(result)
-    assert ecp.status.value == "succeeded"
+    cxrp = to_cxrp_execution_result(result)
+    assert cxrp.status.value == "succeeded"
 
 
 def test_ecp_execution_result_artifact_kind_preserves_oc_vocabulary():
     req = _make_request("p", "d")
     result = _make_result(req)
-    ecp = to_ecp_execution_result(result)
-    kinds = {a.kind for a in ecp.artifacts}
+    cxrp = to_cxrp_execution_result(result)
+    kinds = {a.kind for a in cxrp.artifacts}
     assert "diff" in kinds
     assert "pr_url" in kinds
 
@@ -279,9 +279,9 @@ def test_ecp_execution_result_artifact_kind_preserves_oc_vocabulary():
 def test_ecp_execution_result_diagnostics_carry_validation_summary():
     req = _make_request("p", "d")
     result = _make_result(req)
-    ecp = to_ecp_execution_result(result)
-    assert ecp.diagnostics["validation_status"] == "passed"
-    assert ecp.diagnostics["branch_pushed"] is True
+    cxrp = to_cxrp_execution_result(result)
+    assert cxrp.diagnostics["validation_status"] == "passed"
+    assert cxrp.diagnostics["branch_pushed"] is True
 
 
 # ----------------------------------------------------------------------
@@ -289,10 +289,10 @@ def test_ecp_execution_result_diagnostics_carry_validation_summary():
 # ----------------------------------------------------------------------
 
 
-def test_ecp_mapper_does_not_invoke_adapters_or_execution():
+def test_cxrp_mapper_does_not_invoke_adapters_or_execution():
     """Boundary check: mapper module must be import-side-effect-free and
     must not pull in adapters/execution coordinators."""
-    import operations_center.contracts.ecp_mapper as mod
+    import operations_center.contracts.cxrp_mapper as mod
 
     forbidden = (
         "operations_center.adapters",
@@ -301,12 +301,12 @@ def test_ecp_mapper_does_not_invoke_adapters_or_execution():
     )
     src = Path(mod.__file__).read_text()
     for needle in forbidden:
-        assert needle not in src, f"ecp_mapper unexpectedly imports {needle}"
+        assert needle not in src, f"cxrp_mapper unexpectedly imports {needle}"
 
 
 @pytest.mark.parametrize("status_value", ["succeeded", "failed", "cancelled", "timed_out"])
 def test_ecp_status_round_trip_for_terminal_states(status_value):
-    """All OC ExecutionStatus values that ECP also defines must round-trip."""
+    """All OC ExecutionStatus values that CxRP also defines must round-trip."""
     req = _make_request("p", "d")
     oc = ExecutionResult(
         run_id=req.run_id,
@@ -316,5 +316,5 @@ def test_ecp_status_round_trip_for_terminal_states(status_value):
         success=(status_value == "succeeded"),
         validation=ValidationSummary(status=ValidationStatus.SKIPPED),
     )
-    ecp = to_ecp_execution_result(oc)
-    assert ecp.status.value == status_value
+    cxrp = to_cxrp_execution_result(oc)
+    assert cxrp.status.value == status_value
