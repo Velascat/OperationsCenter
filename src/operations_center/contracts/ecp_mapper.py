@@ -39,6 +39,7 @@ from ecp.contracts import (
 from ecp.vocabulary.lane import LaneType
 from ecp.vocabulary.status import ExecutionStatus as EcpExecutionStatus
 
+from .enums import BackendName, LaneName
 from .execution import ExecutionRequest, ExecutionResult
 from .proposal import TaskProposal
 from .routing import LaneDecision
@@ -112,6 +113,39 @@ def to_ecp_lane_decision(
         alternatives=[
             EcpLaneAlternative(lane=_category_for(alt.value), executor=alt.value)
             for alt in oc.alternatives_considered
+        ],
+    )
+
+
+def from_ecp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
+    """Reconstruct an OC ``LaneDecision`` from an ECP wire payload.
+
+    Used at the OC consume boundary (``HttpLaneRoutingClient``) to accept
+    SwitchBoard's ECP-shaped ``/route`` response. Narrows ECP's
+    open-string ``executor``/``backend`` back into OC's ``LaneName``/
+    ``BackendName`` ``Literal`` constraints; raises ``ValueError`` if the
+    incoming executor or backend is not one OC recognises.
+    """
+    executor = payload.get("executor")
+    backend = payload.get("backend")
+    if executor is None or backend is None:
+        raise ValueError(
+            "ECP LaneDecision missing executor/backend; "
+            "OC requires both to narrow into LaneName/BackendName."
+        )
+    metadata = payload.get("metadata") or {}
+    return LaneDecision(
+        decision_id=payload["decision_id"],
+        proposal_id=payload["proposal_id"],
+        selected_lane=LaneName(executor),
+        selected_backend=BackendName(backend),
+        confidence=payload.get("confidence", 1.0),
+        policy_rule_matched=metadata.get("policy_rule_matched"),
+        rationale=payload.get("rationale") or None,
+        alternatives_considered=[
+            LaneName(alt["executor"])
+            for alt in payload.get("alternatives", [])
+            if alt.get("executor") is not None
         ],
     )
 

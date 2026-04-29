@@ -124,6 +124,59 @@ def test_stub_returns_fixed_decision() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_http_client_decodes_ecp_shape_response() -> None:
+    """SwitchBoard emits ECP v0.2 envelope; the client must deserialize it
+    back into the OC LaneDecision."""
+    ecp_payload = {
+        "schema_version": "0.2",
+        "contract_kind": "lane_decision",
+        "decision_id": "dec-ecp-1",
+        "proposal_id": "prop-ecp-1",
+        "metadata": {"policy_rule_matched": "test_rule"},
+        "lane": "coding_agent",
+        "executor": "claude_cli",
+        "backend": "kodo",
+        "rationale": "ecp-shape decision",
+        "confidence": 0.88,
+        "alternatives": [
+            {"lane": "coding_agent", "executor": "codex_cli"}
+        ],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=ecp_payload)
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    proposal = build_proposal(_ctx())
+    try:
+        decision = client.select_lane(proposal)
+    finally:
+        client.close()
+
+    assert decision.selected_lane == LaneName.CLAUDE_CLI
+    assert decision.selected_backend == BackendName.KODO
+    assert decision.confidence == 0.88
+    assert decision.policy_rule_matched == "test_rule"
+    assert decision.alternatives_considered == [LaneName.CODEX_CLI]
+
+
+def test_http_client_still_accepts_legacy_oc_shape_response() -> None:
+    """Backward compatibility during the wire-flip transition: the client
+    accepts OC's rich Pydantic shape from older SwitchBoard deployments."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_stub_decision().model_dump(mode="json"))
+
+    client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
+    proposal = build_proposal(_ctx())
+    try:
+        decision = client.select_lane(proposal)
+    finally:
+        client.close()
+
+    assert decision.selected_lane == LaneName.CLAUDE_CLI
+
+
 def test_connect_error_raises_switchboard_unavailable() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("Connection refused")
