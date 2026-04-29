@@ -1,12 +1,20 @@
 """
-contracts — canonical cross-repo types for the AI coding platform.
+contracts — OperationsCenter's internal subtype of the ECP envelope.
 
-These models are the single source of truth for how platform components
-(OperationsCenter, SwitchBoard, backend adapters) exchange structured data.
-They are Pydantic v2, fully serialisable, and backend-agnostic.
+The canonical cross-repo wire contract is **ExecutionContractProtocol**
+(``ecp.contracts``). The classes here are OperationsCenter's *internal*
+Pydantic representation: they layer narrower types (``LaneName``,
+``BackendName``, structured ``TaskTarget``/``BranchPolicy``/
+``ValidationProfile``) on top of ECP's open envelope so adapters and
+policy can rely on stricter shapes within OC.
 
-Canonical ownership:  OperationsCenter (src/operations_center/contracts/)
-Consumers:            SwitchBoard, kodo adapters, Archon, any backend
+At repo boundaries (HTTP between OC ↔ SwitchBoard, JSON written for
+OperatorConsole, run artifacts) these models are translated to ECP shape
+via ``operations_center.contracts.ecp_mapper``. The wire format is ECP;
+this module is the OC-internal subtype.
+
+Canonical wire format:  ECP v0.2 (https://github.com/Velascat/ExecutionContractProtocol)
+Internal owner:         OperationsCenter (Pydantic; this package)
 """
 
 from .enums import (
