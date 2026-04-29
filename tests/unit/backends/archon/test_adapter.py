@@ -81,7 +81,7 @@ def test_execute_returns_execution_result(tmp_path):
 
 def test_successful_execution_gives_success_status(tmp_path):
     result = _adapter(_mock_archon(outcome="success")).execute(_req(tmp_path))
-    assert result.status == ExecutionStatus.SUCCESS
+    assert result.status == ExecutionStatus.SUCCEEDED
     assert result.success is True
 
 
@@ -118,7 +118,7 @@ def test_backend_failure_returns_failed_status(tmp_path):
 def test_timeout_outcome_gives_timeout_status(tmp_path):
     archon = _mock_archon(outcome="timeout")
     result = ArchonBackendAdapter(archon).execute(_req(tmp_path))
-    assert result.status == ExecutionStatus.TIMEOUT
+    assert result.status == ExecutionStatus.TIMED_OUT
     assert result.failure_category == FailureReasonCategory.TIMEOUT
 
 

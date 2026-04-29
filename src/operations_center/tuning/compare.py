@@ -172,7 +172,7 @@ def _build_summary(
     timeout_count = sum(
         1 for r in records
         if r.result.failure_category == FailureReasonCategory.TIMEOUT
-        or r.result.status == ExecutionStatus.TIMEOUT
+        or r.result.status == ExecutionStatus.TIMED_OUT
     )
 
     val_pass_count = sum(

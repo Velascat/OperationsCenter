@@ -98,7 +98,7 @@ class TestSuccess:
         with patch("subprocess.run", return_value=_fake_proc(returncode=0)):
             result = _adapter().execute(_request(tmp_path))
         assert result.success is True
-        assert result.status == ExecutionStatus.SUCCESS
+        assert result.status == ExecutionStatus.SUCCEEDED
 
     def test_success_has_no_failure_category(self, tmp_path):
         repo = tmp_path / "repo"
@@ -157,7 +157,7 @@ class TestTimeout:
         repo.mkdir()
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="aider", timeout=30)):
             result = _adapter(timeout_seconds=30).execute(_request(tmp_path))
-        assert result.status == ExecutionStatus.TIMEOUT
+        assert result.status == ExecutionStatus.TIMED_OUT
 
     def test_timeout_sets_timeout_failure_category(self, tmp_path):
         repo = tmp_path / "repo"

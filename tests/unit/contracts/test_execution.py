@@ -47,7 +47,7 @@ def _minimal_result(**kw) -> ExecutionResult:
         run_id="run-1",
         proposal_id="prop-1",
         decision_id="dec-1",
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
     )
     defaults.update(kw)
@@ -227,7 +227,7 @@ class TestExecutionResult:
     def test_minimal_success(self):
         r = _minimal_result()
         assert r.success is True
-        assert r.status == ExecutionStatus.SUCCESS
+        assert r.status == ExecutionStatus.SUCCEEDED
         assert r.changed_files == []
         assert r.artifacts == []
         assert r.branch_pushed is False
@@ -298,7 +298,7 @@ class TestExecutionResult:
     def test_json_enum_values_are_strings(self):
         r = _minimal_result()
         parsed = json.loads(r.model_dump_json())
-        assert parsed["status"] == "success"
+        assert parsed["status"] == "succeeded"
 
     def test_failed_result_round_trip(self):
         r = _minimal_result(
@@ -323,7 +323,7 @@ class TestContractIntegration:
             run_id="run-99",
             proposal_id="prop-1",
             decision_id="dec-1",
-            status=ExecutionStatus.SUCCESS,
+            status=ExecutionStatus.SUCCEEDED,
             success=True,
             changed_files=[ChangedFileRef(path="src/x.py", lines_added=5)],
             changed_files_source="git_diff",

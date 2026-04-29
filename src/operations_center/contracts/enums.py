@@ -51,10 +51,10 @@ class ExecutionStatus(str, Enum):
     """Terminal or in-progress outcome of an execution run."""
     PENDING = "pending"
     RUNNING = "running"
-    SUCCESS = "success"
+    SUCCEEDED = "succeeded"
     FAILED = "failed"
     SKIPPED = "skipped"
-    TIMEOUT = "timeout"
+    TIMED_OUT = "timed_out"
     CANCELLED = "cancelled"
 
 

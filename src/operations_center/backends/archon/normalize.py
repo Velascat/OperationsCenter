@@ -59,7 +59,7 @@ def normalize(
         validation_duration_ms: Validation wall-clock time.
     """
     success = capture.succeeded
-    status = ExecutionStatus.SUCCESS if success else _map_failure_status(capture)
+    status = ExecutionStatus.SUCCEEDED if success else _map_failure_status(capture)
 
     changed_files, changed_files_source, changed_files_confidence = (
         _discover_changed_files(workspace_path) if workspace_path else ([], "unknown", 0.0)
@@ -109,7 +109,7 @@ def normalize(
 
 def _map_failure_status(capture: ArchonRunCapture) -> ExecutionStatus:
     if capture.timeout_hit or capture.outcome == "timeout":
-        return ExecutionStatus.TIMEOUT
+        return ExecutionStatus.TIMED_OUT
     return ExecutionStatus.FAILED
 
 

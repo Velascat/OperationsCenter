@@ -55,7 +55,7 @@ def test_record_id_links_to_record(recorder, builder, successful_rich_result):
 def test_status_matches_result(recorder, builder, successful_rich_result):
     record = recorder.record(successful_rich_result)
     trace = builder.build_report(record)
-    assert trace.status == ExecutionStatus.SUCCESS
+    assert trace.status == ExecutionStatus.SUCCEEDED
 
 
 def test_generated_at_is_set(recorder, builder, successful_rich_result):
@@ -71,7 +71,7 @@ def test_generated_at_is_set(recorder, builder, successful_rich_result):
 
 def test_headline_contains_status(recorder, builder, successful_rich_result):
     trace = _trace(successful_rich_result, recorder, builder)
-    assert "SUCCESS" in trace.headline
+    assert "SUCCEEDED" in trace.headline
 
 
 def test_headline_contains_backend(recorder, builder, successful_rich_result):
@@ -102,7 +102,7 @@ def test_headline_for_failure(recorder, builder, failed_result_with_logs):
 
 def test_headline_for_timeout(recorder, builder, timeout_result):
     trace = _trace(timeout_result, recorder, builder)
-    assert "TIMEOUT" in trace.headline
+    assert "TIMED_OUT" in trace.headline
 
 
 # ---------------------------------------------------------------------------

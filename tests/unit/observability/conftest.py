@@ -25,7 +25,7 @@ def make_result(
     run_id: str = "run-0001",
     proposal_id: str = "prop-0001",
     decision_id: str = "dec-0001",
-    status: ExecutionStatus = ExecutionStatus.SUCCESS,
+    status: ExecutionStatus = ExecutionStatus.SUCCEEDED,
     success: bool = True,
     changed_files: Optional[list[ChangedFileRef]] = None,
     changed_files_source: Optional[str] = None,
@@ -91,7 +91,7 @@ def successful_rich_result() -> ExecutionResult:
     """Successful run: known changed files, validation passed, diff artifact."""
     return make_result(
         run_id="run-rich-01",
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[
             make_changed_file("src/main.py", "modified"),
@@ -132,7 +132,7 @@ def timeout_result() -> ExecutionResult:
     """Timeout: no artifacts, no changed files."""
     return make_result(
         run_id="run-timeout-01",
-        status=ExecutionStatus.TIMEOUT,
+        status=ExecutionStatus.TIMED_OUT,
         success=False,
         failure_category=FailureReasonCategory.TIMEOUT,
         failure_reason="kodo exited -1: [timeout: process group killed after 300s]",

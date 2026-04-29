@@ -85,7 +85,7 @@ def test_execute_returns_execution_result(tmp_path):
 def test_execute_success_status(tmp_path):
     adapter = OpenClawBackendAdapter.with_stub(outcome="success")
     result = adapter.execute(_req(tmp_path))
-    assert result.status == ExecutionStatus.SUCCESS
+    assert result.status == ExecutionStatus.SUCCEEDED
     assert result.success is True
 
 
@@ -125,7 +125,7 @@ def test_execute_failure_status(tmp_path):
 def test_execute_timeout_status(tmp_path):
     adapter = OpenClawBackendAdapter.with_stub(outcome="timeout")
     result = adapter.execute(_req(tmp_path))
-    assert result.status == ExecutionStatus.TIMEOUT
+    assert result.status == ExecutionStatus.TIMED_OUT
 
 
 def test_execute_unsupported_request_returns_unsupported_request(tmp_path):

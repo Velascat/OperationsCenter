@@ -53,7 +53,7 @@ def _success_result(request: ExecutionRequest) -> ExecutionResult:
         run_id=request.run_id,
         proposal_id=request.proposal_id,
         decision_id=request.decision_id,
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         validation=ValidationSummary(status=ValidationStatus.PASSED),
     )
@@ -174,7 +174,7 @@ class TestWriteRun:
         run_dir = tmp_path / "runs" / result.run_id
         data = json.loads((run_dir / "result.json").read_text())
         assert data["success"] is True
-        assert data["status"] == ExecutionStatus.SUCCESS.value
+        assert data["status"] == ExecutionStatus.SUCCEEDED.value
 
     def test_execution_request_json_is_valid(self, tmp_path):
         bundle = _bundle()

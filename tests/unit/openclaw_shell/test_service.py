@@ -42,7 +42,7 @@ def _success_result(**kw):
         run_id="run-svc01",
         proposal_id="prop-svc01",
         decision_id="dec-svc01",
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[make_changed_file("src/main.py")],
         validation_status=ValidationStatus.PASSED,
@@ -192,7 +192,7 @@ def test_summarize_result_success(stub_svc):
     result = _success_result()
     summary = stub_svc.summarize_result(result, lane="claude_cli", backend="kodo")
     assert summary.success is True
-    assert summary.status == ExecutionStatus.SUCCESS.value
+    assert summary.status == ExecutionStatus.SUCCEEDED.value
 
 
 def test_summarize_result_failure(stub_svc):
@@ -281,7 +281,7 @@ def test_inspect_record_status(stub_svc):
     record = recorder.record(result, backend="kodo", lane="claude_cli")
     trace = builder.build_report(record)
     r = stub_svc.inspect_record(record, trace)
-    assert r.status == ExecutionStatus.SUCCESS.value
+    assert r.status == ExecutionStatus.SUCCEEDED.value
     assert r.run_id == "run-svc01"
 
 

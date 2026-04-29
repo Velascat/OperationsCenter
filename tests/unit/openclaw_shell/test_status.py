@@ -47,7 +47,7 @@ def _success_result(**kw):
         run_id="run-s01",
         proposal_id="prop-s01",
         decision_id="dec-s01",
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[make_changed_file("src/main.py")],
         validation_status=ValidationStatus.PASSED,
@@ -94,7 +94,7 @@ def test_status_from_record_success_fields():
     record, trace = _make_record_and_trace(_success_result())
     summary = status_from_record(record, trace)
     assert summary.success is True
-    assert summary.status == ExecutionStatus.SUCCESS.value
+    assert summary.status == ExecutionStatus.SUCCEEDED.value
 
 
 def test_status_from_record_failure_fields():
@@ -188,7 +188,7 @@ def test_status_from_result_only_success():
     result = _success_result()
     summary = status_from_result_only(result)
     assert summary.success is True
-    assert summary.status == ExecutionStatus.SUCCESS.value
+    assert summary.status == ExecutionStatus.SUCCEEDED.value
 
 
 def test_status_from_result_only_failure():
@@ -201,7 +201,7 @@ def test_status_from_result_only_failure():
 def test_status_from_result_only_headline_contains_status():
     result = _success_result()
     summary = status_from_result_only(result, lane="claude_cli", backend="kodo")
-    assert "SUCCESS" in summary.headline.upper()
+    assert "SUCCEEDED" in summary.headline.upper()
 
 
 def test_status_from_result_only_headline_contains_run_id():
@@ -311,7 +311,7 @@ def test_inspection_from_record_identifiers():
 def test_inspection_from_record_status():
     record, trace = _make_record_and_trace(_success_result())
     r = inspection_from_record(record, trace)
-    assert r.status == ExecutionStatus.SUCCESS.value
+    assert r.status == ExecutionStatus.SUCCEEDED.value
 
 
 def test_inspection_from_record_headline_and_summary():

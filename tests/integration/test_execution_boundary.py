@@ -171,7 +171,7 @@ def test_aider_adapter_returns_result_for_trivial_goal(tmp_path: Path, aider_bin
     assert isinstance(result, ExecutionResult)
     assert result.proposal_id == bundle.proposal.proposal_id
     # Status may be SUCCESS or FAILED depending on aider's result — both are valid
-    assert result.status in {ExecutionStatus.SUCCESS, ExecutionStatus.FAILED}
+    assert result.status in {ExecutionStatus.SUCCEEDED, ExecutionStatus.FAILED}
 
 
 # ---------------------------------------------------------------------------

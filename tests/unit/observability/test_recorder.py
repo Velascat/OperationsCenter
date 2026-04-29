@@ -245,7 +245,7 @@ def test_sparse_result_produces_valid_record(recorder, sparse_result):
 
 def test_timeout_result_produces_valid_record(recorder):
     result = make_result(
-        status=ExecutionStatus.TIMEOUT,
+        status=ExecutionStatus.TIMED_OUT,
         success=False,
         failure_category=FailureReasonCategory.TIMEOUT,
         artifacts=[],
