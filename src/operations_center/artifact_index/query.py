@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """query_artifacts() — filter indexed artifacts by stable criteria."""
 
 from __future__ import annotations

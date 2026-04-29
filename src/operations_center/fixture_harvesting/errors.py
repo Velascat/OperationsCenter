@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Errors for the fixture harvesting subsystem."""
 
 from __future__ import annotations

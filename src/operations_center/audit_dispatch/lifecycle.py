@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Post-execution contract discovery for managed audit runs.
 
 After the audit subprocess exits (with any exit code), this module:

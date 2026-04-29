@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for Session 9 autonomy gap implementations.
 
 S9-1  Event-driven pipeline trigger

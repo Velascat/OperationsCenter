@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Promote autonomy-created Plane tasks from Backlog → Ready for AI.
 
 When the operator raises a family's autonomy tier from 1 to 2 (via

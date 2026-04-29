@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """QualityTrendDeriver — objective function for codebase quality measurement.
 
 Computes before/after deltas across retained observer snapshots to answer

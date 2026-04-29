@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for calibration report writing and loading."""
 
 from __future__ import annotations

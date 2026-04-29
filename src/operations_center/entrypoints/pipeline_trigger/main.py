@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Event-driven pipeline trigger — reruns autonomy-cycle when repo state changes.
 
 Rather than relying entirely on scheduled cron or manual invocations, this daemon

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Validation profile constants and family-to-profile mapping.
 
 A validation profile tells the execution worker what post-execution checks to run

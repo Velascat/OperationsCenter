@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 policy/explain.py — generate human-readable explanations for PolicyDecisions.
 

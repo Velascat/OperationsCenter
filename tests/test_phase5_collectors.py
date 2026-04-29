@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for Phase 5 observer collectors: architecture, benchmark, security."""
 from __future__ import annotations
 

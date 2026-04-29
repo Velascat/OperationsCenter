@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Periodic triage scan — priority rescore + awaiting-input unblock.
 
 Wraps `operations_center.priority_scans` helpers into an operator CLI.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Doc-convention detectors as a Custodian plugin contributor.
 
 The C8/C9 detectors caught most documentation drift but their noise

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Scheduled task seeder — periodically injects Plane work items.
 
 What this is: a generator. Each propose cycle, we check every entry in

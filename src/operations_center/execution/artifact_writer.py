@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """execution/artifact_writer.py — persist canonical run contracts to disk.
 
 Writes one directory per execution run:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Close PRs that have been open longer than RepoSettings.stale_pr_days.
 
 Wires the previously-dead `stale_pr_days` field. For each repo with the

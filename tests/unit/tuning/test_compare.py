@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 Unit tests for tuning/compare.py — compare_backends() and compare_by_task_type().
 

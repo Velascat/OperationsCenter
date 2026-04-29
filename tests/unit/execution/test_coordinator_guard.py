@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for ExecutionCoordinator's adapter crash guard.
 
 The coordinator must return a structured ExecutionResult when an adapter

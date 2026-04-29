@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Finding, AuditReport, Status, and Severity models for OpsCenter architecture invariants.
 
 These are OpsCenter-owned types — not imported from any managed repo.

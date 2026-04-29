@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for KodoBackendAdapter (end-to-end through the full pipeline)."""
 
 from __future__ import annotations

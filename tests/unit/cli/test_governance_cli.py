@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """CLI tests for operations-center-governance commands.
 
 Covers the full request → evaluate → approve → run round-trip using

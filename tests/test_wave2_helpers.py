@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Wave 2 — pre-execution validation helpers."""
 from __future__ import annotations
 

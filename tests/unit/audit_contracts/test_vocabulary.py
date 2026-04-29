@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for the managed-repo audit contract controlled vocabulary.
 
 Verifies that:

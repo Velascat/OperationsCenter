@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """CI Monitor: scans open PRs for failing checks and creates fix_pr tasks on the Plane board.
 
 Run as a standalone watcher:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Count code-quality suppression markers added in a kodo diff.
 
 Cited by `docs/design/autonomy_gaps.md` S5-10 (Kodo Quality Erosion

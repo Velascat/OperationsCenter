@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Wave 4 — multi-step planning helpers."""
 from __future__ import annotations
 

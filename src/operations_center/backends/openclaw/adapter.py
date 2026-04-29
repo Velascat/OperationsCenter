@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 backends/openclaw/adapter.py — OpenClawBackendAdapter: canonical entry point.
 

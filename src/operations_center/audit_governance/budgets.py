@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Budget state tracking for audit governance.
 
 State is file-backed JSON under the governance state directory.

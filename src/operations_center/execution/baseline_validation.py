@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Baseline validation step — run repo's validation_commands before kodo.
 
 Wires the previously-dead RepoSettings fields:

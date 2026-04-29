@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 7 — Artifact Index and Retrieval.
 
 Provides manifest loading, artifact indexing, query, and retrieval APIs

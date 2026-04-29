@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Derive CalibrationRecommendations from CalibrationFindings.
 
 Recommendations are advisory only. They are never applied automatically.

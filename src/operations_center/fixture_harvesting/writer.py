@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Fixture pack writer.
 
 Writes selected artifacts and metadata into an OperationsCenter-owned

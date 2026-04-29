@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Periodic Plane task seeder — implementation."""
 from __future__ import annotations
 

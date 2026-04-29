@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Workspace lifecycle for the execution boundary.
 
 The coordinator hands the adapter a workspace and a task branch, but until now

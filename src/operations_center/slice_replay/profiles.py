@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Replay profile → check-type mapping.
 
 Each profile selects a set of check types and determines whether they apply

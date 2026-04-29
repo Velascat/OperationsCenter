@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Audit toolset contract layer for managed repo audits.
 
 Phase 3 of the OpsCenter ↔ VideoFoundry audit system.

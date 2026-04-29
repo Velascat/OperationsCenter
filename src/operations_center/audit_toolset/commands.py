@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Command resolution — produce a ManagedAuditInvocationRequest from config.
 
 Given a repo_id, audit_type, and run_id, this module:

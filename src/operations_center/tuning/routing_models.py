@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 tuning/routing_models.py — Models for evidence-driven routing and backend strategy tuning.
 

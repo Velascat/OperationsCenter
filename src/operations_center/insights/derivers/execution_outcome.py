@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """ExecutionOutcomeDeriver — Phase 4 execution feedback depth.
 
 Reads retained kodo_plane execution artifacts to classify failure patterns

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Regression tests for insight derivers and evidence bundle (kodo test)."""
 
 

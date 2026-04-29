@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Long-lived proposal rejection store.
 
 Records dedup_keys for proposals that were explicitly rejected by humans (task

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 # tests/spec_director/test_state.py
 from __future__ import annotations
 from operations_center.spec_director.models import CampaignRecord, ActiveCampaigns

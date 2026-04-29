@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for the VideoFoundry managed repo config.
 
 These tests are config-only. They do not invoke VideoFoundry commands,

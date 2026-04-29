@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 3: OC's contracts produce wire payloads conforming to CxRP v0.2.
 
 Tests assert each OC→CxRP mapper emits a shape that validates against the

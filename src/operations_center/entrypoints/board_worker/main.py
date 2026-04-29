@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Board worker — Plane-polling watcher for goal, test, and improve roles.
 
 Polls the Plane board for "Ready for AI" issues with a matching task-kind label,

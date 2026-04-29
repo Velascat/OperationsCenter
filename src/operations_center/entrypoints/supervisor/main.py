@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """S7-1: Process supervisor for OperationsCenter watchers.
 
 Spawns and monitors the worker/reviewer/autonomy_cycle processes.  When a

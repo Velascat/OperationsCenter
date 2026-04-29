@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Integration test: full system real flow (no real VideoFoundry subprocess).
 
 Exercises the complete pipeline from a fake VideoFoundry producer through:

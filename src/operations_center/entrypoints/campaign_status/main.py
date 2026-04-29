@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """S10-4: campaign-status CLI entrypoint.
 
 Displays the progress of all multi-step campaigns tracked in

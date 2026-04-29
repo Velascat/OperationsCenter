@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Architecture-invariant detectors as a Custodian plugin contributor.
 
 Wraps the existing ``tools/audit/architecture_invariants`` checker in the

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Runtime error ingestion service (S8-8).
 
 Ingests runtime errors from two sources and converts them to Plane tasks:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Rules enforcing the unidirectional import graph inside src/operations_center/.
 
 Enforced edges (may import →):

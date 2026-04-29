@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Integration test: Phase 9 → Phase 10 → Phase 11 harvest-replay-regression chain.
 
 Exercises the full chain from a real artifact manifest through fixture harvesting,

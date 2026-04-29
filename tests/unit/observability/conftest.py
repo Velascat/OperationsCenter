@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Shared fixture factories for observability tests."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 6 dispatch request and result models."""
 
 from __future__ import annotations

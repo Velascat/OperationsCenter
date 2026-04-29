@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for spec_director main loop — cycle ordering and single board fetch."""
 from __future__ import annotations
 

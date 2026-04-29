@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 from types import SimpleNamespace
 
 from operations_center.entrypoints.maintenance.dependency_check import (

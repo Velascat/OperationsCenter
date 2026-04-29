@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Detect cross-repo impact when a goal touches a shared-interface path.
 
 Cited by `docs/design/autonomy_gaps.md` S7-6 (Cross-Repo Impact Analysis).

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Bidirectional mappers between OperationsCenter's internal Pydantic
 contracts and the canonical CxRP v0.2 envelope.
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for pr_review_watcher — two-phase PR review state machine.
 
 All GitHub API calls are intercepted via monkeypatching GitHubPRClient methods.

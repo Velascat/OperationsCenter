@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests that goal-file mutations during retries are idempotent.
 
 Verifies that validation feedback and scope-constraint violation rewrites

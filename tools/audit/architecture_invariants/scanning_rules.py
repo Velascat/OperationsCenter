@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Rule: artifact_index/ must not perform directory scanning.
 
 The only permitted path to artifact data is:

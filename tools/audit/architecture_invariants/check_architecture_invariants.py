@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """CLI entrypoint for the OperationsCenter architecture invariant audit.
 
 Usage:

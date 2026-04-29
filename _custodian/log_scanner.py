@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """LogScanner implementation for OperationsCenter watcher logs.
 
 Implements Custodian's LogScanner protocol over OC's ``logs/local/watch-all/*.log``

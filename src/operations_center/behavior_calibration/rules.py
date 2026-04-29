@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Calibration rules — pure functions that produce CalibrationFindings.
 
 Each rule function accepts a ManagedArtifactIndex and returns a list of

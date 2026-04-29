@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 upstream_eval/analyze.py — evidence-based evaluation of upstream patch candidates.
 """

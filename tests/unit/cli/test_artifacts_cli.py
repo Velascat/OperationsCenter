@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """CLI tests for operations-center-artifacts commands.
 
 Covers index / list / get / query using typer.testing.CliRunner.

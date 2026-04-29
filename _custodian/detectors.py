@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """OperationsCenter plugin detectors for Custodian.
 
 OC's nine code-health detectors, namespaced ``OC1``-``OC9`` to avoid

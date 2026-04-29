@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Plane-ingest compatibility models.
 
 The supported runtime crosses repo boundaries with canonical contract types under

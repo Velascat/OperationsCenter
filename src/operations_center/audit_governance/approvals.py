@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Manual approval handling for audit governance.
 
 validate_manual_approval() checks that an approval artifact consistently

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Artifact retrieval API.
 
 Provides safe reference and content retrieval for indexed artifacts.

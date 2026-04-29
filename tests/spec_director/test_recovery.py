@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 # tests/spec_director/test_recovery.py
 from __future__ import annotations
 from datetime import UTC, datetime, timedelta

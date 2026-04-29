@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Execute managed audit commands as external subprocesses.
 
 Captures stdout and stderr to log files. Never uses shell=True.

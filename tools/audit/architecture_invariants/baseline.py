@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Baseline load, save, and comparison for architecture invariant reports."""
 from __future__ import annotations
 

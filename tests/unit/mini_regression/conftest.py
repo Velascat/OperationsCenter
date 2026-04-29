@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Shared fixtures for mini_regression tests.
 
 Suite definitions are built from fixture packs created via Phase 9 harvesting.

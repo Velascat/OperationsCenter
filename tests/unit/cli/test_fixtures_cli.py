@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """CLI tests for operations-center-fixtures commands.
 
 Covers harvest / inspect / list using typer.testing.CliRunner.

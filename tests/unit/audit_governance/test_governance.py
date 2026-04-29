@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for Phase 12 audit governance.
 
 Covers: request validation, policy checks, decision logic, budget/cooldown state,

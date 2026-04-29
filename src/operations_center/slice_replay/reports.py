@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Slice replay report persistence.
 
 write_replay_report() writes a SliceReplayReport to an OpsCenter-owned path.

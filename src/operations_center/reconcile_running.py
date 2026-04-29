@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Per-task-kind reconciliation for stale Running tasks.
 
 Cited by `docs/design/autonomy_gaps.md` S5-3 (Per-Task-Kind Running TTL

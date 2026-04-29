@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """StateScanner implementation for OperationsCenter state files.
 
 Implements Custodian's StateScanner protocol over OC's

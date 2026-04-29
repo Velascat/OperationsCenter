@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Custodian sweep — run ``custodian-audit`` across every managed repo.
 
 For each repo in ``settings.repos`` that has a local checkout and a

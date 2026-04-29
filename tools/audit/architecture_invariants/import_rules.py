@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Rule: src/operations_center/ must not import any managed repo code.
 
 Forbidden patterns (line-start anchored by checking the AST module name):

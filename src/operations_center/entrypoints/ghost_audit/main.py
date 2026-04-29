@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Ghost-work audit scanner.
 
 Each detector here corresponds to a row in

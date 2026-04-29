@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Integration tests: observation_coverage deriver → rule pipeline."""
 from __future__ import annotations
 

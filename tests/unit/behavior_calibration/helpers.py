@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Shared test helpers for behavior_calibration tests.
 
 Non-fixture utilities used across test modules.

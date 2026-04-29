@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Guardrails enforcing the anti-collapse invariant.
 
 The one-way promotion pipeline:

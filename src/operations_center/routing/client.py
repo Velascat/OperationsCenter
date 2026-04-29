@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 routing/client.py — LaneRoutingClient protocol and concrete routing clients.
 

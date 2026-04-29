@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Mini regression suite runner.
 
 run_mini_regression_suite() iterates suite entries in order, calls the Phase 10

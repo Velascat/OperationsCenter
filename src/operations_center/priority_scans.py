@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Priority + scheduling scan helpers.
 
 Cited by `docs/design/autonomy_gaps.md` Wave 6 (S10-10 Task Priority

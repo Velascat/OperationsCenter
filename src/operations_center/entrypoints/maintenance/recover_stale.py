@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Recover Plane tasks stuck in `Running` state.
 
 A worker can die mid-task (OOM, restart, kodo subprocess hang) and leave

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Rule: the anti-collapse guardrail must be structurally present and non-empty.
 
 Two checks:

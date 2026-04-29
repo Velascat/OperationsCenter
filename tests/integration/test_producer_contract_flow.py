@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Integration test: Phase 5 fake-producer contract flow.
 
 Simulates what a VideoFoundry audit would produce (run_status.json +

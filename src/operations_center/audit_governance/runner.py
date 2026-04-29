@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Governed audit runner.
 
 run_governed_audit() is the single safe entry point for full managed audits.

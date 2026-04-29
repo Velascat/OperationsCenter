@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Deterministic governance policy checks.
 
 evaluate_governance_policies() runs all checks in order.

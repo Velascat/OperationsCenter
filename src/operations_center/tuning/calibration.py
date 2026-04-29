@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 6 confidence calibration infrastructure.
 
 Tracks the relationship between the confidence label the system assigned to a

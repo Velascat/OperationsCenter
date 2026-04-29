@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 planning/proposal_builder.py — maps PlanningContext → canonical TaskProposal.
 

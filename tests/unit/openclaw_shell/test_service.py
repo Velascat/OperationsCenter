@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for openclaw_shell/service.py — OpenClawShellService."""
 
 from __future__ import annotations

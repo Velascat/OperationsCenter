@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Manage autonomy tier configuration for proposal candidate families.
 
 Tiers control whether proposals created by the autonomy cycle are placed in

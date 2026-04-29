@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 10 — Slice Replay Testing from Fixture Packs.
 
 Turns harvested fixture packs into executable, focused replay tests.

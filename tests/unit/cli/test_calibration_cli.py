@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """CLI tests for operations-center-calibration commands.
 
 Covers analyze / tune-autonomy / report using typer.testing.CliRunner.

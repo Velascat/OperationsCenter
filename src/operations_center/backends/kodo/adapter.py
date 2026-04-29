@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 backends/kodo/adapter.py — KodoBackendAdapter: canonical entry point.
 

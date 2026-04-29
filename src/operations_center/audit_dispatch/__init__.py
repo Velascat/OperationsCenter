@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 6: Dispatch-orchestrated run control for managed repo audits.
 
 Public surface

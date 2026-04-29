@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """ManagedRunIdentity — the identity record for a managed audit run.
 
 Format

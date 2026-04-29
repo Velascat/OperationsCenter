@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Heuristic quality check for PR description bodies.
 
 Cited by `docs/design/autonomy_gaps.md` S9-8 (PR Description Quality Check).

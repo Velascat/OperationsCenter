@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Fixture pack loader.
 
 load_fixture_pack() deserializes a fixture_pack.json and validates that all

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Shared fixtures for slice_replay tests.
 
 All fixture packs are created using tmp_path. No VideoFoundry audits run.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Regression tests for task parser edge cases (kodo test)."""
 import pytest
 from operations_center.application.task_parser import TaskParser

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """ManagedAuditInvocationRequest — the OpsCenter-side audit invocation contract.
 
 This model captures everything OpsCenter knows at the moment it decides to

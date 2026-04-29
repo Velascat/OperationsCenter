@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """In-memory one-audit-per-repo lock registry.
 
 Policy: at most one managed audit per repo_id may be dispatched at a time.

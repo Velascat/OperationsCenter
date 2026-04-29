@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """NoOpLoopDeriver — detects families cycling without acceptance.
 
 When the same proposal family is proposed multiple times in a rolling window but

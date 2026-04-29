@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Run status and manifest discovery for managed audit outputs.
 
 The only permitted discovery chain is:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 proposal.py — TaskProposal: the canonical proposal emitted by OperationsCenter.
 

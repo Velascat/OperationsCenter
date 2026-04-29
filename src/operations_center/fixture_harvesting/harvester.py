@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Main fixture harvesting entry point.
 
 harvest_fixtures() is the single public function in this module.

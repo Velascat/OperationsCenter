@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Promote autonomy-created Plane tasks from Backlog → Ready for AI.
 
 Finds tasks with label "source: autonomy" in Backlog state whose family's

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """
 upstream_eval/recommend.py — conservative recommendation logic for upstream patch proposals.
 """

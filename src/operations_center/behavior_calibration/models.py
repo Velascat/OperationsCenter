@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 8 behavior calibration models.
 
 All output types (findings, recommendations, report) are immutable Pydantic

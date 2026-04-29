@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Pre-execution validation helpers.
 
 Cited by `docs/design/autonomy_gaps.md` Wave 2 entries (S3-2, S7-7, etc.).

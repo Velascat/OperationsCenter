@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Explicit error types for the audit toolset contract layer."""
 
 from __future__ import annotations

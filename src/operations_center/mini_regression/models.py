@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 11 mini regression suite models.
 
 Output types (suite definitions, reports, entry results) are Pydantic so they

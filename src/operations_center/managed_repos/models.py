@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Pydantic models for managed repo contracts."""
 
 from __future__ import annotations

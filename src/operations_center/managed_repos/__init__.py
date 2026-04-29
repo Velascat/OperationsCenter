@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Managed repo contracts — external repos OpsCenter invokes without importing."""
 
 from .loader import load_managed_repo_config

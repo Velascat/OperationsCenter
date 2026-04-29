@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Phase 9 — Fixture Harvesting from Managed Repo Audit Artifacts.
 
 Turns real managed audit runs into durable, reusable fixture packs.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """OperationsCenter-side artifact index models.
 
 These are derived/internal models built from a ManagedArtifactManifest.

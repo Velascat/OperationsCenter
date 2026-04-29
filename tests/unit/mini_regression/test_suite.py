@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for Phase 11 mini regression suite.
 
 Covers: suite loader, runner, report persistence, failure semantics,

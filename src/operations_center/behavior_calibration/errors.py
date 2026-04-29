@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Errors raised by the behavior calibration module."""
 
 from __future__ import annotations

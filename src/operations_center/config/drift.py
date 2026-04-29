@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Config schema drift detection.
 
 Compares a deployed ``operations_center.local.yaml`` against the bundled example

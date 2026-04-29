@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Unit tests for entrypoints.custodian_sweep.
 
 Covers the pure logic — _delta, _render_body, _find_open_sweep_task,

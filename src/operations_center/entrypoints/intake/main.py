@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Intake role — operator queue processor.
 
 Watches ~/.console/queue/ for task files submitted by `console run`.

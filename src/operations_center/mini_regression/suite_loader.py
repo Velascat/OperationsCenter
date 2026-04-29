@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Suite definition loader.
 
 load_mini_regression_suite() reads a JSON suite definition, validates its

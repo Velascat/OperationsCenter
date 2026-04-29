@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Maintenance window evaluation.
 
 A maintenance window is a recurring time-of-day + weekday range during

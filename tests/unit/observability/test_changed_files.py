@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """Tests for observability/changed_files.py — normalize_changed_files."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Velascat
 """analyze_artifacts() — main calibration analysis entry point.
 
 Routes a BehaviorCalibrationInput to the appropriate set of rules based
