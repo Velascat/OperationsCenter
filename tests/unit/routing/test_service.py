@@ -172,16 +172,22 @@ def test_default_service_uses_real_routing():
 
 
 def test_http_backed_service_routes_over_switchboard_boundary():
-    decision = LaneDecision(
-        proposal_id="prop-http-1",
-        selected_lane=LaneName.AIDER_LOCAL,
-        selected_backend=BackendName.DIRECT_LOCAL,
-        confidence=0.95,
-        policy_rule_matched="http_rule",
-    )
+    cxrp_payload = {
+        "schema_version": "0.2",
+        "contract_kind": "lane_decision",
+        "decision_id": "dec-http-1",
+        "proposal_id": "prop-http-1",
+        "metadata": {"policy_rule_matched": "http_rule"},
+        "lane": "coding_agent",
+        "executor": "aider_local",
+        "backend": "direct_local",
+        "confidence": 0.95,
+        "rationale": "",
+        "alternatives": [],
+    }
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=decision.model_dump(mode="json"))
+        return httpx.Response(200, json=cxrp_payload)
 
     client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
     service = PlanningService.with_client(client)

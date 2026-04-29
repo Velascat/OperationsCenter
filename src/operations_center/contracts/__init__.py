@@ -2,7 +2,7 @@
 contracts — OperationsCenter's internal subtype of the ECP envelope.
 
 The canonical cross-repo wire contract is **ExecutionContractProtocol**
-(``ecp.contracts``). The classes here are OperationsCenter's *internal*
+(``cxrp.contracts``). The classes here are OperationsCenter's *internal*
 Pydantic representation: they layer narrower types (``LaneName``,
 ``BackendName``, structured ``TaskTarget``/``BranchPolicy``/
 ``ValidationProfile``) on top of ECP's open envelope so adapters and

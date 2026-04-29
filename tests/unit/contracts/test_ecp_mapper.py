@@ -12,12 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from ecp.contracts import (
+from cxrp.contracts import (
     ExecutionResult as EcpExecutionResult,
     TaskProposal as EcpTaskProposal,
 )
-from ecp.validation.json_schema import validate_contract, validate_payload
-from ecp.vocabulary.lane import LaneType
+from cxrp.validation.json_schema import validate_contract, validate_payload
+from cxrp.vocabulary.lane import LaneType
 
 from operations_center.contracts.common import (
     BranchPolicy,

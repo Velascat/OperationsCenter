@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ecp.contracts import (
+from cxrp.contracts import (
     Artifact as EcpArtifact,
     ExecutionLimits as EcpExecutionLimits,
     ExecutionRequest as EcpExecutionRequest,
@@ -36,8 +36,8 @@ from ecp.contracts import (
     LaneDecision as EcpLaneDecision,
     TaskProposal as EcpTaskProposal,
 )
-from ecp.vocabulary.lane import LaneType
-from ecp.vocabulary.status import ExecutionStatus as EcpExecutionStatus
+from cxrp.vocabulary.lane import LaneType
+from cxrp.vocabulary.status import ExecutionStatus as EcpExecutionStatus
 
 from .enums import BackendName, LaneName
 from .execution import ExecutionRequest, ExecutionResult
