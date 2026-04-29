@@ -14,6 +14,7 @@ from operations_center.config.settings import Settings
 from operations_center.contracts.enums import BackendName
 from operations_center.contracts.execution import ExecutionRequest, ExecutionResult
 
+from .aider_local import AiderLocalBackendAdapter
 from .archon import ArchonBackendAdapter
 from .direct_local import DirectLocalBackendAdapter
 from .kodo import KodoBackendAdapter
@@ -57,6 +58,9 @@ class CanonicalBackendRegistry:
             ),
             BackendName.DIRECT_LOCAL: DirectLocalBackendAdapter(
                 settings.aider,
+            ),
+            BackendName.AIDER_LOCAL: AiderLocalBackendAdapter(
+                settings.aider_local,
             ),
         }
         if archon_adapter is not None:

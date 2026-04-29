@@ -53,6 +53,14 @@ class AiderSettings(BaseModel):
     extra_args: list[str] = Field(default_factory=list)
 
 
+class AiderLocalSettings(BaseModel):
+    binary: str = "aider"
+    model: str = "ollama/qwen2.5-coder:3b"
+    ollama_base_url: str = "http://localhost:11434"
+    timeout_seconds: int = 1800
+    extra_args: list[str] = Field(default_factory=list)
+
+
 class EscalationSettings(BaseModel):
     webhook_url: str = ""
     # Number of same-classification blocks within 24h before escalating
@@ -216,6 +224,7 @@ class Settings(BaseModel):
     git: GitSettings
     kodo: KodoSettings
     aider: AiderSettings = Field(default_factory=AiderSettings)
+    aider_local: AiderLocalSettings = Field(default_factory=AiderLocalSettings)
     repos: dict[str, RepoSettings]
     reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")

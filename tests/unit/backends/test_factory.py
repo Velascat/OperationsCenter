@@ -22,15 +22,23 @@ def test_canonical_registry_does_not_thread_switchboard_proxy_transport(monkeypa
         def __init__(self, settings) -> None:
             captured.append(("direct_local", settings))
 
+    class FakeAiderLocalAdapter:
+        def __init__(self, settings) -> None:
+            captured.append(("aider_local", settings))
+
     monkeypatch.setattr(backend_factory, "KodoBackendAdapter", FakeKodoAdapter)
     monkeypatch.setattr(backend_factory, "DirectLocalBackendAdapter", FakeDirectLocalAdapter)
+    monkeypatch.setattr(backend_factory, "AiderLocalBackendAdapter", FakeAiderLocalAdapter)
 
     settings = SimpleNamespace(
         kodo=object(),
         aider=object(),
+        aider_local=object(),
         spec_director=SimpleNamespace(switchboard_url="http://sb:20401"),
     )
 
     backend_factory.CanonicalBackendRegistry.from_settings(settings)
 
-    assert captured == [("kodo", settings.kodo), ("direct_local", settings.aider)]
+    assert ("kodo", settings.kodo) in captured
+    assert ("direct_local", settings.aider) in captured
+    assert ("aider_local", settings.aider_local) in captured
