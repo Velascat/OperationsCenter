@@ -71,7 +71,7 @@ def normalize(
         validation_duration_ms: Validation wall-clock time.
     """
     success = capture.succeeded
-    status = ExecutionStatus.SUCCESS if success else _map_failure_status(capture)
+    status = ExecutionStatus.SUCCEEDED if success else _map_failure_status(capture)
 
     changed_files, resolved_source = _resolve_changed_files(capture, workspace_path)
     diff_stat = _build_diff_stat(changed_files)
@@ -205,7 +205,7 @@ def _git_status_to_change_type(status: str) -> str:
 
 def _map_failure_status(capture: OpenClawRunCapture) -> ExecutionStatus:
     if capture.timeout_hit or capture.outcome == "timeout":
-        return ExecutionStatus.TIMEOUT
+        return ExecutionStatus.TIMED_OUT
     return ExecutionStatus.FAILED
 
 

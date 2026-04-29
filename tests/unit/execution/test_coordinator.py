@@ -108,7 +108,7 @@ def _success_result(bundle: ProposalDecisionBundle) -> ExecutionResult:
         run_id="run-1",
         proposal_id=bundle.proposal.proposal_id,
         decision_id=bundle.decision.decision_id,
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         validation=ValidationSummary(status=ValidationStatus.SKIPPED),
     )
@@ -218,7 +218,7 @@ def test_canonical_observability_preserves_inferred_changed_files_status() -> No
         run_id="run-2",
         proposal_id=bundle.proposal.proposal_id,
         decision_id=bundle.decision.decision_id,
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[ChangedFileRef(path="src/inferred.py", change_type="modified")],
         changed_files_source="event_stream",

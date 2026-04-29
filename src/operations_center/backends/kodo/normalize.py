@@ -54,7 +54,7 @@ def normalize(
         validation_excerpt:   First failure output if validation failed.
         validation_duration_ms: Validation wall-clock time.
     """
-    status = ExecutionStatus.SUCCESS if capture.succeeded else _map_failure_status(capture)
+    status = ExecutionStatus.SUCCEEDED if capture.succeeded else _map_failure_status(capture)
     success = capture.succeeded
 
     changed_files, changed_files_source, changed_files_confidence = (
@@ -105,7 +105,7 @@ def normalize(
 
 def _map_failure_status(capture: KodoRunCapture) -> ExecutionStatus:
     if capture.timeout_hit:
-        return ExecutionStatus.TIMEOUT
+        return ExecutionStatus.TIMED_OUT
     return ExecutionStatus.FAILED
 
 

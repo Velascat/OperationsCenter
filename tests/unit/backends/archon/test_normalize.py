@@ -50,7 +50,7 @@ def _capture(
 
 def test_success_outcome_gives_success_status():
     result = normalize(_capture(), proposal_id="p1", decision_id="d1")
-    assert result.status == ExecutionStatus.SUCCESS
+    assert result.status == ExecutionStatus.SUCCEEDED
     assert result.success is True
 
 
@@ -124,13 +124,13 @@ def test_failure_reason_set_on_failure():
 def test_timeout_outcome_gives_timeout_status():
     c = _capture(outcome="timeout", timeout_hit=True)
     result = normalize(c, proposal_id="p1", decision_id="d1")
-    assert result.status == ExecutionStatus.TIMEOUT
+    assert result.status == ExecutionStatus.TIMED_OUT
 
 
 def test_timeout_hit_flag_gives_timeout_status():
     c = _capture(outcome="failure", timeout_hit=True)
     result = normalize(c, proposal_id="p1", decision_id="d1")
-    assert result.status == ExecutionStatus.TIMEOUT
+    assert result.status == ExecutionStatus.TIMED_OUT
 
 
 def test_timeout_failure_category():

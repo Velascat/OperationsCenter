@@ -158,7 +158,7 @@ class ExecutionResult(BaseModel):
 
     # Outcome
     status: ExecutionStatus
-    success: bool = Field(description="True only when status == SUCCESS")
+    success: bool = Field(description="True only when status == SUCCEEDED")
 
     # What changed
     changed_files: list[ChangedFileRef] = Field(default_factory=list)

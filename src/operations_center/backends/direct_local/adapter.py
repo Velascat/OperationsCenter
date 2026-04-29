@@ -56,7 +56,7 @@ class DirectLocalBackendAdapter:
             run_id=request.run_id,
             proposal_id=request.proposal_id,
             decision_id=request.decision_id,
-            status=ExecutionStatus.SUCCESS if result.success else _failure_status(result),
+            status=ExecutionStatus.SUCCEEDED if result.success else _failure_status(result),
             success=result.success,
             changed_files=changed_files,
             changed_files_source=changed_files_source,
@@ -150,7 +150,7 @@ class _DirectLocalRunResult:
 
 def _failure_status(result) -> ExecutionStatus:
     if result.metadata.get("timeout_hit"):
-        return ExecutionStatus.TIMEOUT
+        return ExecutionStatus.TIMED_OUT
     return ExecutionStatus.FAILED
 
 

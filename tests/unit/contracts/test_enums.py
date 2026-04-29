@@ -50,7 +50,7 @@ class TestBackendName:
 
 class TestExecutionStatus:
     def test_terminal_states_present(self):
-        terminals = {"success", "failed", "skipped", "timeout", "cancelled"}
+        terminals = {"succeeded", "failed", "skipped", "timed_out", "cancelled"}
         assert terminals <= {m.value for m in ExecutionStatus}
 
     def test_in_progress_states_present(self):

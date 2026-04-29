@@ -88,7 +88,7 @@ class TestExecuteSuccess:
         adapter = _adapter(_mock_kodo(exit_code=0))
         result = adapter.execute(_request(tmp_path))
         assert result.success is True
-        assert result.status == ExecutionStatus.SUCCESS
+        assert result.status == ExecutionStatus.SUCCEEDED
 
     def test_run_id_preserved(self, tmp_path):
         repo = tmp_path / "repo"

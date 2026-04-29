@@ -25,7 +25,7 @@ _recorder = ExecutionRecorder()
 def make_result(
     *,
     run_id: str = "run-0001",
-    status: ExecutionStatus = ExecutionStatus.SUCCESS,
+    status: ExecutionStatus = ExecutionStatus.SUCCEEDED,
     success: bool = True,
     failure_category: FailureReasonCategory | None = None,
     validation_status: ValidationStatus = ValidationStatus.SKIPPED,
@@ -55,7 +55,7 @@ def make_record(
     run_id: str = "run-0001",
     backend: str = "kodo",
     lane: str = "claude_cli",
-    status: ExecutionStatus = ExecutionStatus.SUCCESS,
+    status: ExecutionStatus = ExecutionStatus.SUCCEEDED,
     success: bool = True,
     failure_category: FailureReasonCategory | None = None,
     validation_status: ValidationStatus = ValidationStatus.SKIPPED,
@@ -99,7 +99,7 @@ def make_success(backend: str = "kodo", lane: str = "claude_cli", **kw) -> Execu
     return make_record(
         backend=backend,
         lane=lane,
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         **kw,
     )
@@ -121,7 +121,7 @@ def make_timeout(backend: str = "kodo", lane: str = "claude_cli", **kw) -> Execu
     return make_record(
         backend=backend,
         lane=lane,
-        status=ExecutionStatus.TIMEOUT,
+        status=ExecutionStatus.TIMED_OUT,
         success=False,
         failure_category=FailureReasonCategory.TIMEOUT,
         changed_files=[],
@@ -147,7 +147,7 @@ def make_unknown_changed_files(
     """Successful run but no changed-file info (backend didn't report)."""
     result = make_result(
         run_id=kw.pop("run_id", "run-0001"),
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[],  # empty → normalize_changed_files returns UNKNOWN
     )

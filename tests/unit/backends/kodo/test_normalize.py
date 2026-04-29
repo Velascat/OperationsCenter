@@ -63,7 +63,7 @@ class TestSuccessNormalization:
     def test_success_result_fields(self):
         result = _normalize(_capture(exit_code=0))
         assert result.success is True
-        assert result.status == ExecutionStatus.SUCCESS
+        assert result.status == ExecutionStatus.SUCCEEDED
         assert result.failure_category is None
         assert result.failure_reason is None
 
@@ -120,7 +120,7 @@ class TestFailureNormalization:
     def test_timeout_status(self):
         capture = _capture(exit_code=-1, stderr="[timeout: process group killed after 300s]", timeout_hit=True)
         result = _normalize(capture)
-        assert result.status == ExecutionStatus.TIMEOUT
+        assert result.status == ExecutionStatus.TIMED_OUT
         assert result.failure_category == FailureReasonCategory.TIMEOUT
 
     def test_failure_reason_populated(self):
@@ -212,4 +212,4 @@ class TestResultSerialisation:
         import json
         result = _normalize(_capture())
         parsed = json.loads(result.model_dump_json())
-        assert parsed["status"] == "success"
+        assert parsed["status"] == "succeeded"

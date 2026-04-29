@@ -134,7 +134,7 @@ def _status_summary(**kw) -> ShellStatusSummary:
         run_id="run-1",
         proposal_id="prop-1",
         decision_id="dec-1",
-        status="success",
+        status="succeeded",
         success=True,
         headline="SUCCESS | kodo @ claude_cli | run=run-1abc",
         summary="Run run-1abc; changed 3 files",
@@ -146,7 +146,7 @@ def _status_summary(**kw) -> ShellStatusSummary:
 def test_status_summary_construction():
     s = _status_summary()
     assert s.run_id == "run-1"
-    assert s.status == "success"
+    assert s.status == "succeeded"
     assert s.success is True
 
 
@@ -193,7 +193,7 @@ def _inspection(**kw) -> ShellInspectionResult:
         run_id="run-1",
         proposal_id="prop-1",
         decision_id="dec-1",
-        status="success",
+        status="succeeded",
         headline="SUCCESS | kodo @ claude_cli | run=run-1",
         summary="Run run-1; changed 3 files; validation=passed",
     )
@@ -204,7 +204,7 @@ def _inspection(**kw) -> ShellInspectionResult:
 def test_inspection_construction():
     r = _inspection()
     assert r.run_id == "run-1"
-    assert r.status == "success"
+    assert r.status == "succeeded"
 
 
 def test_inspection_defaults():

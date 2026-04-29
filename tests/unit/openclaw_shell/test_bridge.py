@@ -44,7 +44,7 @@ def _success_result(**kw):
         run_id="run-br01",
         proposal_id="prop-br01",
         decision_id="dec-br01",
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[make_changed_file("src/main.py")],
         validation_status=ValidationStatus.PASSED,
@@ -250,7 +250,7 @@ def test_inspect_from_record_status(bridge):
     record = recorder.record(result, backend="kodo", lane="claude_cli")
     trace = builder.build_report(record)
     r = bridge.inspect_from_record(record, trace)
-    assert r.status == ExecutionStatus.SUCCESS.value
+    assert r.status == ExecutionStatus.SUCCEEDED.value
 
 
 # ---------------------------------------------------------------------------

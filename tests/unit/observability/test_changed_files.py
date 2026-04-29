@@ -161,7 +161,7 @@ def test_unsupported_request_notes_do_not_blame_policy():
 
 def test_empty_files_and_no_special_category_is_unknown():
     result = make_result(
-        status=ExecutionStatus.SUCCESS,
+        status=ExecutionStatus.SUCCEEDED,
         success=True,
         changed_files=[],
         failure_category=None,
