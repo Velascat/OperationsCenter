@@ -12,7 +12,7 @@ from typing import Protocol, runtime_checkable
 
 import httpx
 
-from operations_center.contracts.ecp_mapper import from_ecp_lane_decision
+from operations_center.contracts.cxrp_mapper import from_cxrp_lane_decision
 from operations_center.contracts.proposal import TaskProposal
 from operations_center.contracts.routing import LaneDecision
 
@@ -112,7 +112,7 @@ def _decode_route_response(payload: dict) -> LaneDecision:
         payload.get("contract_kind") == "lane_decision"
         and payload.get("schema_version", "").startswith("0.")
     ):
-        return from_ecp_lane_decision(payload)
+        return from_cxrp_lane_decision(payload)
     raise ValueError(
         "Unexpected /route response shape: expected CxRP LaneDecision "
         "envelope (contract_kind='lane_decision', schema_version='0.x'). "
