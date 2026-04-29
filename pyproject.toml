@@ -28,6 +28,10 @@ operations-center-governance = "operations_center.entrypoints.governance.main:ap
 # {ghost_work,flow,code_health}_audit.md for the catalogs each scanner enforces.
 operations-center-ghost-audit       = "operations_center.entrypoints.ghost_audit.main:main"
 operations-center-flow-audit        = "operations_center.entrypoints.flow_audit.main:main"
+# Cross-repo Custodian sweep — runs custodian-audit against every managed repo
+# with a local checkout and a .custodian.yaml, emits one Plane task per repo
+# with --emit. Read-only against the managed repos; mutates Plane only.
+operations-center-custodian-sweep   = "operations_center.entrypoints.custodian_sweep.main:main"
 # code_health_audit moved to Custodian (2026-04-29). Run `custodian-audit
 # --repo .` instead. The OC-specific detectors (OC1-OC9) live in
 # _custodian/detectors.py and are wired via .custodian.yaml.
