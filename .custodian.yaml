@@ -124,6 +124,8 @@ plugins:
 
 detectors:
   - module: _custodian.detectors:build_oc_detectors
+  - module: _custodian.architecture:build_oc_architecture_detectors
+  - module: _custodian.doc_conventions:build_oc_doc_convention_detectors
 
 maintenance:
   stale_pr_days: 7
