@@ -45,8 +45,24 @@ class AuditContext:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+# Single shared scanner instance — OCLogScanner is stateless and pure, so
+# a module-level instance avoids re-instantiation per detector call. Living
+# in _custodian/ means the parsing rules are reused by Custodian's detectors
+# too (no drift between OC's own ghost_audit and what Custodian sees).
+try:
+    from _custodian.log_scanner import OCLogScanner
+    _LOG_SCANNER = OCLogScanner()
+except ImportError:
+    _LOG_SCANNER = None
+
+
 def _log_lines_since(ctx: AuditContext) -> list[tuple[Path, str]]:
-    """Yield (log_path, line) tuples for every log file modified after ctx.since."""
+    """Yield (log_path, line) tuples for every log file modified after ctx.since.
+
+    Raw-line iterator kept for detectors that still grep with substring
+    matches; new detectors should prefer ``_log_events_since`` which uses
+    the OCLogScanner protocol implementation.
+    """
     out: list[tuple[Path, str]] = []
     if not ctx.log_dir.exists():
         return out
@@ -64,6 +80,21 @@ def _log_lines_since(ctx: AuditContext) -> list[tuple[Path, str]]:
     return out
 
 
+def _log_events_since(ctx: AuditContext):
+    """Yield (log_path, event_dict) for parseable lines via OCLogScanner.
+
+    Lines that don't match a known shape are silently skipped (delegated to
+    the scanner). This is the preferred iterator for detectors written
+    against structured event types rather than substring patterns.
+    """
+    if _LOG_SCANNER is None:
+        return
+    for log, line in _log_lines_since(ctx):
+        event = _LOG_SCANNER.parse_event(line)
+        if event is not None:
+            yield log, event
+
+
 # ── detectors ─────────────────────────────────────────────────────────────────
 
 def _detect_g4_oversized(ctx: AuditContext) -> tuple[int, list[str]]:
@@ -76,8 +107,26 @@ def _detect_g4_oversized(ctx: AuditContext) -> tuple[int, list[str]]:
 
 
 def _detect_g5_policy_blocked(ctx: AuditContext) -> tuple[int, list[str]]:
-    """Tasks blocked by policy after a kodo run."""
+    """Tasks blocked by policy after a kodo run.
+
+    Uses the structured event iterator — when the OCLogScanner sees a
+    board_worker_blocked event with category=policy_blocked, it surfaces
+    that as a typed dict we can match cleanly. Falls back to substring
+    matching when the scanner isn't available (CI without the editable
+    Custodian install).
+    """
     samples = []
+    if _LOG_SCANNER is not None:
+        for _log, event in _log_events_since(ctx):
+            if event.get("category") == "policy_blocked" and event.get("action") == "blocked":
+                ts = event.get("ts", "")
+                role = event.get("role", "?")
+                tid = (event.get("task_id") or "")[:36]
+                samples.append(f"{ts} [{role}] task_id={tid} blocked status=skipped category=policy_blocked")
+                if len(samples) >= 5:
+                    break
+        return len(samples), samples
+    # Fallback path
     for _log, line in _log_lines_since(ctx):
         if "category=policy_blocked" in line:
             samples.append(line.strip()[:120])

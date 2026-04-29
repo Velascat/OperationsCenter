@@ -107,17 +107,31 @@ def _detect_f11_retry_overflow(ctx: FlowContext) -> tuple[int, list[str]]:
 
 # ── F13: stale state files ───────────────────────────────────────────────────
 
+# Reuse OCStateScanner's per_task_subdirs list — single source of truth for
+# which state directories hold per-task records, keeping flow_audit and
+# cleanup_state from drifting if a new state store is added later.
+try:
+    from _custodian.state_scanner import OCStateScanner
+    _STATE_SCANNER = OCStateScanner()
+    _PER_TASK_SUBDIRS = _STATE_SCANNER.per_task_subdirs
+except ImportError:
+    _STATE_SCANNER = None
+    _PER_TASK_SUBDIRS = ("proposal_feedback", "pr_reviews", "improve_insights")
+
+
 def _detect_f13_stale_state(ctx: FlowContext) -> tuple[int, list[str]]:
     """Per-task state files older than 90 days where Plane task is terminal.
 
     Reports the count of files cleanup_state would delete; nonzero means
-    cleanup_state hasn't been run lately.
+    cleanup_state hasn't been run lately. The per-task-state directory list
+    is now sourced from OCStateScanner so flow_audit and the maintenance
+    CLIs can never disagree on what state lives where.
     """
     cutoff_age = 90 * 86400
     now = datetime.now(UTC).timestamp()
     samples = []
     n = 0
-    for sub in ("proposal_feedback", "pr_reviews", "improve_insights"):
+    for sub in _PER_TASK_SUBDIRS:
         d = ctx.state_dir / sub
         if not d.is_dir():
             continue
