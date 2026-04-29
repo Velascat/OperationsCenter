@@ -40,6 +40,11 @@ def main() -> int:
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--max-age-seconds", type=int, default=_DEFAULT_MAX_AGE,
                         help=f"reset Running tasks older than this (default: {_DEFAULT_MAX_AGE}s = 4h)")
+    parser.add_argument(
+        "--per-kind", action="store_true",
+        help="use per-task-kind TTLs (goal=4h, test=45min, improve=90min) "
+             "instead of a single threshold. Honors task-kind labels.",
+    )
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would be reset without modifying Plane")
     args = parser.parse_args()
@@ -61,6 +66,52 @@ def main() -> int:
     cutoff_seconds = args.max_age_seconds
     reset: list[dict] = []
     skipped: list[dict] = []
+
+    # Per-kind variant uses the helper from operations_center.reconcile_running
+    # which has its own TTL map (goal=4h, test=45min, etc.) and returns a
+    # structured candidate list. We unify the output shape below.
+    if args.per_kind:
+        from operations_center.reconcile_running import reconcile_stale_running_issues
+        candidates = reconcile_stale_running_issues(items, now=now)
+        for cand in candidates:
+            entry = {
+                "id":         cand.task_id,
+                "title":      cand.title,
+                "task_kind":  cand.task_kind,
+                "age_minutes": cand.age_minutes,
+                "ttl_minutes": cand.ttl_minutes,
+            }
+            if args.dry_run:
+                entry["action"] = "would_reset"
+                reset.append(entry)
+                continue
+            try:
+                client.transition_issue(cand.task_id, "Ready for AI")
+                client.comment_issue(
+                    cand.task_id,
+                    f"Auto-recovered: per-kind TTL exceeded "
+                    f"(kind={cand.task_kind}, age={cand.age_minutes}m, "
+                    f"ttl={cand.ttl_minutes}m). Re-promoted to Ready for AI.",
+                )
+                entry["action"] = "reset"
+                reset.append(entry)
+            except Exception as exc:
+                entry["action"] = "error"
+                entry["error"] = str(exc)
+                skipped.append(entry)
+        client.close()
+        out = {
+            "scanned_at":      now.isoformat(),
+            "mode":            "per-kind",
+            "dry_run":         args.dry_run,
+            "reset_count":     sum(1 for r in reset if r.get("action") == "reset"),
+            "would_reset_count": sum(1 for r in reset if r.get("action") == "would_reset"),
+            "skipped_count":   len(skipped),
+            "reset":           reset,
+            "skipped":         skipped,
+        }
+        print(json.dumps(out, indent=2))
+        return 0
 
     for issue in items:
         state = issue.get("state")

@@ -224,6 +224,12 @@ class WorkspaceManager:
             logger.warning("WorkspaceManager.finalize: push failed — %s", exc)
             return result
 
+        # Cross-repo impact warning: if the changed files touch any other
+        # repo's declared impact_report_paths, log the affected neighbours
+        # so the operator (or a future commenter) knows. Non-fatal — just
+        # surfaces information the WorkspaceManager already has.
+        self._warn_cross_repo_impact(ws, request)
+
         pr_url = self._maybe_create_pr(request)
 
         return result.model_copy(update={
@@ -231,6 +237,54 @@ class WorkspaceManager:
             "branch_name":      request.task_branch,
             "pull_request_url": pr_url,
         })
+
+    def _warn_cross_repo_impact(self, ws: Path, request: ExecutionRequest) -> None:
+        """Log a warning when changed files cross another repo's interface.
+
+        Pulls the changed files from `git diff --name-only HEAD~1..HEAD`
+        and runs them through `_check_cross_repo_impact` against the
+        configured repos. No Plane / GitHub side effects — this is
+        instrumentation, not control flow.
+        """
+        try:
+            from operations_center.cross_repo_impact import _check_cross_repo_impact
+        except Exception:
+            return  # helper missing — silent (defensive in case of partial install)
+        # Build {key: cfg} from whatever the lookup gives us.
+        # The lookup callback returns a single repo cfg; we don't have a
+        # full repo dict here. Skip if we can't enumerate.
+        all_repos: dict[str, object] = {}
+        # Attempt to walk a settings-like object if the lookup exposes it
+        # via attribute access on a wrapped Settings; otherwise we just
+        # log a stub. Real wiring through a settings reference is a
+        # deliberate next step (avoids breaking the existing unit tests
+        # that construct WorkspaceManager without settings).
+        if hasattr(self._repo_lookup, "__self__"):
+            settings_obj = getattr(self._repo_lookup, "__self__", None)
+            if settings_obj is not None:
+                all_repos = getattr(settings_obj, "repos", {}) or {}
+        if not all_repos:
+            return
+        try:
+            proc = subprocess.run(
+                ["git", "diff", "--name-only", "HEAD~1..HEAD"],
+                cwd=ws, capture_output=True, text=True, check=True,
+            )
+        except subprocess.CalledProcessError:
+            return
+        files = [f for f in proc.stdout.splitlines() if f]
+        if not files:
+            return
+        impacts = _check_cross_repo_impact(
+            files, repos=all_repos, source_repo_key=request.repo_key,
+        )
+        for impact in impacts:
+            logger.warning(
+                "WorkspaceManager.finalize: cross-repo impact — %s touched paths "
+                "declared by %s: %s",
+                request.repo_key, impact.repo_key,
+                ", ".join(impact.matched_paths),
+            )
 
     # ── helpers ──────────────────────────────────────────────────────────────
 

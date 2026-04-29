@@ -283,6 +283,24 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
     # Extract goal text from description
     goal_text = _extract_goal(description, title)
 
+    # Rejection-pattern hint: if recent proposals in this repo were rejected
+    # for a recurring reason, prepend a "common rejection patterns to avoid"
+    # block to the goal text. Best-effort — no hint when the catalog is
+    # empty or unreadable. Helps kodo avoid the same mistake twice.
+    try:
+        from operations_center.quality_alerts import _load_rejection_patterns_for_proposal
+        patterns = _load_rejection_patterns_for_proposal(repo_key=repo_key)
+        if patterns:
+            goal_text = (
+                f"{goal_text}\n\n"
+                f"## Rejection patterns to avoid\n"
+                f"Recent proposals in this repo were rejected for these reasons; "
+                f"do not repeat them:\n"
+                + "\n".join(f"- {p}" for p in patterns[:5])
+            )
+    except Exception:
+        pass
+
     # Improve mode: ask kodo to emit structured suggestions we can turn into
     # concrete follow-up tasks for the propose lane. Without this prompt, the
     # improve run is a pure-side-effect analysis that produces no downstream
