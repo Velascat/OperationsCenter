@@ -102,11 +102,20 @@ class StubLaneRoutingClient:
 def _decode_route_response(payload: dict) -> LaneDecision:
     """Decode SwitchBoard's /route response into an OC LaneDecision.
 
-    SwitchBoard emits the ECP v0.2 envelope (``contract_kind ==
-    "lane_decision"`` and ``schema_version == "0.2"``). Older deployments
-    may still emit OC's rich Pydantic shape; we accept both during the
-    wire-flip transition.
+    SwitchBoard emits the CxRP v0.2 envelope (``contract_kind ==
+    "lane_decision"``, ``schema_version`` starting with ``"0."``). The
+    transitional fallback to OC's rich Pydantic shape has been removed
+    now that the wire flip is complete; an unrecognised shape raises
+    ``ValueError`` rather than silently mis-parsing it.
     """
-    if payload.get("contract_kind") == "lane_decision" and payload.get("schema_version", "").startswith("0."):
+    if (
+        payload.get("contract_kind") == "lane_decision"
+        and payload.get("schema_version", "").startswith("0.")
+    ):
         return from_ecp_lane_decision(payload)
-    return LaneDecision.model_validate(payload)
+    raise ValueError(
+        "Unexpected /route response shape: expected CxRP LaneDecision "
+        "envelope (contract_kind='lane_decision', schema_version='0.x'). "
+        f"Got contract_kind={payload.get('contract_kind')!r}, "
+        f"schema_version={payload.get('schema_version')!r}."
+    )

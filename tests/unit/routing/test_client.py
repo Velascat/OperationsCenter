@@ -41,8 +41,25 @@ def _stub_decision(lane=LaneName.CLAUDE_CLI, backend=BackendName.KODO) -> LaneDe
     )
 
 
+def _stub_ecp_response(executor: str = "claude_cli", backend: str = "kodo") -> dict:
+    """Minimal CxRP v0.2 LaneDecision payload for /route mock responses."""
+    return {
+        "schema_version": "0.2",
+        "contract_kind": "lane_decision",
+        "decision_id": "dec-test-1",
+        "proposal_id": "prop-test-1",
+        "metadata": {"policy_rule_matched": "test_rule"},
+        "lane": "coding_agent",
+        "executor": executor,
+        "backend": backend,
+        "confidence": 0.9,
+        "rationale": "stub",
+        "alternatives": [],
+    }
+
+
 def test_http_client_satisfies_protocol() -> None:
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=_stub_decision().model_dump(mode="json")))
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=_stub_ecp_response()))
     client = HttpLaneRoutingClient("http://switchboard.local", transport=transport)
     try:
         assert isinstance(client, LaneRoutingClient)
@@ -60,7 +77,7 @@ def test_http_client_posts_to_route_endpoint() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(200, json=_stub_decision().model_dump(mode="json"))
+        return httpx.Response(200, json=_stub_ecp_response())
 
     client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
     proposal = build_proposal(_ctx())
@@ -79,7 +96,7 @@ def test_http_client_serializes_canonical_proposal() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.update(json.loads(request.content.decode("utf-8")))
-        return httpx.Response(200, json=_stub_decision().model_dump(mode="json"))
+        return httpx.Response(200, json=_stub_ecp_response())
 
     client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
     proposal = build_proposal(_ctx(task_id="TASK-9", project_id="proj-9"))
@@ -160,21 +177,22 @@ def test_http_client_decodes_ecp_shape_response() -> None:
     assert decision.alternatives_considered == [LaneName.CODEX_CLI]
 
 
-def test_http_client_still_accepts_legacy_oc_shape_response() -> None:
-    """Backward compatibility during the wire-flip transition: the client
-    accepts OC's rich Pydantic shape from older SwitchBoard deployments."""
+def test_http_client_rejects_legacy_oc_shape_response() -> None:
+    """The transitional fallback to OC's rich Pydantic shape was removed
+    after the wire flip; an unrecognised payload now raises ValueError
+    rather than silently mis-parsing."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        # OC's rich Pydantic dump — no schema_version/contract_kind keys.
         return httpx.Response(200, json=_stub_decision().model_dump(mode="json"))
 
     client = HttpLaneRoutingClient("http://switchboard.local", transport=httpx.MockTransport(handler))
     proposal = build_proposal(_ctx())
     try:
-        decision = client.select_lane(proposal)
+        with pytest.raises(ValueError, match="CxRP LaneDecision envelope"):
+            client.select_lane(proposal)
     finally:
         client.close()
-
-    assert decision.selected_lane == LaneName.CLAUDE_CLI
 
 
 def test_connect_error_raises_switchboard_unavailable() -> None:
