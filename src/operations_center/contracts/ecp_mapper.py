@@ -1,0 +1,202 @@
+"""Bidirectional mappers between OperationsCenter's internal Pydantic
+contracts and the canonical ECP v0.2 envelope.
+
+OC's internal types (Pydantic) carry richer constraints than ECP's wire
+envelope: typed enums, structured ``TaskTarget``/``BranchPolicy``/
+``ValidationProfile`` objects, etc. ECP defines the *envelope* — abstract
+``lane`` category plus open-string ``executor``/``backend`` and free-form
+``input_payload``. These mappers translate at the wire boundary so that
+inter-repo communication uses ECP shape.
+
+Mapping conventions:
+
+* OC ``selected_lane`` (e.g. ``claude_cli``) → ECP ``executor``
+* OC ``selected_backend`` (e.g. ``kodo``)   → ECP ``backend``
+* ECP abstract ``lane`` is derived from the OC lane name.
+* OC's rich ``ExecutionArtifact`` (id, label, content, size) collapses
+  to ECP ``Artifact`` (kind, uri, description, metadata) — id/label/size
+  travel in ``metadata``.
+* OC's ``ValidationSummary``/``ChangedFileRef`` lists travel in
+  ``ExecutionResult.diagnostics``.
+
+Inverse helpers (``from_ecp_*``) are intentionally minimal — only the
+fields downstream OC needs at the consume boundary are reconstructed.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from ecp.contracts import (
+    Artifact as EcpArtifact,
+    ExecutionLimits as EcpExecutionLimits,
+    ExecutionRequest as EcpExecutionRequest,
+    ExecutionResult as EcpExecutionResult,
+    LaneAlternative as EcpLaneAlternative,
+    LaneDecision as EcpLaneDecision,
+    TaskProposal as EcpTaskProposal,
+)
+from ecp.vocabulary.lane import LaneType
+from ecp.vocabulary.status import ExecutionStatus as EcpExecutionStatus
+
+from .execution import ExecutionRequest, ExecutionResult
+from .proposal import TaskProposal
+from .routing import LaneDecision
+
+CODING_AGENT_INPUT_SCHEMA_ID = "coding_agent_input/v0.2"
+CODING_AGENT_TARGET_SCHEMA_ID = "coding_agent_target/v0.2"
+
+_OC_LANE_TO_ECP_CATEGORY: dict[str, LaneType] = {
+    "claude_cli": LaneType.CODING_AGENT,
+    "codex_cli": LaneType.CODING_AGENT,
+    "aider_local": LaneType.CODING_AGENT,
+}
+
+
+def _category_for(oc_lane_value: str) -> LaneType:
+    return _OC_LANE_TO_ECP_CATEGORY.get(oc_lane_value, LaneType.CODING_AGENT)
+
+
+def to_ecp_task_proposal(oc: TaskProposal) -> EcpTaskProposal:
+    """Translate an OC TaskProposal into the ECP v0.2 envelope."""
+    target_payload: dict[str, Any] = {
+        "$payload_schema": CODING_AGENT_TARGET_SCHEMA_ID,
+        "repo_key": oc.target.repo_key,
+        "clone_url": oc.target.clone_url,
+        "base_branch": oc.target.base_branch,
+    }
+    return EcpTaskProposal(
+        proposal_id=oc.proposal_id,
+        created_at=oc.proposed_at,
+        metadata={
+            "task_id": oc.task_id,
+            "project_id": oc.project_id,
+            "proposer": oc.proposer,
+            "labels": list(oc.labels),
+        },
+        title=oc.goal_text[:80],
+        objective=oc.goal_text,
+        task_type=oc.task_type.value,
+        execution_mode=oc.execution_mode.value,
+        priority=oc.priority.value,
+        risk_level=oc.risk_level.value,
+        target=target_payload,
+        constraints=[oc.constraints_text] if oc.constraints_text else [],
+    )
+
+
+def to_ecp_lane_decision(
+    oc: LaneDecision, *, extra_metadata: dict[str, Any] | None = None
+) -> EcpLaneDecision:
+    """Translate an OC LaneDecision into ECP envelope shape.
+
+    Mirrors switchboard.adapters.ecp_mapper but lives here so OC's own
+    audit/observability code can emit the same wire shape.
+    """
+    metadata: dict[str, Any] = {
+        "policy_rule_matched": oc.policy_rule_matched,
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+
+    return EcpLaneDecision(
+        decision_id=oc.decision_id,
+        proposal_id=oc.proposal_id,
+        created_at=oc.decided_at,
+        metadata=metadata,
+        lane=_category_for(oc.selected_lane.value),
+        executor=oc.selected_lane.value,
+        backend=oc.selected_backend.value,
+        rationale=oc.rationale or "",
+        confidence=oc.confidence,
+        alternatives=[
+            EcpLaneAlternative(lane=_category_for(alt.value), executor=alt.value)
+            for alt in oc.alternatives_considered
+        ],
+    )
+
+
+def to_ecp_execution_request(oc: ExecutionRequest, *, executor: str, backend: str) -> EcpExecutionRequest:
+    """Translate an OC ExecutionRequest into ECP shape.
+
+    OC's request is rich (workspace paths, branches, validation commands).
+    Those fields land in ECP's ``input_payload`` under the
+    ``coding_agent_input/v0.2`` payload schema. Boundary-universal caps
+    (file count, timeout) become ECP ``limits``.
+    """
+    input_payload: dict[str, Any] = {
+        "goal_text": oc.goal_text,
+        "constraints_text": oc.constraints_text,
+        "repo_key": oc.repo_key,
+        "clone_url": oc.clone_url,
+        "base_branch": oc.base_branch,
+        "task_branch": oc.task_branch,
+        "workspace_path": str(oc.workspace_path),
+        "goal_file_path": str(oc.goal_file_path) if oc.goal_file_path else None,
+        "allowed_paths": list(oc.allowed_paths),
+        "validation_commands": list(oc.validation_commands),
+    }
+    return EcpExecutionRequest(
+        request_id=oc.run_id,
+        proposal_id=oc.proposal_id,
+        lane_decision_id=oc.decision_id,
+        created_at=oc.requested_at,
+        metadata={"executor": executor, "backend": backend},
+        lane=_category_for(executor),
+        executor=executor,
+        backend=backend,
+        scope=oc.goal_text[:120],
+        input_payload=input_payload,
+        input_payload_schema=CODING_AGENT_INPUT_SCHEMA_ID,
+        constraints=[oc.constraints_text] if oc.constraints_text else [],
+        limits=EcpExecutionLimits(
+            max_changed_files=oc.max_changed_files,
+            timeout_seconds=oc.timeout_seconds,
+            require_clean_validation=oc.require_clean_validation,
+        ),
+    )
+
+
+def _ecp_status_for(oc_status_value: str) -> EcpExecutionStatus:
+    return EcpExecutionStatus(oc_status_value)
+
+
+def to_ecp_execution_result(oc: ExecutionResult) -> EcpExecutionResult:
+    """Translate an OC ExecutionResult into ECP shape.
+
+    OC's rich ``ExecutionArtifact`` collapses to ECP ``Artifact``. Heavy
+    sub-objects (validation summary, changed-file refs, telemetry) move
+    into ``diagnostics`` so the envelope stays small.
+    """
+    artifacts: list[EcpArtifact] = [
+        EcpArtifact(
+            kind=art.artifact_type.value,
+            uri=art.uri or "",
+            description=art.label,
+            metadata={
+                "artifact_id": art.artifact_id,
+                "size_bytes": art.size_bytes,
+                "produced_at": art.produced_at.isoformat(),
+            },
+        )
+        for art in oc.artifacts
+    ]
+    diagnostics: dict[str, Any] = {
+        "validation_status": oc.validation.status.value,
+        "branch_pushed": oc.branch_pushed,
+        "branch_name": oc.branch_name,
+        "pull_request_url": oc.pull_request_url,
+        "failure_category": oc.failure_category.value if oc.failure_category else None,
+        "failure_reason": oc.failure_reason,
+        "changed_files_count": len(oc.changed_files),
+    }
+    return EcpExecutionResult(
+        result_id=oc.run_id,
+        created_at=oc.completed_at,
+        metadata={"proposal_id": oc.proposal_id, "decision_id": oc.decision_id},
+        request_id=oc.run_id,
+        ok=oc.success,
+        status=_ecp_status_for(oc.status.value),
+        artifacts=artifacts,
+        diagnostics=diagnostics,
+    )
