@@ -79,6 +79,35 @@ operator tools (`recover_stale`, `cleanup_state`, `close_stale_prs`,
 `check_regressions`, `triage_scan`, `cleanup_stale_backlog`) that
 *mutate* Plane state. Audits never mutate; maintenance does.
 
+## Ownership: who owns what
+
+The crisp rule:
+
+- **Pattern applicable to multiple repos** → Custodian
+- **Fact about one repo** → that repo's `_custodian/`
+- **Cross-repo coordination or Plane mutation** → OperationsCenter
+
+**Custodian owns** (the discipline, not the implementation):
+
+- Detector contract and result shape — every repo agrees on what an audit *looks like*
+- Plugin protocols (`LogScanner`, `StateScanner`, …) — the slots repos fill in
+- Generic baseline detectors C1–C8 — patterns that are bad anywhere (TODOs, prints, bare except)
+- The CLIs (`custodian-audit`, `custodian-doctor`) — the runners
+- Generic maintenance primitives (list-stale-X filters) — repos compose them against their own state
+
+**Each managed repo owns** (its specifics):
+
+- `.custodian.yaml` — what to load, what stale handlers / common words to skip
+- `_custodian/` — repo-specific detectors and protocol implementations
+- Its own state shape, log shape, architecture invariants — Custodian doesn't know these and shouldn't
+
+**OperationsCenter owns** (uniquely, beyond being a Custodian consumer):
+
+- Plane board orchestration, board_worker, proposal/review pipeline
+- Runtime audits that need live Plane (ghost_audit, flow_audit)
+- Maintenance CLIs that *mutate* Plane state (recover_stale, cleanup_state, …)
+- **Cross-repo audit aggregation** — running `custodian-audit` against each managed repo and turning findings into Plane tasks, as part of the weekly audit step in OC's scheduled cycle
+
 ## Three categories of "tool"
 
 | Layer | Lives in | Mutates state? | Examples |
