@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -71,13 +73,29 @@ def _discover_targets(settings) -> list[_RepoTarget]:
     return out
 
 
+def _resolve_custodian_audit() -> str | None:
+    """Find custodian-audit on PATH, falling back to the running python's bin dir.
+
+    `python -m operations_center...` doesn't put the venv's bin on PATH unless
+    the venv was activated, so a plain shutil.which fails for the common case
+    of invoking via the venv python directly. Check sys.executable's dir too.
+    """
+    found = shutil.which("custodian-audit")
+    if found:
+        return found
+    venv_bin = os.path.dirname(sys.executable)
+    candidate = os.path.join(venv_bin, "custodian-audit")
+    return candidate if os.access(candidate, os.X_OK) else None
+
+
 def _run_custodian_audit(target: _RepoTarget) -> _RepoSweep:
     """Shell out to custodian-audit. Failures land in ``error`` rather than raise."""
-    if shutil.which("custodian-audit") is None:
-        return _RepoSweep(target.repo_key, error="custodian-audit not on PATH")
+    audit_bin = _resolve_custodian_audit()
+    if audit_bin is None:
+        return _RepoSweep(target.repo_key, error="custodian-audit not on PATH or in venv bin")
     try:
         proc = subprocess.run(
-            ["custodian-audit", "--repo", str(target.local_path), "--json"],
+            [audit_bin, "--repo", str(target.local_path), "--json"],
             capture_output=True, text=True, check=False, timeout=300,
         )
     except subprocess.TimeoutExpired:
