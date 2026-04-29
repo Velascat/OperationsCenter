@@ -468,6 +468,107 @@ def _detect_c8_phantom_symbols(ctx: CodeContext) -> tuple[int, list[str]]:
     return len(seen), samples[:8]
 
 
+def _detect_c9_doc_value_drift(ctx: CodeContext) -> tuple[int, list[str]]:
+    """Docs cite a value (status / state / kind) that isn't a known constant.
+
+    Complementary to C8: where C8 asks "is this *function* phantom?", C9
+    asks "is this *value* phantom?" — when a doc says "state can be
+    `foo`" but `"foo"` doesn't appear as a string literal anywhere in
+    src/, that's documentation drift in the other direction.
+
+    Detection:
+      • Scan all .md files under docs/ + README.md
+      • Find backtick'd lowercase tokens in *value-context lines*
+        (after status:, state:, kind:, value:, etc.)
+      • For each, check whether the token appears as a string literal
+        in src/ (`"token"` or `'token'`) or as an enum value
+      • Flag tokens with no source-side anchor
+
+    False-positive guard: an "alive list" of common literal value
+    tokens that genuinely exist as constants somewhere — gleaned from
+    the codebase's enum definitions and Plane state names.
+    """
+    docs_root = ctx.repo_root / "docs"
+    readme    = ctx.repo_root / "README.md"
+    files: list[Path] = [readme] if readme.exists() else []
+    if docs_root.exists():
+        files.extend(docs_root.rglob("*.md"))
+
+    src_text = ""
+    for f in _py_files(ctx.src_root):
+        try:
+            src_text += f.read_text(errors="replace") + "\n"
+        except OSError:
+            continue
+
+    # Tokens we accept as "well-known values" without a string-literal probe
+    # (Plane state names, enum cases, etc.). Add to this list rather than
+    # silencing C9 globally.
+    known_values = {
+        # Plane states
+        "ready for ai", "in review", "in progress", "backlog", "done",
+        "cancelled", "blocked", "running", "awaiting input",
+        # Verdicts / outcomes
+        "lgtm", "concerns", "approved", "rejected",
+        # Plane priority enum
+        "low", "medium", "high", "urgent", "none",
+        # Complexity enum
+        "small", "medium", "large",
+        # Task kinds
+        "goal", "test", "improve", "review", "spec",
+        "test_campaign", "improve_campaign",
+        # Severity tiers
+        "info", "warn", "warning", "error", "critical",
+        # Python builtin types & stdlib modules cited as types
+        "bool", "int", "str", "list", "dict", "tuple", "float", "bytes",
+        "fcntl", "subprocess", "logging", "pathlib", "datetime",
+    }
+
+    # Match `<keyword>: \`token\`` or `<keyword> can be \`token\``.
+    value_line_re = re.compile(
+        r"(?:status|state|kind|value|priority|severity|level|verdict|outcome)s?\s*"
+        r"(?:[:=]|\bcan be\b|\bis\b|\bof\b)",
+        re.IGNORECASE,
+    )
+    sym_re = re.compile(r"`([a-z][a-z0-9_]{2,})`")
+
+    seen: dict[str, tuple[Path, int]] = {}
+    for f in files:
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        rel = str(f.relative_to(ctx.repo_root))
+        if "/history/" in rel or "/audits/" in rel or "/archive/" in rel:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if not value_line_re.search(line):
+                continue
+            for m in sym_re.finditer(line):
+                name = m.group(1)
+                if name in seen:
+                    continue
+                if name.lower() in known_values:
+                    continue
+                # Look for the bare string literal in src/
+                if re.search(rf"""['"]{re.escape(name)}['"]""", src_text):
+                    continue
+                # Pydantic field declarations: `name: type`
+                if re.search(rf"^\s+{re.escape(name)}\s*:\s*[A-Za-z]", src_text, re.MULTILINE):
+                    continue
+                # Also a real function/class — caller may have meant the
+                # symbol when writing about its return value or signal name.
+                if re.search(rf"\b(def|class)\s+{re.escape(name)}\b", src_text):
+                    continue
+                seen[name] = (f, i)
+
+    samples = [
+        f"{path.relative_to(ctx.repo_root)}:{ln}: `{name}` cited as a value but no string-literal in src/"
+        for name, (path, ln) in sorted(seen.items())
+    ]
+    return len(seen), samples[:8]
+
+
 _DETECTORS: list[Detector] = [
     Detector("C1", "scaffolded-but-unimplemented backends",       _detect_c1_stub_backends),
     Detector("C2", "untagged TODO/FIXME debt",                    _detect_c2_untagged_todos),
@@ -477,6 +578,7 @@ _DETECTORS: list[Detector] = [
     Detector("C6", "modules called only from tests",              _detect_c6_test_only_modules),
     Detector("C7", "dead settings fields",                        _detect_c7_dead_settings),
     Detector("C8", "docs reference a symbol that doesn't exist",  _detect_c8_phantom_symbols),
+    Detector("C9", "docs cite a value not in src as a string literal", _detect_c9_doc_value_drift),
 ]
 
 

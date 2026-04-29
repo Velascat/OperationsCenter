@@ -113,6 +113,12 @@ class WorkspaceManager:
         # config (no bootstrap fields set) is a no-op so existing repos
         # see no behavior change.
         self._maybe_bootstrap(ws, request)
+        # Baseline validation — if the repo declares validation_commands and
+        # hasn't opted out via skip_baseline_validation, run them here.
+        # Failure leaves a marker file the coordinator reads (so we don't
+        # mutate the prepare() return shape). The actual abort decision
+        # happens in the coordinator path.
+        self._run_baseline_validation(ws, request)
         # If base_branch is a sandbox like "autonomy-staging" that the operator
         # forgot to create, fail with a clear error rather than a cryptic
         # `git checkout` failure. Plane will surface the reason via the new
@@ -382,6 +388,35 @@ class WorkspaceManager:
         except Exception as exc:
             logger.warning("WorkspaceManager: PR creation failed — %s", exc)
             return None
+
+    def _run_baseline_validation(self, ws: Path, request: ExecutionRequest) -> None:
+        """Run repo's baseline validation; persist the summary to a marker file.
+
+        We write the result to ``ws/.baseline-validation.json`` so the
+        coordinator (or a later stage) can read it without WorkspaceManager
+        having to thread the contract through. Best-effort — failures here
+        log a warning but don't abort prepare(). The decision to continue
+        on FAILED status is made downstream.
+        """
+        repo_cfg = self._repo_lookup(request.repo_key)
+        if repo_cfg is None:
+            return
+        try:
+            from operations_center.execution.baseline_validation import (
+                run_baseline_validation,
+            )
+            summary = run_baseline_validation(ws, repo_cfg=repo_cfg)
+        except Exception as exc:
+            logger.warning(
+                "WorkspaceManager.prepare: baseline validation crashed — %s", exc,
+            )
+            return
+        try:
+            (ws / ".baseline-validation.json").write_text(
+                summary.model_dump_json(), encoding="utf-8",
+            )
+        except OSError as exc:
+            logger.debug("baseline-validation marker write failed — %s", exc)
 
     def _maybe_bootstrap(self, ws: Path, request: ExecutionRequest) -> None:
         """Run repo-bootstrap (venv setup + dev install) when configured.

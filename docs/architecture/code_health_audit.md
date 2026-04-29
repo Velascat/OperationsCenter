@@ -18,6 +18,8 @@ consumers, untagged TODO debt, and so on.
 | C5 | Unconditional skipped tests | `pytest.skip` / `@pytest.mark.skip` whose surrounding context lacks an env-probe (e.g. `shutil.which` for an external binary) | **Open** |
 | C6 | Modules called only from tests | Production modules whose every importer lives under tests/ — placeholder; needs proper static analysis | **Open / placeholder** |
 | C7 | Dead settings fields | Fields declared on `Settings` / `RepoSettings` / etc. that no production code reads via `.field` or `["field"]`, even self-references inside settings.py | **Open** |
+| C8 | Doc phantom symbols | Backtick'd snake_case identifiers in `docs/design/` or `docs/architecture/` cited in implementation-claim contexts (after `**Files:**`, `Implementation:`, etc.) that have no `def`/`class` in `src/`. Skips known stale handler names from pre-board_worker architecture. | **Open** |
+| C9 | Doc value drift | Backtick'd values cited in value-position contexts (after `status:`, `state:`, `kind:`, etc.) that don't exist as string literals, fields, or symbols in `src/`. Inverse of C8: where C8 asks "is this *function* phantom?", C9 asks "is this *value* phantom?" | **Open** |
 
 ## Encoded check
 
