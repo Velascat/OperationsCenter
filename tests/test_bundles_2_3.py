@@ -15,9 +15,8 @@ from operations_center.contracts.enums import ValidationStatus
 
 def test_c9_skips_known_values(tmp_path):
     """Status enums like 'in progress' are well-known — don't flag."""
-    from operations_center.entrypoints.code_health_audit.main import (
-        CodeContext, _detect_c9_doc_value_drift,
-    )
+    from custodian.audit_kit.detector import AuditContext
+    from _custodian.detectors import _detect_oc9_doc_value_drift
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
@@ -27,16 +26,19 @@ def test_c9_skips_known_values(tmp_path):
     )
     src.mkdir()
     (src / "x.py").write_text("# nothing useful\n")
-    ctx = CodeContext(src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path)
-    count, _ = _detect_c9_doc_value_drift(ctx)
+    ctx = AuditContext(
+        src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
+        config={}, plugin_modules=[],
+    )
+    result = _detect_oc9_doc_value_drift(ctx)
+    count = result.count
     assert count == 0
 
 
 def test_c9_flags_truly_drifted_value(tmp_path):
     """A doc value with no string-literal anchor is flagged."""
-    from operations_center.entrypoints.code_health_audit.main import (
-        CodeContext, _detect_c9_doc_value_drift,
-    )
+    from custodian.audit_kit.detector import AuditContext
+    from _custodian.detectors import _detect_oc9_doc_value_drift
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
@@ -46,17 +48,20 @@ def test_c9_flags_truly_drifted_value(tmp_path):
     )
     src.mkdir()
     (src / "x.py").write_text("# real code, no such literal\n")
-    ctx = CodeContext(src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path)
-    count, samples = _detect_c9_doc_value_drift(ctx)
+    ctx = AuditContext(
+        src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
+        config={}, plugin_modules=[],
+    )
+    result = _detect_oc9_doc_value_drift(ctx)
+    count, samples = result.count, result.samples
     assert count == 1
     assert "nonexistent_kind_value" in samples[0]
 
 
 def test_c9_accepts_pydantic_field_definition(tmp_path):
     """A doc citing a value that's also a Pydantic field name passes."""
-    from operations_center.entrypoints.code_health_audit.main import (
-        CodeContext, _detect_c9_doc_value_drift,
-    )
+    from custodian.audit_kit.detector import AuditContext
+    from _custodian.detectors import _detect_oc9_doc_value_drift
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
@@ -66,16 +71,19 @@ def test_c9_accepts_pydantic_field_definition(tmp_path):
     )
     src.mkdir()
     (src / "x.py").write_text("class Foo:\n    is_compliant: bool = False\n")
-    ctx = CodeContext(src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path)
-    count, _ = _detect_c9_doc_value_drift(ctx)
+    ctx = AuditContext(
+        src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
+        config={}, plugin_modules=[],
+    )
+    result = _detect_oc9_doc_value_drift(ctx)
+    count = result.count
     assert count == 0
 
 
 def test_c9_accepts_function_definition(tmp_path):
     """When a value-cited token is actually a function name, accept."""
-    from operations_center.entrypoints.code_health_audit.main import (
-        CodeContext, _detect_c9_doc_value_drift,
-    )
+    from custodian.audit_kit.detector import AuditContext
+    from _custodian.detectors import _detect_oc9_doc_value_drift
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
@@ -85,8 +93,12 @@ def test_c9_accepts_function_definition(tmp_path):
     )
     src.mkdir()
     (src / "x.py").write_text("def signal_stale(): pass\n")
-    ctx = CodeContext(src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path)
-    count, _ = _detect_c9_doc_value_drift(ctx)
+    ctx = AuditContext(
+        src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
+        config={}, plugin_modules=[],
+    )
+    result = _detect_oc9_doc_value_drift(ctx)
+    count = result.count
     assert count == 0
 
 

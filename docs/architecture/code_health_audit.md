@@ -23,11 +23,19 @@ consumers, untagged TODO debt, and so on.
 
 ## Encoded check
 
+This audit is now run by [Custodian](https://github.com/Velascat/Custodian),
+the cross-repo audit toolkit. OC's nine OC-specific detectors live in
+`_custodian/detectors.py` and are registered via `.custodian.yaml`;
+Custodian's own generic `C1`-`C8` (TODO / print / bare-except / etc.) run
+alongside them.
+
 ```
-python -m operations_center.entrypoints.code_health_audit
+custodian-audit --json --repo .
 ```
 
-Output is JSON keyed by `Cn`, symmetric with the other audits.
+Output schema: `{schema_version: 1, repo_key, total_findings, patterns: {...}}`.
+The OC contributions are namespaced `OC1`-`OC9` to avoid collision with
+Custodian's defaults.
 
 ## Acting on findings
 
@@ -55,6 +63,8 @@ treatment per pattern:
 ## Adding a new pattern
 
 1. Append a row to the table above.
-2. Add a detector to `entrypoints/code_health_audit/main.py`.
+2. Add a detector function to `_custodian/detectors.py` and register it
+   in `build_oc_detectors()`. Custodian's own detectors are
+   *generic* — anything OC-specific stays in `_custodian/`.
 3. If the pattern is mechanically fixable, the fix lands separately;
    the detector just measures the gap.
