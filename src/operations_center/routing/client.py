@@ -12,6 +12,7 @@ from typing import Protocol, runtime_checkable
 
 import httpx
 
+from operations_center.contracts.ecp_mapper import from_ecp_lane_decision
 from operations_center.contracts.proposal import TaskProposal
 from operations_center.contracts.routing import LaneDecision
 
@@ -73,7 +74,7 @@ class HttpLaneRoutingClient:
                 f"SwitchBoard request timed out at {self.base_url}. "
                 f"Cause: {exc}"
             ) from exc
-        return LaneDecision.model_validate(response.json())
+        return _decode_route_response(response.json())
 
     def close(self) -> None:
         self._client.close()
@@ -96,3 +97,16 @@ class StubLaneRoutingClient:
 
     def select_lane(self, proposal: TaskProposal) -> LaneDecision:
         return self._decision
+
+
+def _decode_route_response(payload: dict) -> LaneDecision:
+    """Decode SwitchBoard's /route response into an OC LaneDecision.
+
+    SwitchBoard emits the ECP v0.2 envelope (``contract_kind ==
+    "lane_decision"`` and ``schema_version == "0.2"``). Older deployments
+    may still emit OC's rich Pydantic shape; we accept both during the
+    wire-flip transition.
+    """
+    if payload.get("contract_kind") == "lane_decision" and payload.get("schema_version", "").startswith("0."):
+        return from_ecp_lane_decision(payload)
+    return LaneDecision.model_validate(payload)
