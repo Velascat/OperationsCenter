@@ -32,7 +32,7 @@ Invariant compliance:
 """
 from __future__ import annotations
 
-from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult
+from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult, HIGH, MEDIUM
 
 
 def _to_result(findings) -> DetectorResult:
@@ -92,8 +92,8 @@ def build_oc_architecture_detectors() -> list[Detector]:
     status to "partial" or "open" to signal that's the expected state.
     """
     return [
-        Detector("AI1", "managed-repo imports inside src/operations_center/", "fixed", _detect_ai1_managed_repo_imports),
-        Detector("AI2", "layer-direction violations",                          "fixed", _detect_ai2_layer_direction),
-        Detector("AI3", "directory-scanning in artifact_index",                "fixed", _detect_ai3_no_directory_scanning),
-        Detector("AI4", "anti-collapse guardrail structurally present",        "fixed", _detect_ai4_anti_collapse),
+        Detector("AI1", "managed-repo imports inside src/operations_center/", "fixed", _detect_ai1_managed_repo_imports, HIGH),
+        Detector("AI2", "layer-direction violations",                          "fixed", _detect_ai2_layer_direction,           HIGH),
+        Detector("AI3", "directory-scanning in artifact_index",                "fixed", _detect_ai3_no_directory_scanning,    MEDIUM),
+        Detector("AI4", "anti-collapse guardrail structurally present",        "fixed", _detect_ai4_anti_collapse,             HIGH),
     ]

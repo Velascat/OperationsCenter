@@ -20,7 +20,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult
+from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult, HIGH, MEDIUM, LOW
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -392,13 +392,13 @@ def build_oc_detectors() -> list[Detector]:
     generic set doesn't cover.
     """
     return [
-        Detector("OC1", "scaffolded-but-unimplemented backends",       "open",    _detect_oc1_stub_backends),
-        Detector("OC2", "untagged TODO/FIXME debt (deferred-aware)",   "open",    _detect_oc2_untagged_todos),
-        Detector("OC3", "orphaned entrypoints",                        "open",    _detect_oc3_orphaned_entrypoints),
-        Detector("OC4", "ruff lint findings",                          "fixed",   _detect_oc4_ruff),
-        Detector("OC5", "unconditional skipped tests",                 "open",    _detect_oc5_unconditional_skips),
-        Detector("OC6", "modules called only from tests",              "deferred", _detect_oc6_test_only_modules),
-        Detector("OC7", "dead settings fields",                        "open",    _detect_oc7_dead_settings),
-        Detector("OC8", "docs reference a symbol that doesn't exist",  "open",    _detect_oc8_phantom_symbols),
-        Detector("OC9", "docs cite a value not in src as a string literal", "open", _detect_oc9_doc_value_drift),
+        Detector("OC1", "scaffolded-but-unimplemented backends",            "open",     _detect_oc1_stub_backends,   MEDIUM),
+        Detector("OC2", "untagged TODO/FIXME debt (deferred-aware)",        "open",     _detect_oc2_untagged_todos,  LOW),
+        Detector("OC3", "orphaned entrypoints",                             "open",     _detect_oc3_orphaned_entrypoints, MEDIUM),
+        Detector("OC4", "ruff lint findings",                               "fixed",    _detect_oc4_ruff,            MEDIUM),
+        Detector("OC5", "unconditional skipped tests",                      "open",     _detect_oc5_unconditional_skips, HIGH),
+        Detector("OC6", "modules called only from tests",                   "deferred", _detect_oc6_test_only_modules, LOW),
+        Detector("OC7", "dead settings fields",                             "open",     _detect_oc7_dead_settings,   MEDIUM),
+        Detector("OC8", "docs reference a symbol that doesn't exist",       "open",     _detect_oc8_phantom_symbols,  LOW),
+        Detector("OC9", "docs cite a value not in src as a string literal", "open",     _detect_oc9_doc_value_drift, LOW),
     ]

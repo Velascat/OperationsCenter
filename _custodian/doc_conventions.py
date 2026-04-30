@@ -40,7 +40,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult
+from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult, LOW
 
 
 # ── DC1: design-spec front matter ────────────────────────────────────────────
@@ -191,9 +191,9 @@ def _detect_dc5_unqualified_symbol_citations(ctx: AuditContext) -> DetectorResul
 def build_oc_doc_convention_detectors() -> list[Detector]:
     """Custodian plugin contributor for OC's doc conventions."""
     return [
-        Detector("DC1", "design specs missing YAML front matter / status",     "open", _detect_dc1_design_front_matter),
-        Detector("DC2", "cross-doc references that don't resolve",             "open", _detect_dc2_dead_doc_references),
-        Detector("DC3", "ADRs not following NNNN-kebab-case.md",               "open", _detect_dc3_adr_naming),
-        Detector("DC4", "README missing required sections",                    "open", _detect_dc4_readme_sections),
-        Detector("DC5", "bare symbol citations in **Files:** contexts",        "open", _detect_dc5_unqualified_symbol_citations),
+        Detector("DC1", "design specs missing YAML front matter / status",     "open", _detect_dc1_design_front_matter, LOW),
+        Detector("DC2", "cross-doc references that don't resolve",             "open", _detect_dc2_dead_doc_references,  LOW),
+        Detector("DC3", "ADRs not following NNNN-kebab-case.md",               "open", _detect_dc3_adr_naming,           LOW),
+        Detector("DC4", "README missing required sections",                    "open", _detect_dc4_readme_sections,      LOW),
+        Detector("DC5", "bare symbol citations in **Files:** contexts",        "open", _detect_dc5_unqualified_symbol_citations, LOW),
     ]
