@@ -279,7 +279,7 @@ def main() -> None:
 
     manifest_path = Path(args.manifest)
     if not manifest_path.exists():
-        _logger.error(f"Manifest not found: {manifest_path}")
+        _logger.error("Manifest not found: %s", manifest_path)
         sys.exit(1)
 
     processes = _load_manifest(manifest_path)
