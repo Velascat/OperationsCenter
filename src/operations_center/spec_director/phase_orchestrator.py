@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 # src/operations_center/spec_director/phase_orchestrator.py
 """Phase orchestrator — advances spec campaign phases and unblocks stuck tasks."""

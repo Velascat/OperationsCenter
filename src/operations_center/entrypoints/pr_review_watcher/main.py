@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """PR Review Watcher — two-phase state machine for PRs created by the goal lane.
 

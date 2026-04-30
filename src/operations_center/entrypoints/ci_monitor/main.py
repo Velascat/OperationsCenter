@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """CI Monitor: scans open PRs for failing checks and creates fix_pr tasks on the Plane board.
 

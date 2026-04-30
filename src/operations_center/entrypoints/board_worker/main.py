@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """Board worker — Plane-polling watcher for goal, test, and improve roles.
 

@@ -938,4 +938,4 @@ This repo is not trying to be a production distributed control plane yet. It is 
 
 ## License
 
-GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
+GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [LICENSE](LICENSE).

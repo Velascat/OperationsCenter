@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """Tests for PhaseOrchestrator — phase advancement and blocked-task unblocking."""
 from __future__ import annotations

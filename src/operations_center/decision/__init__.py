@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 from operations_center.decision.models import ProposalCandidatesArtifact
 from operations_center.decision.service import DecisionContext, DecisionEngineService, new_decision_context

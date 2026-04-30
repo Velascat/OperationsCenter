@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """Integration test: Phase 9 → Phase 10 → Phase 11 harvest-replay-regression chain.
 

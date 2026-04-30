@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """Per-section-walk helpers — last 2 real phantoms from autonomy_gaps.md."""
 from __future__ import annotations
