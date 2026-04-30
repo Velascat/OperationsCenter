@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """
 enums.py — canonical enumerated types for the platform contract layer.
@@ -40,6 +40,7 @@ class BackendName(str, Enum):
     ARCHON = "archon"
     ARCHON_THEN_KODO = "archon_then_kodo"
     OPENCLAW = "openclaw"
+    DEMO_STUB = "demo_stub"
 
 
 class ExecutionMode(str, Enum):
