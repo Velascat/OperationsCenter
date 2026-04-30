@@ -49,6 +49,8 @@ def _grep_lines(root: Path, pattern: str, *, max_results: int = 400) -> list[tup
 # ── OC1: scaffolded-but-unimplemented backends ───────────────────────────────
 
 def _detect_oc1_stub_backends(ctx: AuditContext) -> DetectorResult:
+    audit_cfg = ctx.config.get("audit", {}) or {}
+    exempt_paths = set(audit_cfg.get("oc1_exempt", []) or [])
     samples = []
     for f in _py_files(ctx.src_root):
         try:
@@ -56,8 +58,10 @@ def _detect_oc1_stub_backends(ctx: AuditContext) -> DetectorResult:
         except OSError:
             continue
         if "raise NotImplementedError" in text and "/backends/" in str(f):
-            rel = f.relative_to(ctx.repo_root)
-            samples.append(str(rel))
+            rel = str(f.relative_to(ctx.repo_root))
+            if rel in exempt_paths:
+                continue
+            samples.append(rel)
     return DetectorResult(count=len(samples), samples=samples[:10])
 
 
@@ -188,6 +192,8 @@ def _detect_oc7_dead_settings(ctx: AuditContext) -> DetectorResult:
     field_re = re.compile(r"^\s+([a-z_][a-z0-9_]*)\s*:\s*[A-Za-z]", re.MULTILINE)
     fields = set(field_re.findall(text))
     ignored = {"version", "name", "type", "config", "id", "model_config"}
+    audit_cfg = ctx.config.get("audit", {}) or {}
+    ignored |= set(audit_cfg.get("oc7_exempt", []) or [])
     fields -= ignored
     samples: list[str] = []
     for fname in sorted(fields):

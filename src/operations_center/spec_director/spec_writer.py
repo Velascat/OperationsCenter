@@ -56,7 +56,7 @@ class SpecWriter:
                     created = datetime.fromisoformat(fm.created_at).timestamp()
                     if created > cutoff:
                         continue
-                except Exception:
+                except ValueError:
                     pass
             archive_dir.mkdir(parents=True, exist_ok=True)
             dest = archive_dir / spec_file.name

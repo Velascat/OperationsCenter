@@ -2,9 +2,12 @@
 # Copyright (C) 2026 Velascat
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 def post_escalation(
@@ -32,5 +35,5 @@ def post_escalation(
     try:
         with httpx.Client(timeout=10) as http:
             http.post(webhook_url, json=payload)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning('{"event": "escalation_webhook_failed", "error": "%s"}', exc)

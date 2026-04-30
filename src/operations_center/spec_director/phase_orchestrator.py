@@ -375,5 +375,5 @@ class PhaseOrchestrator:
         for parent in parents:
             try:
                 self._client.comment_issue(str(parent["id"]), message)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug('{"event": "comment_parent_failed", "parent_id": "%s", "error": "%s"}', parent.get("id"), exc)

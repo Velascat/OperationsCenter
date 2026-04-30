@@ -27,11 +27,14 @@ Usage::
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from dataclasses import dataclass, asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_STORE_PATH = Path("state/campaigns.json")
 
@@ -168,8 +171,8 @@ class CampaignStore:
         if self._path.exists():
             try:
                 return json.loads(self._path.read_text())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning('{"event": "campaign_store_load_failed", "path": "%s", "error": "%s"}', self._path, exc)
         return {}
 
     def _save(self, campaigns: dict[str, Any]) -> None:

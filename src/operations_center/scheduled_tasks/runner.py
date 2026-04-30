@@ -141,7 +141,7 @@ def due_tasks(
         if last_run_iso:
             try:
                 last_run = datetime.fromisoformat(last_run_iso.replace("Z", "+00:00"))
-            except Exception:
+            except ValueError:
                 pass
         if _is_due(task, last_run, when):
             out.append(task)

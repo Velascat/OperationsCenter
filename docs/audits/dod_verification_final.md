@@ -136,7 +136,7 @@ Contracts do not leak streaming objects. The single reference to `event_stream` 
 
 **OperatorConsole README:** Accurately describes itself as a persistent workspace manager that delegates to OperationsCenter's execute entrypoint. Does not claim execution ownership.
 
-No `9router` or `nine-router` references appear in any active README. All 9router mentions are confined to archival/migration docs (`docs/architecture/adr/0001-remove-9router.md`, `docs/migration/workstation-9router-removal.md`, `docs/architecture/final-phase-checklist-result.md`) — correctly treated as historical record.
+No `9router` or `nine-router` references appear in any active README. All 9router mentions are confined to archival/migration docs (docs/architecture/adr/0001-remove-9router.md in WorkStation, docs/migration/workstation-9router-removal.md in WorkStation, docs/architecture/final-phase-checklist-result.md in OperationsCenter archive) — correctly treated as historical record.
 
 ---
 

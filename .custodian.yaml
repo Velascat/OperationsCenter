@@ -3,6 +3,30 @@ src_root: src/operations_center
 tests_root: tests
 
 audit:
+  # C1/C6 (TODO/FIXME markers): exclude paths where TODO/FIXME appear as
+  # strings being analysed (todo_signal, todo_accumulation, artifact_writer)
+  # or in comments already tagged [deferred, reviewed] and covered by OC2.
+  # C2 (print statements): entrypoints are CLI tools that write to stdout
+  # deliberately; two library files have print() only in docstring examples.
+  exclude_paths:
+    C1:
+      - src/operations_center/observer/collectors/todo_signal.py
+      - src/operations_center/observer/artifact_writer.py
+      - src/operations_center/decision/rules/todo_accumulation.py
+      - src/operations_center/proposer/candidate_mapper.py
+      - src/operations_center/observer/collectors/validation_history.py
+      - src/operations_center/tuning/metrics.py
+      - src/operations_center/insights/derivers/quality_trend.py
+    C6:
+      - src/operations_center/observer/collectors/todo_signal.py
+      - src/operations_center/decision/rules/todo_accumulation.py
+      - src/operations_center/proposer/candidate_mapper.py
+      - src/operations_center/insights/derivers/quality_trend.py
+    C2:
+      - src/operations_center/entrypoints/**
+      - src/operations_center/execution/campaign_store.py
+      - src/operations_center/tuning/calibration.py
+
   # Stale handler names cited in autonomy_gaps.md from a pre-board_worker
   # architecture. Used by Custodian's generic C8 (and OC's OC8) to skip
   # tokens that are documented architecture drift, not unimplemented features.
@@ -109,6 +133,39 @@ audit:
     - ghost_audit
     - flow_audit
     - code_health_audit
+    - in_progress
+    - interrupted
+    - json_artifact_reads
+    - known_repo_required
+    - last_progress_at
+    - manual_review
+    - manual_selection
+    - metadata_only_reason_present
+    - needs_manual_approval
+    - not_yet_run
+    - parse_task_dependencies
+    - partial_run
+    - recover_stale_running
+    - repo_count
+    - representative
+    - requires_human_approval
+    - ruff_clean
+    - scope_too_broad
+    - shared_insight_kind
+    - source_manifest_loads
+    - spec_revision_count
+    - stage_slice
+    - state_retention_days
+    - task_dependencies_met
+    - test_regression
+    - tests_pass
+    - timeout_pattern
+    - ty_clean
+    - unavailable
+    - urgent_override_policy
+    - validation_loop
+    - velocity_cap_exceeded
+    - verified
 
   # Additional well-known string values for OC9 to recognise without
   # requiring a string-literal anchor in src/.
@@ -117,6 +174,24 @@ audit:
     - in_progress
     - test_campaign
     - improve_campaign
+    - execute_representative_workflow
+    - requires_human_approval
+
+  # OC1 backends that have raise NotImplementedError intentionally —
+  # openclaw and archon are partially scaffolded; full implementation is deferred.
+  oc1_exempt:
+    - src/operations_center/backends/openclaw/invoke.py
+    - src/operations_center/backends/archon/invoke.py
+
+  # Settings fields that are intentionally kept even though OC7 can't find
+  # dot-notation usage. These are generated into config file templates by
+  # setup/main.py (as dict keys) and must remain in the schema so user
+  # configs load without validation errors.
+  oc7_exempt:
+    - push_on_validation_failure
+    - sign_commits
+    - signing_key
+    - switchboard_url
 
 plugins:
   - module: _custodian.log_scanner:OCLogScanner

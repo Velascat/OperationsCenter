@@ -52,7 +52,7 @@ def issue_urgency_score(issue: dict, *, now: datetime | None = None) -> float:
         ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
         age_days = (moment - ts).total_seconds() / 86400
         score += min(0.6, age_days / 30.0)  # caps at 0.6 for 30+ day-old tasks
-    except Exception:
+    except (ValueError, AttributeError):
         pass
     # Label boosts
     labels = [
