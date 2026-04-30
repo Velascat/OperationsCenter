@@ -83,7 +83,7 @@ class ManagedRunIdentity(BaseModel):
             raise ValueError(
                 f"run_id {v!r} does not match the managed-run format "
                 f"'{'{repo_id}_{audit_type}_{YYYYMMDDTHHMMSSz}_{8hex}'}'. "
-                f"Use generate_managed_run_identity() to create a valid id."
+                "Use generate_managed_run_identity() to create a valid id."
             )
         return v
 

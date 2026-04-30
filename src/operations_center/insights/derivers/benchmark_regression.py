@@ -30,7 +30,7 @@ class BenchmarkRegressionDeriver:
         insights: list[DerivedInsight] = []
         observed_at = snapshots[0].observed_at
 
-        if bench.status == "regression" and len(bench.regressions) > 0:
+        if bench.status == "regression" and bench.regressions:
             insights.append(
                 self.normalizer.normalize(
                     kind="benchmark_regression",

@@ -93,9 +93,9 @@ def main() -> int:
             client.transition_issue(entry["id"], "Cancelled")
             client.comment_issue(
                 entry["id"],
-                f"Auto-cancelled: autonomy Backlog item has been stale "
+                "Auto-cancelled: autonomy Backlog item has been stale "
                 f"{round(age_days, 1)}d (threshold {threshold_days}d, from "
-                f"Settings.stale_autonomy_backlog_days). Re-open if still relevant.",
+                "Settings.stale_autonomy_backlog_days). Re-open if still relevant.",
             )
             entry["action"] = "cancelled"
             cancelled.append(entry)

@@ -202,7 +202,7 @@ def _identify_limitations(records: list[ExecutionRecord]) -> list[str]:
 
     # Check for task_type metadata coverage
     records_with_task_type = sum(1 for r in records if r.metadata.get("task_type"))
-    if records_with_task_type == 0 and len(records) > 0:
+    if records_with_task_type == 0 and records:
         limitations.append(
             "No records carry task_type metadata. "
             "Per-task-type comparison is unavailable."

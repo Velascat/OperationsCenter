@@ -127,7 +127,7 @@ def cmd_harvest(
 
 @app.command("inspect")
 def cmd_inspect(
-    fixture_pack: str = typer.Option(..., "--fixture-pack", "-f", help="Path to fixture_pack.json or pack directory."),
+    fixture_pack: str = typer.Option(..., "--fixture-pack", "-", help="Path to fixture_pack.json or pack directory."),
 ) -> None:
     """Inspect a fixture pack and display its contents."""
     path = Path(fixture_pack)

@@ -323,7 +323,7 @@ def check_coverage_gaps(index: "ManagedArtifactIndex") -> list[CalibrationFindin
         by_kind[a.artifact_kind].append(a)
 
     for kind, entries in by_kind.items():
-        if all(a.status == ArtifactStatus.MISSING for a in entries) and len(entries) > 0:
+        if entries and all(a.status == ArtifactStatus.MISSING for a in entries):
             findings.append(CalibrationFinding(
                 severity=FindingSeverity.WARNING,
                 category=FindingCategory.COVERAGE_GAP,

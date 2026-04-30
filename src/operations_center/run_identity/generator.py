@@ -140,12 +140,12 @@ def apply_run_identity_env(
             raise RunIdentityEnvConflictError(
                 f"base_env already contains {identity.env_var}={existing!r} "
                 f"which conflicts with identity run_id={identity.run_id!r}. "
-                f"Clear the existing value or use a fresh env."
+                "Clear the existing value or use a fresh env."
             )
         if not allow_same:
             raise RunIdentityEnvConflictError(
                 f"base_env already contains {identity.env_var}={existing!r}. "
-                f"allow_same=False was set; any pre-existing value is rejected."
+                "allow_same=False was set; any pre-existing value is rejected."
             )
     result = dict(base_env)
     result[identity.env_var] = identity.run_id
@@ -174,7 +174,7 @@ class PreparedManagedAuditInvocation:
 
     def __repr__(self) -> str:
         return (
-            f"PreparedManagedAuditInvocation("
+            "PreparedManagedAuditInvocation("
             f"repo_id={self.identity.repo_id!r}, "
             f"audit_type={self.identity.audit_type!r}, "
             f"run_id={self.identity.run_id!r})"

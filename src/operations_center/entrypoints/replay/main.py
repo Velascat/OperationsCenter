@@ -44,7 +44,7 @@ console = Console()
 @app.command("run")
 def cmd_run(
     fixture_pack: str = typer.Option(
-        ..., "--fixture-pack", "-f", help="Path to fixture_pack.json or pack directory."
+        ..., "--fixture-pack", "-", help="Path to fixture_pack.json or pack directory."
     ),
     profile: SliceReplayProfile = typer.Option(
         SliceReplayProfile.FIXTURE_INTEGRITY,

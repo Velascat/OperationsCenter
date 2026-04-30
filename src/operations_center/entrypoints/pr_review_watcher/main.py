@@ -295,9 +295,9 @@ def _phase1(
         f'{{"result": "LGTM", "summary": "..."}}\n'
         f"or\n"
         f'{{"result": "CONCERNS", "summary": "bullet list of specific issues"}}\n\n'
-        f"Use LGTM if the code is correct and ready to merge. "
-        f"Use CONCERNS only if there are concrete, actionable issues. "
-        f"Do NOT push any code changes to the repository."
+        "Use LGTM if the code is correct and ready to merge. "
+        "Use CONCERNS only if there are concrete, actionable issues. "
+        "Do NOT push any code changes to the repository."
     )
 
     logger.info(
@@ -345,8 +345,8 @@ def _phase1(
             f"{reviewer.bot_comment_marker}\n"
             f"**Escalated to human review** after {state['self_review_loops']} self-review pass(es).\n\n"
             f"Remaining concerns:\n\n{summary}\n\n"
-            f"Reply `/lgtm` or add a 👍 reaction to approve and merge. "
-            f"Leave a comment to request specific changes."
+            "Reply `/lgtm` or add a 👍 reaction to approve and merge. "
+            "Leave a comment to request specific changes."
         )
         try:
             gh_client.post_comment(owner, repo, pr_number, escalation_body)

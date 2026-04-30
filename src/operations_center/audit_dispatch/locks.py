@@ -93,8 +93,8 @@ class ManagedRepoAuditLockRegistry:
             if repo_id in self._held:
                 raise RepoLockAlreadyHeldError(
                     f"A managed audit is already running for repo '{repo_id}'. "
-                    f"Only one audit per repo is permitted at a time. "
-                    f"Wait for the in-progress audit to complete before dispatching another."
+                    "Only one audit per repo is permitted at a time. "
+                    "Wait for the in-progress audit to complete before dispatching another."
                 )
             self._held.add(repo_id)
         return ManagedRepoAuditLock(repo_id, self)

@@ -196,7 +196,7 @@ def main() -> None:
         elif emitted > 0 and s.get("created", 0) == 0 and live_run_count > 0:
             recommendations.append(
                 f"  {family}: {emitted} emitted but 0 created — all blocked by guardrails or max_create. "
-                f"Check cooldown_minutes / max_create settings."
+                "Check cooldown_minutes / max_create settings."
             )
         else:
             recommendations.append(f"  {family}: healthy ({emitted} emitted, {suppressed} suppressed)")

@@ -624,7 +624,7 @@ def _write_cycle_report(
         "guard_rail_summary": {
             "budget_remaining": budget_remaining,
             "families_gated": gated_families,
-            "cycle_health": "nominal" if len(snapshot.collector_errors) == 0 else "degraded",
+            "cycle_health": "nominal" if not snapshot.collector_errors else "degraded",
         },
     }
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

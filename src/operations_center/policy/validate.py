@@ -144,13 +144,13 @@ def _check_contradictions(policy: RepoPolicy, ctx: str) -> list[str]:
     if rr.blocked_without_human and rr.autonomous_allowed:
         errors.append(
             f"{ctx}.review_requirement: blocked_without_human=True contradicts "
-            f"autonomous_allowed=True"
+            "autonomous_allowed=True"
         )
 
     if not policy.enabled and policy.allowed_task_types:
         errors.append(
             f"{ctx}: enabled=False but allowed_task_types is set — "
-            f"allowed_task_types has no effect when repo is disabled"
+            "allowed_task_types has no effect when repo is disabled"
         )
 
     return errors
@@ -163,7 +163,7 @@ def _check_duplicate_repo_keys(config: PolicyConfig) -> list[str]:
         if policy.repo_key in seen:
             errors.append(
                 f"Duplicate repo_key {policy.repo_key!r} in repo_policies — "
-                f"only the first match is used"
+                "only the first match is used"
             )
         seen.add(policy.repo_key)
     return errors

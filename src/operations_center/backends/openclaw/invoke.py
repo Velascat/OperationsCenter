@@ -16,6 +16,7 @@ API, or another mechanism — belongs here and must not escape into the wider ad
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -52,15 +53,9 @@ class OpenClawRunner:
     files it modified. When absent, the invoker falls back to git diff.
     """
 
+    @abstractmethod
     def run(self, prepared: OpenClawPreparedRun) -> OpenClawRunResult:
-        """Execute an OpenClaw run and return the raw result.
-
-        Raises:
-            NotImplementedError: in the base class.
-        """
-        raise NotImplementedError(
-            "OpenClawRunner.run() must be implemented by a concrete subclass."
-        )
+        """Execute an OpenClaw run and return the raw result."""
 
 
 class StubOpenClawRunner(OpenClawRunner):

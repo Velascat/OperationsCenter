@@ -185,7 +185,7 @@ def cmd_report(
 
 def _print_report_summary(report) -> None:
     console.print(
-        f"[bold]Calibration Report[/bold] — "
+        "[bold]Calibration Report[/bold] — "
         f"{report.repo_id}/{report.audit_type} "
         f"[dim]profile={report.analysis_profile.value}[/dim]"
     )

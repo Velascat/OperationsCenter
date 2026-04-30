@@ -86,8 +86,8 @@ def build_multi_step_plan(
             "title": f"[Step 1/3: Analyze] {parent_title}"[:80],
             "goal": (
                 f"Analyze the scope of: {parent_goal}\n\n"
-                f"Read-only step. Identify which files / modules need to change "
-                f"and what the implementation strategy is. Do not modify code."
+                "Read-only step. Identify which files / modules need to change "
+                "and what the implementation strategy is. Do not modify code."
             ),
             "kind": "goal",
             "depends_on": [],
@@ -97,8 +97,8 @@ def build_multi_step_plan(
             "title": f"[Step 2/3: Implement] {parent_title}"[:80],
             "goal": (
                 f"Implement: {parent_goal}\n\n"
-                f"Use the analysis from step 1 (linked via original-task-id). "
-                f"Make the code changes; tests come in step 3."
+                "Use the analysis from step 1 (linked via original-task-id). "
+                "Make the code changes; tests come in step 3."
             ),
             "kind": "goal",
             "depends_on": [],  # filled in by caller after step 1 is created
@@ -108,8 +108,8 @@ def build_multi_step_plan(
             "title": f"[Step 3/3: Verify] {parent_title}"[:80],
             "goal": (
                 f"Verify: {parent_goal}\n\n"
-                f"Run tests / validation against the implementation from step 2. "
-                f"Surface any regressions as a follow-up goal task."
+                "Run tests / validation against the implementation from step 2. "
+                "Surface any regressions as a follow-up goal task."
             ),
             "kind": "test",
             "depends_on": [],  # filled in by caller after step 2 is created

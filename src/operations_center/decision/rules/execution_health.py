@@ -122,7 +122,7 @@ class ExecutionHealthRule:
                         confidence="high",
                         evidence_lines=[
                             f"{unknown_error_total} of the last {total} runs for '{repo}' "
-                            f"ended with unknown or error outcomes "
+                            "ended with unknown or error outcomes "
                             f"({unknown_count} unknown, {error_count} errors).",
                         ],
                         risk_class="logic",

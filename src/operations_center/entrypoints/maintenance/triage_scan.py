@@ -96,7 +96,7 @@ def main() -> int:
                 client.comment_issue(
                     a.task_id,
                     f"Triage scan: {a.new_comment_count} new operator comment(s) — "
-                    f"re-promoted to Ready for AI for another kodo pass.",
+                    "re-promoted to Ready for AI for another kodo pass.",
                 )
                 entry["action"] = "transitioned"
             except Exception as exc:

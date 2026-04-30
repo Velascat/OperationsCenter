@@ -63,7 +63,7 @@ class ArchitectureSignalCollector:
         )
         coupling_score = round(cross_module_imports / total_modules, 3) if total_modules > 0 else 0.0
 
-        has_warnings = len(cycles) > 0 or coupling_score > 5.0 or max_depth > 8
+        has_warnings = bool(cycles) or coupling_score > 5.0 or max_depth > 8
         status = "warnings" if has_warnings else "healthy"
 
         parts: list[str] = []

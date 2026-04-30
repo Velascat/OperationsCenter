@@ -51,8 +51,8 @@ def main() -> None:
         print(
             f"[warn] Latest observer snapshot is {age_hours:.1f}h old "
             f"(threshold: {_stale_warn_hours}h). "
-            f"Insights may not reflect the current repo state. "
-            f"Re-run 'operations-center.sh observe-repo' for fresh data.",
+            "Insights may not reflect the current repo state. "
+            "Re-run 'operations-center.sh observe-repo' for fresh data.",
             flush=True,
         )
 

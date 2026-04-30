@@ -116,7 +116,7 @@ def discover_post_execution(
             failure_reason=(
                 f"run_status.json not found in '{expected_output}' "
                 f"for run_id='{run_id}'. "
-                f"The managed audit may not have written contract files."
+                "The managed audit may not have written contract files."
             ),
         )
 

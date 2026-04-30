@@ -85,9 +85,8 @@ def _resolve_custodian_audit() -> str | None:
     found = shutil.which("custodian-audit")
     if found:
         return found
-    venv_bin = os.path.dirname(sys.executable)
-    candidate = os.path.join(venv_bin, "custodian-audit")
-    return candidate if os.access(candidate, os.X_OK) else None
+    candidate = Path(sys.executable).parent / "custodian-audit"
+    return str(candidate) if os.access(candidate, os.X_OK) else None
 
 
 def _run_custodian_audit(target: _RepoTarget) -> _RepoSweep:

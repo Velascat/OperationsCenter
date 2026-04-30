@@ -91,7 +91,7 @@ def main() -> int:
                 client.transition_issue(cand.task_id, "Ready for AI")
                 client.comment_issue(
                     cand.task_id,
-                    f"Auto-recovered: per-kind TTL exceeded "
+                    "Auto-recovered: per-kind TTL exceeded "
                     f"(kind={cand.task_kind}, age={cand.age_minutes}m, "
                     f"ttl={cand.ttl_minutes}m). Re-promoted to Ready for AI.",
                 )
@@ -140,10 +140,10 @@ def main() -> int:
             client.transition_issue(entry["id"], "Ready for AI")
             client.comment_issue(
                 entry["id"],
-                f"Auto-recovered from stale Running state by maintenance.recover_stale "
+                "Auto-recovered from stale Running state by maintenance.recover_stale "
                 f"(age {int(age/60)}m, threshold {int(cutoff_seconds/60)}m). "
-                f"The previous run did not produce a result file — re-promoted to "
-                f"Ready for AI for a fresh attempt.",
+                "The previous run did not produce a result file — re-promoted to "
+                "Ready for AI for a fresh attempt.",
             )
             entry["action"] = "reset"
             reset.append(entry)

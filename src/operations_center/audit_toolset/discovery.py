@@ -107,8 +107,8 @@ def resolve_artifact_manifest_path(
     if run_status.artifact_manifest_path is None:
         raise ArtifactManifestPathMissingError(
             f"run_status for run_id={run_status.run_id!r} has no "
-            f"artifact_manifest_path. This is a contract violation for managed "
-            f"runs. The VF audit must be updated (Phase 5) to write this field."
+            "artifact_manifest_path. This is a contract violation for managed "
+            "runs. The VF audit must be updated (Phase 5) to write this field."
         )
 
     p = Path(run_status.artifact_manifest_path)
@@ -118,8 +118,8 @@ def resolve_artifact_manifest_path(
     if base_dir is None:
         raise ArtifactManifestPathResolutionError(
             f"artifact_manifest_path={str(p)!r} is a relative path but no "
-            f"base_dir was supplied. Pass base_dir= (managed repo root or "
-            f"run_status.json parent directory) to resolve the path."
+            "base_dir was supplied. Pass base_dir= (managed repo root or "
+            "run_status.json parent directory) to resolve the path."
         )
 
     return (Path(base_dir) / p).resolve()

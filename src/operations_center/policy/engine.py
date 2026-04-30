@@ -361,7 +361,7 @@ def _check_tool_guardrail(
                 rule_id="tool.network_local_only",
                 category="tool",
                 message=(
-                    f"Tool policy requires local-only execution, but routing "
+                    "Tool policy requires local-only execution, but routing "
                     f"selected remote lane {lane_value!r}"
                 ),
                 blocking=True,
@@ -400,7 +400,7 @@ def _check_validation_requirements(
     task_type_value = proposal.task_type.value
 
     validation_available = (
-        request is not None and len(request.validation_commands) > 0
+        request is not None and bool(request.validation_commands)
     ) or (
         proposal.validation_profile.commands
     )

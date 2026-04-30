@@ -58,7 +58,7 @@ def cmd_record(args: argparse.Namespace) -> None:
         print(
             f"  Feedback already exists for task {task_id}:\n"
             f"    outcome: {existing.get('outcome')}  recorded_at: {existing.get('recorded_at')}\n"
-            f"  Use --force to overwrite."
+            "  Use --force to overwrite."
         )
         return
 

@@ -130,12 +130,12 @@ def _check_command_status(
     if status in _ALWAYS_BLOCKED:
         raise ManagedAuditCommandUnavailableError(
             f"audit_type={audit_type!r} has command_status={status!r} which is "
-            f"blocked. Resolve the command evidence before generating invocation "
-            f"requests."
+            "blocked. Resolve the command evidence before generating invocation "
+            "requests."
         )
     if status == "not_yet_run" and not allow_not_yet_run:
         raise ManagedAuditCommandUnavailableError(
             f"audit_type={audit_type!r} has command_status='not_yet_run' and "
-            f"allow_not_yet_run=False. Run the audit at least once to verify "
-            f"the command before strict contract generation."
+            "allow_not_yet_run=False. Run the audit at least once to verify "
+            "the command before strict contract generation."
         )

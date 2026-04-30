@@ -210,7 +210,7 @@ def _claim_next(client, role: str, settings) -> dict | None:
                 str(issue["id"]),
                 f"board_worker[{role}] refused to claim — goal text too thin "
                 f"({len(candidate_goal)} chars; minimum {_MIN_GOAL_TEXT_CHARS}). "
-                f"Add concrete description and re-promote to Ready for AI.",
+                "Add concrete description and re-promote to Ready for AI.",
             )
         except Exception as exc:
             logger.warning("board_worker[%s]: empty-goal block failed task_id=%s — %s",
@@ -296,7 +296,7 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
             goal_text = (
                 f"{goal_text}\n\n"
                 f"## Rejection patterns to avoid\n"
-                f"Recent proposals in this repo were rejected for these reasons; "
+                "Recent proposals in this repo were rejected for these reasons; "
                 f"do not repeat them:\n"
                 + "\n".join(f"- {p}" for p in patterns[:5])
             )
@@ -323,9 +323,9 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
             f"  ]\n"
             f"}}\n"
             f"```\n"
-            f"Each suggestion should be small enough to implement in a focused PR "
-            f"(complexity:small ≈ <50 LOC, medium ≈ <200 LOC, large flagged for split). "
-            f"Limit to 5 suggestions; pick the highest-impact ones."
+            "Each suggestion should be small enough to implement in a focused PR "
+            "(complexity:small ≈ <50 LOC, medium ≈ <200 LOC, large flagged for split). "
+            "Limit to 5 suggestions; pick the highest-impact ones."
         )
 
     # Derive execution_mode from task_kind (test_campaign → test_campaign, etc.)

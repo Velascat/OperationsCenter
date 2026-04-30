@@ -134,7 +134,7 @@ class ProposalCandidateMapper:
         known = sorted(settings.repos.keys())
         raise ValueError(
             f"Proposal candidate references repo '{provenance.repo_name}' which is not in the configured repos: {known}. "
-            f"Update the candidate provenance or add the repo to config."
+            "Update the candidate provenance or add the repo to config."
         )
 
     @staticmethod

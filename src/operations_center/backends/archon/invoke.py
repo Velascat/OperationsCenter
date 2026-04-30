@@ -14,6 +14,7 @@ ArchonRunCapture, isolating invocation mechanics from the rest of the adapter.
 from __future__ import annotations
 
 import os
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -46,15 +47,9 @@ class ArchonAdapter:
     API, RPC, etc. — belongs here and must not escape into the wider adapter.
     """
 
+    @abstractmethod
     def run(self, config: ArchonWorkflowConfig) -> ArchonRunResult:
-        """Execute an Archon workflow and return the raw result.
-
-        Raises:
-            NotImplementedError: in the base class.
-        """
-        raise NotImplementedError(
-            "ArchonAdapter.run() must be implemented by a concrete subclass."
-        )
+        """Execute an Archon workflow and return the raw result."""
 
 
 class StubArchonAdapter(ArchonAdapter):

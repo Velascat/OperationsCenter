@@ -130,7 +130,7 @@ class WorkspaceManager:
         except Exception as exc:
             raise RuntimeError(
                 f"base_branch {request.base_branch!r} does not exist on origin — "
-                f"if this is a sandbox branch (sandbox_base_branch in config), "
+                "if this is a sandbox branch (sandbox_base_branch in config), "
                 f"create it on origin first (e.g. `git push origin main:{request.base_branch}`). "
                 f"Underlying: {exc}"
             ) from exc
@@ -207,8 +207,8 @@ class WorkspaceManager:
                 "failure_reason": (
                     f"diff exceeded soft cap: {n_files} files, {n_lines} lines "
                     f"(caps {self._max_files} / {self._max_lines}). "
-                    f"Suggested next: split into smaller goal tasks scoped to one or "
-                    f"two files each, or raise OPS_CENTER_MAX_FILES / "
+                    "Suggested next: split into smaller goal tasks scoped to one or "
+                    "two files each, or raise OPS_CENTER_MAX_FILES / "
                     f"OPS_CENTER_MAX_LINES if the wide scope is intentional.\n"
                     f"Top files in this run:\n{top_files}{extra}"
                 ),

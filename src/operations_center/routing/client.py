@@ -68,7 +68,7 @@ class HttpLaneRoutingClient:
         except httpx.ConnectError as exc:
             raise SwitchBoardUnavailableError(
                 f"SwitchBoard unreachable at {self.base_url}. "
-                f"Set OPERATIONS_CENTER_SWITCHBOARD_URL or start the SwitchBoard service. "
+                "Set OPERATIONS_CENTER_SWITCHBOARD_URL or start the SwitchBoard service. "
                 f"Cause: {exc}"
             ) from exc
         except httpx.TimeoutException as exc:
