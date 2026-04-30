@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Velascat
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +29,8 @@ from operations_center.observer.models import (
     ValidationHistorySignal,
 )
 from operations_center.observer.snapshot_builder import SnapshotBuilder
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -283,6 +286,7 @@ class RepoObserverService:
         try:
             return collector.collect(context)
         except Exception as exc:
+            logger.debug("Optional collector %r failed: %s", name, exc)
             collector_errors[name] = str(exc)
             return default
 

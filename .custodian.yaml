@@ -73,6 +73,45 @@ audit:
       - src/operations_center/behavior_calibration/rules.py
       # spec director phase orchestrator: one best-effort traceability append
       - src/operations_center/spec_director/phase_orchestrator.py
+    C9:
+      # Entrypoints are polling workers (same rationale as C4); broad catches
+      # prevent one bad work item from aborting the whole cycle. The cycle logs
+      # aggregate outcomes via artifact files, not per-exception logger calls.
+      - src/operations_center/entrypoints/**
+      # Analytics / signal collection — one bad record or failing collector must
+      # not crash the analysis pass. Errors surface in artifact-level counts.
+      - src/operations_center/insights/derivers/**
+      - src/operations_center/observer/collectors/**
+      - src/operations_center/observer/service.py  # _collect_required re-raises; _collect_optional now logs
+      - src/operations_center/tuning/**
+      # Backend normalisers: parse best-effort; return None/[] on any decode failure
+      - src/operations_center/backends/**
+      # Adapter layer: GitHub/kodo API calls return [] / None on any transport error;
+      # callers decide whether to retry or skip.
+      - src/operations_center/adapters/github_pr.py
+      - src/operations_center/adapters/kodo/adapter.py
+      # Structured error capture — exception message stored in a result/error list,
+      # not silently discarded:
+      - src/operations_center/audit_dispatch/executor.py
+      - src/operations_center/proposer/backlog_promoter.py
+      - src/operations_center/proposer/candidate_integration.py
+      - src/operations_center/behavior_calibration/rules.py
+      # Best-effort / non-fatal defensive fallbacks (documented per-file):
+      - src/operations_center/audit_governance/runner.py  # budget/cooldown state now logs warnings
+      - src/operations_center/autonomy_tiers/config.py
+      - src/operations_center/config/drift.py
+      - src/operations_center/execution/validation.py
+      - src/operations_center/execution/workspace.py
+      - src/operations_center/insights/loader.py
+      - src/operations_center/mini_regression/runner.py
+      - src/operations_center/post_merge_regression.py
+      - src/operations_center/priority_scans.py
+      - src/operations_center/reconcile_running.py
+      - src/operations_center/scheduled_tasks/runner.py
+      - src/operations_center/spec_director/context_bundle.py
+      - src/operations_center/spec_director/phase_orchestrator.py
+      - src/operations_center/spec_director/recovery.py
+      - src/operations_center/spec_director/spec_writer.py
 
   # Stale handler names cited in autonomy_gaps.md from a pre-board_worker
   # architecture. Used by Custodian's generic C8 (and OC's OC8) to skip

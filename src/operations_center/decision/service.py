@@ -244,14 +244,14 @@ class DecisionEngineService:
         for results_file in proposer_root.glob("*/proposal_results.json"):
             try:
                 data = json.loads(results_file.read_text())
-            except Exception:
+            except (OSError, ValueError):
                 continue
             if data.get("dry_run"):
                 continue
             ts_raw = data.get("generated_at", "")
             try:
                 generated_at = datetime.fromisoformat(str(ts_raw))
-            except Exception:
+            except ValueError:
                 continue
             if generated_at < cutoff:
                 continue
@@ -287,7 +287,7 @@ class DecisionEngineService:
             for results_file in proposer_root.glob("*/proposal_results.json"):
                 try:
                     data = json.loads(results_file.read_text())
-                except Exception:
+                except (OSError, ValueError):
                     continue
                 created = data.get("created", [])
                 if not isinstance(created, list):
@@ -306,7 +306,7 @@ class DecisionEngineService:
             for fb_file in feedback_root.glob("*.json"):
                 try:
                     record = json.loads(fb_file.read_text())
-                except Exception:
+                except (OSError, ValueError):
                     continue
                 task_id = str(record.get("task_id", ""))
                 outcome = str(record.get("outcome", ""))

@@ -11,6 +11,7 @@ Only AuditGovernanceDecision.decision == "approved" with a valid AuditManualAppr
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -38,6 +39,8 @@ from .models import (
 )
 from .policy import evaluate_governance_policies, make_governance_decision
 from .reports import write_governance_report
+
+logger = logging.getLogger(__name__)
 
 
 def _check_approval_request_id(
@@ -139,14 +142,16 @@ def run_governed_audit(
         budget_state: AuditBudgetState | None = load_budget_state(
             cfg.state_dir, request.repo_id, request.audit_type, budget_config
         )
-    except Exception:
-        budget_state = None  # Non-fatal for evaluation; logged in policy results
+    except Exception as exc:
+        logger.warning("Could not load budget state for %s/%s: %s", request.repo_id, request.audit_type, exc)
+        budget_state = None
 
     try:
         cooldown_state: AuditCooldownState | None = load_cooldown_state(
             cfg.state_dir, request.repo_id, request.audit_type, cooldown_config
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning("Could not load cooldown state for %s/%s: %s", request.repo_id, request.audit_type, exc)
         cooldown_state = None
 
     # --- Evaluate policies ---
@@ -287,15 +292,15 @@ def run_governed_audit(
         budget_state = increment_budget_after_dispatch(
             cfg.state_dir, request.repo_id, request.audit_type, budget_config, ran_at
         )
-    except Exception:
-        pass  # State update failure is non-fatal; dispatch already ran
+    except Exception as exc:
+        logger.warning("Budget state update failed (non-fatal, dispatch already ran): %s", exc)
 
     try:
         cooldown_state = update_cooldown_after_dispatch(
             cfg.state_dir, request.repo_id, request.audit_type, cooldown_config, ran_at
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Cooldown state update failed (non-fatal, dispatch already ran): %s", exc)
 
     dispatch_summary = DispatchResultSummary(
         run_id=dispatch_result.run_id,
