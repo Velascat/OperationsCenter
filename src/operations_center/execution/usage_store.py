@@ -8,7 +8,7 @@ import shutil
 import threading
 from collections import Counter
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Generator, cast
 
@@ -187,7 +187,7 @@ class UsageStore:
             # Auto-reset if the last attempt was >1h ago — indicates a human manually
             # unblocked the task and expects another try with a clean slate.
             last_attempt_ts = self._last_attempt_timestamp(data, task_id)
-            ref = now or datetime.now(last_attempt_ts.tzinfo if last_attempt_ts else None)
+            ref = now or datetime.now(UTC)
             if last_attempt_ts is None or (ref - last_attempt_ts) > timedelta(hours=1):
                 self._reset_task_attempts(data, task_id)
                 attempts = 0
@@ -540,7 +540,7 @@ class UsageStore:
         like "what did the system do to repo X this week?" without reading raw
         JSON events.
         """
-        _now = now or datetime.now()
+        _now = now or datetime.now(UTC)
         data = self.load()
         events = self._prune_events(list(data.get("events", [])), now=_now)
         cutoff = _now - timedelta(days=window_days)
@@ -774,7 +774,7 @@ class UsageStore:
 
         Returns 0.5 (neutral) if fewer than 3 samples exist.
         """
-        now = now or datetime.now()
+        now = now or datetime.now(UTC)
         data = self.load()
         events = self._prune_events(list(data.get("events", [])), now=now)
         outcomes = [
@@ -814,7 +814,7 @@ class UsageStore:
         Requires at least *window* samples before returning True to avoid
         false-positives on new commands.
         """
-        now = now or datetime.now()
+        now = now or datetime.now(UTC)
         data = self.load()
         events = self._prune_events(list(data.get("events", [])), now=now)
         outcomes = [
@@ -981,7 +981,7 @@ class UsageStore:
                 },
             }
         """
-        _now = now or datetime.now()
+        _now = now or datetime.now(UTC)
         data = self.load()
         events = self._prune_events(list(data.get("events", [])), now=_now)
         cutoff = _now - timedelta(days=window_days)
