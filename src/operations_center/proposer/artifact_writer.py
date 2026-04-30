@@ -16,7 +16,7 @@ class ProposerArtifactWriter:
         run_dir.mkdir(parents=True, exist_ok=True)
 
         json_path = run_dir / "proposal_results.json"
-        json_path.write_text(artifact.model_dump_json(indent=2))
+        json_path.write_text(artifact.model_dump_json(indent=2), encoding="utf-8")
 
         md_path = run_dir / "proposal_results.md"
         lines = [
@@ -42,5 +42,5 @@ class ProposerArtifactWriter:
             [f"- {item.family} | {item.reason} | {item.dedup_key}" for item in artifact.failed]
             or ["- none"]
         )
-        md_path.write_text("\n".join(lines))
+        md_path.write_text("\n".join(lines), encoding="utf-8")
         return [str(json_path), str(md_path)]

@@ -408,7 +408,7 @@ def load_env_exports(env_path: Path) -> dict[str, str]:
     if not env_path.exists():
         return {}
     exports: dict[str, str] = {}
-    for raw_line in env_path.read_text().splitlines():
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line.startswith("export ") or "=" not in line:
             continue
@@ -424,7 +424,7 @@ def load_env_exports(env_path: Path) -> dict[str, str]:
 def load_existing_config(config_path: Path) -> dict[str, object]:
     if not config_path.exists():
         return {}
-    raw = yaml.safe_load(config_path.read_text())
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if isinstance(raw, dict):
         return raw
     return {}
@@ -559,7 +559,7 @@ def ensure_github_ssh_setup(git_email: str, repo_root: Path) -> None:
         typer.echo("https://github.com/settings/keys")
         typer.echo("")
         typer.echo("--- BEGIN SSH KEY ---")
-        typer.echo(public_key.read_text().strip())
+        typer.echo(public_key.read_text(encoding="utf-8").strip())
         typer.echo("--- END SSH KEY ---")
         typer.prompt("Press ENTER after adding the SSH key to GitHub", default="", show_default=False)
         success, output = verify_github_ssh()
@@ -1195,10 +1195,10 @@ def main(
     )
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(render_settings_yaml(answers))
-    env_path.write_text(render_env_file(answers))
+    config_path.write_text(render_settings_yaml(answers), encoding="utf-8")
+    env_path.write_text(render_env_file(answers), encoding="utf-8")
     task_template_path.parent.mkdir(parents=True, exist_ok=True)
-    task_template_path.write_text(render_task_template(answers))
+    task_template_path.write_text(render_task_template(answers), encoding="utf-8")
 
     print_section("Done", "Local setup files were updated.")
     typer.echo(f"Config: {config_path}")

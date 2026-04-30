@@ -101,7 +101,7 @@ class UsageStore:
                 "blocked_due_to_retry_cap": 0,
                 "suppressed_due_to_proposal_budget": 0,
             }
-        return json.loads(self.path.read_text())
+        return json.loads(self.path.read_text(encoding="utf-8"))
 
     def save(self, data: dict[str, Any], *, now: datetime) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,7 +119,7 @@ class UsageStore:
         data["suppressed_due_to_proposal_budget"] = counts.get("proposal_budget_suppressed", 0)
         # Atomic write: write to a temp file then rename (rename is atomic on Linux).
         tmp = self.path.with_name(self.path.name + ".tmp")
-        tmp.write_text(json.dumps(data, indent=2))
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
         tmp.replace(self.path)
 
     def budget_decision(self, *, now: datetime) -> BudgetDecision:
@@ -233,7 +233,7 @@ class UsageStore:
                 del sigs[key]
         data["last_task_signatures"] = sigs
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=2))
+        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def noop_decision(
         self,
@@ -746,7 +746,7 @@ class UsageStore:
             ]
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_name(self.path.name + ".tmp")
-            tmp.write_text(json.dumps(data, indent=2))
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
             tmp.replace(self.path)
 
     def record_proposal_outcome(self, *, category: str, succeeded: bool, now: datetime) -> None:

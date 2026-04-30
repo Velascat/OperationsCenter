@@ -243,7 +243,7 @@ class DecisionEngineService:
             return 0
         for results_file in proposer_root.glob("*/proposal_results.json"):
             try:
-                data = json.loads(results_file.read_text())
+                data = json.loads(results_file.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
             if data.get("dry_run"):
@@ -286,7 +286,7 @@ class DecisionEngineService:
         if proposer_root.exists():
             for results_file in proposer_root.glob("*/proposal_results.json"):
                 try:
-                    data = json.loads(results_file.read_text())
+                    data = json.loads(results_file.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
                 created = data.get("created", [])
@@ -305,7 +305,7 @@ class DecisionEngineService:
         if feedback_root.exists():
             for fb_file in feedback_root.glob("*.json"):
                 try:
-                    record = json.loads(fb_file.read_text())
+                    record = json.loads(fb_file.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
                 task_id = str(record.get("task_id", ""))

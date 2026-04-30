@@ -43,7 +43,7 @@ def aggregate_family_metrics(
         if not path.exists():
             continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
         if data.get("dry_run"):
@@ -61,7 +61,7 @@ def aggregate_family_metrics(
             if not path.exists():
                 continue
             try:
-                data = json.loads(path.read_text())
+                data = json.loads(path.read_text(encoding="utf-8"))
             except Exception:
                 continue
             if data.get("dry_run"):
@@ -78,7 +78,7 @@ def aggregate_family_metrics(
             if not path.exists():
                 continue
             try:
-                data = json.loads(path.read_text())
+                data = json.loads(path.read_text(encoding="utf-8"))
             except Exception:
                 continue
             for item in _iter_list(data, "created"):
@@ -94,7 +94,7 @@ def aggregate_family_metrics(
     if _feedback_root.exists():
         for feedback_file in _feedback_root.glob("*.json"):
             try:
-                record = json.loads(feedback_file.read_text())
+                record = json.loads(feedback_file.read_text(encoding="utf-8"))
             except Exception:
                 continue
             task_id = str(record.get("task_id", ""))

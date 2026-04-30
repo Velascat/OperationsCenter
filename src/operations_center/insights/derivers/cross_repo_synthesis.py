@@ -123,7 +123,7 @@ def _read_latest_insight_kinds(root: Path) -> dict[str, set[str]]:
         if not artifact_path.exists():
             continue
         try:
-            data = json.loads(artifact_path.read_text())
+            data = json.loads(artifact_path.read_text(encoding="utf-8"))
         except Exception:
             continue
 

@@ -47,7 +47,7 @@ class ProposalCandidateLoader:
 
     def _all_decisions(self) -> list[ProposalCandidatesArtifact]:
         artifacts = [
-            ProposalCandidatesArtifact.model_validate_json(path.read_text())
+            ProposalCandidatesArtifact.model_validate_json(path.read_text(encoding="utf-8"))
             for path in self.decision_root.glob("*/proposal_candidates.json")
         ]
         return sorted(artifacts, key=lambda artifact: artifact.generated_at, reverse=True)
@@ -56,4 +56,4 @@ class ProposalCandidateLoader:
         path = self.insights_root / run_id / "repo_insights.json"
         if not path.exists():
             raise ValueError(f"Insight artifact not found for decision source run: {run_id}")
-        return RepoInsightsArtifact.model_validate_json(path.read_text())
+        return RepoInsightsArtifact.model_validate_json(path.read_text(encoding="utf-8"))

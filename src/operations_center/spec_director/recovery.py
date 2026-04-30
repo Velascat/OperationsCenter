@@ -62,8 +62,8 @@ class RecoveryService:
         # Update spec front matter
         spec_path = specs_dir / f"{campaign.slug}.md"
         if spec_path.exists():
-            text = spec_path.read_text()
-            spec_path.write_text(text.replace("status: active", "status: cancelled", 1))
+            text = spec_path.read_text(encoding="utf-8")
+            spec_path.write_text(text.replace("status: active", "status: cancelled", 1), encoding="utf-8")
 
         # Mark campaign cancelled in state
         self._state.mark_cancelled(campaign.campaign_id)

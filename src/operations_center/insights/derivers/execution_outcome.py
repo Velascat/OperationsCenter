@@ -67,8 +67,8 @@ class ExecutionOutcomeDeriver:
                 continue
             try:
                 import json
-                outcome = json.loads(outcome_file.read_text())
-                request = json.loads(request_file.read_text())
+                outcome = json.loads(outcome_file.read_text(encoding="utf-8"))
+                request = json.loads(request_file.read_text(encoding="utf-8"))
             except Exception:
                 continue
 
@@ -85,7 +85,7 @@ class ExecutionOutcomeDeriver:
                 p = run_dir / candidate
                 if p.exists():
                     try:
-                        stderr = p.read_text(errors="replace").lower()
+                        stderr = p.read_text(encoding="utf-8", errors="replace").lower()
                     except Exception:
                         pass
                     break

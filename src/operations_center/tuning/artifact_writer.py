@@ -19,7 +19,7 @@ class TuningArtifactWriter:
 
         # Primary machine-readable artifact (used by loader for cooldown/quota)
         run_path = run_dir / "tuning_run.json"
-        run_path.write_text(artifact.model_dump_json(indent=2))
+        run_path.write_text(artifact.model_dump_json(indent=2), encoding="utf-8")
 
         # Human-readable summary split into separate files per task spec
         summary_path = run_dir / "family_tuning_summary.json"
@@ -34,7 +34,7 @@ class TuningArtifactWriter:
                     "family_metrics": [m.model_dump() for m in artifact.family_metrics],
                 }
             )
-        )
+        , encoding="utf-8")
 
         rec_path = run_dir / "tuning_recommendations.json"
         rec_path.write_text(
@@ -45,7 +45,7 @@ class TuningArtifactWriter:
                     "recommendations": [r.model_dump() for r in artifact.recommendations],
                 }
             )
-        )
+        , encoding="utf-8")
 
         changes_path = run_dir / "tuning_changes.json"
         changes_path.write_text(
@@ -58,7 +58,7 @@ class TuningArtifactWriter:
                     "changes_skipped": [s.model_dump() for s in artifact.changes_skipped],
                 }
             )
-        )
+        , encoding="utf-8")
 
         return [str(run_path), str(summary_path), str(rec_path), str(changes_path)]
 

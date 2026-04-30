@@ -176,7 +176,7 @@ def _write_quiet_diagnosis(
         return  # Not enough history yet
 
     all_zero = all(
-        json.loads(p.read_text()).get("stages", {}).get("decide", {}).get("candidates_emitted", -1) == 0
+        json.loads(p.read_text(encoding="utf-8")).get("stages", {}).get("decide", {}).get("candidates_emitted", -1) == 0
         for p in cycle_reports
     )
     if not all_zero:
@@ -190,7 +190,7 @@ def _write_quiet_diagnosis(
     families_seen: set[str] = set()
     for report_path in cycle_reports:
         try:
-            report = json.loads(report_path.read_text())
+            report = json.loads(report_path.read_text(encoding="utf-8"))
             decide = report.get("stages", {}).get("decide", {})
             for reason, count in decide.get("suppression_reasons", {}).items():
                 reason_totals[reason] += int(count)
@@ -215,7 +215,7 @@ def _write_quiet_diagnosis(
         ),
     }
     diag_path = report_dir / "quiet_diagnosis.json"
-    diag_path.write_text(json.dumps(diag, indent=2))
+    diag_path.write_text(json.dumps(diag, indent=2), encoding="utf-8")
     print(f"\n  [warn] Proposer quiet for {quiet_window} cycles — diagnosis → {diag_path}")
     # S7-7: Fire escalation webhook when proposer goes silent.
     if escalation_webhook:
@@ -627,7 +627,7 @@ def _write_cycle_report(
             "cycle_health": "nominal" if len(snapshot.collector_errors) == 0 else "degraded",
         },
     }
-    report_path.write_text(json.dumps(report, indent=2))
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\n  Cycle report  → {report_path}")
 
     # Quiet diagnosis: if the last _QUIET_WINDOW cycle reports all had 0

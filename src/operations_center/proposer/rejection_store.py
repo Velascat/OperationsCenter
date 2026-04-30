@@ -89,7 +89,7 @@ class ProposalRejectionStore:
         if not self.path.exists():
             return []
         try:
-            raw = json.loads(self.path.read_text())
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(raw, list):
                 return raw
             return []
@@ -99,5 +99,5 @@ class ProposalRejectionStore:
     def _save(self, records: list[dict[str, Any]]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(records, indent=2))
+        tmp.write_text(json.dumps(records, indent=2), encoding="utf-8")
         tmp.replace(self.path)

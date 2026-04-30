@@ -203,11 +203,11 @@ class ConfidenceCalibrationStore:
     def _load(self) -> dict:
         if self._path.exists():
             try:
-                return json.loads(self._path.read_text())
+                return json.loads(self._path.read_text(encoding="utf-8"))
             except Exception:
                 pass
         return {"events": []}
 
     def _save(self, data: dict) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(data, indent=2))
+        self._path.write_text(json.dumps(data, indent=2), encoding="utf-8")

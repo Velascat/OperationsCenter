@@ -27,7 +27,7 @@ class TuningArtifactLoader:
             if not path.exists():
                 continue
             try:
-                data = json.loads(path.read_text())
+                data = json.loads(path.read_text(encoding="utf-8"))
                 results.append(TuningRunArtifact.model_validate(data))
             except Exception:
                 continue

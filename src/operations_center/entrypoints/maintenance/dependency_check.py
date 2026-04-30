@@ -233,7 +233,7 @@ def write_dependency_report(run_dir: Path, statuses: list[DependencyStatus], cre
             },
             indent=2,
         )
-    )
+    , encoding="utf-8")
     lines = ["# Dependency Check", "", "## Statuses"]
     for status in statuses:
         lines.append(f"- {status.label}: healthy={status.healthy} pinned={status.pinned_version or 'none'} installed={status.installed_version or 'none'} upstream={status.upstream_latest or 'unknown'}")
@@ -241,7 +241,7 @@ def write_dependency_report(run_dir: Path, statuses: list[DependencyStatus], cre
             lines.append(f"  - {note}")
     lines.extend(["", "## Created Tasks"])
     lines.extend([f"- {task_id}" for task_id in created_task_ids] or ["- none"])
-    md_path.write_text("\n".join(lines))
+    md_path.write_text("\n".join(lines), encoding="utf-8")
     return [str(json_path), str(md_path)]
 
 

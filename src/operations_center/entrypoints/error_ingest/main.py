@@ -68,7 +68,7 @@ def _is_duplicate(key: str, window_seconds: int) -> bool:
         if not _DEDUP_STATE_PATH.exists():
             return False
         try:
-            state = json.loads(_DEDUP_STATE_PATH.read_text())
+            state = json.loads(_DEDUP_STATE_PATH.read_text(encoding="utf-8"))
         except Exception:
             return False
         last_raw = state.get(key)
@@ -87,12 +87,12 @@ def _mark_created(key: str) -> None:
         state: dict = {}
         if _DEDUP_STATE_PATH.exists():
             try:
-                state = json.loads(_DEDUP_STATE_PATH.read_text())
+                state = json.loads(_DEDUP_STATE_PATH.read_text(encoding="utf-8"))
             except Exception:
                 pass
         state[key] = datetime.now(UTC).isoformat()
         _DEDUP_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _DEDUP_STATE_PATH.write_text(json.dumps(state, indent=2))
+        _DEDUP_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

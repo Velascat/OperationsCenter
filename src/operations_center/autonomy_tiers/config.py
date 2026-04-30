@@ -47,7 +47,7 @@ def load_tiers_config(path: Path | None = None) -> AutonomyTiersConfig | None:
     if not p.exists():
         return None
     try:
-        data = json.loads(p.read_text())
+        data = json.loads(p.read_text(encoding="utf-8"))
         return AutonomyTiersConfig.model_validate(data)
     except Exception:
         return None
@@ -56,7 +56,7 @@ def load_tiers_config(path: Path | None = None) -> AutonomyTiersConfig | None:
 def save_tiers_config(config: AutonomyTiersConfig, path: Path | None = None) -> None:
     p = path or _DEFAULT_TIERS_PATH
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(config.model_dump_json(indent=2))
+    p.write_text(config.model_dump_json(indent=2), encoding="utf-8")
 
 
 def get_family_tier(family: str, config: AutonomyTiersConfig | None) -> int:

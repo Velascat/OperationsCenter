@@ -16,7 +16,7 @@ class ObserverArtifactWriter:
         run_dir.mkdir(parents=True, exist_ok=True)
 
         json_path = run_dir / "repo_state_snapshot.json"
-        json_path.write_text(snapshot.model_dump_json(indent=2))
+        json_path.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
 
         md_path = run_dir / "repo_state_snapshot.md"
         md_lines = [
@@ -69,5 +69,5 @@ class ObserverArtifactWriter:
         if snapshot.collector_errors:
             md_lines.extend(["", "## Collector Errors"])
             md_lines.extend([f"- {name}: {error}" for name, error in snapshot.collector_errors.items()])
-        md_path.write_text("\n".join(md_lines))
+        md_path.write_text("\n".join(md_lines), encoding="utf-8")
         return [str(json_path), str(md_path)]

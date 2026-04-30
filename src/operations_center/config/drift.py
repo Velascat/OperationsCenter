@@ -43,8 +43,8 @@ def detect_config_drift(
     should treat an empty list as "cannot determine" rather than "no drift".
     """
     try:
-        config_raw = yaml.safe_load(Path(config_path).read_text()) or {}
-        example_raw = yaml.safe_load(Path(example_path).read_text()) or {}
+        config_raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
+        example_raw = yaml.safe_load(Path(example_path).read_text(encoding="utf-8")) or {}
     except Exception:
         return []
 

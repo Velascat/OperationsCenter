@@ -170,14 +170,14 @@ class CampaignStore:
     def _load(self) -> dict[str, Any]:
         if self._path.exists():
             try:
-                return json.loads(self._path.read_text())
+                return json.loads(self._path.read_text(encoding="utf-8"))
             except Exception as exc:
                 logger.warning('{"event": "campaign_store_load_failed", "path": "%s", "error": "%s"}', self._path, exc)
         return {}
 
     def _save(self, campaigns: dict[str, Any]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(campaigns, indent=2))
+        self._path.write_text(json.dumps(campaigns, indent=2), encoding="utf-8")
 
 
 def _compute_status(record: dict[str, Any]) -> str:

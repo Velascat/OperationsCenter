@@ -58,7 +58,7 @@ class NoOpLoopDeriver:
         try:
             for artifact_path in sorted(self.proposer_root.glob("proposer_result_*.json")):
                 try:
-                    data = json.loads(artifact_path.read_text())
+                    data = json.loads(artifact_path.read_text(encoding="utf-8"))
                     written_at_str = data.get("generated_at") or data.get("written_at") or ""
                     if written_at_str:
                         written_at = datetime.fromisoformat(written_at_str)
@@ -81,7 +81,7 @@ class NoOpLoopDeriver:
         try:
             for feedback_path in self.feedback_root.glob("*.json"):
                 try:
-                    data = json.loads(feedback_path.read_text())
+                    data = json.loads(feedback_path.read_text(encoding="utf-8"))
                     rec_at_str = data.get("recorded_at") or ""
                     if rec_at_str:
                         rec_at = datetime.fromisoformat(rec_at_str)

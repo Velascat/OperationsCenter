@@ -75,7 +75,7 @@ class ManagedProcess:
 
 
 def _load_manifest(path: Path) -> list[ManagedProcess]:
-    raw = yaml.safe_load(path.read_text())
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     processes: list[ManagedProcess] = []
     for entry in raw.get("processes", []):
         processes.append(
@@ -99,7 +99,7 @@ def _heartbeat_age_seconds(log_dir: Path, role: str, now: datetime) -> float | N
     if not hb_file.exists():
         return None
     try:
-        payload = json.loads(hb_file.read_text())
+        payload = json.loads(hb_file.read_text(encoding="utf-8"))
         ts = datetime.fromisoformat(str(payload["ts"]))
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=_tz.utc)
@@ -185,7 +185,7 @@ def _write_supervisor_status(log_dir: Path, processes: list[ManagedProcess]) -> 
                 for mp in processes
             ],
         }
-        status_path.write_text(json.dumps(payload, indent=2))
+        status_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     except Exception:
         pass
 

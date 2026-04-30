@@ -43,7 +43,7 @@ def _load_ci_fix_state(owner: str, repo: str, pr_number: int) -> dict | None:
     path = _ci_fix_state_path(owner, repo, pr_number)
     if path.exists():
         try:
-            return json.loads(path.read_text())
+            return json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             return None
     return None
@@ -51,7 +51,7 @@ def _load_ci_fix_state(owner: str, repo: str, pr_number: int) -> dict | None:
 
 def _save_ci_fix_state(owner: str, repo: str, pr_number: int, state: dict) -> None:
     CI_FIX_STATE_DIR.mkdir(parents=True, exist_ok=True)
-    _ci_fix_state_path(owner, repo, pr_number).write_text(json.dumps(state, indent=2))
+    _ci_fix_state_path(owner, repo, pr_number).write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 def _pr_is_awaiting_ci(branch: str) -> bool:
@@ -64,7 +64,7 @@ def _pr_is_awaiting_ci(branch: str) -> bool:
     if not state_file.exists():
         return False
     try:
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         return state.get("phase") == "awaiting_ci"
     except Exception:
         return False
@@ -261,7 +261,7 @@ def run_monitor_loop(
                     "cycle": cycle,
                     "tasks_created": created,
                     "updated_at": datetime.now(UTC).isoformat(),
-                }, indent=2))
+                }, indent=2), encoding="utf-8")
 
         except Exception as exc:
             logger.warning(json.dumps({"event": "ci_monitor_cycle_error", "cycle": cycle, "error": str(exc)}))

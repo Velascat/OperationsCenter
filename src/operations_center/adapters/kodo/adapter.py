@@ -122,7 +122,7 @@ class KodoAdapter:
             "Follow with a blank line and 1-3 sentences of body context (motivation, approach, trade-offs).",
             "Do NOT use generic messages like 'apply task' or include task IDs in the subject line.",
         ])
-        path.write_text("\n".join(lines).strip() + "\n")
+        path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
         return path
 
     def build_command(
@@ -320,7 +320,7 @@ class KodoAdapter:
         """Run kodo with a team override written to .kodo/team.json."""
         team_override = repo_path / ".kodo" / "team.json"
         team_override.parent.mkdir(exist_ok=True)
-        team_override.write_text(json.dumps(team, indent=2))
+        team_override.write_text(json.dumps(team, indent=2), encoding="utf-8")
         try:
             timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
             command = self.build_command(goal_file, repo_path, profile=profile, kodo_mode=kodo_mode)

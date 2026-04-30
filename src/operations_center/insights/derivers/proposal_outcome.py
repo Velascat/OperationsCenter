@@ -94,7 +94,7 @@ class ProposalOutcomeDeriver:
         records = []
         for path in sorted(_FEEDBACK_DIR.glob("*.json")):
             try:
-                records.append(json.loads(path.read_text()))
+                records.append(json.loads(path.read_text(encoding="utf-8")))
             except Exception:
                 continue
         return records
@@ -106,7 +106,7 @@ class ProposalOutcomeDeriver:
             return family_map
         for path in _PROPOSER_ROOT.glob("*/proposal_results.json"):
             try:
-                artifact = ProposalResultsArtifact.model_validate_json(path.read_text())
+                artifact = ProposalResultsArtifact.model_validate_json(path.read_text(encoding="utf-8"))
                 for item in artifact.created:
                     if item.plane_issue_id:
                         family_map[item.plane_issue_id] = item.family

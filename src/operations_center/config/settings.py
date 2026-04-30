@@ -292,7 +292,7 @@ def _resolve_binary(binary: str, config_dir: Path) -> str:
 
 def load_settings(path: str | Path) -> Settings:
     config_path = Path(path).resolve()
-    raw = yaml.safe_load(config_path.read_text())
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     settings = Settings.model_validate(raw)
     config_dir = config_path.parent
     settings.kodo.binary = _resolve_binary(settings.kodo.binary, config_dir)

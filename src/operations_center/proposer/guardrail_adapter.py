@@ -157,7 +157,7 @@ class ProposerGuardrailAdapter:
             reverse=True,
         )
         for path in paths:
-            artifact = ProposalResultsArtifact.model_validate_json(path.read_text())
+            artifact = ProposalResultsArtifact.model_validate_json(path.read_text(encoding="utf-8"))
             for item in artifact.created:
                 if item.dedup_key == dedup_key and item.status in {"created", "dry_run"}:
                     return artifact.generated_at

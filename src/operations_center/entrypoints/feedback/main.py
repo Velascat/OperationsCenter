@@ -54,7 +54,7 @@ def cmd_record(args: argparse.Namespace) -> None:
 
     feedback_path = PROPOSAL_FEEDBACK_DIR / f"{task_id}.json"
     if feedback_path.exists() and not args.force:
-        existing = json.loads(feedback_path.read_text())
+        existing = json.loads(feedback_path.read_text(encoding="utf-8"))
         print(
             f"  Feedback already exists for task {task_id}:\n"
             f"    outcome: {existing.get('outcome')}  recorded_at: {existing.get('recorded_at')}\n"
@@ -74,7 +74,7 @@ def cmd_record(args: argparse.Namespace) -> None:
     if args.note:
         record["note"] = args.note
 
-    feedback_path.write_text(json.dumps(record, indent=2))
+    feedback_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
     print(f"  Recorded: task={task_id}  outcome={outcome}  → {feedback_path}")
 
     # S8-10: Update confidence calibration store if confidence label is provided.
@@ -96,7 +96,7 @@ def cmd_list(args: argparse.Namespace) -> None:
     records = []
     for path in sorted(PROPOSAL_FEEDBACK_DIR.glob("*.json")):
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             records.append(data)
         except Exception:
             continue
@@ -133,7 +133,7 @@ def cmd_show(args: argparse.Namespace) -> None:
         print(f"  No feedback record found for task {args.task_id}")
         return
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         print(f"  Error reading feedback record: {exc}")
         return

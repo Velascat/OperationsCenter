@@ -44,14 +44,14 @@ logger = logging.getLogger(__name__)
 
 def _load_state() -> dict:
     try:
-        return json.loads(_TRIGGER_STATE_PATH.read_text())
+        return json.loads(_TRIGGER_STATE_PATH.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
 
 def _save_state(state: dict) -> None:
     _TRIGGER_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _TRIGGER_STATE_PATH.write_text(json.dumps(state, indent=2))
+    _TRIGGER_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 def _get_trigger_sources(config_path: str) -> list[Path]:

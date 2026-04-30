@@ -25,7 +25,7 @@ def load_tuning_config(path: Path | None = None) -> TuningConfig | None:
     if not p.exists():
         return None
     try:
-        data = json.loads(p.read_text())
+        data = json.loads(p.read_text(encoding="utf-8"))
         return TuningConfig.model_validate(data)
     except Exception:
         return None
@@ -85,7 +85,7 @@ class TuningApplier:
         )
 
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(updated.model_dump_json(indent=2))
+        self.config_path.write_text(updated.model_dump_json(indent=2), encoding="utf-8")
 
         return TuningChange(
             family=family,

@@ -23,7 +23,7 @@ class CampaignStateManager:
         if not self.state_path.exists():
             return ActiveCampaigns()
         try:
-            data = json.loads(self.state_path.read_text())
+            data = json.loads(self.state_path.read_text(encoding="utf-8"))
             return ActiveCampaigns.model_validate(data)
         except Exception as exc:
             corrupt_path = self.state_path.with_suffix(
@@ -42,7 +42,7 @@ class CampaignStateManager:
     def save(self, state: ActiveCampaigns) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.state_path.with_suffix(".tmp")
-        tmp.write_text(state.model_dump_json(indent=2))
+        tmp.write_text(state.model_dump_json(indent=2), encoding="utf-8")
         tmp.rename(self.state_path)
 
     def add_campaign(self, record: CampaignRecord) -> None:
@@ -76,7 +76,7 @@ class CampaignStateManager:
         campaigns = []
         for spec_file in sorted(specs_dir.glob("*.md")):
             try:
-                fm = SpecFrontMatter.from_spec_text(spec_file.read_text())
+                fm = SpecFrontMatter.from_spec_text(spec_file.read_text(encoding="utf-8"))
                 if fm.status == "active":
                     campaigns.append(CampaignRecord(
                         campaign_id=fm.campaign_id,

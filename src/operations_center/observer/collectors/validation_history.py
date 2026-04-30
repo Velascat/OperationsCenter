@@ -62,8 +62,8 @@ class ValidationHistoryCollector:
                 continue
 
             try:
-                outcome = json.loads(outcome_file.read_text())
-                request = json.loads(request_file.read_text())
+                outcome = json.loads(outcome_file.read_text(encoding="utf-8"))
+                request = json.loads(request_file.read_text(encoding="utf-8"))
             except Exception:
                 continue
 
@@ -88,7 +88,7 @@ class ValidationHistoryCollector:
             validation_file = run_dir / "validation.json"
             if validation_file.exists():
                 try:
-                    v = json.loads(validation_file.read_text())
+                    v = json.loads(validation_file.read_text(encoding="utf-8"))
                     if v.get("passed") is False:
                         task_stats[task_id]["validation_failures"] += 1
                         total_validation_failures += 1

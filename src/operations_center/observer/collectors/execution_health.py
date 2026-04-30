@@ -45,8 +45,8 @@ class ExecutionArtifactCollector:
                 continue
 
             try:
-                outcome = json.loads(outcome_file.read_text())
-                request = json.loads(request_file.read_text())
+                outcome = json.loads(outcome_file.read_text(encoding="utf-8"))
+                request = json.loads(request_file.read_text(encoding="utf-8"))
             except Exception:
                 continue
 
@@ -59,7 +59,7 @@ class ExecutionArtifactCollector:
             validation_file = run_dir / "validation.json"
             if validation_file.exists():
                 try:
-                    v = json.loads(validation_file.read_text())
+                    v = json.loads(validation_file.read_text(encoding="utf-8"))
                     raw = v.get("passed")
                     if raw is not None:
                         validation_passed = bool(raw)

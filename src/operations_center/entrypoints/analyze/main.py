@@ -28,7 +28,7 @@ def _load_decision_artifacts(root: Path, repo: str | None, limit: int) -> list[P
     artifacts = []
     for path in paths:
         try:
-            a = ProposalCandidatesArtifact.model_validate_json(path.read_text())
+            a = ProposalCandidatesArtifact.model_validate_json(path.read_text(encoding="utf-8"))
             if repo:
                 norm = repo.strip().lower()
                 if a.repo.name.strip().lower() != norm and str(a.repo.path).strip().lower() != norm:
@@ -46,7 +46,7 @@ def _load_proposer_artifacts(root: Path, limit: int) -> list[ProposalResultsArti
     artifacts = []
     for path in paths[:limit]:
         try:
-            artifacts.append(ProposalResultsArtifact.model_validate_json(path.read_text()))
+            artifacts.append(ProposalResultsArtifact.model_validate_json(path.read_text(encoding="utf-8")))
         except Exception:
             continue
     return artifacts

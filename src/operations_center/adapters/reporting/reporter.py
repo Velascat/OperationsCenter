@@ -30,53 +30,53 @@ class Reporter:
                 },
                 indent=2,
             )
-        )
+        , encoding="utf-8")
         return str(path)
 
     def write_request(self, run_dir: Path, req: Any) -> str:
         path = run_dir / "request.json"
-        path.write_text(req.model_dump_json(indent=2, exclude={"workspace_path", "goal_file_path"}))
+        path.write_text(req.model_dump_json(indent=2, exclude={"workspace_path", "goal_file_path"}), encoding="utf-8")
         return str(path)
 
     def write_plane_payload(self, run_dir: Path, payload: dict[str, object]) -> str:
         path = run_dir / "plane_work_item.json"
-        path.write_text(json.dumps(payload, indent=2))
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return str(path)
 
     def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str, *, prefix: str = "kodo") -> list[str]:
         cmd = run_dir / f"{prefix}_command.json"
         out = run_dir / f"{prefix}_stdout.log"
         err = run_dir / f"{prefix}_stderr.log"
-        cmd.write_text(command_json)
-        out.write_text(stdout)
-        err.write_text(stderr)
+        cmd.write_text(command_json, encoding="utf-8")
+        out.write_text(stdout, encoding="utf-8")
+        err.write_text(stderr, encoding="utf-8")
         return [str(cmd), str(out), str(err)]
 
     def write_bootstrap(self, run_dir: Path, commands: list[dict[str, object]]) -> str:
         path = run_dir / "bootstrap.json"
-        path.write_text(json.dumps(commands, indent=2))
+        path.write_text(json.dumps(commands, indent=2), encoding="utf-8")
         return str(path)
 
     def write_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
         path = run_dir / "validation.json"
-        path.write_text(json.dumps(data, indent=2))
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return str(path)
 
     def write_initial_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
         path = run_dir / "validation_initial.json"
-        path.write_text(json.dumps(data, indent=2))
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         return str(path)
 
     def write_policy_violation(self, run_dir: Path, violations: list[str]) -> str:
         path = run_dir / "policy_violation.json"
-        path.write_text(json.dumps({"violations": violations}, indent=2))
+        path.write_text(json.dumps({"violations": violations}, indent=2), encoding="utf-8")
         return str(path)
 
     def write_diff(self, run_dir: Path, *, diff_stat: str, diff_patch: str) -> list[str]:
         stat_path = run_dir / "diff_stat.txt"
         patch_path = run_dir / "diff.patch"
-        stat_path.write_text(diff_stat)
-        patch_path.write_text(diff_patch)
+        stat_path.write_text(diff_stat, encoding="utf-8")
+        patch_path.write_text(diff_patch, encoding="utf-8")
         return [str(stat_path), str(patch_path)]
 
     def write_failure(self, run_dir: Path, error: str, phase: str) -> str:
@@ -90,7 +90,7 @@ class Reporter:
                 },
                 indent=2,
             )
-        )
+        , encoding="utf-8")
         return str(path)
 
     def write_smoke_result(
@@ -118,7 +118,7 @@ class Reporter:
                 },
                 indent=2,
             )
-        )
+        , encoding="utf-8")
         return str(path)
 
     def write_summary(self, run_dir: Path, result: Any) -> str:
@@ -157,10 +157,10 @@ class Reporter:
                 if vr.stderr.strip():
                     lines.append(f"  stderr: {vr.stderr.strip()[:200]}")
         lines.extend(["", "## Summary", result.summary])
-        path.write_text("\n".join(lines))
+        path.write_text("\n".join(lines), encoding="utf-8")
         return str(path)
 
     def write_control_outcome(self, run_dir: Path, payload: dict[str, object]) -> str:
         path = run_dir / "control_outcome.json"
-        path.write_text(json.dumps(payload, indent=2))
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return str(path)

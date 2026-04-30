@@ -46,7 +46,7 @@ class SpecWriter:
 
         for spec_file in self.specs_dir.glob("*.md"):
             try:
-                fm = SpecFrontMatter.from_spec_text(spec_file.read_text())
+                fm = SpecFrontMatter.from_spec_text(spec_file.read_text(encoding="utf-8"))
             except Exception:
                 continue
             if fm.status not in {"complete", "cancelled"}:
@@ -71,6 +71,6 @@ class SpecWriter:
         spec_path = self.specs_dir / f"{slug}.md"
         if not spec_path.exists():
             return
-        text = spec_path.read_text()
+        text = spec_path.read_text(encoding="utf-8")
         updated = text.replace("status: active", f"status: {status}", 1)
-        spec_path.write_text(updated)
+        spec_path.write_text(updated, encoding="utf-8")

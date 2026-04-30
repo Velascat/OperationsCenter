@@ -16,7 +16,7 @@ class DependencyDriftCollector:
         if candidate is None:
             return DependencyDriftSignal(status="not_available")
 
-        payload = json.loads(candidate.read_text())
+        payload = json.loads(candidate.read_text(encoding="utf-8"))
         statuses = payload.get("statuses", [])
         created_task_ids = payload.get("created_task_ids", [])
         actionable = [

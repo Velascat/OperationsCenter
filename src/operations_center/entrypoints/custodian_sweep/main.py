@@ -202,7 +202,7 @@ def main() -> int:
     previous_all: dict[str, Any] = {}
     if args.history.exists():
         try:
-            previous_all = json.loads(args.history.read_text())
+            previous_all = json.loads(args.history.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             previous_all = {}
 
@@ -242,7 +242,7 @@ def main() -> int:
     args.history.write_text(json.dumps(
         {s.repo_key: s.envelope for s in sweeps if not s.error},
         indent=2,
-    ))
+    ), encoding="utf-8")
     print(json.dumps(summary, indent=2))
     return 0
 

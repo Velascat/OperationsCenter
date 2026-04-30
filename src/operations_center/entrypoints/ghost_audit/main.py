@@ -75,7 +75,7 @@ def _log_lines_since(ctx: AuditContext) -> list[tuple[Path, str]]:
         except OSError:
             continue
         try:
-            for line in log.read_text(errors="replace").splitlines():
+            for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
                 out.append((log, line))
         except OSError:
             pass

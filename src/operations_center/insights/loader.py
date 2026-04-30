@@ -56,7 +56,7 @@ class SnapshotLoader:
             repo_norm = repo.strip().lower()
             for path in paths:
                 try:
-                    snap = RepoStateSnapshot.model_validate_json(path.read_text())
+                    snap = RepoStateSnapshot.model_validate_json(path.read_text(encoding="utf-8"))
                     if snap.repo.name.strip().lower() == repo_norm or str(snap.repo.path).strip().lower() == repo_norm:
                         mtime = path.stat().st_mtime
                         age = (datetime.now(timezone.utc).timestamp() - mtime) / 3600
@@ -77,5 +77,5 @@ class SnapshotLoader:
         )
         snapshots: list[RepoStateSnapshot] = []
         for path in snapshot_paths:
-            snapshots.append(RepoStateSnapshot.model_validate_json(path.read_text()))
+            snapshots.append(RepoStateSnapshot.model_validate_json(path.read_text(encoding="utf-8")))
         return snapshots

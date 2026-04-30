@@ -16,7 +16,7 @@ class InsightArtifactWriter:
         run_dir.mkdir(parents=True, exist_ok=True)
 
         json_path = run_dir / "repo_insights.json"
-        json_path.write_text(artifact.model_dump_json(indent=2))
+        json_path.write_text(artifact.model_dump_json(indent=2), encoding="utf-8")
 
         md_path = run_dir / "repo_insights.md"
         lines = [
@@ -37,5 +37,5 @@ class InsightArtifactWriter:
             ]
             or ["- none"]
         )
-        md_path.write_text("\n".join(lines))
+        md_path.write_text("\n".join(lines), encoding="utf-8")
         return [str(json_path), str(md_path)]

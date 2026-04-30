@@ -106,7 +106,7 @@ def _write_trigger(event: dict[str, Any]) -> None:
     """Write a trigger file so the autonomy cycle or reviewer watcher can pick it up."""
     _TRIGGER_DIR.mkdir(parents=True, exist_ok=True)
     fname = f"ci_{event['head_sha'][:12]}_{event['conclusion']}.json"
-    (_TRIGGER_DIR / fname).write_text(json.dumps(event, indent=2))
+    (_TRIGGER_DIR / fname).write_text(json.dumps(event, indent=2), encoding="utf-8")
     _logger.info(json.dumps({
         "event": "ci_webhook_trigger_written",
         "repo": event.get("repo"),

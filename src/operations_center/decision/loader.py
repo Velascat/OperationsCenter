@@ -52,12 +52,12 @@ class DecisionLoader:
         return current, prior_decisions
 
     def _all_insights(self) -> list[RepoInsightsArtifact]:
-        artifacts = [RepoInsightsArtifact.model_validate_json(path.read_text()) for path in self.insights_root.glob("*/repo_insights.json")]
+        artifacts = [RepoInsightsArtifact.model_validate_json(path.read_text(encoding="utf-8")) for path in self.insights_root.glob("*/repo_insights.json")]
         return sorted(artifacts, key=lambda artifact: artifact.generated_at, reverse=True)
 
     def _all_decisions(self) -> list[ProposalCandidatesArtifact]:
         artifacts = [
-            ProposalCandidatesArtifact.model_validate_json(path.read_text())
+            ProposalCandidatesArtifact.model_validate_json(path.read_text(encoding="utf-8"))
             for path in self.decision_root.glob("*/proposal_candidates.json")
         ]
         return sorted(artifacts, key=lambda artifact: artifact.generated_at, reverse=True)

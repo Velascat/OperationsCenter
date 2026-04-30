@@ -32,7 +32,7 @@ class GitClient:
     def add_local_exclude(self, repo_path: Path, pattern: str) -> None:
         exclude_path = repo_path / ".git" / "info" / "exclude"
         exclude_path.parent.mkdir(parents=True, exist_ok=True)
-        existing = exclude_path.read_text() if exclude_path.exists() else ""
+        existing = exclude_path.read_text(encoding="utf-8") if exclude_path.exists() else ""
         lines = [line.strip() for line in existing.splitlines()]
         if pattern.strip() in lines:
             return
@@ -40,7 +40,7 @@ class GitClient:
         if updated and not updated.endswith("\n"):
             updated += "\n"
         updated += f"{pattern.strip()}\n"
-        exclude_path.write_text(updated)
+        exclude_path.write_text(updated, encoding="utf-8")
 
     def verify_remote_branch_exists(self, repo_path: Path, branch: str) -> None:
         out = self._run(["git", "ls-remote", "--heads", "origin", branch], cwd=repo_path)

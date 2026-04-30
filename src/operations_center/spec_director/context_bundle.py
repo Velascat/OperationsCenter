@@ -89,7 +89,7 @@ class ContextBundleBuilder:
             if p.parent.name == "archive":
                 continue
             try:
-                fm = SpecFrontMatter.from_spec_text(p.read_text())
+                fm = SpecFrontMatter.from_spec_text(p.read_text(encoding="utf-8"))
                 index.append({"slug": fm.slug, "status": fm.status})
             except Exception:
                 index.append({"slug": p.stem, "status": "unknown"})
