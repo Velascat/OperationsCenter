@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Plane + Kodo Wrapper Design
 
 ## Purpose

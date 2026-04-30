@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Autonomy Proposer Integration
 
 The proposer integration is the fourth stage of the autonomy pipeline. It connects retained decision output to the existing proposer lane by creating Plane tasks from emitted candidates. Execution, review, and feedback form the remaining stages that close the loop back into the observer.

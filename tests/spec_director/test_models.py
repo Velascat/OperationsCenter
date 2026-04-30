@@ -81,8 +81,6 @@ def test_spec_director_settings_defaults():
     assert s.max_tasks_per_campaign == 6
     assert s.spec_retention_days == 90
     assert s.campaign_abandon_hours == 72
-    assert s.compliance_diff_max_kb == 32
-    assert s.brainstorm_context_snapshot_kb == 8
 
 
 def test_spec_front_matter_missing_close_delimiter():

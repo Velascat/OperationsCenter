@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Lifecycle Contract
 
 Operations Center has six board-facing worker lanes:

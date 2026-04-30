@@ -1,3 +1,6 @@
+---
+status: deferred
+---
 # OperationsCenter Roadmap
 
 This document tracks what is deferred, what is partially done, and what must be true before each item is unlocked.

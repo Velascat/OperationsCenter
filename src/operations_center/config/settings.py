@@ -19,7 +19,6 @@ class PlaneSettings(BaseModel):
 
 
 class GitSettings(BaseModel):
-    provider: str = "github"
     token_env: str | None = None
     open_pr_default: bool = True
     push_on_validation_failure: bool = True
@@ -63,12 +62,8 @@ class AiderLocalSettings(BaseModel):
 
 class EscalationSettings(BaseModel):
     webhook_url: str = ""
-    # Number of same-classification blocks within 24h before escalating
-    block_threshold: int = 5
     # Minimum seconds between two escalation POSTs for the same classification
     cooldown_seconds: int = 3600
-    # S7-2: Warn when a GitHub token expires within this many days (0 = disabled)
-    credential_expiry_warn_days: int = 7
 
 
 class ErrorIngestLogSource(BaseModel):
@@ -95,13 +90,9 @@ class SpecDirectorSettings(BaseModel):
     enabled: bool = True
     poll_interval_seconds: int = 120
     brainstorm_model: str = "claude-opus-4-6"
-    compliance_model: str = "claude-sonnet-4-6"
     drop_file_path: str = "state/spec_direction.md"
-    max_active_campaigns: int = 1
     max_tasks_per_campaign: int = 6
     spec_retention_days: int = 90
-    brainstorm_context_snapshot_kb: int = 8
-    compliance_diff_max_kb: int = 32
     campaign_abandon_hours: int = 72
     # Historical compatibility field retained only so old configs still load.
     # Spec director no longer injects routing environment variables at runtime.
@@ -163,10 +154,6 @@ class ReviewerSettings(BaseModel):
     human_review_timeout_seconds: int = 86400
     # HTML marker appended to every bot-posted comment — belt-and-suspenders filter
     bot_comment_marker: str = "<!-- operations-center:bot -->"
-    # When True, autonomy-sourced PRs are merged automatically once CI is green
-    # without waiting for a human 👍.  Only applies to tasks labelled
-    # "source: autonomy".  Requires repo-level auto_merge_on_ci_green = True too.
-    auto_merge_success_rate_threshold: float = 0.9
 
 
 class RepoSettings(BaseModel):
@@ -228,12 +215,6 @@ class Settings(BaseModel):
     repos: dict[str, RepoSettings]
     reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")
-    # Keywords/phrases the proposer uses to prioritise proposals.  Proposals
-    # whose title or goal text match any entry are kept at their natural
-    # confidence; those that don't match are demoted to Backlog so the system
-    # works on what matters before filling the board with lower-priority noise.
-    # Leave empty (the default) to disable filtering.
-    focus_areas: list[str] = Field(default_factory=list)
     # The repo key that identifies this OperationsCenter installation itself.
     # Tasks targeting this repo require a "self-modify: approved" label before
     # the goal/test watcher will auto-execute them, and proposals for it are
@@ -248,11 +229,6 @@ class Settings(BaseModel):
     # (the default) to disable cost recording.  The value is operator-supplied;
     # OperationsCenter does not parse Kodo billing output.
     cost_per_execution_usd: float = 0.0
-    # Number of parallel task-execution slots per watcher lane.  1 = serial
-    # (default).  Values > 1 launch that many threads that each poll and execute
-    # tasks independently.  Periodic scans (heartbeat, merge-conflict, etc.)
-    # only run in slot 0 to avoid duplicate work.
-    parallel_slots: int = 1
     # Per-task-kind Kodo execution profile overrides.  Keys are task_kind values
     # (e.g. "goal", "improve", "test") or a special "default" fallback.  Any
     # field omitted in a profile inherits from the top-level ``kodo`` block.
@@ -276,15 +252,6 @@ class Settings(BaseModel):
     # S8-8: Runtime error ingestion configuration.  None = disabled.
     error_ingest: ErrorIngestSettings | None = None
     spec_director: SpecDirectorSettings = Field(default_factory=SpecDirectorSettings)
-    # Maximum number of concurrent kodo processes across all worker roles.
-    # Workers that run kodo (goal, test) will skip their execute cycle when this
-    # many kodo-shim processes are already running, then retry next poll.
-    # 0 = unlimited (default 1).
-    max_concurrent_kodo: int = 1
-    # Minimum available system RAM in MB before a worker will launch kodo.
-    # If available memory drops below this threshold the execute cycle is
-    # skipped and a watch_skip_low_memory event is logged.  0 = disabled.
-    min_kodo_available_mb: int = 400
     # Propose worker skips its generation cycle when the "Ready for AI" queue
     # already has this many or more tasks.  0 = disabled (default 8).
     propose_skip_when_ready_count: int = 8

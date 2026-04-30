@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Execution Budget And Safety Controls
 
 Operations Center now enforces a local execution control layer before expensive worker actions run.

@@ -16,7 +16,7 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 
 ---
 
-## What This System Is
+## Overview
 
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
 - **OperationsCenter** is the planning, execution, policy, and evidence layer.
@@ -634,7 +634,7 @@ Top-level config options added in the autonomy hardening phase:
 - `cost_per_execution_usd: 0.0` — operator estimate of cost per Kodo task run; enables spend telemetry (0.0 = disabled)
 - `parallel_slots: 1` — number of parallel task-execution threads per watcher lane (1 = serial)
 
-## Fastest Happy Path
+## Quick Start
 
 ```bash
 ./scripts/operations-center.sh setup

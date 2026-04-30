@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Decision Engine
 
 The decision engine is the third stage of the autonomy pipeline. It converts normalized insights into guarded proposal candidates and explicit suppression records.

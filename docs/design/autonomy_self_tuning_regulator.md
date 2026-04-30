@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Autonomy Self-Tuning Regulator
 
 Operations Center includes a bounded self-tuning regulation loop that uses retained artifact evidence to recommend and optionally apply conservative threshold adjustments to the decision engine.

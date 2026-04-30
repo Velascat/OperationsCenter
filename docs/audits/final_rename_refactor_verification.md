@@ -48,7 +48,7 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `README.md` | `delegate` (cockpit doc link description) | Fixed → `run` |
 | `tests/test_cockpit.py` | `src/console/` (6 path references) | Fixed → `src/operator_console/` |
 | `tests/test_architecture_demo.py` | `src/console/` (2 path references) | Fixed → `src/operator_console/` |
-| `docs/migration/fob-operator-flow-update.md` | `fob-operator-flow-update.md` filename, `9router` in body | **Left** — file is explicitly marked "Historical migration note" |
+| docs/migration/fob-operator-flow-update.md (OperatorConsole) | `fob-operator-flow-update.md` filename, `9router` in body | **Left** — file is explicitly marked "Historical migration note" |
 
 ### OperationsCenter
 
@@ -62,11 +62,11 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `docs/operator/pr_review.md` (7 occurrences) | `<!-- controlplane:bot -->`, `controlplane-bot` | Fixed throughout |
 | `docs/operator/runtime.md:65` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
 | `docs/design/autonomy_gaps.md:1189` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
-| `docs/superpowers/plans/2026-04-15-autonomous-spec-driven-chain.md` (2 occurrences) | `<!-- controlplane:bot -->` in code strings | Fixed → `<!-- operations-center:bot -->` |
+| docs/superpowers/plans/2026-04-15-autonomous-spec-driven-chain.md (removed) (2 occurrences) | `<!-- controlplane:bot -->` in code strings | Fixed → `<!-- operations-center:bot -->` |
 | `README.md:90-91` | `controlplane-routing.md`, `controlplane-routing-examples.md` file paths | Fixed → `operations-center-routing{,-examples}.md` |
 | `README.md:469` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
 | `README.md:935` | "production distributed control plane" | **Left** — generic architectural term (networking/k8s concept), not a reference to the renamed repo |
-| `docs/architecture/phase6-boundary-decision.md` | "Historical 9router notes remain…" | **Left** — this is itself an archival ADR |
+| docs/architecture/phase6-boundary-decision.md (removed) | "Historical 9router notes remain…" | **Left** — this is itself an archival ADR |
 
 ### SwitchBoard
 
@@ -87,10 +87,10 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `docs/architecture/ownership.md:171` | `fob demo` (section heading) | Fixed → `console demo` |
 | `docs/architecture/ownership.md:218` | `fob demo` (checklist item) | Fixed → `console demo` |
 | `docs/architecture/execution-observability.md:253` | `controlplane-routing.md` link | Fixed → `operations-center-routing.md` |
-| `docs/architecture/controlplane-routing.md` | Filename | Renamed → `operations-center-routing.md` (content was already updated) |
-| `docs/architecture/controlplane-routing-examples.md` | Filename | Renamed → `operations-center-routing-examples.md` (content was already updated) |
-| `docs/migration/workstation-9router-removal.md` | `9router` throughout | **Left** — explicitly archival migration doc |
-| `docs/architecture/adr/0001-remove-9router.md` | `9router` throughout | **Left** — ADR, explicitly archival |
+| docs/architecture/controlplane-routing.md (WorkStation) | Filename | Renamed → `operations-center-routing.md` (content was already updated) |
+| docs/architecture/controlplane-routing-examples.md (WorkStation) | Filename | Renamed → `operations-center-routing-examples.md` (content was already updated) |
+| docs/migration/workstation-9router-removal.md (WorkStation) | `9router` throughout | **Left** — explicitly archival migration doc |
+| docs/architecture/adr/0001-remove-9router.md (WorkStation) | `9router` throughout | **Left** — ADR, explicitly archival |
 
 ---
 
@@ -108,10 +108,10 @@ The following files were found to contain legacy terms but are correctly classif
 
 | File | Repo | Reason |
 |------|------|--------|
-| `docs/migration/fob-operator-flow-update.md` | OperatorConsole | File header: "Historical migration note. Retained only to record the cutover." |
-| `docs/migration/workstation-9router-removal.md` | WorkStation | Archival migration note |
-| `docs/architecture/adr/0001-remove-9router.md` | WorkStation | ADR explicitly documenting the 9router removal decision |
-| `docs/architecture/phase6-boundary-decision.md` | OperationsCenter | ADR — contains the rule "Historical 9router notes remain only in explicitly historical migration or ADR" |
+| docs/migration/fob-operator-flow-update.md (OperatorConsole) | OperatorConsole | File header: "Historical migration note. Retained only to record the cutover." |
+| docs/migration/workstation-9router-removal.md (WorkStation) | WorkStation | Archival migration note |
+| docs/architecture/adr/0001-remove-9router.md (WorkStation) | WorkStation | ADR explicitly documenting the 9router removal decision |
+| docs/architecture/phase6-boundary-decision.md (removed) | OperationsCenter | ADR — contains the rule "Historical 9router notes remain only in explicitly historical migration or ADR" |
 | `README.md:935` ("production distributed control plane") | OperationsCenter | Generic networking/systems term, not a reference to the renamed ControlPlane repo |
 
 ---

@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Repo Observer
 
 The observer is the first stage of the autonomy pipeline. It inspects a local repo without modifying it, collects a bounded set of factual signals, and emits one normalized snapshot artifact per run.

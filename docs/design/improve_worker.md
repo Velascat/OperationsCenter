@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Improve Worker
 
 `improve` is the board-level reasoning and stabilization lane.

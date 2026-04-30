@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Repo-Aware Autonomy Layer
 
 Operations Center's repo-aware autonomy layer is an internal pipeline that feeds bounded work into the existing proposer lane.

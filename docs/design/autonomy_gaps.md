@@ -1,3 +1,6 @@
+---
+status: deferred
+---
 # Autonomy Hardening — 46 Full-Autonomy Gap Improvements
 
 > **Audit note (2026-04-28):** Headings tagged `*[deferred, reviewed YYYY-MM-DD]*`

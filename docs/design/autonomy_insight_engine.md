@@ -1,3 +1,6 @@
+---
+status: implemented
+---
 # Insight Engine
 
 The insight engine is the second stage of the autonomy pipeline. It converts retained repo observer snapshots into normalized, machine-readable findings.
