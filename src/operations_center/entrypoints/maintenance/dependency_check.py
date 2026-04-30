@@ -110,7 +110,7 @@ def collect_dependency_statuses(settings: Settings, env: dict[str, str]) -> list
     )
 
     try:
-        proc = subprocess.run(["kodo", "--version"], check=False, capture_output=True, text=True)
+        proc = subprocess.run(["kodo", "--version"], check=False, capture_output=True, text=True, timeout=10)
         kodo_version_raw = (proc.stdout or proc.stderr).strip() if proc.returncode == 0 else ""
     except Exception:
         kodo_version_raw = ""

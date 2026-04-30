@@ -112,6 +112,18 @@ audit:
       - src/operations_center/spec_director/phase_orchestrator.py
       - src/operations_center/spec_director/recovery.py
       - src/operations_center/spec_director/spec_writer.py
+    C11:
+      # Agent-spawning entrypoints: board_worker, intake, pr_review_watcher invoke
+      # the coding backend (kodo, aider, etc.) which runs for an unbounded duration.
+      # A timeout would kill legitimate long-running tasks.
+      - src/operations_center/entrypoints/board_worker/**
+      - src/operations_center/entrypoints/intake/**
+      - src/operations_center/entrypoints/pr_review_watcher/**
+      # Interactive setup scripts run once by a human operator; timeouts would
+      # interrupt interactive login flows and package installation.
+      - src/operations_center/entrypoints/setup/**
+      # Workspace bootstrap runs pip/npm install for repo setup — can take minutes.
+      - src/operations_center/adapters/workspace/bootstrap.py
 
   # Stale handler names cited in autonomy_gaps.md from a pre-board_worker
   # architecture. Used by Custodian's generic C8 (and OC's OC8) to skip

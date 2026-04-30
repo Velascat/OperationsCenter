@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class GitClient:
-    def _run(self, args: list[str], cwd: Path | None = None) -> str:
-        proc = subprocess.run(args, cwd=cwd, capture_output=True, text=True, check=False)
+    def _run(self, args: list[str], cwd: Path | None = None, *, timeout: int = 60) -> str:
+        proc = subprocess.run(args, cwd=cwd, capture_output=True, text=True, check=False, timeout=timeout)
         if proc.returncode != 0:
             raise RuntimeError(f"git command failed: {' '.join(args)}\n{proc.stderr}")
         return proc.stdout.strip()
 
-    def _run_bytes(self, args: list[str], cwd: Path | None = None) -> bytes:
-        proc = subprocess.run(args, cwd=cwd, capture_output=True, check=False)
+    def _run_bytes(self, args: list[str], cwd: Path | None = None, *, timeout: int = 60) -> bytes:
+        proc = subprocess.run(args, cwd=cwd, capture_output=True, check=False, timeout=timeout)
         if proc.returncode != 0:
             stderr = proc.stderr.decode("utf-8", errors="replace")
             raise RuntimeError(f"git command failed: {' '.join(args)}\n{stderr}")
@@ -73,14 +73,14 @@ class GitClient:
         """
         proc = subprocess.run(
             ["git", "merge", "--no-edit", f"origin/{base_branch}"],
-            cwd=repo_path, capture_output=True, text=True,
+            cwd=repo_path, capture_output=True, text=True, timeout=60,
         )
         if proc.returncode == 0:
             return True, []
         # Collect unmerged paths
         status = subprocess.run(
             ["git", "diff", "--name-only", "--diff-filter=U"],
-            cwd=repo_path, capture_output=True, text=True,
+            cwd=repo_path, capture_output=True, text=True, timeout=30,
         )
         if status.returncode != 0:
             logger.warning(

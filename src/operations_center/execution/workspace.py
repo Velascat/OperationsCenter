@@ -96,7 +96,7 @@ class WorkspaceManager:
         # repo root IS the workspace — no extra `repo/` subdir to confuse kodo.
         proc = subprocess.run(
             ["git", "clone", request.clone_url, "."],
-            cwd=ws, capture_output=True, text=True,
+            cwd=ws, capture_output=True, text=True, timeout=120,
         )
         if proc.returncode != 0:
             raise RuntimeError(
@@ -276,7 +276,7 @@ class WorkspaceManager:
         try:
             proc = subprocess.run(
                 ["git", "diff", "--name-only", "HEAD~1..HEAD"],
-                cwd=ws, capture_output=True, text=True, check=True,
+                cwd=ws, capture_output=True, text=True, check=True, timeout=30,
             )
         except subprocess.CalledProcessError:
             return
@@ -303,19 +303,19 @@ class WorkspaceManager:
         so the comment we write to Plane is deterministic.
         """
         try:
-            subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
+            subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True, timeout=30)
             proc = subprocess.run(
                 ["git", "diff", "--cached", "--shortstat"],
-                cwd=ws, capture_output=True, text=True, check=True,
+                cwd=ws, capture_output=True, text=True, check=True, timeout=30,
             )
             files_proc = subprocess.run(
                 ["git", "diff", "--cached", "--name-only"],
-                cwd=ws, capture_output=True, text=True, check=True,
+                cwd=ws, capture_output=True, text=True, check=True, timeout=30,
             )
         except subprocess.CalledProcessError:
             return None
         finally:
-            subprocess.run(["git", "reset"], cwd=ws, capture_output=True)
+            subprocess.run(["git", "reset"], cwd=ws, capture_output=True, timeout=30)
 
         file_list = sorted(line.strip() for line in files_proc.stdout.splitlines() if line.strip())
         n_files = len(file_list)
@@ -330,7 +330,7 @@ class WorkspaceManager:
     def _has_new_commits(self, ws: Path, base_branch: str) -> bool:
         proc = subprocess.run(
             ["git", "rev-list", "--count", f"origin/{base_branch}..HEAD"],
-            cwd=ws, capture_output=True, text=True,
+            cwd=ws, capture_output=True, text=True, timeout=30,
         )
         if proc.returncode != 0:
             return False

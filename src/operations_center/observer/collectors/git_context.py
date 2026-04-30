@@ -16,6 +16,7 @@ def run_git(args: list[str], repo_path: Path) -> str:
         capture_output=True,
         text=True,
         check=False,
+        timeout=30,
     )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or f"git {' '.join(args)} failed")
