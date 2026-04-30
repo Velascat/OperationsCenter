@@ -203,7 +203,8 @@ class UsageStore:
     def _last_attempt_timestamp(self, data: dict[str, object], task_id: str) -> datetime | None:
         """Return the timestamp of the most recent execution event for this task_id."""
         events = data.get("events", [])
-        assert isinstance(events, list)
+        if not isinstance(events, list):
+            return None
         for event in reversed(events):
             if not isinstance(event, dict):
                 continue

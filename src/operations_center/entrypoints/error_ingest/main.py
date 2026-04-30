@@ -235,7 +235,7 @@ def _tail_log_file(
             if not log_path.exists():
                 time.sleep(5)
                 continue
-            with open(log_path, "r", errors="replace") as f:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
                 f.seek(offset)
                 while not stop_event.is_set():
                     line = f.readline()

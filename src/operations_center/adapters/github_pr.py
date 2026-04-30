@@ -68,7 +68,8 @@ class GitHubPRClient:
                 "url": url,
             }))
             time.sleep(retry_after)
-        assert resp is not None
+        if resp is None:
+            raise RuntimeError("HTTP retry loop exited without a response")
         return resp
 
     @staticmethod

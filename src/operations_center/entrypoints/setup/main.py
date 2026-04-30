@@ -914,7 +914,8 @@ def main(
         start_plane_now = False
 
     if start_plane_now:
-        assert plane_start_command is not None
+        if plane_start_command is None:
+            raise RuntimeError("start_plane_now is True but plane_start_command was not set")
         typer.echo("Starting Plane...")
         run_local_command(plane_start_command)
         typer.echo("Plane start command finished.")
