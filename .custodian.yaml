@@ -26,6 +26,53 @@ audit:
       - src/operations_center/entrypoints/**
       - src/operations_center/execution/campaign_store.py
       - src/operations_center/tuning/calibration.py
+    C4:
+      # Entrypoints are polling workers — pass-in-except is correct in loops
+      # where a single bad item must not abort the whole work cycle.
+      - src/operations_center/entrypoints/**
+      # Library files with pass-in-except that is intentional:
+      # adapters: subprocess/git cleanup, process kill, PR metadata parsing
+      - src/operations_center/adapters/git/client.py
+      - src/operations_center/adapters/github_pr.py
+      - src/operations_center/adapters/kodo/adapter.py
+      # backends: finally-block cleanup (temp file delete, process teardown)
+      - src/operations_center/backends/aider_local/adapter.py
+      - src/operations_center/backends/kodo/invoke.py
+      # governance/audit: state load failure → None is documented fallback
+      - src/operations_center/audit_governance/runner.py
+      # store: corrupted state file → empty dict (already logs warning)
+      - src/operations_center/execution/usage_store.py
+      # analytics/observer: malformed records in scan loops are skipped
+      - src/operations_center/insights/derivers/execution_outcome.py
+      - src/operations_center/insights/derivers/noop_loop.py
+      - src/operations_center/observer/collectors/check_signal.py
+      - src/operations_center/observer/collectors/execution_health.py
+      - src/operations_center/observer/collectors/validation_history.py
+      # priority scoring: malformed timestamp/label → default score (correct)
+      - src/operations_center/priority_scans.py
+      # proposer: config value parse failure → skip constraint (correct)
+      - src/operations_center/proposer/guardrail_adapter.py
+      # scheduled tasks: datetime parse failure → treat as never run (correct)
+      - src/operations_center/scheduled_tasks/runner.py
+      # spec director: date parse on archival, state file load
+      - src/operations_center/spec_director/spec_writer.py
+      - src/operations_center/spec_director/state.py
+      # tuning: calibration/metrics/compare calculations — one bad record skipped
+      - src/operations_center/tuning/calibration.py
+      - src/operations_center/tuning/compare.py
+      - src/operations_center/tuning/metrics.py
+      # fixture harvesting: file write failure on best-effort copy
+      - src/operations_center/fixture_harvesting/writer.py
+      # mini regression: test-run failure in analysis loop
+      - src/operations_center/mini_regression/runner.py
+      # proposer: integration step failure — skip candidate
+      - src/operations_center/proposer/candidate_integration.py
+      # audit dispatch: process cleanup (SIGTERM fallback)
+      - src/operations_center/audit_dispatch/executor.py
+      # behavior calibration: unresolvable artifact path — skip rule
+      - src/operations_center/behavior_calibration/rules.py
+      # spec director phase orchestrator: one best-effort traceability append
+      - src/operations_center/spec_director/phase_orchestrator.py
 
   # Stale handler names cited in autonomy_gaps.md from a pre-board_worker
   # architecture. Used by Custodian's generic C8 (and OC's OC8) to skip
