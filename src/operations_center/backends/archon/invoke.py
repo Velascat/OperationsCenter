@@ -14,7 +14,7 @@ ArchonRunCapture, isolating invocation mechanics from the rest of the adapter.
 from __future__ import annotations
 
 import os
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -37,7 +37,7 @@ class ArchonRunResult:
     workflow_events: list[dict] = field(default_factory=list)
 
 
-class ArchonAdapter:
+class ArchonAdapter(ABC):
     """Low-level Archon workflow interface.
 
     Override run() in a concrete subclass to connect to a real Archon service.

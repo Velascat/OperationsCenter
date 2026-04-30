@@ -265,6 +265,12 @@ audit:
     - velocity_cap_exceeded
     - verified
 
+  # Plugin-defined audit config keys — suppresses unknown-key warnings in doctor.
+  plugin_audit_keys:
+    - known_values
+    - oc1_exempt
+    - oc7_exempt
+
   # Additional well-known string values for OC9 to recognise without
   # requiring a string-literal anchor in src/.
   known_values:
@@ -290,6 +296,31 @@ audit:
     - sign_commits
     - signing_key
     - switchboard_url
+
+architecture:
+  layers:
+    - name: domain
+      glob: "src/operations_center/domain/**"
+      may_not_import:
+        - "src/operations_center/adapters/**"
+        - "src/operations_center/backends/**"
+        - "src/operations_center/entrypoints/**"
+    - name: contracts
+      glob: "src/operations_center/contracts/**"
+      may_not_import:
+        - "src/operations_center/adapters/**"
+        - "src/operations_center/backends/**"
+        - "src/operations_center/entrypoints/**"
+    - name: backends
+      glob: "src/operations_center/backends/**"
+      may_not_import:
+        - "src/operations_center/entrypoints/**"
+        - "src/operations_center/adapters/**"
+    - name: adapters
+      glob: "src/operations_center/adapters/**"
+      may_not_import:
+        - "src/operations_center/entrypoints/**"
+        - "src/operations_center/backends/**"
 
 plugins:
   - module: _custodian.log_scanner:OCLogScanner

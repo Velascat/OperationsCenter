@@ -72,14 +72,13 @@ def test_stub_different_configs_same_result():
 
 
 # ---------------------------------------------------------------------------
-# ArchonAdapter base — raises NotImplementedError
+# ArchonAdapter base — abstract, cannot be instantiated directly
 # ---------------------------------------------------------------------------
 
 
-def test_base_adapter_raises():
-    adapter = ArchonAdapter()
-    with pytest.raises(NotImplementedError):
-        adapter.run(_config())
+def test_base_adapter_is_abstract():
+    with pytest.raises(TypeError):
+        ArchonAdapter()  # type: ignore[abstract]
 
 
 # ---------------------------------------------------------------------------

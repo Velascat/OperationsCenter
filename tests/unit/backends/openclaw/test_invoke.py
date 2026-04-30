@@ -84,10 +84,9 @@ def test_stub_injects_reported_changed_files():
     assert len(result.reported_changed_files) == 1
 
 
-def test_base_runner_raises_not_implemented():
-    runner = OpenClawRunner()
-    with pytest.raises(NotImplementedError):
-        runner.run(_prepared())
+def test_base_runner_is_abstract():
+    with pytest.raises(TypeError):
+        OpenClawRunner()  # type: ignore[abstract]
 
 
 # ---------------------------------------------------------------------------

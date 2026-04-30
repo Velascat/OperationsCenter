@@ -16,7 +16,7 @@ API, or another mechanism — belongs here and must not escape into the wider ad
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -40,7 +40,7 @@ class OpenClawRunResult:
     reported_changed_files: list[dict] = field(default_factory=list)
 
 
-class OpenClawRunner:
+class OpenClawRunner(ABC):
     """Low-level OpenClaw execution interface.
 
     Override run() in a concrete subclass to connect to a real OpenClaw service.
