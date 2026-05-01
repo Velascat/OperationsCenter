@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import NoReturn, cast
+from typing import cast
 import webbrowser
 
 from rich.console import Console
@@ -715,10 +715,6 @@ def render_task_template(answers: SetupAnswers) -> str:
 def shell_quote(value: str) -> str:
     escaped = value.replace("'", "'\"'\"'")
     return f"'{escaped}'"
-
-
-def prompt_repo(repo_index: int) -> NoReturn:
-    raise RuntimeError("prompt_repo now requires discovery context")
 
 
 def prompt_repo_with_discovery(
