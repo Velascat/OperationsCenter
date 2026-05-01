@@ -392,13 +392,13 @@ def build_oc_detectors() -> list[Detector]:
     generic set doesn't cover.
     """
     return [
-        Detector("OC1", "scaffolded-but-unimplemented backends",            "open",     _detect_oc1_stub_backends,   MEDIUM),
+        Detector("OC1", "scaffolded-but-unimplemented backends",            "deferred", _detect_oc1_stub_backends,   MEDIUM),  # superseded by U1-U3 (Custodian generic stub detector)
         Detector("OC2", "untagged TODO/FIXME debt (deferred-aware)",        "open",     _detect_oc2_untagged_todos,  LOW),
         Detector("OC3", "orphaned entrypoints",                             "open",     _detect_oc3_orphaned_entrypoints, MEDIUM),
         Detector("OC4", "ruff lint findings",                               "fixed",    _detect_oc4_ruff,            MEDIUM),
         Detector("OC5", "unconditional skipped tests",                      "open",     _detect_oc5_unconditional_skips, HIGH),
         Detector("OC6", "modules called only from tests",                   "deferred", _detect_oc6_test_only_modules, LOW),
-        Detector("OC7", "dead settings fields",                             "open",     _detect_oc7_dead_settings,   MEDIUM),
+        Detector("OC7", "dead settings fields",                             "deferred", _detect_oc7_dead_settings,   MEDIUM),  # superseded by F3 (Custodian Pydantic BaseModel field liveness)
         Detector("OC8", "docs reference a symbol that doesn't exist",       "open",     _detect_oc8_phantom_symbols,  LOW),
         Detector("OC9", "docs cite a value not in src as a string literal", "open",     _detect_oc9_doc_value_drift, LOW),
     ]

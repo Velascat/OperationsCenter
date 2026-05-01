@@ -311,6 +311,15 @@ audit:
     - switchboard_url
 
 architecture:
+  # NOTE: These S1 declarative layer rules overlap with AI2 in
+  # _custodian/architecture.py, which wraps
+  # tools/audit/architecture_invariants/layer_rules.py. The two checks
+  # are currently complementary rather than identical — AI2 applies
+  # import-graph analysis from layer_rules.py (which may encode additional
+  # nuance such as allowed cross-layer exceptions). Migrating AI2 fully into
+  # S1 is possible but requires a careful reading of layer_rules.py to
+  # verify that no rules would be silently dropped. Do not migrate until
+  # layer_rules.py has been audited against this S1 block.
   layers:
     - name: domain
       glob: "src/operations_center/domain/**"
