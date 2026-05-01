@@ -37,14 +37,6 @@ _CONFLICT_SIGNALS = (
     "auto-merge failed",
 )
 
-_PARTIAL_SIGNALS = (
-    "partial completion",
-    "workflow incomplete",
-    "step failed",
-    "workflow aborted",
-    "incomplete workflow",
-)
-
 _VALIDATION_FAILED_SIGNALS = (
     "validation failed",
     "validation error",

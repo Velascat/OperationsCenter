@@ -35,10 +35,6 @@ from .routing_models import (
 # Minimum evidence strength to generate a recommendation.
 _MIN_STRENGTH_FOR_RECOMMENDATION = EvidenceStrength.MODERATE
 
-# Reliability thresholds for findings.
-_HIGH_SUCCESS_THRESHOLD = 0.85
-_LOW_SUCCESS_THRESHOLD = 0.60
-
 # Timeout rate above which a finding is generated.
 _HIGH_TIMEOUT_RATE = 0.20
 

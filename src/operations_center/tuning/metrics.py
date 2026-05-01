@@ -17,9 +17,6 @@ from operations_center.tuning.models import FamilyMetrics
 # Unlock condition: ≥3 months of data and ≥20 feedback records per family.
 # See docs/design/roadmap.md §Phase 6.
 
-_MIN_SAMPLE_RUNS = 1  # only exclude runs, not families; callers apply their own floor
-
-
 def aggregate_family_metrics(
     *,
     decision_root: Path,

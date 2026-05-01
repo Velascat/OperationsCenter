@@ -51,16 +51,6 @@ _VALIDATION_FAILED_SIGNALS = (
     "type errors found",
 )
 
-_PARTIAL_SIGNALS = (
-    "partial completion",
-    "incomplete",
-    "step failed",
-    "agent aborted",
-    "stopped early",
-    "context limit",
-)
-
-
 def categorize_failure(
     outcome: str,
     combined_output: str,

@@ -31,7 +31,7 @@ class ExecutionHealthDeriver:
     def __init__(
         self,
         normalizer: InsightNormalizer,
-        validation_failure_threshold: int = 2,
+        validation_failure_threshold: int = _DEFAULT_VALIDATION_FAILURE_THRESHOLD,
         unknown_failure_threshold: int = 2,
     ) -> None:
         self.normalizer = normalizer

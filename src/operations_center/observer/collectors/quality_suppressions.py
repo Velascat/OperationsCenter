@@ -31,7 +31,6 @@ _SUPPRESSION_PATTERNS = (
     r"@pytest\.mark\.xfail\b",
 )
 _ADDED_LINE_RE = re.compile(r"^\+(?!\+\+).*", re.MULTILINE)
-_PATTERN_RE = re.compile("|".join(_SUPPRESSION_PATTERNS))
 
 
 @dataclass(frozen=True)

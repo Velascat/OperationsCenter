@@ -30,9 +30,6 @@ from .routing_models import StrategyAnalysisReport
 from .routing_recommend import derive_findings, generate_recommendations
 
 
-# Minimum records before any useful analysis is possible.
-_MIN_RECORDS_FOR_ANALYSIS = 1
-
 DEFAULT_POLICY_GUARDRAILS = [
     "Routing tuning cannot override explicit repo policy, safety guardrails, or blocked task/path/tool rules.",
     "Routing tuning cannot mutate active SwitchBoard policy; it only emits reviewable proposals.",

@@ -51,9 +51,6 @@ def _comment_markdown(
 
 # ── _extract_rejection_patterns + _load_rejection_patterns_for_proposal ──────
 
-_REJECTION_DIR = Path("state/proposal_rejections")
-
-
 def _extract_rejection_patterns(rejection_records: list[dict]) -> list[str]:
     """Pull the most-cited rejection reasons across recent records.
 
