@@ -180,7 +180,9 @@ def test_to_cxrp_task_proposal_returns_ecp_envelope():
 
 def test_ecp_task_proposal_validates_against_schema():
     cxrp = to_cxrp_task_proposal(_make_proposal())
-    validate_contract("task_proposal", cxrp.to_dict())
+    payload = cxrp.to_dict()
+    validate_contract("task_proposal", payload)
+    assert payload["task_type"] is not None
 
 
 def test_ecp_task_proposal_carries_layered_vocabulary():
@@ -213,7 +215,9 @@ def test_to_cxrp_lane_decision_separates_category_from_executor_backend():
 
 def test_ecp_lane_decision_validates_against_schema():
     cxrp = to_cxrp_lane_decision(_make_decision("p-1"))
-    validate_contract("lane_decision", _serialize_envelope(cxrp))
+    envelope = _serialize_envelope(cxrp)
+    validate_contract("lane_decision", envelope)
+    assert envelope["lane"] is not None
 
 
 def test_ecp_lane_decision_alternatives_become_structured():
@@ -233,6 +237,7 @@ def test_to_cxrp_execution_request_validates_against_schema():
     payload = cxrp.to_dict()
     payload["lane"] = payload["lane"].value if hasattr(payload["lane"], "value") else payload["lane"]
     validate_contract("execution_request", payload)
+    assert payload["executor"] is not None
 
 
 def test_execution_request_input_payload_validates_against_lane_schema():
@@ -259,7 +264,9 @@ def test_to_cxrp_execution_result_validates_against_schema():
     req = _make_request("p", "d")
     result = _make_result(req)
     cxrp = to_cxrp_execution_result(result)
-    validate_contract("execution_result", _serialize_result(cxrp))
+    serialized = _serialize_result(cxrp)
+    validate_contract("execution_result", serialized)
+    assert serialized["status"] is not None
 
 
 def test_ecp_execution_result_status_uses_canonical_spelling():

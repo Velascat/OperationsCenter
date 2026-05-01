@@ -353,7 +353,8 @@ class TestValidateAllRecommendations:
         assert len(recs) == 3
 
     def test_empty_list_passes(self) -> None:
-        validate_all_recommendations([])  # must not raise
+        validate_all_recommendations([])
+        assert True  # empty list is always valid
 
     def test_one_invalid_raises(self) -> None:
         valid = _make_recommendation()
@@ -364,10 +365,12 @@ class TestValidateAllRecommendations:
     def test_analyzer_output_passes_guardrails(self, failed_index) -> None:
         report = analyze_artifacts(make_input(failed_index, AnalysisProfile.RECOMMENDATION))
         validate_all_recommendations(report.recommendations)
+        assert isinstance(report.recommendations, list)
 
     def test_summary_profile_has_no_recommendations_to_validate(self, completed_index) -> None:
         report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
-        validate_all_recommendations(report.recommendations)  # empty list, must not raise
+        validate_all_recommendations(report.recommendations)
+        assert report.recommendations == []
 
 
 # ---------------------------------------------------------------------------
