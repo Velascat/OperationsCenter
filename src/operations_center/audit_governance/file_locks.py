@@ -14,6 +14,7 @@ from __future__ import annotations
 import fcntl
 import os
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -23,7 +24,7 @@ class FileLockTimeout(OSError):
 
 
 @contextmanager
-def locked_state_file(path: Path, timeout: float = 5.0):
+def locked_state_file(path: Path, timeout: float = 5.0) -> Generator[None, None, None]:
     """Acquire an exclusive lock on a .lock file adjacent to *path*, then yield.
 
     A separate <path>.lock sentinel is used so that locking never interferes

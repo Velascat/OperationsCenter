@@ -20,6 +20,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from operations_center.adapters.plane import PlaneClient
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +131,7 @@ class AwaitingInputResult:
 
 def handle_awaiting_input_scan(
     issues: list[dict],
-    plane_client,
+    plane_client: PlaneClient,
     *,
     state_name: str = "Awaiting Input",
 ) -> list[AwaitingInputResult]:

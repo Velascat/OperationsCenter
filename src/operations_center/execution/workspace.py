@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from operations_center.adapters.git.client import GitClient
@@ -64,7 +65,7 @@ class WorkspaceManager:
         bot_identity: tuple[str, str] = ("Operations Center", "operations-center@local"),
         max_files: int | None = None,
         max_lines: int | None = None,
-        repo_settings_lookup=None,
+        repo_settings_lookup: Callable[[str], object] | None = None,
     ) -> None:
         self._git = git_client or GitClient()
         self._token = github_token

@@ -20,6 +20,7 @@ from .models import (
     PatchCandidateCategory,
     SeverityClass,
     UpstreamPatchEvaluationReport,
+    UpstreamPatchProposal,
     WorkaroundComplexityClass,
     WorkaroundReliabilityClass,
 )
@@ -50,7 +51,7 @@ class UpstreamPatchEvaluator:
     def recommend(
         self,
         report: UpstreamPatchEvaluationReport,
-    ):
+    ) -> list[UpstreamPatchProposal]:
         if report.recommendations:
             return report.recommendations
         return recommend_patch_proposals(report.friction_findings, report.workaround_assessments)

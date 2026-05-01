@@ -152,7 +152,7 @@ def _create_error_task(
 
 def _make_webhook_handler(plane_client: PlaneClient, default_repo_key: str):
     class _Handler(http.server.BaseHTTPRequestHandler):
-        def log_message(self, format: str, *args) -> None:  # noqa: A002
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A002
             pass  # suppress default access log; structured logging handles it
 
         def do_POST(self) -> None:  # noqa: N802

@@ -28,6 +28,10 @@ import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from operations_center.adapters.github_pr import GitHubPRClient
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +48,7 @@ class RegressionSignal:
 
 
 def detect_post_merge_regressions(
-    gh_client,
+    gh_client: GitHubPRClient,
     owner: str,
     repo: str,
     *,

@@ -32,9 +32,6 @@ from .routing_models import (
     BackendComparisonSummary,
 )
 
-# Minimum evidence strength to generate a recommendation.
-_MIN_STRENGTH_FOR_RECOMMENDATION = EvidenceStrength.MODERATE
-
 # Timeout rate above which a finding is generated.
 _HIGH_TIMEOUT_RATE = 0.20
 

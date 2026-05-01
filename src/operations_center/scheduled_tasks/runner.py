@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from operations_center.adapters.plane import PlaneClient
     from operations_center.config.settings import ScheduledTask, Settings
 
 logger = logging.getLogger(__name__)
@@ -158,7 +159,7 @@ class ScheduledTaskRunner:
         created_ids = runner.tick()
     """
 
-    def __init__(self, plane_client, settings: "Settings", *, state_file: Path | None = None) -> None:
+    def __init__(self, plane_client: "PlaneClient", settings: "Settings", *, state_file: Path | None = None) -> None:
         self._client = plane_client
         self._settings = settings
         self._state_file = state_file or _STATE_FILE

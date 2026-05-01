@@ -8,7 +8,11 @@ ExecutionRequest and returns ExecutionResult.
 """
 
 from __future__ import annotations
-from typing import Mapping, Protocol
+from typing import TYPE_CHECKING, Mapping, Protocol
+
+if TYPE_CHECKING:
+    from operations_center.backends.archon.adapter import ArchonBackendAdapter
+    from operations_center.backends.openclaw.adapter import OpenClawBackendAdapter
 
 from operations_center.config.settings import Settings
 from operations_center.contracts.enums import BackendName
@@ -49,8 +53,8 @@ class CanonicalBackendRegistry:
         cls,
         settings: Settings,
         *,
-        archon_adapter=None,
-        openclaw_runner=None,
+        archon_adapter: ArchonBackendAdapter | None = None,
+        openclaw_runner: OpenClawBackendAdapter | None = None,
     ) -> "CanonicalBackendRegistry":
         adapters: dict[BackendName, CanonicalBackendAdapter] = {
             BackendName.KODO: KodoBackendAdapter.from_settings(

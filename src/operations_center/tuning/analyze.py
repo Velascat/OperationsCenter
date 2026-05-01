@@ -23,10 +23,12 @@ Architecture rule:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from operations_center.observability.models import ExecutionRecord
 
 from .compare import compare_backends
-from .routing_models import StrategyAnalysisReport
+from .routing_models import BackendComparisonSummary, RoutingTuningProposal, StrategyAnalysisReport
 from .routing_recommend import derive_findings, generate_recommendations
 
 
@@ -55,9 +57,9 @@ class StrategyTuningService:
 
     def __init__(
         self,
-        compare_fn=None,
-        findings_fn=None,
-        recommendations_fn=None,
+        compare_fn: Callable[..., list[BackendComparisonSummary]] | None = None,
+        findings_fn: Callable[..., object] | None = None,
+        recommendations_fn: Callable[..., list[RoutingTuningProposal]] | None = None,
     ) -> None:
         self._compare = compare_fn or compare_backends
         self._findings = findings_fn or derive_findings
@@ -118,7 +120,7 @@ class StrategyTuningService:
         *,
         task_type_scope: list[str] | None = None,
         risk_scope: list[str] | None = None,
-    ):
+    ) -> list[BackendComparisonSummary]:
         """Expose comparison as an inspectable first-class step."""
         return self._compare(
             records,
@@ -131,7 +133,7 @@ class StrategyTuningService:
         report: StrategyAnalysisReport,
         *,
         policy_guardrails: list[str] | None = None,
-    ):
+    ) -> list[RoutingTuningProposal]:
         """Derive proposals from an existing report without rerunning comparison."""
         if report.recommendations and not policy_guardrails:
             return report.recommendations

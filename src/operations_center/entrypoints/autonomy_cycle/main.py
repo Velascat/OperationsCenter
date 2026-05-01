@@ -11,6 +11,7 @@ from pathlib import Path
 
 from operations_center.adapters.plane import PlaneClient
 from operations_center.config import load_settings
+from operations_center.config.settings import Settings
 from operations_center.decision.artifact_writer import DecisionArtifactWriter
 from operations_center.decision.loader import DecisionLoader
 from operations_center.decision.service import ALL_FAMILIES, DecisionEngineService, _DEFAULT_ALLOWED_FAMILIES, new_decision_context
@@ -643,7 +644,7 @@ def _write_cycle_report(
 
 
 def run_pipeline(
-    settings,
+    settings: Settings,
     client: PlaneClient,
     *,
     repo_filter: str | None = None,

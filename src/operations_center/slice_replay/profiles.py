@@ -8,6 +8,7 @@ per-artifact or once per pack. Check types are resolved via CHECK_REGISTRY.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .models import SliceReplayProfile
@@ -112,7 +113,7 @@ def get_check_specs(profile: SliceReplayProfile) -> list[CheckSpec]:
     return specs
 
 
-def get_artifact_filter(apply_only_when: str | None):
+def get_artifact_filter(apply_only_when: str | None) -> Callable[..., bool] | None:
     """Return the filter callable for the given filter key, or None."""
     if apply_only_when is None:
         return None

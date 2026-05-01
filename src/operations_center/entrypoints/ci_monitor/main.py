@@ -21,6 +21,7 @@ from pathlib import Path
 from operations_center.adapters.github_pr import GitHubPRClient
 from operations_center.adapters.plane import PlaneClient
 from operations_center.config import load_settings
+from operations_center.config.settings import Settings
 
 # Re-use the same branch pattern as the reviewer.
 _BRANCH_TASK_ID_RE = re.compile(
@@ -112,7 +113,7 @@ def _build_fix_pr_description(
 
 def run_ci_monitor_cycle(
     plane_client: PlaneClient,
-    settings,
+    settings: Settings,
     logger: logging.Logger,
 ) -> int:
     """Scan open PRs for CI failures and create fix_pr tasks. Returns count of new tasks."""
@@ -239,7 +240,7 @@ def run_ci_monitor_cycle(
 
 def run_monitor_loop(
     plane_client: PlaneClient,
-    settings,
+    settings: Settings,
     *,
     poll_interval_seconds: int,
     max_cycles: int | None,

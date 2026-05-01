@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from operations_center.observability.models import ExecutionRecord
@@ -153,9 +154,9 @@ class OpenClawBridge:
     def wrap_action(
         self,
         action: str,
-        fn,
-        *args,
-        **kwargs,
+        fn: Callable[..., object],
+        *args: object,
+        **kwargs: object,
     ) -> ShellActionResult:
         """Execute a callable and wrap the outcome in a ShellActionResult.
 
