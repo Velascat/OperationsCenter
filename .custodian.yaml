@@ -406,3 +406,8 @@ detectors:
 maintenance:
   stale_pr_days: 7
   stale_state_days: 90
+
+tools:
+  ruff: true
+  vulture: true
+  # semgrep: true  # for AI3 (.glob/.rglob in artifact_index) once Phase 4 lands

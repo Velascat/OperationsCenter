@@ -29,3 +29,6 @@ uv.lock
 scripts/audit_*.py
 scripts/debug_*.py
 scripts/tmp_*.py
+
+# Warehouse data (generated artifacts gitignored via .warehouse/yard/*/.gitignore)
+.warehouse/yard/
