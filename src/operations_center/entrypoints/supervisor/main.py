@@ -45,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import yaml
 
@@ -215,7 +215,7 @@ def run_supervisor(
     for mp in processes:
         _spawn(mp)
 
-    def _handle_sigterm(signum: int, frame: Any) -> None:  # noqa: ANN001
+    def _handle_sigterm(signum: int, frame: Any) -> NoReturn:  # noqa: ANN001
         _logger.info(json.dumps({"event": "supervisor_shutdown", "signal": signum}))
         for mp in processes:
             _terminate(mp)

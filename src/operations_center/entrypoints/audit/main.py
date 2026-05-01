@@ -27,6 +27,7 @@ This CLI does not:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 from rich.console import Console
@@ -70,7 +71,7 @@ def cmd_run(
     requested_by: str | None = typer.Option(None, "--requested-by", help="Caller identity."),
     log_dir: str | None = typer.Option(None, "--log-dir", help="Override stdout/stderr log dir."),
     json_output: bool = typer.Option(False, "--json", help="Output result as JSON."),
-) -> None:
+) -> NoReturn:
     """Dispatch a managed audit and wait for completion."""
     request = ManagedAuditDispatchRequest(
         repo_id=repo,

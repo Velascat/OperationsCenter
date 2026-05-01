@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import NoReturn
 import os
 import signal
 import subprocess
@@ -244,7 +245,7 @@ class KodoAdapter:
         # killed before we exit.
         _prev_sigterm = signal.getsignal(signal.SIGTERM)
 
-        def _sigterm_handler(signum: int, frame: object) -> None:
+        def _sigterm_handler(signum: int, frame: object) -> NoReturn:
             _kill_group()
             # Restore the previous handler.  We raise SystemExit rather than
             # re-sending the signal via os.kill: re-sending with SIG_DFL causes

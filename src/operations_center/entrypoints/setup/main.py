@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import cast
+from typing import NoReturn, cast
 import webbrowser
 
 from rich.console import Console
@@ -717,7 +717,7 @@ def shell_quote(value: str) -> str:
     return f"'{escaped}'"
 
 
-def prompt_repo(repo_index: int) -> RepoSetupAnswers:
+def prompt_repo(repo_index: int) -> NoReturn:
     raise RuntimeError("prompt_repo now requires discovery context")
 
 

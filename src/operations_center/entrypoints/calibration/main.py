@@ -20,7 +20,7 @@ This CLI is read-only. It does not:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 import typer
 from rich.console import Console
@@ -83,7 +83,7 @@ def cmd_analyze(
     include_content: bool = typer.Option(False, "--include-content", help="Opt-in artifact content analysis (JSON readability check)."),
     output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Write JSON report to this directory."),
     json_output: bool = typer.Option(False, "--json", help="Print report as JSON."),
-) -> None:
+) -> NoReturn:
     """Analyze an artifact manifest with an explicit analysis profile."""
     try:
         ap = AnalysisProfile(profile)
