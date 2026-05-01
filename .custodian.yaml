@@ -124,6 +124,19 @@ audit:
       - src/operations_center/entrypoints/setup/**
       # Workspace bootstrap runs pip/npm install for repo setup — can take minutes.
       - src/operations_center/adapters/workspace/bootstrap.py
+    C23:
+      # shell=True is intentional in OC's orchestration layer — all commands come
+      # from trusted YAML config (not user input) and may use shell features like
+      # && chaining. Injection risk is acceptable given the trusted source.
+      - src/operations_center/application/validation.py
+      - src/operations_center/execution/workspace.py
+      - src/operations_center/execution/baseline_validation.py
+      - src/operations_center/adapters/workspace/bootstrap.py
+      - src/operations_center/entrypoints/setup/main.py
+      # shell=True in docstring "Never uses shell=True." — regex false positive
+      - src/operations_center/audit_dispatch/executor.py
+      # install_provider() runs npm/curl install commands from trusted YAML config
+      - src/operations_center/entrypoints/setup/providers.py
 
   # Stale handler names cited in autonomy_gaps.md from a pre-board_worker
   # architecture. Used by Custodian's generic C8 (and OC's OC8) to skip
