@@ -34,7 +34,7 @@ class DirectLocalBackendAdapter:
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
         repo_path = Path(request.workspace_path)
         command, env = self._build_invocation(
-            repo_path=repo_path,
+            _repo_path=repo_path,
             goal=request.goal_text,
             constraints=request.constraints_text or "",
         )
@@ -75,7 +75,7 @@ class DirectLocalBackendAdapter:
     def _build_invocation(
         self,
         *,
-        repo_path: Path,
+        _repo_path: Path,
         goal: str,
         constraints: str,
     ) -> tuple[list[str], dict[str, str]]:

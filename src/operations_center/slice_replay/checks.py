@@ -84,9 +84,9 @@ def _error(check: SliceReplayCheck, summary: str, err: str) -> SliceReplayCheckR
 def check_fixture_pack_loads(
     check: SliceReplayCheck,
     pack: FixturePack,
-    pack_dir: Path,
-    artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _pack_dir: Path,
+    _artifact: FixtureArtifact | None,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if the fixture pack was loaded successfully (it was, or we wouldn't be here)."""
     return _pass(check, f"Fixture pack {pack.fixture_pack_id!r} loaded successfully")
@@ -94,10 +94,10 @@ def check_fixture_pack_loads(
 
 def check_copied_file_exists(
     check: SliceReplayCheck,
-    pack: FixturePack,
+    _pack: FixturePack,
     pack_dir: Path,
     artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if copied=True artifact file is present in artifacts/."""
     if artifact is None:
@@ -118,10 +118,10 @@ def check_copied_file_exists(
 
 def check_metadata_only_reason_present(
     check: SliceReplayCheck,
-    pack: FixturePack,
-    pack_dir: Path,
+    _pack: FixturePack,
+    _pack_dir: Path,
     artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if metadata-only artifact has a copy_error explaining why it wasn't copied."""
     if artifact is None:
@@ -141,10 +141,10 @@ def check_metadata_only_reason_present(
 
 def check_source_manifest_loads(
     check: SliceReplayCheck,
-    pack: FixturePack,
+    _pack: FixturePack,
     pack_dir: Path,
-    artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _artifact: FixtureArtifact | None,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if source_manifest.json exists and parses as valid JSON."""
     manifest_file = pack_dir / "source_manifest.json"
@@ -168,10 +168,10 @@ def check_source_manifest_loads(
 
 def check_source_index_summary_loads(
     check: SliceReplayCheck,
-    pack: FixturePack,
+    _pack: FixturePack,
     pack_dir: Path,
-    artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _artifact: FixtureArtifact | None,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if source_index_summary.json exists and parses as valid JSON."""
     summary_file = pack_dir / "source_index_summary.json"
@@ -194,7 +194,7 @@ def check_source_index_summary_loads(
 
 def check_json_artifact_reads(
     check: SliceReplayCheck,
-    pack: FixturePack,
+    _pack: FixturePack,
     pack_dir: Path,
     artifact: FixtureArtifact | None,
     request: SliceReplayRequest,
@@ -232,7 +232,7 @@ def check_json_artifact_reads(
 
 def check_text_artifact_reads(
     check: SliceReplayCheck,
-    pack: FixturePack,
+    _pack: FixturePack,
     pack_dir: Path,
     artifact: FixtureArtifact | None,
     request: SliceReplayRequest,
@@ -271,9 +271,9 @@ def check_text_artifact_reads(
 def check_failure_limitation_present(
     check: SliceReplayCheck,
     pack: FixturePack,
-    pack_dir: Path,
+    _pack_dir: Path,
     artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if the fixture pack or artifact carries failure/partial limitations."""
     if artifact is not None:
@@ -307,10 +307,10 @@ def check_failure_limitation_present(
 
 def check_checksum_matches_if_available(
     check: SliceReplayCheck,
-    pack: FixturePack,
+    _pack: FixturePack,
     pack_dir: Path,
     artifact: FixtureArtifact | None,
-    request: SliceReplayRequest,
+    _request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
     """Pass if artifact checksum matches the recorded value (skipped if none recorded)."""
     if artifact is None:
@@ -344,8 +344,8 @@ def check_checksum_matches_if_available(
 
 def check_artifact_kind_matches(
     check: SliceReplayCheck,
-    pack: FixturePack,
-    pack_dir: Path,
+    _pack: FixturePack,
+    _pack_dir: Path,
     artifact: FixtureArtifact | None,
     request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:
@@ -364,8 +364,8 @@ def check_artifact_kind_matches(
 
 def check_source_stage_matches(
     check: SliceReplayCheck,
-    pack: FixturePack,
-    pack_dir: Path,
+    _pack: FixturePack,
+    _pack_dir: Path,
     artifact: FixtureArtifact | None,
     request: SliceReplayRequest,
 ) -> SliceReplayCheckResult:

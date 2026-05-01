@@ -34,7 +34,7 @@ from operations_center.autonomy_tiers.config import (
 _ALL_KNOWN_FAMILIES = sorted(_DEFAULT_FAMILY_TIERS.keys())
 
 
-def cmd_show(args: argparse.Namespace) -> None:
+def cmd_show(_args: argparse.Namespace) -> None:
     config = load_tiers_config()
     print("Autonomy Tier Configuration")
     print("=" * 50)

@@ -230,7 +230,7 @@ def _is_lgtm_comment(comment: dict) -> bool:
 def _merge_and_done(
     state: dict,
     state_path: Path,
-    pr_data: dict,
+    _pr_data: dict,
     gh_client,
     owner: str,
     repo: str,
@@ -584,7 +584,7 @@ def _phase2(
 
 # ── Plane task lookup ─────────────────────────────────────────────────────────
 
-def _find_plane_task_id(settings, repo_key: str, pr_number: int, pr_data: dict) -> str | None:
+def _find_plane_task_id(settings, repo_key: str, pr_number: int, _pr_data: dict) -> str | None:
     """Attempt to find a Plane 'In Review' task matching this PR. Best-effort."""
     try:
         client = _plane_client(settings)

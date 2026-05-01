@@ -67,7 +67,7 @@ class StubOpenClawRunner(OpenClawRunner):
     def __init__(self, result: OpenClawRunResult) -> None:
         self._result = result
 
-    def run(self, prepared: OpenClawPreparedRun) -> OpenClawRunResult:
+    def run(self, _prepared: OpenClawPreparedRun) -> OpenClawRunResult:
         return self._result
 
 

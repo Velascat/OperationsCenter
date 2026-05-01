@@ -546,7 +546,7 @@ def _determine_status(
 def _effective_validation_profile(
     proposal: TaskProposal,
     policy: RepoPolicy,
-    request: Optional[ExecutionRequest],
+    _request: Optional[ExecutionRequest],
 ) -> str:
     risk_value = proposal.risk_level.value
     task_type_value = proposal.task_type.value
@@ -557,7 +557,7 @@ def _effective_validation_profile(
 
 
 def _effective_review_requirement(
-    proposal: TaskProposal,
+    _proposal: TaskProposal,
     policy: RepoPolicy,
     violations: list[PolicyViolation],
 ) -> str:

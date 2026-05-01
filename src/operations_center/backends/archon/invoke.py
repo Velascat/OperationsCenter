@@ -61,7 +61,7 @@ class StubArchonAdapter(ArchonAdapter):
     def __init__(self, result: ArchonRunResult) -> None:
         self._result = result
 
-    def run(self, config: ArchonWorkflowConfig) -> ArchonRunResult:
+    def run(self, _config: ArchonWorkflowConfig) -> ArchonRunResult:
         return self._result
 
 

@@ -117,8 +117,8 @@ def _summary_for(
 
 
 def _scope_notes_for(
-    finding: IntegrationFrictionFinding,
-    assessment: AdapterWorkaroundAssessment,
+    _finding: IntegrationFrictionFinding,
+    _assessment: AdapterWorkaroundAssessment,
 ) -> str:
     return (
         "Evaluate a narrow upstream change that addresses the specific clustered issue. "

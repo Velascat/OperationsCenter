@@ -80,12 +80,13 @@ def build_multi_step_plan(
 
     Returns a MultiStepPlan; caller persists each step as a Plane task.
     """
+    repo_prefix = f"[{repo_key}] " if repo_key else ""
     steps = (
         {
             "step": 1,
-            "title": f"[Step 1/3: Analyze] {parent_title}"[:80],
+            "title": f"[Step 1/3: Analyze] {repo_prefix}{parent_title}"[:80],
             "goal": (
-                f"Analyze the scope of: {parent_goal}\n\n"
+                f"Repo: {repo_key}\n\nAnalyze the scope of: {parent_goal}\n\n"
                 "Read-only step. Identify which files / modules need to change "
                 "and what the implementation strategy is. Do not modify code."
             ),
@@ -94,9 +95,9 @@ def build_multi_step_plan(
         },
         {
             "step": 2,
-            "title": f"[Step 2/3: Implement] {parent_title}"[:80],
+            "title": f"[Step 2/3: Implement] {repo_prefix}{parent_title}"[:80],
             "goal": (
-                f"Implement: {parent_goal}\n\n"
+                f"Repo: {repo_key}\n\nImplement: {parent_goal}\n\n"
                 "Use the analysis from step 1 (linked via original-task-id). "
                 "Make the code changes; tests come in step 3."
             ),
@@ -105,9 +106,9 @@ def build_multi_step_plan(
         },
         {
             "step": 3,
-            "title": f"[Step 3/3: Verify] {parent_title}"[:80],
+            "title": f"[Step 3/3: Verify] {repo_prefix}{parent_title}"[:80],
             "goal": (
-                f"Verify: {parent_goal}\n\n"
+                f"Repo: {repo_key}\n\nVerify: {parent_goal}\n\n"
                 "Run tests / validation against the implementation from step 2. "
                 "Surface any regressions as a follow-up goal task."
             ),

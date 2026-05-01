@@ -21,7 +21,7 @@ from .models import PolicyDecision, PolicyExplanation, PolicyStatus, RepoPolicy
 
 def explain(
     decision: PolicyDecision,
-    policy: Optional[RepoPolicy] = None,
+    _policy: Optional[RepoPolicy] = None,
 ) -> PolicyExplanation:
     """Generate a human-readable explanation for a PolicyDecision.
 

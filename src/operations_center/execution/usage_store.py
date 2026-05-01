@@ -739,6 +739,7 @@ class UsageStore:
         can re-evaluate immediately after tasks complete rather than staying
         silent until an external autonomy-cycle refresh.
         """
+        del now  # reserved for future time-bounded reset (currently removes all proposal_cycle events)
         with self._exclusive():
             data = self.load()
             data["events"] = [

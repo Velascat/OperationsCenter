@@ -568,7 +568,7 @@ def _read_improve_output(workspace: Path) -> list[dict]:
     return valid
 
 
-def _handle_success(client, issue: dict, role: str, task_kind: str, needs_verification: bool, settings,
+def _handle_success(client, issue: dict, role: str, _task_kind: str, needs_verification: bool, settings,
                     *, improve_suggestions: list[dict] | None = None) -> None:
     task_id = str(issue["id"])
     labels  = issue.get("labels", [])
@@ -756,7 +756,7 @@ def _retry_count_from_labels(labels: list) -> int:
     return 0
 
 
-def _create_split_followups(client, parent: dict, settings, file_list: list[str], reason: str) -> list[str]:
+def _create_split_followups(client, parent: dict, _settings, file_list: list[str], reason: str) -> list[str]:
     """Spawn smaller goal tasks scoped to file subsets after a scope_too_wide block.
 
     Caps total split depth at 2 (parent retry-count >= 2 → no further split,
@@ -861,7 +861,7 @@ def _add_label(client, issue: dict, new_label: str) -> None:
 
 
 def _handle_failure(
-    client, issue: dict, role: str, task_kind: str, result: dict, settings,
+    client, issue: dict, role: str, _task_kind: str, result: dict, settings,
     *, scope_files: list[str] | None = None,
 ) -> None:
     task_id  = str(issue["id"])
@@ -921,7 +921,7 @@ def _handle_failure(
 
 
 def _create_improve_follow_up(
-    client, parent: dict, settings, suggestion: dict,
+    client, parent: dict, _settings, suggestion: dict,
 ) -> str | None:
     """Create a focused goal task from one kodo improve suggestion.
 
@@ -995,7 +995,7 @@ def _create_improve_follow_up(
 _MAX_FOLLOW_UP_RETRIES = 3
 
 
-def _create_follow_up(client, parent: dict, settings, follow_kind: str, reason: str) -> str:
+def _create_follow_up(client, parent: dict, _settings, follow_kind: str, reason: str) -> str:
     """Create a follow-up Plane task with full lineage metadata. Returns the new task id.
 
     Refuses past `_MAX_FOLLOW_UP_RETRIES` (default 3): a chain of test_failure →

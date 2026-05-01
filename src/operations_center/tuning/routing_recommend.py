@@ -44,7 +44,7 @@ _ACCEPTABLE_SUCCESS_WITH_POOR_CHANGE_EVIDENCE = 0.75
 
 def derive_findings(
     summaries: list[BackendComparisonSummary],
-    records: list[ExecutionRecord] | None = None,
+    _records: list[ExecutionRecord] | None = None,
 ) -> list[StrategyFinding]:
     """Derive StrategyFindings from comparison summaries.
 

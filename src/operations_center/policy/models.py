@@ -117,7 +117,6 @@ class ValidationRequirement:
     applies_to_task_types: empty = applies to all task types.
     required_profile: logical name of the required validation profile.
     must_pass: if True, validation failure → block execution.
-    allow_partial: if True, partial validation is acceptable.
     block_if_unavailable: if True and no validation commands are present,
         the run is blocked.
     """
@@ -125,7 +124,6 @@ class ValidationRequirement:
     applies_to_task_types: list[str] = field(default_factory=list)
     required_profile: str = "standard"
     must_pass: bool = True
-    allow_partial: bool = False
     block_if_unavailable: bool = False
 
 

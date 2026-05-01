@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 def _select_minimal_failure(
     index: "ManagedArtifactIndex",
-    request: HarvestRequest,
+    _request: HarvestRequest,
 ) -> list[SelectedArtifact]:
     """Smallest artifact set needed to inspect a failure.
 
@@ -58,7 +58,7 @@ def _select_minimal_failure(
 
 def _select_partial_run(
     index: "ManagedArtifactIndex",
-    request: HarvestRequest,
+    _request: HarvestRequest,
 ) -> list[SelectedArtifact]:
     """Artifacts around an interrupted/partial lifecycle."""
     result: list[SelectedArtifact] = []
@@ -78,7 +78,7 @@ def _select_partial_run(
 
 def _select_artifact_health(
     index: "ManagedArtifactIndex",
-    request: HarvestRequest,
+    _request: HarvestRequest,
 ) -> list[SelectedArtifact]:
     """Unresolved paths, missing files, and partial artifacts."""
     result: list[SelectedArtifact] = []
@@ -99,7 +99,7 @@ def _select_artifact_health(
 
 def _select_producer_compliance(
     index: "ManagedArtifactIndex",
-    request: HarvestRequest,
+    _request: HarvestRequest,
 ) -> list[SelectedArtifact]:
     """All artifacts — used for producer contract compliance review."""
     return [
@@ -129,7 +129,7 @@ def _select_stage_slice(
 
 def _select_full_manifest_snapshot(
     index: "ManagedArtifactIndex",
-    request: HarvestRequest,
+    _request: HarvestRequest,
 ) -> list[SelectedArtifact]:
     """All manifest artifacts."""
     return [

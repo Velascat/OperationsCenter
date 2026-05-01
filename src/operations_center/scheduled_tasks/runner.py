@@ -63,7 +63,6 @@ def _task_key(task: "ScheduledTask") -> str:
 
 @dataclass
 class _DueTask:
-    task: "ScheduledTask"
     key: str
     last_run: datetime | None
 

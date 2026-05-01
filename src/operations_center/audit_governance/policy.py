@@ -99,7 +99,7 @@ def _check_known_audit_type(
 
 
 def _check_cooldown_policy(
-    request: AuditGovernanceRequest,
+    _request: AuditGovernanceRequest,
     cooldown_state: AuditCooldownState | None,
 ) -> PolicyResult:
     """Enforce minimum gap between consecutive full audits for the same repo/type."""
@@ -137,7 +137,7 @@ def _check_cooldown_policy(
 
 
 def _check_budget_policy(
-    request: AuditGovernanceRequest,
+    _request: AuditGovernanceRequest,
     budget_state: AuditBudgetState | None,
 ) -> PolicyResult:
     """Enforce per-period run limit for the repo/audit_type."""

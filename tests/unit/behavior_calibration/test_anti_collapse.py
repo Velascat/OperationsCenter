@@ -353,8 +353,10 @@ class TestValidateAllRecommendations:
         assert len(recs) == 3
 
     def test_empty_list_passes(self) -> None:
-        validate_all_recommendations([])
-        assert True  # empty list is always valid
+        # validate_all_recommendations raises GuardrailViolation on any violation;
+        # returning without raising is the success condition for an empty list.
+        result = validate_all_recommendations([])
+        assert result is None  # function returns None when all checks pass
 
     def test_one_invalid_raises(self) -> None:
         valid = _make_recommendation()

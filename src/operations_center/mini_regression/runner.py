@@ -75,7 +75,7 @@ def _compute_suite_status(
 
 
 def _compute_summary(
-    suite: MiniRegressionSuiteDefinition,
+    _suite: MiniRegressionSuiteDefinition,
     entry_results: list[MiniRegressionEntryResult],
 ) -> MiniRegressionSuiteSummary:
     total = len(entry_results)
