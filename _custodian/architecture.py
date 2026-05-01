@@ -6,8 +6,8 @@ Two invariants requiring custom AST analysis:
 
   AI3  no_directory_scanning — artifact_index/ must not call directory
                                traversal at runtime (glob, rglob, scandir, etc.)
-                               (call-pattern check — no Custodian built-in for this;
-                               use semgrep when available)
+                               [TRANSITIONAL] call-pattern check; replace with semgrep
+                               rule when semgrep is enabled (Phase 4).
   AI4  anti_collapse         — behavior_calibration's _FORBIDDEN_MUTATION_FIELDS
                                guardrail is structurally present and non-empty
                                (structural assignment check — custom logic required)
@@ -122,6 +122,7 @@ def build_oc_architecture_detectors() -> list[Detector]:
     .custodian.yaml (A1 and S1 detectors respectively).
     """
     return [
+        # TRANSITIONAL: replace with semgrep rule (AI3 glob/rglob pattern) in Phase 4
         Detector("AI3", "directory-scanning in artifact_index",         "fixed", _detect_ai3_no_directory_scanning, MEDIUM),
         Detector("AI4", "anti-collapse guardrail structurally present", "fixed", _detect_ai4_anti_collapse,         HIGH),
     ]
