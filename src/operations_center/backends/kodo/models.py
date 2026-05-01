@@ -74,17 +74,6 @@ class KodoRunCapture:
         return ((self.stdout or "") + "\n" + (self.stderr or "")).strip()
 
 
-@dataclass
-class KodoFailureInfo:
-    """Structured failure detail extracted from a kodo capture."""
-
-    exit_code: int
-    failure_category_value: str  # matches FailureReasonCategory values
-    failure_reason: str
-    is_timeout: bool = False
-    is_rate_limited: bool = False
-    is_quota_exhausted: bool = False
-
 
 @dataclass
 class SupportCheck:

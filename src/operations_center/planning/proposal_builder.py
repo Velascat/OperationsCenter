@@ -152,5 +152,5 @@ def _derive_task_id(context: PlanningContext) -> str:
     """Derive a stable task ID when none is provided."""
     slug = context.task_type.replace("_", "-")[:20]
     import hashlib
-    h = hashlib.sha1(context.goal_text.encode()).hexdigest()[:8]
+    h = hashlib.sha1(context.goal_text.encode(), usedforsecurity=False).hexdigest()[:8]
     return f"auto-{slug}-{h}"

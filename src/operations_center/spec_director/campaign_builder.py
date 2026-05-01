@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
 from typing import Any
 
 from operations_center.spec_director.models import SpecFrontMatter
@@ -13,15 +12,6 @@ from operations_center.spec_director.models import SpecFrontMatter
 logger = logging.getLogger(__name__)
 
 _GOAL_PATTERN = re.compile(r"^\d+\.\s+(.+)$", re.MULTILINE)
-
-
-@dataclass
-class ChildTaskSpec:
-    title: str
-    goal_text: str
-    constraints_text: str
-    phase: str  # "implement" | "test_campaign" | "improve_campaign"
-    spec_coverage_hint: str
 
 
 class CampaignBuilder:

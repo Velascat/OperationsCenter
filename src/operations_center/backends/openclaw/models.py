@@ -73,18 +73,6 @@ class OpenClawArtifactCapture:
     artifact_type: str  # mirrors ArtifactType values
 
 
-@dataclass
-class OpenClawEventDetailRef:
-    """Reference to a chunk of raw OpenClaw event stream data.
-
-    Retained for observability (BackendDetailRef) without contaminating
-    canonical ExecutionResult. Not inlined into canonical telemetry.
-    """
-
-    event_type: str  # e.g. "tool_use", "tool_result", "message", "step"
-    index: int
-    summary: str = ""  # brief human-readable description
-
 
 @dataclass
 class OpenClawRunCapture:
@@ -127,13 +115,3 @@ class OpenClawRunCapture:
     def event_count(self) -> int:
         return len(self.events)
 
-
-@dataclass
-class OpenClawFailureInfo:
-    """Structured failure detail extracted from an OpenClaw capture."""
-
-    outcome: str
-    failure_category_value: str  # matches FailureReasonCategory values
-    failure_reason: str
-    is_timeout: bool = False
-    is_partial: bool = False
