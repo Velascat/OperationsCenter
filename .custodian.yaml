@@ -112,6 +112,20 @@ audit:
       - src/operations_center/spec_director/phase_orchestrator.py
       - src/operations_center/spec_director/recovery.py
       - src/operations_center/spec_director/spec_writer.py
+    C29:
+      # Entrypoint main files are necessarily large — they wire together the full
+      # worker lifecycle (arg parsing, signal handling, retry loops, artifact
+      # writes). Splitting them would fragment cohesion without adding clarity.
+      - src/operations_center/entrypoints/board_worker/main.py
+      - src/operations_center/entrypoints/setup/main.py
+      - src/operations_center/entrypoints/autonomy_cycle/main.py
+      - src/operations_center/entrypoints/pr_review_watcher/main.py
+      # usage_store: one file, one responsibility — tracks token/cost usage with
+      # many storage/query/aggregation methods. A clean boundary, not monolithic.
+      - src/operations_center/execution/usage_store.py
+      # policy engine: declarative rule evaluation over many rule types — each
+      # rule type needs its own evaluation method; cannot reasonably be split.
+      - src/operations_center/policy/engine.py
     C11:
       # Agent-spawning entrypoints: board_worker, intake, pr_review_watcher invoke
       # the coding backend (kodo, aider, etc.) which runs for an unbounded duration.
@@ -277,6 +291,17 @@ audit:
     - validation_loop
     - velocity_cap_exceeded
     - verified
+
+  # F3-exempt field names: schema/documentation fields never accessed by dot
+  # notation because they're serialized to JSON and consumed by external readers,
+  # or are compatibility fields retained for schema stability.
+  f3_exempt:
+    - bucket_naming_note
+    - bucket_naming_pattern
+    - contract_version
+    - evidence_id
+    - ref_id
+    - workdir_name
 
   # Plugin-defined audit config keys — suppresses unknown-key warnings in doctor.
   plugin_audit_keys:
