@@ -336,16 +336,8 @@ audit:
     - switchboard_url
 
 architecture:
-  # NOTE: These S1 declarative layer rules overlap with AI2 in
-  # _custodian/architecture.py, which wraps
-  # tools/audit/architecture_invariants/layer_rules.py. The two checks
-  # are currently complementary rather than identical — AI2 applies
-  # import-graph analysis from layer_rules.py (which may encode additional
-  # nuance such as allowed cross-layer exceptions). Migrating AI2 fully into
-  # S1 is possible but requires a careful reading of layer_rules.py to
-  # verify that no rules would be silently dropped. Do not migrate until
-  # layer_rules.py has been audited against this S1 block.
   layers:
+    # General DDD boundary rules
     - name: domain
       glob: "src/operations_center/domain/**"
       may_not_import:
@@ -368,6 +360,39 @@ architecture:
       may_not_import:
         - "src/operations_center/entrypoints/**"
         - "src/operations_center/backends/**"
+    # AI2: fast-feedback ladder — unidirectional import graph
+    - name: slice_replay
+      glob: "src/operations_center/slice_replay/**"
+      may_not_import:
+        - "src/operations_center/audit_dispatch/**"
+        - "src/operations_center/audit_governance/**"
+        - "src/operations_center/mini_regression/**"
+    - name: mini_regression
+      glob: "src/operations_center/mini_regression/**"
+      may_not_import:
+        - "src/operations_center/audit_dispatch/**"
+        - "src/operations_center/audit_governance/**"
+    - name: fixture_harvesting
+      glob: "src/operations_center/fixture_harvesting/**"
+      may_not_import:
+        - "src/operations_center/audit_dispatch/**"
+    - name: audit_governance
+      glob: "src/operations_center/audit_governance/**"
+      may_not_import:
+        - "src/operations_center/fixture_harvesting/**"
+        - "src/operations_center/slice_replay/**"
+        - "src/operations_center/mini_regression/**"
+  invariants:
+    # AI1: src/operations_center must not import managed-repo packages
+    - name: "AI1 managed-repo import (videofoundry)"
+      glob: "src/operations_center/**"
+      forbidden_import_prefix: "videofoundry"
+    - name: "AI1 managed-repo import (tools.audit)"
+      glob: "src/operations_center/**"
+      forbidden_import_prefix: "tools.audit"
+    - name: "AI1 managed-repo import (managed_repo)"
+      glob: "src/operations_center/**"
+      forbidden_import_prefix: "managed_repo"
 
 plugins:
   - module: _custodian.log_scanner:OCLogScanner
