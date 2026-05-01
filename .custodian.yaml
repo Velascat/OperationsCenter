@@ -9,16 +9,6 @@ audit:
   # C2 (print statements): entrypoints are CLI tools that write to stdout
   # deliberately; two library files have print() only in docstring examples.
   exclude_paths:
-    D1:
-      # detect_config_drift is a documented public API (drift.py module docstring
-      # shows usage) not yet wired to any entrypoint call site.
-      - src/operations_center/config/drift.py
-      # https_remote_to_ssh and prompt_repo_with_discovery are setup utilities;
-      # the main setup flow uses interactive discovery, not these helpers yet.
-      - src/operations_center/entrypoints/setup/providers.py
-      # run_pipeline is the programmatic autonomy-cycle entry for when the
-      # propose watcher replaces the removed cron job; not yet wired.
-      - src/operations_center/entrypoints/autonomy_cycle/main.py
     C1:
       - src/operations_center/observer/collectors/todo_signal.py
       - src/operations_center/observer/artifact_writer.py

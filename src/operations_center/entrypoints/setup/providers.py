@@ -2,6 +2,8 @@
 # Copyright (C) 2026 Velascat
 from __future__ import annotations
 
+__all__ = ["https_remote_to_ssh"]
+
 from dataclasses import dataclass
 import os
 from pathlib import Path

@@ -28,6 +28,8 @@ from pathlib import Path
 
 import yaml
 
+__all__ = ["detect_config_drift"]
+
 
 def detect_config_drift(
     config_path: str | Path,

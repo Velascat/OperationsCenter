@@ -66,6 +66,8 @@ from operations_center.proposer.candidate_integration import new_proposer_integr
 from operations_center.entrypoints.observer.main import configured_repo_match, ensure_git_repo, resolve_repo_path
 from operations_center.observer.collectors.git_context import run_git
 
+__all__ = ["run_pipeline"]
+
 
 def build_observer_service() -> RepoObserverService:
     return RepoObserverService(
