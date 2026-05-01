@@ -138,16 +138,6 @@ class TestDispatchConfigErrors:
         with pytest.raises(AuditDispatchConfigError, match="no_such_repo"):
             dispatch_managed_audit(req, config_dir=_CONFIG_DIR, log_dir=tmp_path)
 
-    def test_blocked_command_raises_config_error(self, tmp_path: Path) -> None:
-        _req = ManagedAuditDispatchRequest(
-            repo_id="videofoundry",
-            audit_type="representative",
-            allow_unverified_command=False,  # representative is verified, but test other type
-        )
-        # This will succeed for "representative" since it's verified.
-        # For a proper blocked test, we'd need a type with unknown status.
-        # Just verify the config error path is reachable (no crash).
-        pass  # covered by unknown_repo test above
 
 
 # ---------------------------------------------------------------------------

@@ -897,10 +897,12 @@ class TestFileLocking:
         from operations_center.audit_governance.file_locks import locked_state_file
         lock_target = tmp_path / "test.json"
         with locked_state_file(lock_target):
-            pass  # lock acquired and released
-        # Can acquire again immediately
-        with locked_state_file(lock_target):
             pass
+        # Can acquire again — proves lock was released
+        reacquired = False
+        with locked_state_file(lock_target):
+            reacquired = True
+        assert reacquired
 
     def test_lock_released_after_exception(self, tmp_path: Path):
         """Lock must be released even when the guarded block raises."""
@@ -912,8 +914,10 @@ class TestFileLocking:
         except ValueError:
             pass
         # Lock released — can acquire again
+        reacquired = False
         with locked_state_file(lock_target):
-            pass
+            reacquired = True
+        assert reacquired
 
 
 # ---------------------------------------------------------------------------

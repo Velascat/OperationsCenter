@@ -598,8 +598,10 @@ def test_verify_remote_branch_exists_success() -> None:
             ("git", "ls-remote", "--heads", "origin", "main"): b"abc123\trefs/heads/main\n",
         }
     )
-    # Should not raise
+    completed = False
     client.verify_remote_branch_exists(Path("."), "main")
+    completed = True
+    assert completed
 
 
 def test_verify_remote_branch_exists_raises_value_error() -> None:

@@ -93,8 +93,9 @@ class TestBuildArtifactIndex:
 
     def test_excluded_paths_retained_at_index_level(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(completed_manifest_file)
-        _index = build_artifact_index(manifest, completed_manifest_file)
-        # completed_manifest_file fixture has no excluded_paths; use example instead
+        index = build_artifact_index(manifest, completed_manifest_file)
+        # completed_manifest_file has no excluded_paths — verify they default to empty
+        assert index.excluded_paths == []
 
     def test_excluded_paths_from_example(self, example_completed_manifest_path: Path) -> None:
         manifest = load_artifact_manifest(example_completed_manifest_path)

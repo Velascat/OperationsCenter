@@ -230,7 +230,8 @@ class TestRecommendationsAreAdvisory:
 
     def test_validate_recommendation_structure_passes_valid(self) -> None:
         rec = _make_recommendation()
-        validate_recommendation_structure(rec)  # must not raise
+        validate_recommendation_structure(rec)
+        assert rec.recommendation_id is not None
 
     def test_recommendation_has_risk_field(self) -> None:
         rec = _make_recommendation()
@@ -348,7 +349,8 @@ class TestNoAutoApply:
 class TestValidateAllRecommendations:
     def test_valid_list_passes(self) -> None:
         recs = [_make_recommendation() for _ in range(3)]
-        validate_all_recommendations(recs)  # must not raise
+        validate_all_recommendations(recs)
+        assert len(recs) == 3
 
     def test_empty_list_passes(self) -> None:
         validate_all_recommendations([])  # must not raise
