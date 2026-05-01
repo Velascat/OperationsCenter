@@ -29,7 +29,7 @@ from operations_center.contracts.enums import (
 )
 
 from .errors import build_failure_reason, categorize_failure
-from .models import KodoRunCapture
+from .models import KodoFailureInfo, KodoRunCapture
 
 
 def normalize(
@@ -73,13 +73,9 @@ def normalize(
 
     artifacts = _map_artifacts(capture)
 
-    failure_category: Optional[FailureReasonCategory] = None
-    failure_reason: Optional[str] = None
-    if not success:
-        failure_category = categorize_failure(capture.exit_code, capture.combined_output)
-        failure_reason = build_failure_reason(
-            capture.exit_code, capture.stderr, capture.stdout
-        )
+    failure_info = _extract_failure_info(capture) if not success else None
+    failure_category = FailureReasonCategory(failure_info.failure_category_value) if failure_info else None
+    failure_reason = failure_info.failure_reason if failure_info else None
 
     return ExecutionResult(
         run_id=capture.run_id,
@@ -104,6 +100,33 @@ def normalize(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+_RATE_LIMITED_SIGNALS = ("rate limit exceeded", "too many requests", "429")
+_QUOTA_EXHAUSTED_SIGNALS = (
+    "quota exceeded",
+    "insufficient_quota",
+    "you've hit your limit",
+    "usage limit reached",
+    "you have run out of credits",
+    "payment required",
+)
+
+
+def _extract_failure_info(capture: KodoRunCapture) -> KodoFailureInfo | None:
+    if capture.exit_code == 0 and capture.succeeded:
+        return None
+    lower = capture.combined_output.lower()
+    is_rate_limited = any(s in lower for s in _RATE_LIMITED_SIGNALS)
+    is_quota_exhausted = any(s in lower for s in _QUOTA_EXHAUSTED_SIGNALS)
+    return KodoFailureInfo(
+        exit_code=capture.exit_code,
+        failure_category_value=categorize_failure(capture.exit_code, capture.combined_output).value,
+        failure_reason=build_failure_reason(capture.exit_code, capture.stderr, capture.stdout),
+        is_timeout=capture.timeout_hit,
+        is_rate_limited=is_rate_limited,
+        is_quota_exhausted=is_quota_exhausted,
+    )
+
 
 def _map_failure_status(capture: KodoRunCapture) -> ExecutionStatus:
     if capture.timeout_hit:

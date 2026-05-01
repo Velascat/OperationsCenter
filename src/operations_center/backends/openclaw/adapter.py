@@ -40,7 +40,7 @@ from operations_center.observability.models import BackendDetailRef
 
 from .invoke import OpenClawBackendInvoker, OpenClawRunner
 from .mapper import check_support, map_request
-from .models import OpenClawRunCapture, SupportCheck
+from .models import OpenClawEventDetailRef, OpenClawRunCapture, SupportCheck
 from .normalize import normalize
 
 logger = logging.getLogger(__name__)
@@ -180,8 +180,22 @@ class OpenClawBackendAdapter:
         refs: list[BackendDetailRef] = []
 
         if capture.events:
+            event_refs = [
+                OpenClawEventDetailRef(
+                    event_type=evt.get("type", "unknown"),
+                    index=i,
+                    summary=str(evt.get("content") or evt.get("summary") or "")[:120],
+                )
+                for i, evt in enumerate(capture.events)
+            ]
             events_path = detail_dir / "openclaw-events.json"
-            events_path.write_text(json.dumps(capture.events, indent=2) + "\n", encoding="utf-8")
+            events_path.write_text(
+                json.dumps(
+                    [{"event_type": r.event_type, "index": r.index, "summary": r.summary} for r in event_refs],
+                    indent=2,
+                ) + "\n",
+                encoding="utf-8",
+            )
             refs.append(
                 BackendDetailRef(
                     detail_type="event_trace",

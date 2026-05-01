@@ -35,7 +35,7 @@ from operations_center.contracts.enums import (
 from operations_center.contracts.execution import ExecutionArtifact, ExecutionResult
 
 from .errors import build_failure_reason, categorize_failure
-from .models import OpenClawRunCapture
+from .models import OpenClawFailureInfo, OpenClawRunCapture
 
 
 def normalize(
@@ -91,13 +91,9 @@ def normalize(
 
     artifacts = _map_artifacts(capture)
 
-    failure_category: Optional[FailureReasonCategory] = None
-    failure_reason: Optional[str] = None
-    if not success:
-        failure_category = categorize_failure(capture.outcome, capture.combined_output)
-        failure_reason = build_failure_reason(
-            capture.outcome, capture.error_text, capture.output_text
-        )
+    failure_info = _extract_failure_info(capture) if not success else None
+    failure_category = FailureReasonCategory(failure_info.failure_category_value) if failure_info else None
+    failure_reason = failure_info.failure_reason if failure_info else None
 
     return ExecutionResult(
         run_id=capture.run_id,
@@ -204,6 +200,18 @@ def _git_status_to_change_type(status: str) -> str:
 # ---------------------------------------------------------------------------
 # Other helpers
 # ---------------------------------------------------------------------------
+
+def _extract_failure_info(capture: OpenClawRunCapture) -> OpenClawFailureInfo | None:
+    if capture.outcome == "success":
+        return None
+    return OpenClawFailureInfo(
+        outcome=capture.outcome,
+        failure_category_value=categorize_failure(capture.outcome, capture.combined_output).value,
+        failure_reason=build_failure_reason(capture.outcome, capture.error_text, capture.output_text),
+        is_timeout=capture.timeout_hit or capture.outcome == "timeout",
+        is_partial=capture.outcome == "partial",
+    )
+
 
 def _map_failure_status(capture: OpenClawRunCapture) -> ExecutionStatus:
     if capture.timeout_hit or capture.outcome == "timeout":

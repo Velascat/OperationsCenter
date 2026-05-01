@@ -100,3 +100,12 @@ class ArchonRunCapture:
     def combined_output(self) -> str:
         return ((self.output_text or "") + "\n" + (self.error_text or "")).strip()
 
+
+@dataclass
+class ArchonFailureInfo:
+    """Structured failure detail extracted from an Archon capture."""
+    outcome: str
+    failure_category_value: str  # matches FailureReasonCategory values
+    failure_reason: str
+    is_timeout: bool = False
+    is_partial: bool = False

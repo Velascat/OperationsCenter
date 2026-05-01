@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from operations_center.spec_director.models import SpecFrontMatter
@@ -12,6 +13,15 @@ from operations_center.spec_director.models import SpecFrontMatter
 logger = logging.getLogger(__name__)
 
 _GOAL_PATTERN = re.compile(r"^\d+\.\s+(.+)$", re.MULTILINE)
+
+
+@dataclass
+class ChildTaskSpec:
+    title: str
+    goal_text: str
+    constraints_text: str
+    phase: str  # "implement" | "test_campaign" | "improve_campaign"
+    spec_coverage_hint: str
 
 
 class CampaignBuilder:
@@ -57,14 +67,21 @@ class CampaignBuilder:
             for phase in fm.phases:
                 if child_count >= self._max_tasks:
                     break
+                phase_prefix = {"implement": "Impl", "test_campaign": "Test", "improve_campaign": "Improve"}.get(phase, phase)
+                title = f"[{phase_prefix}] {goal_text[:60].strip()}"
+                spec_coverage_hint = f"Goal {idx + 1}"
+                spec = ChildTaskSpec(
+                    title=title,
+                    goal_text=goal_text,
+                    constraints_text=constraints,
+                    phase=phase,
+                    spec_coverage_hint=spec_coverage_hint,
+                )
                 task_id = self._create_child_task(
                     fm=fm,
                     repo_key=repo_key,
                     base_branch=base_branch,
-                    goal_text=goal_text,
-                    constraints_text=constraints,
-                    phase=phase,
-                    goal_index=idx + 1,
+                    spec=spec,
                 )
                 created_ids.append(task_id)
                 child_count += 1
@@ -80,11 +97,9 @@ class CampaignBuilder:
         fm: SpecFrontMatter,
         repo_key: str,
         base_branch: str,
-        goal_text: str,
-        constraints_text: str,
-        phase: str,
-        goal_index: int,
+        spec: ChildTaskSpec,
     ) -> str:
+        phase = spec.phase
         task_kind = "goal" if phase == "implement" else phase
         state = "Ready for AI" if phase == "implement" else "Backlog"
         depends_note = ""
@@ -99,17 +114,15 @@ base_branch: {base_branch}
 mode: {task_kind}
 spec_campaign_id: {fm.campaign_id}
 spec_file: docs/specs/{fm.slug}.md
-task_phase: {phase}
-spec_coverage_hint: Goal {goal_index}
+task_phase: {spec.phase}
+spec_coverage_hint: {spec.spec_coverage_hint}
 
 ## Goal
-{goal_text.strip()}
+{spec.goal_text.strip()}
 
 ## Constraints
-{constraints_text.strip()}{depends_note}
+{spec.constraints_text.strip()}{depends_note}
 """
-        phase_prefix = {"implement": "Impl", "test_campaign": "Test", "improve_campaign": "Improve"}.get(phase, phase)
-        title = f"[{phase_prefix}] {goal_text[:60].strip()}"
         labels = [
             f"task-kind: {task_kind}",
             f"repo: {repo_key}",
@@ -117,7 +130,7 @@ spec_coverage_hint: Goal {goal_index}
             f"campaign-id: {fm.campaign_id}",
         ]
         issue = self._client.create_issue(
-            name=title,
+            name=spec.title,
             description=body,
             label_names=labels,
             state=state,
