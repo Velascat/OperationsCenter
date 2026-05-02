@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-class FileLockTimeout(OSError):
+class FileLockTimeoutError(OSError):
     """Raised when the exclusive lock cannot be acquired within the timeout."""
 
 
@@ -30,7 +30,7 @@ def locked_state_file(path: Path, timeout: float = 5.0) -> Generator[None, None,
     A separate <path>.lock sentinel is used so that locking never interferes
     with normal file reads/writes on the state path itself.
 
-    Raises FileLockTimeout if the lock cannot be acquired within *timeout* seconds.
+    Raises FileLockTimeoutError if the lock cannot be acquired within *timeout* seconds.
     """
     lock_path = path.with_suffix(path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,7 @@ def locked_state_file(path: Path, timeout: float = 5.0) -> Generator[None, None,
                 break
             except BlockingIOError:
                 if time.monotonic() >= deadline:
-                    raise FileLockTimeout(
+                    raise FileLockTimeoutError(
                         f"Could not acquire lock on {lock_path} within {timeout}s"
                     ) from None
                 time.sleep(0.02)
@@ -56,4 +56,4 @@ def locked_state_file(path: Path, timeout: float = 5.0) -> Generator[None, None,
         os.close(fd)
 
 
-__all__ = ["FileLockTimeout", "locked_state_file"]
+__all__ = ["FileLockTimeoutError", "locked_state_file"]
