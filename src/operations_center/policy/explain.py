@@ -27,7 +27,7 @@ def explain(
 
     Args:
         decision: The evaluated PolicyDecision.
-        policy:   Optional RepoPolicy used for additional context.
+        _policy:  Optional RepoPolicy used for additional context.
 
     Returns:
         A frozen PolicyExplanation with structured reasoning text.
