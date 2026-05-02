@@ -9,6 +9,15 @@ audit:
   # C2 (print statements): entrypoints are CLI tools that write to stdout
   # deliberately; two library files have print() only in docstring examples.
   exclude_paths:
+    T1:
+      # OC adapter classes are integration-tested via monkeypatching (the class
+      # name appears only in docstrings/comments of test files, not as ast.Name).
+      # Entrypoints are end-to-end tested, not unit tested.
+      # artifact_index models and backends are used through their consumers.
+      - "src/operations_center/adapters/**"
+      - "src/operations_center/entrypoints/**"
+      - "src/operations_center/artifact_index/**"
+      - "src/operations_center/backends/**"
     C1:
       - src/operations_center/observer/collectors/todo_signal.py
       - src/operations_center/observer/artifact_writer.py
