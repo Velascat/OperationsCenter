@@ -424,13 +424,13 @@ architecture:
       forbidden_import_prefix: "managed_repo"
 
 plugins:
-  - module: _custodian.log_scanner:OCLogScanner
-  - module: _custodian.state_scanner:OCStateScanner
+  - module: ".custodian/log_scanner.py:OCLogScanner"
+  - module: ".custodian/state_scanner.py:OCStateScanner"
 
 detectors:
-  - module: _custodian.detectors:build_oc_detectors
-  - module: _custodian.architecture:build_oc_architecture_detectors
-  - module: _custodian.doc_conventions:build_oc_doc_convention_detectors
+  - module: ".custodian/detectors.py:build_oc_detectors"
+  - module: ".custodian/architecture.py:build_oc_architecture_detectors"
+  - module: ".custodian/doc_conventions.py:build_oc_doc_convention_detectors"
 
 maintenance:
   stale_pr_days: 7
