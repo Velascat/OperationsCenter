@@ -1,5 +1,8 @@
-.console/
-!.console/*.example*
+.console/*
+!.console/task.md
+!.console/backlog.md
+!.console/guidelines.md
+!.console/log.md
 __pycache__/
 *.pyc
 *.pyo
