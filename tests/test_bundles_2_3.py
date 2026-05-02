@@ -13,18 +13,18 @@ import pytest
 from operations_center.contracts.enums import ValidationStatus
 
 
-# ── C9 detector ──────────────────────────────────────────────────────────────
+# ── K2 detector (doc value drift — superseded OC9) ───────────────────────────
 
-def test_c9_skips_known_values(tmp_path):
-    """Status enums like 'in progress' are well-known — don't flag."""
+def test_k2_skips_known_values(tmp_path):
+    """Status enums like 'done' are well-known — don't flag."""
     from custodian.audit_kit.detector import AuditContext
-    from _custodian.detectors import _detect_oc9_doc_value_drift
+    from custodian.audit_kit.detectors.docs import detect_k2
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
     (docs / "x.md").write_text(
         "## Plane states\n"
-        "Status can be `in progress` or `done`.\n"
+        "Status can be `done` or `cancelled`.\n"
     )
     src.mkdir()
     (src / "x.py").write_text("# nothing useful\n")
@@ -32,15 +32,14 @@ def test_c9_skips_known_values(tmp_path):
         src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
         config={}, plugin_modules=[],
     )
-    result = _detect_oc9_doc_value_drift(ctx)
-    count = result.count
-    assert count == 0
+    result = detect_k2(ctx)
+    assert result.count == 0
 
 
-def test_c9_flags_truly_drifted_value(tmp_path):
+def test_k2_flags_truly_drifted_value(tmp_path):
     """A doc value with no string-literal anchor is flagged."""
     from custodian.audit_kit.detector import AuditContext
-    from _custodian.detectors import _detect_oc9_doc_value_drift
+    from custodian.audit_kit.detectors.docs import detect_k2
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
@@ -54,38 +53,36 @@ def test_c9_flags_truly_drifted_value(tmp_path):
         src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
         config={}, plugin_modules=[],
     )
-    result = _detect_oc9_doc_value_drift(ctx)
-    count, samples = result.count, result.samples
-    assert count == 1
-    assert "nonexistent_kind_value" in samples[0]
+    result = detect_k2(ctx)
+    assert result.count == 1
+    assert "nonexistent_kind_value" in result.samples[0]
 
 
-def test_c9_accepts_pydantic_field_definition(tmp_path):
-    """A doc citing a value that's also a Pydantic field name passes."""
+def test_k2_accepts_field_annotation(tmp_path):
+    """A doc citing a token that's a type-annotated field name passes."""
     from custodian.audit_kit.detector import AuditContext
-    from _custodian.detectors import _detect_oc9_doc_value_drift
+    from custodian.audit_kit.detectors.docs import detect_k2
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
     (docs / "x.md").write_text(
         "## Schema\n"
-        "Each task has a `is_compliant` value.\n"
+        "Status can be `compliant` or `non_compliant`.\n"
     )
     src.mkdir()
-    (src / "x.py").write_text("class Foo:\n    is_compliant: bool = False\n")
+    (src / "x.py").write_text("class Foo:\n    compliant: bool = False\n    non_compliant: bool = False\n")
     ctx = AuditContext(
         src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
         config={}, plugin_modules=[],
     )
-    result = _detect_oc9_doc_value_drift(ctx)
-    count = result.count
-    assert count == 0
+    result = detect_k2(ctx)
+    assert result.count == 0
 
 
-def test_c9_accepts_function_definition(tmp_path):
-    """When a value-cited token is actually a function name, accept."""
+def test_k2_accepts_function_definition(tmp_path):
+    """When a value-cited token is a function name, it passes."""
     from custodian.audit_kit.detector import AuditContext
-    from _custodian.detectors import _detect_oc9_doc_value_drift
+    from custodian.audit_kit.detectors.docs import detect_k2
     src = tmp_path / "src"
     docs = tmp_path / "docs" / "design"
     docs.mkdir(parents=True)
@@ -99,9 +96,8 @@ def test_c9_accepts_function_definition(tmp_path):
         src_root=src, tests_root=tmp_path / "t", repo_root=tmp_path,
         config={}, plugin_modules=[],
     )
-    result = _detect_oc9_doc_value_drift(ctx)
-    count = result.count
-    assert count == 0
+    result = detect_k2(ctx)
+    assert result.count == 0
 
 
 # ── baseline_validation ──────────────────────────────────────────────────────
