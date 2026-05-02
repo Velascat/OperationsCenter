@@ -183,13 +183,3 @@ def make_policy_config(policy: RepoPolicy) -> PolicyConfig:
 # ---------------------------------------------------------------------------
 # Pytest fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def default_proposal():
-    return make_proposal()
-
-
-@pytest.fixture
-def default_decision():
-    return remote_decision()

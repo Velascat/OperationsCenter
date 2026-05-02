@@ -182,11 +182,3 @@ def index_from_example_completed():
     path = here.parents[3] / "examples" / "audit_contracts" / "completed_artifact_manifest.json"
     manifest = load_artifact_manifest(path)
     return build_artifact_index(manifest, path)
-
-
-@pytest.fixture()
-def index_from_example_failed():
-    here = Path(__file__).resolve()
-    path = here.parents[3] / "examples" / "audit_contracts" / "failed_artifact_manifest.json"
-    manifest = load_artifact_manifest(path)
-    return build_artifact_index(manifest, path)

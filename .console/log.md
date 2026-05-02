@@ -7,6 +7,7 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 | Decision | Rationale | Date |
 |----------|-----------|------|
+| T4 orphan fixtures deleted | Custodian T4 detector flagged default_proposal(), default_decision() (policy/conftest.py) and index_from_example_failed() (behavior_calibration/conftest.py) as never requested; all removed; 279 tests pass | 2026-05-02 |
 | `artifact_manifest_path` is `Optional[str]` in model | VF doesn't write it yet; `is_compliant` enforces it without rejecting legacy files | 2026-04-26 |
 | `IN_PROGRESS_LEGACY = "in_progress"` in RunStatus | VF emits `in_progress`; contract canonicalizes to `running`; legacy value accepted but non-compliant | 2026-04-26 |
 | Generic enums vs VF profile enums are explicitly separated via GENERIC_ENUMS / VIDEOFOUNDRY_PROFILE_ENUMS tuples | Allows AST-based boundary test and cross-repo reuse without coupling | 2026-04-26 |
