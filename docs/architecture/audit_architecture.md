@@ -57,14 +57,14 @@ responsibility for audits, runtime checks, and maintenance.
 **`custodian-audit`** (entry point, lives in Custodian):
 
 1. Reads `.custodian.yaml`
-2. Always runs Custodian's generic **C1–C8**
+2. Always runs Custodian's built-in detectors (C, D, F, K, S, A, H, T, G, N, U, P classes)
 3. Loads plugins (OCLogScanner, OCStateScanner) → puts them in
    `AuditContext.plugin_modules`
 4. Loads detector contributors:
-   - `_custodian.detectors:build_oc_detectors`            → OC1–OC9
-   - `_custodian.architecture:build_oc_architecture_detectors` → AI1–AI4
+   - `_custodian.detectors:build_oc_detectors`            → OC2–OC9 (active subset)
+   - `_custodian.architecture:build_oc_architecture_detectors` → AI3–AI4
    - `_custodian.doc_conventions:build_oc_doc_convention_detectors` → DC1–DC5
-5. Runs all 26 detectors against `AuditContext`, emits one JSON
+5. Runs all active detectors against `AuditContext`, emits one JSON
    `{schema_version, repo_key, total_findings, patterns: {...}}`
 
 **OC's `ghost_audit` / `flow_audit`** are *not* run by Custodian. They
@@ -91,7 +91,7 @@ The crisp rule:
 
 - Detector contract and result shape — every repo agrees on what an audit *looks like*
 - Plugin protocols (`LogScanner`, `StateScanner`, …) — the slots repos fill in
-- Generic baseline detectors C1–C8 — patterns that are bad anywhere (TODOs, prints, bare except)
+- Built-in detectors (C/D/F/K/S/A/H/T/G/N/U/P classes) — patterns that are bad anywhere (dead code, doc drift, arch violations, stubs)
 - The CLIs (`custodian-audit`, `custodian-doctor`) — the runners
 - Generic maintenance primitives (list-stale-X filters) — repos compose them against their own state
 
