@@ -30,7 +30,7 @@ from operations_center.observer.service import RepoObserverService, new_observer
 from operations_center.observer.snapshot_builder import SnapshotBuilder
 
 
-def write_config(tmp_path: Path) -> Path:
+def _write_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -53,13 +53,13 @@ def write_config(tmp_path: Path) -> Path:
     return config_path
 
 
-def init_git_repo(path: Path) -> None:
+def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
 
 
-def commit_file(repo: Path, name: str, content: str, message: str) -> None:
+def _commit_file(repo: Path, name: str, content: str, message: str) -> None:
     target = repo / name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
@@ -103,12 +103,12 @@ def test_snapshot_builder_serializes_with_partial_errors() -> None:
 def test_git_context_and_recent_commits_collectors(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    init_git_repo(repo)
-    commit_file(repo, "src/a.py", "print('a')\n", "Add a")
-    commit_file(repo, "src/b.py", "print('b')\n", "Add b")
+    _init_git_repo(repo)
+    _commit_file(repo, "src/a.py", "print('a')\n", "Add a")
+    _commit_file(repo, "src/b.py", "print('b')\n", "Add b")
     (repo / "dirty.txt").write_text("dirty\n")
 
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
     context = new_observer_context(
         repo_path=repo,
         repo_name="operations-center",
@@ -133,12 +133,12 @@ def test_git_context_and_recent_commits_collectors(tmp_path: Path) -> None:
 def test_file_hotspots_and_todo_signal_collectors(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    init_git_repo(repo)
-    commit_file(repo, "src/a.py", "# TODO\nprint('a')\n", "Add a")
-    commit_file(repo, "src/a.py", "# TODO\n# FIXME\nprint('a2')\n", "Update a")
-    commit_file(repo, "src/b.py", "# TODO\nprint('b')\n", "Add b")
+    _init_git_repo(repo)
+    _commit_file(repo, "src/a.py", "# TODO\nprint('a')\n", "Add a")
+    _commit_file(repo, "src/a.py", "# TODO\n# FIXME\nprint('a2')\n", "Update a")
+    _commit_file(repo, "src/b.py", "# TODO\nprint('b')\n", "Add b")
 
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
     context = new_observer_context(
         repo_path=repo,
         repo_name="operations-center",
@@ -181,7 +181,7 @@ def test_test_signal_and_dependency_drift_collectors(tmp_path: Path) -> None:
         )
     )
 
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
     context = new_observer_context(
         repo_path=tmp_path,
         repo_name="operations-center",
@@ -206,12 +206,12 @@ def test_test_signal_and_dependency_drift_collectors(tmp_path: Path) -> None:
 def test_observer_service_writes_snapshot_artifacts(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    init_git_repo(repo)
-    commit_file(repo, "src/a.py", "# TODO\nprint('a')\n", "Add a")
+    _init_git_repo(repo)
+    _commit_file(repo, "src/a.py", "# TODO\nprint('a')\n", "Add a")
 
     logs_root = tmp_path / "logs" / "local"
     logs_root.mkdir(parents=True)
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
     service = RepoObserverService(
         repo_collector=GitContextCollector(),
         recent_commits_collector=RecentCommitsCollector(),
@@ -285,12 +285,12 @@ def _make_service(tmp_path: Path, **extra_collectors) -> tuple[RepoObserverServi
     """Helper: build a minimal service + context for unit-level service tests."""
     repo = tmp_path / "repo"
     repo.mkdir()
-    init_git_repo(repo)
-    commit_file(repo, "src/a.py", "print('a')\n", "Add a")
+    _init_git_repo(repo)
+    _commit_file(repo, "src/a.py", "print('a')\n", "Add a")
 
     logs_root = tmp_path / "logs" / "local"
     logs_root.mkdir(parents=True)
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
 
     service = RepoObserverService(
         repo_collector=GitContextCollector(),

@@ -95,7 +95,7 @@ def _make_recommendation(
     )
 
 
-def make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:
+def _make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:
     return BehaviorCalibrationInput(
         repo_id=index.source.repo_id,
         run_id=index.source.run_id,
@@ -365,12 +365,12 @@ class TestValidateAllRecommendations:
             validate_all_recommendations([valid, invalid])
 
     def test_analyzer_output_passes_guardrails(self, failed_index) -> None:
-        report = analyze_artifacts(make_input(failed_index, AnalysisProfile.RECOMMENDATION))
+        report = analyze_artifacts(_make_input(failed_index, AnalysisProfile.RECOMMENDATION))
         validate_all_recommendations(report.recommendations)
         assert isinstance(report.recommendations, list)
 
     def test_summary_profile_has_no_recommendations_to_validate(self, completed_index) -> None:
-        report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
+        report = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
         validate_all_recommendations(report.recommendations)
         assert report.recommendations == []
 

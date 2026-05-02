@@ -72,7 +72,7 @@ class FakePlaneClient:
         self.comments.append((task_id, comment_markdown))
 
 
-def write_config(tmp_path: Path) -> Path:
+def _write_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -95,13 +95,13 @@ def write_config(tmp_path: Path) -> Path:
     return config_path
 
 
-def init_git_repo(path: Path) -> None:
+def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
 
 
-def commit_file(repo: Path, name: str, content: str, message: str) -> None:
+def _commit_file(repo: Path, name: str, content: str, message: str) -> None:
     target = repo / name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
@@ -118,10 +118,10 @@ def commit_file(repo: Path, name: str, content: str, message: str) -> None:
 def test_repo_aware_autonomy_chain_creates_provenance_rich_task(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    init_git_repo(repo)
-    commit_file(repo, "src/watcher.py", "# TODO: tighten observer coverage\nprint('watcher')\n", "Add watcher file")
+    _init_git_repo(repo)
+    _commit_file(repo, "src/watcher.py", "# TODO: tighten observer coverage\nprint('watcher')\n", "Add watcher file")
 
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
     logs_root = tmp_path / "logs" / "local"
     logs_root.mkdir(parents=True)
 

@@ -20,7 +20,7 @@ from operations_center.insights.artifact_writer import InsightArtifactWriter
 from operations_center.insights.models import InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
 
-def write_config(tmp_path: Path) -> Path:
+def _write_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -43,7 +43,7 @@ def write_config(tmp_path: Path) -> Path:
     return config_path
 
 
-def write_decision_inputs(tmp_path: Path) -> None:
+def _write_decision_inputs(tmp_path: Path) -> None:
     generated_at = datetime(2026, 3, 31, 13, tzinfo=UTC)
     insight = RepoInsightsArtifact(
         run_id="ins_1",
@@ -85,7 +85,7 @@ def test_propose_from_candidates_cli_writes_artifact_in_dry_run(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    write_decision_inputs(tmp_path)
+    _write_decision_inputs(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PLANE_API_TOKEN", "test-token")
 
@@ -109,7 +109,7 @@ def test_propose_from_candidates_cli_writes_artifact_in_dry_run(
     monkeypatch.setattr("operations_center.entrypoints.proposer.main.PlaneClient", FakeClient)
     monkeypatch.setattr(
         "sys.argv",
-        ["propose-from-candidates", "--config", str(write_config(tmp_path)), "--dry-run"],
+        ["propose-from-candidates", "--config", str(_write_config(tmp_path)), "--dry-run"],
     )
 
     proposer_main.main()

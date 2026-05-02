@@ -15,7 +15,7 @@ from operations_center.insights.artifact_writer import InsightArtifactWriter
 from operations_center.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
 
-def make_insight_artifact(
+def _make_insight_artifact(
     *,
     run_id: str,
     generated_at: datetime,
@@ -32,7 +32,7 @@ def make_insight_artifact(
     )
 
 
-def make_insight(
+def _make_insight(
     *,
     kind: str,
     subject: str,
@@ -58,7 +58,7 @@ def test_loader_reads_latest_insight_and_bounded_decision_history(tmp_path: Path
     insights_root = tmp_path / "insights"
     writer = InsightArtifactWriter(insights_root)
     writer.write(
-        make_insight_artifact(
+        _make_insight_artifact(
             run_id="ins_old",
             generated_at=datetime(2026, 3, 31, 11, tzinfo=UTC),
             repo_path=repo_path,
@@ -66,7 +66,7 @@ def test_loader_reads_latest_insight_and_bounded_decision_history(tmp_path: Path
         )
     )
     writer.write(
-        make_insight_artifact(
+        _make_insight_artifact(
             run_id="ins_new",
             generated_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
             repo_path=repo_path,
@@ -159,30 +159,30 @@ def test_policy_suppresses_on_cooldown_and_quota() -> None:
 def test_service_emits_and_suppresses_candidates(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
-    insight = make_insight_artifact(
+    insight = _make_insight_artifact(
         run_id="ins_1",
         generated_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
         repo_path=repo_path,
         insights=[
-            make_insight(
+            _make_insight(
                 kind="observation_coverage",
                 subject="test_signal",
                 dedup_key="observation_coverage|test_signal|persistent_unavailable",
                 evidence={"signal": "test_signal", "consecutive_snapshots": 3},
             ),
-            make_insight(
+            _make_insight(
                 kind="test_status_continuity",
                 subject="test_signal",
                 dedup_key="test_status_continuity|unknown|persistent",
                 evidence={"current_status": "unknown", "consecutive_snapshots": 4},
             ),
-            make_insight(
+            _make_insight(
                 kind="dependency_drift_continuity",
                 subject="dependency_drift",
                 dedup_key="dependency_drift_continuity|present|persistent",
                 evidence={"consecutive_snapshots": 3},
             ),
-            make_insight(
+            _make_insight(
                 kind="file_hotspot",
                 subject="src/operations_center/watcher.py",
                 dedup_key="file_hotspot|src/operations_center/watcher.py|repeated_presence",
@@ -213,12 +213,12 @@ def test_service_emits_and_suppresses_candidates(tmp_path: Path) -> None:
 def test_zero_candidate_run_is_valid(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
-    insight = make_insight_artifact(
+    insight = _make_insight_artifact(
         run_id="ins_1",
         generated_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
         repo_path=repo_path,
         insights=[
-            make_insight(
+            _make_insight(
                 kind="commit_activity",
                 subject="operations-center",
                 dedup_key="commit_activity|recent_window",

@@ -84,11 +84,11 @@ def _bundle() -> ProposalDecisionBundle:
     )
     return ProposalDecisionBundle(
         proposal=proposal,
-        decision=proposal_decision(proposal.proposal_id),
+        decision=_proposal_decision(proposal.proposal_id),
     )
 
 
-def proposal_decision(proposal_id: str):
+def _proposal_decision(proposal_id: str):
     from operations_center.contracts.routing import LaneDecision
 
     return LaneDecision(

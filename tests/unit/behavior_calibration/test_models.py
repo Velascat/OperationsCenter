@@ -21,7 +21,7 @@ from operations_center.behavior_calibration import (
 )
 
 
-def make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:
+def _make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:
     return BehaviorCalibrationInput(
         repo_id=index.source.repo_id,
         run_id=index.source.run_id,
@@ -44,19 +44,19 @@ class TestBehaviorCalibrationInput:
         assert inp.artifact_index is completed_index
 
     def test_analysis_profile_must_be_explicit(self, completed_index) -> None:
-        inp = make_input(completed_index, AnalysisProfile.FAILURE_DIAGNOSIS)
+        inp = _make_input(completed_index, AnalysisProfile.FAILURE_DIAGNOSIS)
         assert inp.analysis_profile == AnalysisProfile.FAILURE_DIAGNOSIS
 
     def test_content_opt_in_defaults_false(self, completed_index) -> None:
-        inp = make_input(completed_index, AnalysisProfile.SUMMARY)
+        inp = _make_input(completed_index, AnalysisProfile.SUMMARY)
         assert inp.include_artifact_content is False
 
     def test_max_bytes_default(self, completed_index) -> None:
-        inp = make_input(completed_index, AnalysisProfile.SUMMARY)
+        inp = _make_input(completed_index, AnalysisProfile.SUMMARY)
         assert inp.max_artifact_bytes == 10 * 1024 * 1024
 
     def test_selected_artifact_ids_default_none(self, completed_index) -> None:
-        inp = make_input(completed_index, AnalysisProfile.SUMMARY)
+        inp = _make_input(completed_index, AnalysisProfile.SUMMARY)
         assert inp.selected_artifact_ids is None
 
 
@@ -133,7 +133,7 @@ class TestCalibrationRecommendation:
 class TestBehaviorCalibrationReport:
     def test_report_serializes_to_json(self, completed_index) -> None:
         from operations_center.behavior_calibration import analyze_artifacts
-        inp = make_input(completed_index, AnalysisProfile.SUMMARY)
+        inp = _make_input(completed_index, AnalysisProfile.SUMMARY)
         report = analyze_artifacts(inp)
         json_str = report.model_dump_json()
         data = json.loads(json_str)

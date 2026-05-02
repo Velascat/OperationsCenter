@@ -12,7 +12,7 @@ from operations_center.insights.artifact_writer import InsightArtifactWriter
 from operations_center.insights.models import DerivedInsight, InsightRepoRef, RepoInsightsArtifact, SourceSnapshotRef
 
 
-def write_insight(tmp_path: Path) -> None:
+def _write_insight(tmp_path: Path) -> None:
     artifact = RepoInsightsArtifact(
         run_id="ins_1",
         generated_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
@@ -36,7 +36,7 @@ def write_insight(tmp_path: Path) -> None:
 
 
 def test_decide_proposals_cli_writes_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    write_insight(tmp_path)
+    _write_insight(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.argv", ["decide-proposals"])
 
@@ -75,7 +75,7 @@ def test_decide_proposals_cli_errors_without_insight(monkeypatch: pytest.MonkeyP
 
 
 def test_decide_proposals_cli_accepts_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    write_insight(tmp_path)
+    _write_insight(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.argv", ["decide-proposals", "--dry-run"])
 

@@ -11,7 +11,7 @@ from operations_center.decision.rules.dependency_drift import DependencyDriftRul
 from operations_center.insights.models import DerivedInsight
 
 
-def make_insight(
+def _make_insight(
     *,
     kind: str = "dependency_drift_continuity",
     subject: str = "dependency_drift",
@@ -40,7 +40,7 @@ class TestDependencyDriftRule:
 
     def test_wrong_kind_filtered_out(self) -> None:
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             kind="observation_coverage",
             subject="dependency_drift",
             dedup_key="observation_coverage|present|persistent",
@@ -50,7 +50,7 @@ class TestDependencyDriftRule:
 
     def test_wrong_subject_filtered_out(self) -> None:
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             kind="dependency_drift_continuity",
             subject="test_signal",
             dedup_key="dependency_drift_continuity|present|persistent",
@@ -61,7 +61,7 @@ class TestDependencyDriftRule:
     def test_present_persistent_generates_candidate(self) -> None:
         """Insight with 'present|persistent' dedup_key suffix generates a candidate."""
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             evidence={"consecutive_snapshots": 3},
         )
         candidates = rule.evaluate([insight])
@@ -71,7 +71,7 @@ class TestDependencyDriftRule:
     def test_persistent_high_consecutive_generates_high_confidence(self) -> None:
         """Insight with >=4 consecutive snapshots generates a high-confidence candidate."""
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             evidence={"consecutive_snapshots": 5},
         )
         candidates = rule.evaluate([insight])
@@ -81,7 +81,7 @@ class TestDependencyDriftRule:
     def test_transition_dedup_key_does_not_match(self) -> None:
         """Insight with a transition dedup_key suffix is not matched by the rule."""
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             dedup_key="dependency_drift_continuity|available|not_available|transition",
             evidence={"consecutive_snapshots": 5},
         )
@@ -89,7 +89,7 @@ class TestDependencyDriftRule:
 
     def test_below_min_consecutive_runs_returns_empty(self) -> None:
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             evidence={"consecutive_snapshots": 2},
         )
         assert rule.evaluate([insight]) == []
@@ -97,7 +97,7 @@ class TestDependencyDriftRule:
     def test_candidate_spec_fields(self) -> None:
         """Verify that CandidateSpec fields are correctly populated."""
         rule = DependencyDriftRule(min_consecutive_runs=2)
-        insight = make_insight(
+        insight = _make_insight(
             evidence={"consecutive_snapshots": 3},
         )
         candidates = rule.evaluate([insight])
@@ -122,7 +122,7 @@ class TestDependencyDriftRule:
     def test_medium_confidence_below_four_snapshots(self) -> None:
         """Exactly 3 consecutive snapshots yields medium confidence."""
         rule = DependencyDriftRule(min_consecutive_runs=3)
-        insight = make_insight(
+        insight = _make_insight(
             evidence={"consecutive_snapshots": 3},
         )
         candidates = rule.evaluate([insight])

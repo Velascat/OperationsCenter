@@ -60,7 +60,7 @@ class FakePlaneClient:
         self.comments.append((task_id, comment_markdown))
 
 
-def write_config(tmp_path: Path) -> Path:
+def _write_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -86,7 +86,7 @@ def write_config(tmp_path: Path) -> Path:
     return config_path
 
 
-def make_decision_artifact(tmp_path: Path) -> tuple[ProposalCandidatesArtifact, RepoInsightsArtifact]:
+def _make_decision_artifact(tmp_path: Path) -> tuple[ProposalCandidatesArtifact, RepoInsightsArtifact]:
     generated_at = datetime(2026, 3, 31, 13, tzinfo=UTC)
     insight = RepoInsightsArtifact(
         run_id="ins_1",
@@ -125,7 +125,7 @@ def make_decision_artifact(tmp_path: Path) -> tuple[ProposalCandidatesArtifact, 
 
 
 def test_candidate_loader_reads_latest_decision_and_matching_insight(tmp_path: Path) -> None:
-    decision, insight = make_decision_artifact(tmp_path)
+    decision, insight = _make_decision_artifact(tmp_path)
     loader = ProposalCandidateLoader(
         decision_root=tmp_path / "tools" / "report" / "operations_center" / "decision",
         insights_root=tmp_path / "tools" / "report" / "operations_center" / "insights",
@@ -138,8 +138,8 @@ def test_candidate_loader_reads_latest_decision_and_matching_insight(tmp_path: P
 
 
 def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
-    decision, insight = make_decision_artifact(tmp_path)
-    settings = load_settings(write_config(tmp_path))
+    decision, insight = _make_decision_artifact(tmp_path)
+    settings = load_settings(_write_config(tmp_path))
     candidate = decision.candidates[0]
     mapper = ProposalCandidateMapper()
 
@@ -165,9 +165,9 @@ def test_mapper_carries_provenance_into_task_body(tmp_path: Path) -> None:
 
 
 def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
-    decision, insight = make_decision_artifact(tmp_path)
+    decision, insight = _make_decision_artifact(tmp_path)
     decision.repo.name = "OperationsCenter"
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
     candidate = decision.candidates[0]
     mapper = ProposalCandidateMapper()
 
@@ -187,8 +187,8 @@ def test_mapper_uses_repo_from_provenance_when_present(tmp_path: Path) -> None:
 
 
 def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_path: Path) -> None:
-    make_decision_artifact(tmp_path)
-    settings = load_settings(write_config(tmp_path))
+    _make_decision_artifact(tmp_path)
+    settings = load_settings(_write_config(tmp_path))
     client = FakePlaneClient()
     service = CandidateProposerIntegrationService(
         settings=settings,
@@ -218,8 +218,8 @@ def test_candidate_integration_dry_run_preserves_output_without_plane_write(tmp_
 
 
 def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Path) -> None:
-    make_decision_artifact(tmp_path)
-    settings = load_settings(write_config(tmp_path))
+    _make_decision_artifact(tmp_path)
+    settings = load_settings(_write_config(tmp_path))
     client = FakePlaneClient(
         [
             {
@@ -257,7 +257,7 @@ def test_candidate_integration_skips_existing_open_equivalent_task(tmp_path: Pat
 
 
 def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> None:
-    decision, _ = make_decision_artifact(tmp_path)
+    decision, _ = _make_decision_artifact(tmp_path)
     decision.candidates.append(
         ProposalCandidate(
             candidate_id="candidate:dependency_drift:deps:persistent",
@@ -274,7 +274,7 @@ def test_candidate_integration_records_partial_plane_failure(tmp_path: Path) -> 
         )
     )
     DecisionArtifactWriter(tmp_path / "tools" / "report" / "operations_center" / "decision").write(decision)
-    settings = load_settings(write_config(tmp_path))
+    settings = load_settings(_write_config(tmp_path))
 
     class FailingSecondCreateClient(FakePlaneClient):
         def create_issue(self, **kwargs):  # noqa: ANN003

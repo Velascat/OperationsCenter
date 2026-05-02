@@ -10,7 +10,7 @@ import pytest
 from operations_center.entrypoints.observer import main as observer_main
 
 
-def write_config(tmp_path: Path) -> Path:
+def _write_config(tmp_path: Path) -> Path:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -33,7 +33,7 @@ def write_config(tmp_path: Path) -> Path:
     return config_path
 
 
-def init_git_repo(path: Path) -> None:
+def _init_git_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
@@ -45,8 +45,8 @@ def init_git_repo(path: Path) -> None:
 def test_observe_repo_cli_writes_artifact_and_prints_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    init_git_repo(repo)
-    config_path = write_config(tmp_path)
+    _init_git_repo(repo)
+    config_path = _write_config(tmp_path)
 
     monkeypatch.chdir(repo)
     monkeypatch.setattr(
@@ -67,7 +67,7 @@ def test_observe_repo_cli_writes_artifact_and_prints_path(tmp_path: Path, monkey
 
 
 def test_observe_repo_cli_returns_nonzero_for_missing_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    config_path = write_config(tmp_path)
+    config_path = _write_config(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
         [

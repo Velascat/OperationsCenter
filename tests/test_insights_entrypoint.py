@@ -19,7 +19,7 @@ from operations_center.observer.models import (
 )
 
 
-def make_snapshot(run_id: str, observed_at: datetime, *, repo_path: Path) -> RepoStateSnapshot:
+def _make_snapshot(run_id: str, observed_at: datetime, *, repo_path: Path) -> RepoStateSnapshot:
     return RepoStateSnapshot(
         run_id=run_id,
         observed_at=observed_at,
@@ -44,7 +44,7 @@ def make_snapshot(run_id: str, observed_at: datetime, *, repo_path: Path) -> Rep
 def test_generate_insights_cli_writes_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     observer_root = tmp_path / "tools" / "report" / "operations_center" / "observer"
     ObserverArtifactWriter(observer_root).write(
-        make_snapshot("obs_1", datetime(2026, 3, 31, 12, tzinfo=UTC), repo_path=tmp_path / "repo")
+        _make_snapshot("obs_1", datetime(2026, 3, 31, 12, tzinfo=UTC), repo_path=tmp_path / "repo")
     )
 
     monkeypatch.chdir(tmp_path)

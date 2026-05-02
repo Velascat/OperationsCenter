@@ -18,7 +18,7 @@ from operations_center.behavior_calibration import (
 )
 
 
-def make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:
+def _make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibrationInput:
     return BehaviorCalibrationInput(
         repo_id=index.source.repo_id,
         run_id=index.source.run_id,
@@ -31,24 +31,24 @@ def make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibration
 
 class TestWriteCalibrationReport:
     def test_writes_report_file(self, tmp_path: Path, completed_index) -> None:
-        report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
+        report = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
         path = write_calibration_report(report, tmp_path)
         assert path.exists()
 
     def test_report_at_expected_path(self, tmp_path: Path, completed_index) -> None:
-        report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
+        report = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
         path = write_calibration_report(report, tmp_path)
         expected = tmp_path / report.repo_id / report.run_id / "summary.json"
         assert path == expected
 
     def test_report_is_valid_json(self, tmp_path: Path, completed_index) -> None:
-        report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
+        report = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
         path = write_calibration_report(report, tmp_path)
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["schema_version"] == "1.0"
 
     def test_creates_parent_dirs(self, tmp_path: Path, completed_index) -> None:
-        report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
+        report = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
         nested = tmp_path / "deep" / "nested" / "dir"
         path = write_calibration_report(report, nested)
         assert path.exists()
@@ -56,8 +56,8 @@ class TestWriteCalibrationReport:
     def test_different_profiles_write_different_files(
         self, tmp_path: Path, completed_index
     ) -> None:
-        r1 = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
-        r2 = analyze_artifacts(make_input(completed_index, AnalysisProfile.ARTIFACT_HEALTH))
+        r1 = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
+        r2 = analyze_artifacts(_make_input(completed_index, AnalysisProfile.ARTIFACT_HEALTH))
         p1 = write_calibration_report(r1, tmp_path)
         p2 = write_calibration_report(r2, tmp_path)
         assert p1 != p2
@@ -67,7 +67,7 @@ class TestWriteCalibrationReport:
 
 class TestLoadCalibrationReport:
     def test_roundtrip_write_load(self, tmp_path: Path, completed_index) -> None:
-        report = analyze_artifacts(make_input(completed_index, AnalysisProfile.SUMMARY))
+        report = analyze_artifacts(_make_input(completed_index, AnalysisProfile.SUMMARY))
         path = write_calibration_report(report, tmp_path)
         loaded = load_calibration_report(path)
         assert loaded.repo_id == report.repo_id
@@ -79,13 +79,13 @@ class TestLoadCalibrationReport:
             load_calibration_report(tmp_path / "nonexistent.json")
 
     def test_loaded_findings_preserved(self, tmp_path: Path, failed_index) -> None:
-        report = analyze_artifacts(make_input(failed_index, AnalysisProfile.FAILURE_DIAGNOSIS))
+        report = analyze_artifacts(_make_input(failed_index, AnalysisProfile.FAILURE_DIAGNOSIS))
         path = write_calibration_report(report, tmp_path)
         loaded = load_calibration_report(path)
         assert len(loaded.findings) == len(report.findings)
 
     def test_loaded_recommendations_preserved(self, tmp_path: Path, failed_index) -> None:
-        report = analyze_artifacts(make_input(failed_index, AnalysisProfile.RECOMMENDATION))
+        report = analyze_artifacts(_make_input(failed_index, AnalysisProfile.RECOMMENDATION))
         path = write_calibration_report(report, tmp_path)
         loaded = load_calibration_report(path)
         assert len(loaded.recommendations) == len(report.recommendations)
@@ -93,7 +93,7 @@ class TestLoadCalibrationReport:
     def test_recommendations_require_human_review_after_roundtrip(
         self, tmp_path: Path, failed_index
     ) -> None:
-        report = analyze_artifacts(make_input(failed_index, AnalysisProfile.RECOMMENDATION))
+        report = analyze_artifacts(_make_input(failed_index, AnalysisProfile.RECOMMENDATION))
         path = write_calibration_report(report, tmp_path)
         loaded = load_calibration_report(path)
         for rec in loaded.recommendations:

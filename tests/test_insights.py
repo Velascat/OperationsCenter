@@ -28,7 +28,7 @@ from operations_center.observer.models import (
 )
 
 
-def make_snapshot(
+def _make_snapshot(
     *,
     run_id: str,
     observed_at: datetime,
@@ -77,8 +77,8 @@ def make_snapshot(
 
 def test_loader_reads_latest_snapshot_with_bounded_history(tmp_path: Path) -> None:
     writer = ObserverArtifactWriter(tmp_path / "observer")
-    oldest = make_snapshot(run_id="obs_old", observed_at=datetime(2026, 3, 31, 10, tzinfo=UTC))
-    newest = make_snapshot(run_id="obs_new", observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC))
+    oldest = _make_snapshot(run_id="obs_old", observed_at=datetime(2026, 3, 31, 10, tzinfo=UTC))
+    newest = _make_snapshot(run_id="obs_new", observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC))
     writer.write(oldest)
     writer.write(newest)
 
@@ -103,7 +103,7 @@ def test_normalizer_assigns_deterministic_keys() -> None:
 
 def test_derivers_cover_bounded_insight_kinds() -> None:
     normalizer = InsightNormalizer()
-    current = make_snapshot(
+    current = _make_snapshot(
         run_id="obs_2",
         observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
         is_dirty=True,
@@ -116,7 +116,7 @@ def test_derivers_cover_bounded_insight_kinds() -> None:
         top_file=("src/operations_center/watcher.py", 3),
         collector_errors={"dependency_drift": "timeout"},
     )
-    previous = make_snapshot(
+    previous = _make_snapshot(
         run_id="obs_1",
         observed_at=datetime(2026, 3, 31, 11, tzinfo=UTC),
         is_dirty=True,
@@ -159,7 +159,7 @@ def test_derivers_cover_bounded_insight_kinds() -> None:
 
 def test_observation_coverage_derives_unknown_test_signal() -> None:
     normalizer = InsightNormalizer()
-    snapshot = make_snapshot(
+    snapshot = _make_snapshot(
         run_id="obs_1",
         observed_at=datetime(2026, 3, 31, 12, tzinfo=UTC),
         test_status="unknown",
