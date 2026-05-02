@@ -20,6 +20,7 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 | K1/K2 (doc phantom symbols, doc value drift) added to Custodian | Absorbs OC8/OC9; skips plans/, specs/, changelog dirs by default | 2026-05-02 |
 | P1 (hollow return bodies) added to Custodian | Returns only `[]`/`{}`/`None` with no other logic | 2026-05-02 |
 | VF3 removed from VF `_custodian/detectors.py` | Superseded by native C13 with `c13_allowed_paths` config | 2026-05-02 |
+| CLAUDE.md: simplify console update instruction | "Before each commit" → "After meaningful progress" — same intent, clearer phrasing | 2026-05-02 |
 | audit_architecture.md updated: C1-C8 reference → current detector classes | doc was stale from Phase 0; now references C/D/F/K/S/A/H/T/G/N/U/P classes and correct OC plugin subset (OC2-OC9 active subset, AI3-AI4) | 2026-05-02 |
 | K3 fix: explain.py docstring `policy:` → `_policy:` | K3 detector caught genuine param drift — the parameter is named `_policy` in the signature but the docstring said `policy` | 2026-05-02 |
 | Custodian 574 tests passing; all repos clean | VF: A1(1 real architectural debt); all others: 0 | 2026-05-02 |
