@@ -16,5 +16,5 @@ The context file contains your current task, guidelines, backlog, log, and runti
 | `.console/backlog.md` | Work inventory — in-progress, up-next, done |
 | `.console/log.md` | Recent decisions, stop points, what changed and why |
 
-After meaningful progress, update `.console/backlog.md` and `.console/log.md`.
+Before each commit, update `.console/log.md` with decisions made. Update `.console/backlog.md` when tasks change state. At natural stop points, note where work left off.
 Do not edit `.console/.context` directly — it is regenerated at each launch.

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Require .console/log.md to be updated when committing source changes.
+# Install: git config core.hooksPath .hooks
+
+TRIVIAL='^(\.console/|uv\.lock|package-lock\.json|poetry\.lock|\.gitignore|\.hooks/)'
+
+staged_source=$(git diff --cached --name-only | grep -vE "$TRIVIAL" || true)
+
+[ -z "$staged_source" ] && exit 0
+
+log_staged=$(git diff --cached --name-only | grep -c '^\.console/log\.md' || true)
+
+if [ "$log_staged" -eq 0 ]; then
+    printf '\n\033[33m  .console/log.md not staged\033[0m\n'
+    printf '  Add an entry for decisions in this commit, then re-stage it.\n'
+    printf '  Skip: git commit --no-verify\n\n'
+    exit 1
+fi

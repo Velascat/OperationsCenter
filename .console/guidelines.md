@@ -22,11 +22,31 @@ _Edit when project rules change — not during normal work sessions._
 - Use `console status` to check repo and session state.
 - Prefer small, targeted edits over large rewrites.
 
-## After Meaningful Progress
+## When to Update log.md
 
-- Update `.console/backlog.md` to reflect completed and remaining work.
-- Update `.console/log.md` with decisions made and rationale.
-- Summarize what changed and what's next.
+Update **before each commit**. Specifically, add an entry when:
+- A decision was made (chose approach A over B, deferred X, excluded Y)
+- A bug was fixed and the root cause is non-obvious
+- A detector, feature, or API was added or removed
+- Work is stopping and will resume next session (note where you left off)
+
+## When to Update backlog.md
+
+- When a task moves In Progress → Done
+- When a new task is identified
+- When scope or priority changes
+
+## Commit Guard Hook
+
+A pre-commit hook enforces log.md updates. Install once per clone:
+
+```
+git config core.hooksPath .hooks
+```
+
+The hook blocks commits that stage source files without also staging `.console/log.md`.
+Override with `git commit --no-verify` only when the commit genuinely needs no log entry
+(e.g. typo fix, lock file bump).
 
 ## What Not to Do
 
