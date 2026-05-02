@@ -2,22 +2,25 @@
 # Copyright (C) 2026 Velascat
 """OperationsCenter plugin detectors for Custodian.
 
-OC's nine code-health detectors, namespaced ``OC1``-``OC9`` to avoid
-collision with Custodian's generic ``C1``-``C8`` defaults. Custodian's
-generic detectors (TODO/print/bare-except/etc.) run alongside; the
-combined audit reports both sets.
+Remaining OC-specific detectors after migration to Custodian natives:
 
-Each detector here is a port of the body that previously lived in
-``src/operations_center/entrypoints/code_health_audit/main.py``. The
-adapter shape change is minimal — Custodian's ``AuditContext`` exposes
-the same ``src_root`` / ``tests_root`` / ``repo_root`` triple OC's
-detectors expected; only the wrapping into Custodian's ``Detector`` /
-``DetectorResult`` types is new.
+  OC2  Deferred-aware TODO detection  (complements native C1 which now also
+       skips [deferred, reviewed] tags — kept here for OC-specific domain-path
+       filtering of the observer/proposer/insights TODO domain)
+  OC3  Orphaned entrypoints           (OC-specific: checks operations_center.entrypoints.*)
+  OC5  Unconditional skipped tests    (now also native T3; kept for OC's hint list)
+  OC8  Doc phantom symbols            (now also native K1; kept for OC config tuning)
+  OC9  Doc value drift                (now also native K2; kept for OC config tuning)
+
+Superseded and removed (native Custodian covers them):
+  OC1  → U1-U3 (stub/unimplemented detector family)
+  OC4  → RUFF adapter
+  OC6  → dead placeholder (removed)
+  OC7  → F3 (Pydantic BaseModel field liveness)
 """
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 
 from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult, HIGH, MEDIUM, LOW
@@ -44,25 +47,6 @@ def _grep_lines(root: Path, pattern: str, *, max_results: int = 400) -> list[tup
         except OSError:
             continue
     return out
-
-
-# ── OC1: scaffolded-but-unimplemented backends ───────────────────────────────
-
-def _detect_oc1_stub_backends(ctx: AuditContext) -> DetectorResult:
-    audit_cfg = ctx.config.get("audit", {}) or {}
-    exempt_paths = set(audit_cfg.get("oc1_exempt", []) or [])
-    samples = []
-    for f in _py_files(ctx.src_root):
-        try:
-            text = f.read_text(errors="replace")
-        except OSError:
-            continue
-        if "raise NotImplementedError" in text and "/backends/" in str(f):
-            rel = str(f.relative_to(ctx.repo_root))
-            if rel in exempt_paths:
-                continue
-            samples.append(rel)
-    return DetectorResult(count=len(samples), samples=samples[:10])
 
 
 # ── OC2: untagged TODO/FIXME debt ────────────────────────────────────────────
@@ -132,22 +116,6 @@ def _detect_oc3_orphaned_entrypoints(ctx: AuditContext) -> DetectorResult:
     return DetectorResult(count=len(samples), samples=samples[:10])
 
 
-# ── OC4: ruff lint findings ──────────────────────────────────────────────────
-
-def _detect_oc4_ruff(ctx: AuditContext) -> DetectorResult:
-    try:
-        proc = subprocess.run(
-            ["ruff", "check", str(ctx.src_root), "--output-format", "concise"],
-            capture_output=True, text=True, cwd=ctx.repo_root,
-        )
-    except FileNotFoundError:
-        return DetectorResult(count=0, samples=["# ruff not installed"])
-    lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-    findings = [line for line in lines if ":" in line and ("error" not in line.lower() or "[" in line)]
-    findings = [f for f in findings if not f.startswith("Found ") and not f.startswith("All ")]
-    return DetectorResult(count=len(findings), samples=findings[:8])
-
-
 # ── OC5: unconditional skipped tests ─────────────────────────────────────────
 
 _ENV_GATE_HINTS = ("aider", "switchboard", "OPERATIONS_CENTER_", "shutil.which", "pkg_path", "not present")
@@ -171,52 +139,6 @@ def _detect_oc5_unconditional_skips(ctx: AuditContext) -> DetectorResult:
                 continue
             samples.append(f"{f.relative_to(ctx.repo_root)}:{i}: {line.strip()[:80]}")
     return DetectorResult(count=len(samples), samples=samples[:8])
-
-
-# ── OC6: modules called only from tests (placeholder) ────────────────────────
-
-def _detect_oc6_test_only_modules(ctx: AuditContext) -> DetectorResult:
-    return DetectorResult(count=0, samples=[])
-
-
-# ── OC7: dead settings fields ────────────────────────────────────────────────
-
-def _detect_oc7_dead_settings(ctx: AuditContext) -> DetectorResult:
-    settings_file = ctx.src_root / "config" / "settings.py"
-    if not settings_file.exists():
-        return DetectorResult(count=0, samples=[])
-    try:
-        text = settings_file.read_text()
-    except OSError:
-        return DetectorResult(count=0, samples=[])
-    field_re = re.compile(r"^\s+([a-z_][a-z0-9_]*)\s*:\s*[A-Za-z]", re.MULTILINE)
-    fields = set(field_re.findall(text))
-    ignored = {"version", "name", "type", "config", "id", "model_config"}
-    audit_cfg = ctx.config.get("audit", {}) or {}
-    ignored |= set(audit_cfg.get("oc7_exempt", []) or [])
-    fields -= ignored
-    samples: list[str] = []
-    for fname in sorted(fields):
-        rx_dot     = re.compile(rf"\.{fname}\b")
-        rx_idx     = re.compile(rf"""\[['\"]{fname}['\"]\]""")
-        rx_getattr = re.compile(rf"""getattr\([^)]*?['\"]{fname}['\"]""")
-        ref = False
-        for f in _py_files(ctx.src_root):
-            try:
-                t = f.read_text(errors="replace")
-            except OSError:
-                continue
-            if f == settings_file:
-                if rx_dot.findall(t) or rx_idx.findall(t) or rx_getattr.search(t):
-                    ref = True
-                    break
-                continue
-            if rx_dot.search(t) or rx_idx.search(t) or rx_getattr.search(t):
-                ref = True
-                break
-        if not ref:
-            samples.append(fname)
-    return DetectorResult(count=len(samples), samples=samples[:10])
 
 
 # ── OC8: doc phantom symbols ─────────────────────────────────────────────────
@@ -387,18 +309,14 @@ def _detect_oc9_doc_value_drift(ctx: AuditContext) -> DetectorResult:
 def build_oc_detectors() -> list[Detector]:
     """Custodian plugin contributor for OperationsCenter.
 
-    Custodian's generic ``C1``-``C8`` (TODO/print/bare-except/etc.) run by
-    default; these ``OC1``-``OC9`` are the OC-specific overlays that the
-    generic set doesn't cover.
+    Custodian's generic detectors (C1, U1-U3, T3, K1-K2, F3, RUFF, etc.) run
+    alongside these OC-specific overlays. OC1/OC4/OC6/OC7 have been removed
+    — native Custodian covers them (U1-U3, RUFF adapter, F3).
     """
     return [
-        Detector("OC1", "scaffolded-but-unimplemented backends",            "deferred", _detect_oc1_stub_backends,   MEDIUM),  # superseded by U1-U3 (Custodian generic stub detector)
         Detector("OC2", "untagged TODO/FIXME debt (deferred-aware)",        "open",     _detect_oc2_untagged_todos,  LOW),
         Detector("OC3", "orphaned entrypoints",                             "open",     _detect_oc3_orphaned_entrypoints, MEDIUM),
-        Detector("OC4", "ruff lint findings",                               "fixed",    _detect_oc4_ruff,            MEDIUM),
         Detector("OC5", "unconditional skipped tests",                      "open",     _detect_oc5_unconditional_skips, HIGH),
-        Detector("OC6", "modules called only from tests",                   "deferred", _detect_oc6_test_only_modules, LOW),
-        Detector("OC7", "dead settings fields",                             "deferred", _detect_oc7_dead_settings,   MEDIUM),  # superseded by F3 (Custodian Pydantic BaseModel field liveness)
         Detector("OC8", "docs reference a symbol that doesn't exist",       "open",     _detect_oc8_phantom_symbols,  LOW),
         Detector("OC9", "docs cite a value not in src as a string literal", "open",     _detect_oc9_doc_value_drift, LOW),
     ]
