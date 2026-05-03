@@ -51,7 +51,7 @@ def _load_state() -> dict:
 
 def _save_state(state: dict) -> None:
     _TRIGGER_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _TRIGGER_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    _TRIGGER_STATE_PATH.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _get_trigger_sources(config_path: str) -> list[Path]:
@@ -119,7 +119,7 @@ def _run_pipeline(config_path: str, *, execute: bool) -> bool:
         "event": "pipeline_trigger_running",
         "command": " ".join(cmd),
         "triggered_at": datetime.now(UTC).isoformat(),
-    }))
+    }, ensure_ascii=False))
     try:
         result = subprocess.run(cmd, timeout=600, capture_output=False)
         success = result.returncode == 0
@@ -127,13 +127,13 @@ def _run_pipeline(config_path: str, *, execute: bool) -> bool:
             "event": "pipeline_trigger_complete",
             "returncode": result.returncode,
             "success": success,
-        }))
+        }, ensure_ascii=False))
         return success
     except subprocess.TimeoutExpired:
-        logger.warning(json.dumps({"event": "pipeline_trigger_timeout"}))
+        logger.warning(json.dumps({"event": "pipeline_trigger_timeout"}, ensure_ascii=False))
         return False
     except Exception as exc:
-        logger.warning(json.dumps({"event": "pipeline_trigger_error", "error": str(exc)}))
+        logger.warning(json.dumps({"event": "pipeline_trigger_error", "error": str(exc)}, ensure_ascii=False))
         return False
 
 
@@ -158,7 +158,7 @@ def run_trigger_loop(
         "sources_count": len(sources),
         "min_interval_seconds": min_interval_seconds,
         "execute": execute,
-    }))
+    }, ensure_ascii=False))
 
     while True:
         time.sleep(poll_interval_seconds)
@@ -177,7 +177,7 @@ def run_trigger_loop(
                 "event": "pipeline_trigger_debounced",
                 "changed": changed,
                 "next_run_in_seconds": round(min_interval_seconds - elapsed_since_last),
-            }))
+            }, ensure_ascii=False))
             snapshot = new_snapshot
             continue
 
@@ -185,7 +185,7 @@ def run_trigger_loop(
             "event": "pipeline_trigger_fired",
             "changed": changed,
             "elapsed_since_last_run": round(elapsed_since_last),
-        }))
+        }, ensure_ascii=False))
 
         _run_pipeline(config_path, execute=execute)
         last_run_at = time.time()
@@ -237,7 +237,7 @@ def main() -> None:
             poll_interval_seconds=args.poll_interval,
         )
     except KeyboardInterrupt:
-        logger.info(json.dumps({"event": "pipeline_trigger_stopped"}))
+        logger.info(json.dumps({"event": "pipeline_trigger_stopped"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

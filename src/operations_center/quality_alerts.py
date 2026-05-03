@@ -125,7 +125,7 @@ def _escalate_to_human(
     try:
         _ESCALATION_LOG.parent.mkdir(parents=True, exist_ok=True)
         with _ESCALATION_LOG.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload) + "\n")
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
         return True
     except OSError as exc:
         logger.warning("_escalate_to_human: failed to write escalation — %s", exc)

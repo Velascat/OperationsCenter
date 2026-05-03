@@ -51,7 +51,7 @@ class GitHubPRClient:
                             "event": "github_rate_limit_low",
                             "remaining": int(remaining_raw),
                             "reset_epoch": resp.headers.get("X-RateLimit-Reset"),
-                        }))
+                        }, ensure_ascii=False))
                 except (ValueError, TypeError):
                     pass
             if resp.status_code != 429 or attempt >= _GH_RATE_LIMIT_MAX_RETRIES:
@@ -66,7 +66,7 @@ class GitHubPRClient:
                 "attempt": attempt + 1,
                 "retry_after_seconds": retry_after,
                 "url": url,
-            }))
+            }, ensure_ascii=False))
             time.sleep(retry_after)
         if resp is None:
             raise RuntimeError("HTTP retry loop exited without a response")

@@ -227,7 +227,7 @@ class ScheduledTaskRunner:
             try:
                 self._state_file.parent.mkdir(parents=True, exist_ok=True)
                 tmp = self._state_file.with_suffix(".tmp")
-                tmp.write_text(json.dumps(last_run_map, indent=2), encoding="utf-8")
+                tmp.write_text(json.dumps(last_run_map, indent=2, ensure_ascii=False), encoding="utf-8")
                 tmp.rename(self._state_file)
             except OSError as exc:
                 logger.warning("scheduled_tasks: failed to persist last_run state — %s", exc)

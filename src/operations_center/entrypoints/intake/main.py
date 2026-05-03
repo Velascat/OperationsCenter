@@ -150,7 +150,7 @@ def _process_item(item: dict, config_path: Path, venv_python: str) -> bool:
 
         # ── Step 2: Execution ─────────────────────────────────────────────────
         bundle_file = tmp / "bundle.json"
-        bundle_file.write_text(json.dumps(bundle), encoding="utf-8")
+        bundle_file.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
 
         config_file = tmp / "ops.yaml"
         shutil.copy(config_path, config_file)

@@ -53,7 +53,7 @@ def _load_bundle(path: Path) -> ProposalDecisionBundle:
 
 
 def _emit(payload: dict, output: Path | None) -> None:
-    rendered = json.dumps(payload, indent=2, sort_keys=True)
+    rendered = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
     if output:
         output.write_text(rendered + "\n", encoding="utf-8")
     else:

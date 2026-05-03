@@ -74,7 +74,7 @@ def cmd_record(args: argparse.Namespace) -> None:
     if args.note:
         record["note"] = args.note
 
-    feedback_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    feedback_path.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"  Recorded: task={task_id}  outcome={outcome}  → {feedback_path}")
 
     # S8-10: Update confidence calibration store if confidence label is provided.
@@ -137,7 +137,7 @@ def cmd_show(args: argparse.Namespace) -> None:
     except Exception as exc:
         print(f"  Error reading feedback record: {exc}")
         return
-    print(json.dumps(data, indent=2))
+    print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def main() -> None:

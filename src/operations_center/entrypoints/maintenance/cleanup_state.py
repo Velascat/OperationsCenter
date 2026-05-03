@@ -62,7 +62,7 @@ def main() -> int:
     try:
         items = client.list_issues()
     except Exception as exc:
-        print(json.dumps({"error": f"plane_fetch_failed: {exc}"}))
+        print(json.dumps({"error": f"plane_fetch_failed: {exc}"}, ensure_ascii=False))
         return 1
     finally:
         # Close after we're done extracting — but we still need terminal map
@@ -130,7 +130,7 @@ def main() -> int:
         "deleted":            deleted[:50],
         "kept_sample":        kept[:10],
     }
-    print(json.dumps(out, indent=2))
+    print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
 
 

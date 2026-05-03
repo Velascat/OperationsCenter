@@ -66,4 +66,4 @@ class TuningArtifactWriter:
 def _json_dumps(data: object) -> str:
     import json
 
-    return json.dumps(data, indent=2, default=str)
+    return json.dumps(data, indent=2, default=str, ensure_ascii=False)

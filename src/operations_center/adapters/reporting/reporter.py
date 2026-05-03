@@ -29,6 +29,7 @@ class Reporter:
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
                 indent=2,
+            ensure_ascii=False,
             )
         , encoding="utf-8")
         return str(path)
@@ -40,7 +41,7 @@ class Reporter:
 
     def write_plane_payload(self, run_dir: Path, payload: dict[str, object]) -> str:
         path = run_dir / "plane_work_item.json"
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)
 
     def write_kodo(self, run_dir: Path, command_json: str, stdout: str, stderr: str, *, prefix: str = "kodo") -> list[str]:
@@ -54,22 +55,22 @@ class Reporter:
 
     def write_bootstrap(self, run_dir: Path, commands: list[dict[str, object]]) -> str:
         path = run_dir / "bootstrap.json"
-        path.write_text(json.dumps(commands, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(commands, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)
 
     def write_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
         path = run_dir / "validation.json"
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)
 
     def write_initial_validation(self, run_dir: Path, data: list[dict[str, str | int]]) -> str:
         path = run_dir / "validation_initial.json"
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)
 
     def write_policy_violation(self, run_dir: Path, violations: list[str]) -> str:
         path = run_dir / "policy_violation.json"
-        path.write_text(json.dumps({"violations": violations}, indent=2), encoding="utf-8")
+        path.write_text(json.dumps({"violations": violations}, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)
 
     def write_diff(self, run_dir: Path, *, diff_stat: str, diff_patch: str) -> list[str]:
@@ -89,6 +90,7 @@ class Reporter:
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
                 indent=2,
+            ensure_ascii=False,
             )
         , encoding="utf-8")
         return str(path)
@@ -117,6 +119,7 @@ class Reporter:
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
                 indent=2,
+            ensure_ascii=False,
             )
         , encoding="utf-8")
         return str(path)
@@ -162,5 +165,5 @@ class Reporter:
 
     def write_control_outcome(self, run_dir: Path, payload: dict[str, object]) -> str:
         path = run_dir / "control_outcome.json"
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return str(path)

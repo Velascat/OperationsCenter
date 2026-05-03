@@ -130,7 +130,7 @@ def main() -> None:
                 for family, reasons in sorted(suppression_reasons.items())
             },
         }
-        print(json.dumps(output, indent=2))
+        print(json.dumps(output, indent=2, ensure_ascii=False))
         return
 
     # Human-readable report

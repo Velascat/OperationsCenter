@@ -218,7 +218,7 @@ def _write_quiet_diagnosis(
         ),
     }
     diag_path = report_dir / "quiet_diagnosis.json"
-    diag_path.write_text(json.dumps(diag, indent=2), encoding="utf-8")
+    diag_path.write_text(json.dumps(diag, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\n  [warn] Proposer quiet for {quiet_window} cycles — diagnosis → {diag_path}")
     # S7-7: Fire escalation webhook when proposer goes silent.
     if escalation_webhook:
@@ -630,7 +630,7 @@ def _write_cycle_report(
             "cycle_health": "nominal" if not snapshot.collector_errors else "degraded",
         },
     }
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\n  Cycle report  → {report_path}")
 
     # Quiet diagnosis: if the last _QUIET_WINDOW cycle reports all had 0

@@ -76,7 +76,7 @@ def _bootstrap_orphan_campaigns(
         if not spec_path.exists():
             logger.warning(json.dumps({
                 "event": "orphan_campaign_no_spec", "slug": campaign.slug,
-            }))
+            }, ensure_ascii=False))
             continue
         try:
             spec_text = spec_path.read_text(encoding="utf-8")
@@ -85,7 +85,7 @@ def _bootstrap_orphan_campaigns(
             logger.error(json.dumps({
                 "event": "orphan_campaign_parse_failed",
                 "slug": campaign.slug, "error": str(exc),
-            }))
+            }, ensure_ascii=False))
             continue
         repo_key = fm.repos[0] if fm.repos else ""
         repo_cfg = settings.repos.get(repo_key) if settings.repos else None
@@ -93,7 +93,7 @@ def _bootstrap_orphan_campaigns(
             logger.warning(json.dumps({
                 "event": "orphan_campaign_unknown_repo",
                 "slug": campaign.slug, "repo": repo_key,
-            }))
+            }, ensure_ascii=False))
             continue
         try:
             task_ids = builder.build(
@@ -106,12 +106,12 @@ def _bootstrap_orphan_campaigns(
                 "campaign_id": campaign.campaign_id,
                 "slug": campaign.slug,
                 "tasks_created": len(task_ids),
-            }))
+            }, ensure_ascii=False))
         except Exception as exc:
             logger.error(json.dumps({
                 "event": "orphan_campaign_bootstrap_failed",
                 "slug": campaign.slug, "error": str(exc),
-            }))
+            }, ensure_ascii=False))
 
 
 _LIFECYCLE_SKIP_PROMOTE = {"lifecycle: expanded", "lifecycle: archived", "lifecycle: escalated"}
@@ -148,14 +148,14 @@ def _auto_promote_backlog(client: PlaneClient, issues: list[dict]) -> None:
     try:
         result = service.promote(issues=filtered)
     except Exception as exc:
-        logger.error(json.dumps({"event": "auto_promote_failed", "error": str(exc)}))
+        logger.error(json.dumps({"event": "auto_promote_failed", "error": str(exc)}, ensure_ascii=False))
         return
     if result.promoted:
         logger.info(json.dumps({
             "event": "auto_promote_backlog",
             "count": len(result.promoted),
             "families": sorted({t.family for t in result.promoted}),
-        }))
+        }, ensure_ascii=False))
 
 
 def run_once(settings: Any, client: PlaneClient) -> None:
@@ -163,7 +163,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     if not sd.enabled:
         return
 
-    logger.info(json.dumps({"event": "spec_cycle_start"}))
+    logger.info(json.dumps({"event": "spec_cycle_start"}, ensure_ascii=False))
 
     state_mgr = CampaignStateManager()
     spec_writer = SpecWriter(specs_dir=_SPECS_DIR)
@@ -173,7 +173,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     try:
         all_issues = client.list_issues()
     except Exception as exc:
-        logger.error(json.dumps({"event": "spec_board_fetch_failed", "error": str(exc)}))
+        logger.error(json.dumps({"event": "spec_board_fetch_failed", "error": str(exc)}, ensure_ascii=False))
         return
 
     # Step 1.5: Bootstrap orphan campaigns — campaigns registered in state but with
@@ -204,7 +204,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
             "tasks_unblocked": orch_result.tasks_unblocked,
             "tasks_cancelled": orch_result.tasks_cancelled,
             "campaigns_completed": orch_result.campaigns_completed,
-        }))
+        }, ensure_ascii=False))
 
     # Step 3: Recovery scan (runs after orchestration so completions are already processed)
     active = state_mgr.load()
@@ -216,7 +216,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     for campaign in active.active_campaigns():
         if recovery.should_abandon(campaign):
             recovery.self_cancel(campaign, "abandon_hours_exceeded", _SPECS_DIR)
-            logger.info(json.dumps({"event": "spec_campaign_abandoned", "campaign_id": campaign.campaign_id}))
+            logger.info(json.dumps({"event": "spec_campaign_abandoned", "campaign_id": campaign.campaign_id}, ensure_ascii=False))
 
     # Reload after potential cancellations
     active = state_mgr.load()
@@ -237,20 +237,20 @@ def run_once(settings: Any, client: PlaneClient) -> None:
             "ready_count": ready_count,
             "running_count": running_count,
             "has_active": active.has_active(),
-        }))
+        }, ensure_ascii=False))
         return
 
     logger.info(json.dumps({
         "event": "spec_campaign_starting",
         "trigger_source": str(trigger.source),
         "seed_preview": trigger.seed_text[:80],
-    }))
+    }, ensure_ascii=False))
 
     # Disk space check before writing
     try:
         _check_disk_space(_SPECS_DIR)
     except OSError as exc:
-        logger.error(json.dumps({"event": "spec_disk_space_critical", "error": str(exc)}))
+        logger.error(json.dumps({"event": "spec_disk_space_critical", "error": str(exc)}, ensure_ascii=False))
         return
 
     # Step 5a: Build context bundle — reuse already-fetched issues
@@ -275,7 +275,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     try:
         result = brainstorm_svc.brainstorm(bundle)
     except Exception as exc:
-        logger.error(json.dumps({"event": "spec_brainstorm_failed", "error": str(exc)}))
+        logger.error(json.dumps({"event": "spec_brainstorm_failed", "error": str(exc)}, ensure_ascii=False))
         return
 
     # Step 5c: Write spec
@@ -306,7 +306,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
             base_branch=base_branch,
         )
     except Exception as exc:
-        logger.error(json.dumps({"event": "spec_campaign_build_failed", "error": str(exc)}))
+        logger.error(json.dumps({"event": "spec_campaign_build_failed", "error": str(exc)}, ensure_ascii=False))
         spec_path.unlink(missing_ok=True)
         return
 
@@ -329,7 +329,7 @@ def run_once(settings: Any, client: PlaneClient) -> None:
         "campaign_id": result.campaign_id,
         "slug": result.slug,
         "tasks_created": len(task_ids),
-    }))
+    }, ensure_ascii=False))
 
 
 def main() -> None:
@@ -356,7 +356,7 @@ def main() -> None:
             try:
                 run_once(settings, client)
             except Exception as exc:
-                logger.error(json.dumps({"event": "spec_director_cycle_error", "cycle": cycle, "error": str(exc)}))
+                logger.error(json.dumps({"event": "spec_director_cycle_error", "cycle": cycle, "error": str(exc)}, ensure_ascii=False))
             cycle += 1
             time.sleep(sd.poll_interval_seconds)
     finally:

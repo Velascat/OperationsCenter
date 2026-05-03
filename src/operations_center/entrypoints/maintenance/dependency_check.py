@@ -232,6 +232,7 @@ def write_dependency_report(run_dir: Path, statuses: list[DependencyStatus], cre
                 "created_task_ids": created_task_ids,
             },
             indent=2,
+        ensure_ascii=False,
         )
     , encoding="utf-8")
     lines = ["# Dependency Check", "", "## Statuses"]
@@ -287,6 +288,7 @@ def main() -> None:
                 "created_task_ids": created_task_ids,
             },
             indent=2,
+        ensure_ascii=False,
         )
     )
 

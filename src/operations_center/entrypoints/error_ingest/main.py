@@ -92,7 +92,7 @@ def _mark_created(key: str) -> None:
                 pass
         state[key] = datetime.now(UTC).isoformat()
         _DEDUP_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _DEDUP_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        _DEDUP_STATE_PATH.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -135,14 +135,14 @@ def _create_error_task(
             "source": source,
             "severity": severity,
             "repo_key": repo_key,
-        }))
+        }, ensure_ascii=False))
         return task_id
     except Exception as exc:
         _logger.warning(json.dumps({
             "event": "error_ingest_task_failed",
             "error": str(exc),
             "title": title,
-        }))
+        }, ensure_ascii=False))
         return None
 
 
@@ -194,7 +194,7 @@ def _make_webhook_handler(plane_client: PlaneClient, default_repo_key: str):
             _mark_created(key)
             self.send_response(200)
             self.end_headers()
-            resp = json.dumps({"status": "ok", "task_id": task_id}).encode()
+            resp = json.dumps({"status": "ok", "task_id": task_id}, ensure_ascii=False).encode()
             self.wfile.write(resp)
 
     return _Handler
@@ -203,7 +203,7 @@ def _make_webhook_handler(plane_client: PlaneClient, default_repo_key: str):
 def run_webhook_server(plane_client: PlaneClient, *, port: int, default_repo_key: str) -> None:
     handler = _make_webhook_handler(plane_client, default_repo_key)
     server = http.server.ThreadingHTTPServer(("", port), handler)
-    _logger.info(json.dumps({"event": "error_ingest_webhook_started", "port": port}))
+    _logger.info(json.dumps({"event": "error_ingest_webhook_started", "port": port}, ensure_ascii=False))
     server.serve_forever()
 
 
@@ -222,7 +222,7 @@ def _tail_log_file(
 ) -> None:
     log_path = Path(path)
     compiled = re.compile(pattern, re.IGNORECASE)
-    _logger.info(json.dumps({"event": "error_ingest_tail_start", "path": path, "repo_key": repo_key}))
+    _logger.info(json.dumps({"event": "error_ingest_tail_start", "path": path, "repo_key": repo_key}, ensure_ascii=False))
 
     # Seek to end of file initially to avoid replaying historical errors
     try:
@@ -264,7 +264,7 @@ def _tail_log_file(
                 "event": "error_ingest_tail_error",
                 "path": path,
                 "error": str(exc),
-            }))
+            }, ensure_ascii=False))
             time.sleep(10)
 
 
@@ -337,7 +337,7 @@ def main() -> None:
             while True:
                 time.sleep(60)
         except KeyboardInterrupt:
-            _logger.info(json.dumps({"event": "error_ingest_stopping"}))
+            _logger.info(json.dumps({"event": "error_ingest_stopping"}, ensure_ascii=False))
             stop_event.set()
     finally:
         client.close()

@@ -121,7 +121,7 @@ def main(service: PlanningService | None = None) -> int:
             pass  # best-effort; never mask the original error
 
         error_payload = _routing_failure_json(proposal, partial_run_id, str(exc))
-        rendered = json.dumps(error_payload, indent=2)
+        rendered = json.dumps(error_payload, indent=2, ensure_ascii=False)
         if args.output:
             args.output.write_text(rendered + "\n", encoding="utf-8")
         else:
@@ -129,7 +129,7 @@ def main(service: PlanningService | None = None) -> int:
         return 1
 
     payload = _bundle_json(bundle)
-    rendered = json.dumps(payload, indent=2, sort_keys=True)
+    rendered = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
     if args.output:
         args.output.write_text(rendered + "\n", encoding="utf-8")
     else:

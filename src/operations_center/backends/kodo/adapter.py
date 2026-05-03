@@ -191,7 +191,7 @@ class KodoBackendAdapter:
                 for artifact in capture.artifacts
             ],
         }
-        capture_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        capture_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         refs.append(
             BackendDetailRef(
                 detail_type="structured_result",

@@ -69,7 +69,7 @@ class RunArtifactWriter:
             metadata.update(extra_metadata)
 
         (run_dir / "run_metadata.json").write_text(
-            json.dumps(metadata, indent=2, default=str) + "\n", encoding="utf-8"
+            json.dumps(metadata, indent=2, default=str, ensure_ascii=False) + "\n", encoding="utf-8"
         )
 
         return [str(p) for p, _ in files] + [str(run_dir / "run_metadata.json")]
@@ -107,7 +107,7 @@ class RunArtifactWriter:
             metadata.update(extra_metadata)
 
         m = run_dir / "run_metadata.json"
-        m.write_text(json.dumps(metadata, indent=2, default=str) + "\n", encoding="utf-8")
+        m.write_text(json.dumps(metadata, indent=2, default=str, ensure_ascii=False) + "\n", encoding="utf-8")
         written.append(str(m))
 
         return written

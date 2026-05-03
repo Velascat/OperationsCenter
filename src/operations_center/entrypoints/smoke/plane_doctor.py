@@ -104,6 +104,7 @@ def main() -> None:
                     "checks": checks,
                 },
                 indent=2,
+            ensure_ascii=False,
             )
         )
     finally:

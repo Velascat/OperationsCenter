@@ -169,7 +169,7 @@ class ArchonBackendAdapter:
 
         if capture.workflow_events:
             path = detail_dir / "archon-workflow-events.json"
-            path.write_text(json.dumps(capture.workflow_events, indent=2) + "\n", encoding="utf-8")
+            path.write_text(json.dumps(capture.workflow_events, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
             refs.append(
                 BackendDetailRef(
                     detail_type="event_trace",
@@ -189,7 +189,7 @@ class ArchonBackendAdapter:
             "output_text": capture.output_text,
             "error_text": capture.error_text,
         }
-        capture_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        capture_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         refs.append(
             BackendDetailRef(
                 detail_type="structured_result",

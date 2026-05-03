@@ -49,7 +49,7 @@ def main() -> int:
     settings = load_settings(args.config)
     token = settings.git_token()
     if not token:
-        print(json.dumps({"error": "no git token configured"}))
+        print(json.dumps({"error": "no git token configured"}, ensure_ascii=False))
         return 1
     gh = GitHubPRClient(token)
 
@@ -127,7 +127,7 @@ def main() -> int:
         "closed":              closed,
         "skipped":             skipped[:20],
     }
-    print(json.dumps(out, indent=2))
+    print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
 
 

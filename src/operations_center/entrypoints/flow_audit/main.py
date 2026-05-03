@@ -243,7 +243,7 @@ def main() -> int:
     out["total_open_gaps"] = sum(
         v.get("count", 0) for v in out["patterns"].values() if isinstance(v, dict)
     )
-    print(json.dumps(out, indent=2))
+    print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
 
 

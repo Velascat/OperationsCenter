@@ -41,7 +41,7 @@ def main() -> int:
     settings = load_settings(args.config)
     token = settings.git_token()
     if not token:
-        print(json.dumps({"error": "no git token"}))
+        print(json.dumps({"error": "no git token"}, ensure_ascii=False))
         return 1
     gh = GitHubPRClient(token)
 
@@ -86,7 +86,7 @@ def main() -> int:
         "revert_local":   bool(args.revert) and not args.dry_run,
         "findings":       findings,
     }
-    print(json.dumps(out, indent=2))
+    print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
 
 

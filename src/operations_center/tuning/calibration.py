@@ -210,4 +210,4 @@ class ConfidenceCalibrationStore:
 
     def _save(self, data: dict) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        self._path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")

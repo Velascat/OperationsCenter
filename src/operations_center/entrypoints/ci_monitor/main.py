@@ -52,7 +52,7 @@ def _load_ci_fix_state(owner: str, repo: str, pr_number: int) -> dict | None:
 
 def _save_ci_fix_state(owner: str, repo: str, pr_number: int, state: dict) -> None:
     CI_FIX_STATE_DIR.mkdir(parents=True, exist_ok=True)
-    _ci_fix_state_path(owner, repo, pr_number).write_text(json.dumps(state, indent=2), encoding="utf-8")
+    _ci_fix_state_path(owner, repo, pr_number).write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _pr_is_awaiting_ci(branch: str) -> bool:
@@ -139,7 +139,7 @@ def run_ci_monitor_cycle(
                 "event": "ci_monitor_list_prs_failed",
                 "repo_key": repo_key,
                 "error": str(exc),
-            }))
+            }, ensure_ascii=False))
             continue
 
         for pr in open_prs:
@@ -157,7 +157,7 @@ def run_ci_monitor_cycle(
                     "pr_number": pr_number,
                     "repo_key": repo_key,
                     "branch": branch,
-                }))
+                }, ensure_ascii=False))
                 continue
 
             try:
@@ -179,7 +179,7 @@ def run_ci_monitor_cycle(
                         "pr_number": pr_number,
                         "repo_key": repo_key,
                         "fix_task_id": existing.get("fix_task_id"),
-                    }))
+                    }, ensure_ascii=False))
                     continue
 
                 description = _build_fix_pr_description(
@@ -220,7 +220,7 @@ def run_ci_monitor_cycle(
                     "repo_key": repo_key,
                     "fix_task_id": fix_task_id,
                     "failures": failures,
-                }))
+                }, ensure_ascii=False))
                 created += 1
 
             except Exception as exc:
@@ -229,7 +229,7 @@ def run_ci_monitor_cycle(
                     "pr_number": pr_number,
                     "repo_key": repo_key,
                     "error": str(exc),
-                }))
+                }, ensure_ascii=False))
 
     return created
 
@@ -251,10 +251,10 @@ def run_monitor_loop(
 
     while True:
         cycle += 1
-        logger.info(json.dumps({"event": "ci_monitor_cycle_start", "cycle": cycle}))
+        logger.info(json.dumps({"event": "ci_monitor_cycle_start", "cycle": cycle}, ensure_ascii=False))
         try:
             created = run_ci_monitor_cycle(plane_client, settings, logger)
-            logger.info(json.dumps({"event": "ci_monitor_cycle_end", "cycle": cycle, "tasks_created": created}))
+            logger.info(json.dumps({"event": "ci_monitor_cycle_end", "cycle": cycle, "tasks_created": created}, ensure_ascii=False))
 
             if status_dir:
                 status_dir.mkdir(parents=True, exist_ok=True)
@@ -262,13 +262,13 @@ def run_monitor_loop(
                     "cycle": cycle,
                     "tasks_created": created,
                     "updated_at": datetime.now(UTC).isoformat(),
-                }, indent=2), encoding="utf-8")
+                }, indent=2, ensure_ascii=False), encoding="utf-8")
 
         except Exception as exc:
-            logger.warning(json.dumps({"event": "ci_monitor_cycle_error", "cycle": cycle, "error": str(exc)}))
+            logger.warning(json.dumps({"event": "ci_monitor_cycle_error", "cycle": cycle, "error": str(exc)}, ensure_ascii=False))
 
         if max_cycles is not None and cycle >= max_cycles:
-            logger.info(json.dumps({"event": "ci_monitor_complete", "cycles": cycle}))
+            logger.info(json.dumps({"event": "ci_monitor_complete", "cycles": cycle}, ensure_ascii=False))
             return
 
         time.sleep(poll_interval_seconds)

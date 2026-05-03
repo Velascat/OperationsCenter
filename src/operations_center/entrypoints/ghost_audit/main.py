@@ -306,7 +306,7 @@ def main() -> None:
         print(f"# warning: Plane fetch failed ({exc}); skipping Plane-based detectors", flush=True)
 
     ctx = AuditContext(log_dir=log_dir, since=since, plane_issues=plane_issues)
-    print(json.dumps(scan(ctx), indent=2))
+    print(json.dumps(scan(ctx), indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

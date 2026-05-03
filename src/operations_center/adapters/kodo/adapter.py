@@ -321,7 +321,7 @@ class KodoAdapter:
         """Run kodo with a team override written to .kodo/team.json."""
         team_override = repo_path / ".kodo" / "team.json"
         team_override.parent.mkdir(exist_ok=True)
-        team_override.write_text(json.dumps(team, indent=2), encoding="utf-8")
+        team_override.write_text(json.dumps(team, indent=2, ensure_ascii=False), encoding="utf-8")
         try:
             timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
             command = self.build_command(goal_file, repo_path, profile=profile, kodo_mode=kodo_mode)
@@ -345,7 +345,7 @@ class KodoAdapter:
 
     @staticmethod
     def command_to_json(command: list[str]) -> str:
-        return json.dumps({"command": command}, indent=2)
+        return json.dumps({"command": command}, indent=2, ensure_ascii=False)
 
     @staticmethod
     def get_version(binary: str) -> str | None:

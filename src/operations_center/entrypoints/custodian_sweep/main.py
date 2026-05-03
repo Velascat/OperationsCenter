@@ -241,8 +241,9 @@ def main() -> int:
     args.history.write_text(json.dumps(
         {s.repo_key: s.envelope for s in sweeps if not s.error},
         indent=2,
+    ensure_ascii=False,
     ), encoding="utf-8")
-    print(json.dumps(summary, indent=2))
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
     return 0
 
 

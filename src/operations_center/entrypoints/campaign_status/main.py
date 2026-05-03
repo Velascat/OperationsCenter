@@ -50,7 +50,7 @@ def main() -> None:
     campaigns = store.list_campaigns(status=args.status)
 
     if args.output_json:
-        print(json.dumps(campaigns, indent=2))
+        print(json.dumps(campaigns, indent=2, ensure_ascii=False))
         return
 
     if not campaigns:

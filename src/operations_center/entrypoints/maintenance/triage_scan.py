@@ -51,7 +51,7 @@ def main() -> int:
         items = client.list_issues()
     except Exception as exc:
         client.close()
-        print(json.dumps({"error": f"plane_fetch_failed: {exc}"}))
+        print(json.dumps({"error": f"plane_fetch_failed: {exc}"}, ensure_ascii=False))
         return 1
 
     now = datetime.now(UTC)
@@ -112,7 +112,7 @@ def main() -> int:
         "apply":      args.apply,
         "rescore":    rescore_actions,
         "awaiting":   awaiting_actions,
-    }, indent=2))
+    }, indent=2, ensure_ascii=False))
     return 0
 
 

@@ -106,7 +106,7 @@ def _write_trigger(event: dict[str, Any]) -> None:
     """Write a trigger file so the autonomy cycle or reviewer watcher can pick it up."""
     _TRIGGER_DIR.mkdir(parents=True, exist_ok=True)
     fname = f"ci_{event['head_sha'][:12]}_{event['conclusion']}.json"
-    (_TRIGGER_DIR / fname).write_text(json.dumps(event, indent=2), encoding="utf-8")
+    (_TRIGGER_DIR / fname).write_text(json.dumps(event, indent=2, ensure_ascii=False), encoding="utf-8")
     _logger.info(json.dumps({
         "event": "ci_webhook_trigger_written",
         "repo": event.get("repo"),
@@ -114,7 +114,7 @@ def _write_trigger(event: dict[str, Any]) -> None:
         "conclusion": event.get("conclusion"),
         "check_name": event.get("check_name"),
         "trigger_file": fname,
-    }))
+    }, ensure_ascii=False))
 
 
 def _run_trigger_command(event: dict[str, Any]) -> None:
@@ -136,12 +136,12 @@ def _run_trigger_command(event: dict[str, Any]) -> None:
             "event": "ci_webhook_trigger_command",
             "cmd": cmd,
             "conclusion": event.get("conclusion"),
-        }))
+        }, ensure_ascii=False))
     except Exception as exc:
         _logger.warning(json.dumps({
             "event": "ci_webhook_trigger_command_failed",
             "error": str(exc)[:200],
-        }))
+        }, ensure_ascii=False))
         _write_trigger(event)  # Fall back to file trigger
 
 
@@ -165,7 +165,7 @@ class _WebhookHandler(http.server.BaseHTTPRequestHandler):
         if secret:
             sig = self.headers.get("X-Hub-Signature-256", "")
             if not _verify_signature(body, sig, secret):
-                _logger.warning(json.dumps({"event": "ci_webhook_invalid_signature"}))
+                _logger.warning(json.dumps({"event": "ci_webhook_invalid_signature"}, ensure_ascii=False))
                 self.send_response(401)
                 self.end_headers()
                 self.wfile.write(b"Invalid signature")
@@ -209,7 +209,7 @@ def serve(*, host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT, secret: bytes
         "host": host,
         "port": port,
         "hmac_enabled": secret is not None,
-    }))
+    }, ensure_ascii=False))
     server.serve_forever()
 
 
@@ -229,7 +229,7 @@ def main() -> None:
         _logger.warning(json.dumps({
             "event": "ci_webhook_no_secret",
             "advice": f"Set {_SECRET_ENV} to enable HMAC signature validation.",
-        }))
+        }, ensure_ascii=False))
 
     serve(host=args.host, port=args.port, secret=secret)
 

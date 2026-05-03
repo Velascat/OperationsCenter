@@ -61,7 +61,7 @@ def _save_state(path: Path, state: dict) -> None:
     state = dict(state)
     state["updated_at"] = datetime.now(UTC).isoformat()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    path.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def _new_state(repo_key: str, pr_number: int) -> dict:
@@ -188,7 +188,7 @@ def _run_pipeline(
         workspace    = tmp / "workspace"
         result_file  = tmp / "result.json"
 
-        bundle_file.write_text(json.dumps(bundle), encoding="utf-8")
+        bundle_file.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
         shutil.copy(config_path, config_copy)
         workspace.mkdir()
 
@@ -618,7 +618,7 @@ def _write_heartbeat(status_dir: Path) -> None:
             "role":   "review",
             "at":     datetime.now(UTC).isoformat(),
             "status": "active",
-        }), encoding="utf-8")
+        }, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
 

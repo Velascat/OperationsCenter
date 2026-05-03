@@ -159,7 +159,7 @@ def _write_evidence(
         "executed": outcome.executed,
     }
     meta_path = evidence_dir / "run_metadata.json"
-    meta_path.write_text(json.dumps(meta, indent=2, default=str) + "\n", encoding="utf-8")
+    meta_path.write_text(json.dumps(meta, indent=2, default=str, ensure_ascii=False) + "\n", encoding="utf-8")
     written.append(meta_path)
     return written
 

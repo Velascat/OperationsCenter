@@ -424,7 +424,7 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
 
         # ── Step 2: Execution ─────────────────────────────────────────────
         bundle_file = tmp / "bundle.json"
-        bundle_file.write_text(json.dumps(bundle), encoding="utf-8")
+        bundle_file.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
 
         config_file = tmp / "ops.yaml"
         shutil.copy(config_path, config_file)
@@ -486,7 +486,7 @@ def _process_issue(issue: dict, role: str, config_path: Path, settings, client) 
                 # Persist the new outcome for downstream readers (artifact
                 # writer, observability) — overwrite original so retry is
                 # the recorded outcome, not the transient blip.
-                result_file.write_text(json.dumps(outcome), encoding="utf-8")
+                result_file.write_text(json.dumps(outcome, ensure_ascii=False), encoding="utf-8")
 
         # Improve mode: harvest structured suggestions from kodo's workspace
         # before the tempdir is cleaned. _handle_success uses these to spawn
@@ -1068,7 +1068,7 @@ def _write_heartbeat(status_dir: Path, role: str) -> None:
             "role": role,
             "at":   datetime.now(UTC).isoformat(),
             "status": "idle",
-        }), encoding="utf-8")
+        }, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
 

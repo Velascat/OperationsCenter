@@ -61,7 +61,7 @@ def main() -> int:
     try:
         items = client.list_issues()
     except Exception as exc:
-        print(json.dumps({"error": f"plane_fetch_failed: {exc}"}))
+        print(json.dumps({"error": f"plane_fetch_failed: {exc}"}, ensure_ascii=False))
         return 1
 
     now = datetime.now(UTC)
@@ -112,7 +112,7 @@ def main() -> int:
             "reset":           reset,
             "skipped":         skipped,
         }
-        print(json.dumps(out, indent=2))
+        print(json.dumps(out, indent=2, ensure_ascii=False))
         return 0
 
     for issue in items:
@@ -163,7 +163,7 @@ def main() -> int:
         "reset":           reset,
         "skipped":         skipped,
     }
-    print(json.dumps(out, indent=2))
+    print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
 
 
