@@ -14,6 +14,7 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 | `excluded_paths` separate from `artifacts` | Coverage.ini, .coverage.*, sitecustomize.py are infra noise, not audit artifacts | 2026-04-26 |
 | `repo_singleton` location type for architecture_invariants | The file overwrites itself on every run; `valid_for=[latest_snapshot]`, `limitations=[repo_singleton_overwritten]` | 2026-04-26 |
 | Phase 2 gate before Phase 5 | Can't implement VF-side writing until contract is locked; 119 tests are the gate | 2026-04-26 |
+| OC2/OC5/OC9 removed from detectors.py; OC3+OC8 kept | OC2 → native C1 + exclude_paths.C1; OC5 → native T3 + t3_env_gate_hints (aider, switchboard, OPERATIONS_CENTER_, shutil.which, pkg_path, not present); OC9 → native K2. OC3 (orphaned entrypoints cross-file analysis) and OC8 (K1 + field-def name:Type pattern) are genuinely OC-specific — kept as plugins. | 2026-05-03 |
 | OC1/OC4/OC6/OC7 removed from `_custodian/detectors.py` | Superseded by native U1-U3/RUFF/F3; `subprocess` import removed | 2026-05-02 |
 | C13 (raw os.environ outside config layer) added to Custodian | Absorbs VF3 custom detector; configured via `audit.c13_allowed_paths` | 2026-05-02 |
 | C1 now deferred-aware | Skips lines tagged `[deferred, reviewed]`; absorbs OC2 intent | 2026-05-02 |

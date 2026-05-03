@@ -12,6 +12,16 @@ audit:
   # modules. The config layer (config/) is the canonical place; other modules
   # read env vars for their own config (execution paths, tuning thresholds,
   # provider setup). These are accepted patterns, not architectural debt.
+  # T3 env-gate hints: these phrases near a pytest.skip() indicate the skip
+  # is conditional on a missing tool, env var, or service — not unconditional.
+  t3_env_gate_hints:
+    - "aider"
+    - "switchboard"
+    - "OPERATIONS_CENTER_"
+    - "shutil.which"
+    - "pkg_path"
+    - "not present"
+
   c13_allowed_paths:
     - "src/operations_center/config/**"
     - "src/operations_center/entrypoints/**"
