@@ -148,3 +148,193 @@ class TestCmdResolveManifest:
         out = _runner.invoke(app, ["resolve-manifest", str(tmp_path / "missing.json")])
         assert out.exit_code == 1
         assert "Not found" in out.output
+
+
+# ---------------------------------------------------------------------------
+# cmd_list_active + cmd_unlock + cmd_dispatch (Slice D)
+# ---------------------------------------------------------------------------
+
+
+class TestCmdListActive:
+    def test_list_active_empty(self, tmp_path: Path, monkeypatch):
+        from operations_center.audit_dispatch.lock_store import PersistentLockStore
+
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": PersistentLockStore(tmp_path)})(),
+        )
+        out = _runner.invoke(app, ["list-active"])
+        assert out.exit_code == 0
+        assert "no active audit locks" in out.output
+
+    def test_list_active_renders_table(self, tmp_path: Path, monkeypatch):
+        import os
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        store = PersistentLockStore(tmp_path)
+        store.try_acquire(
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="vid_rep_xyz",
+                audit_type="representative",
+                oc_pid=os.getpid(),
+                started_at="2026-05-04T12:00:00Z",
+                command="python -m foo",
+                expected_run_status_path="/tmp/output",
+            )
+        )
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": store})(),
+        )
+        out = _runner.invoke(app, ["list-active"])
+        assert out.exit_code == 0
+        # Rich may truncate long strings in narrow terminals; assert the table renders.
+        assert "Active Audit Locks" in out.output
+
+    def test_list_active_json(self, tmp_path: Path, monkeypatch):
+        import os
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        store = PersistentLockStore(tmp_path)
+        store.try_acquire(
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="r1",
+                audit_type="representative",
+                oc_pid=os.getpid(),
+                started_at="2026-05-04T12:00:00Z",
+                command="x",
+                expected_run_status_path="/tmp/x",
+            )
+        )
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": store})(),
+        )
+        out = _runner.invoke(app, ["list-active", "--json"])
+        assert out.exit_code == 0
+        rows = json.loads(out.output)
+        assert rows[0]["repo_id"] == "videofoundry"
+        assert rows[0]["oc_pid_alive"] is True
+
+
+class TestCmdUnlock:
+    def test_unlock_no_lock(self, tmp_path: Path, monkeypatch):
+        from operations_center.audit_dispatch.lock_store import PersistentLockStore
+
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": PersistentLockStore(tmp_path)})(),
+        )
+        out = _runner.invoke(app, ["unlock", "--repo", "videofoundry"])
+        assert out.exit_code == 0
+        assert "No lock held" in out.output
+
+    def test_unlock_refuses_alive(self, tmp_path: Path, monkeypatch):
+        import os
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        store = PersistentLockStore(tmp_path)
+        store.try_acquire(
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="r1",
+                audit_type="representative",
+                oc_pid=os.getpid(),  # alive
+                started_at="2026-05-04T12:00:00Z",
+                command="x",
+                expected_run_status_path="/tmp/x",
+            )
+        )
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": store})(),
+        )
+        out = _runner.invoke(app, ["unlock", "--repo", "videofoundry"])
+        assert out.exit_code == 1
+        assert "still alive" in out.output
+        # Lock still exists.
+        assert store.read("videofoundry") is not None
+
+    def test_unlock_force_releases_alive(self, tmp_path: Path, monkeypatch):
+        import os
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        store = PersistentLockStore(tmp_path)
+        store.try_acquire(
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="r1",
+                audit_type="representative",
+                oc_pid=os.getpid(),
+                started_at="2026-05-04T12:00:00Z",
+                command="x",
+                expected_run_status_path="/tmp/x",
+            )
+        )
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": store})(),
+        )
+        out = _runner.invoke(app, ["unlock", "--repo", "videofoundry", "--force"])
+        assert out.exit_code == 0
+        assert "Force-released" in out.output
+        assert store.read("videofoundry") is None
+
+    def test_unlock_releases_stale(self, tmp_path: Path, monkeypatch):
+        import subprocess
+        import sys
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        proc.wait()
+        store = PersistentLockStore(tmp_path)
+        store._write_atomic(
+            tmp_path / "videofoundry.lock",
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="r1",
+                audit_type="representative",
+                oc_pid=proc.pid,  # dead
+                started_at="2026-05-04T12:00:00Z",
+                command="x",
+                expected_run_status_path="/tmp/x",
+            ),
+        )
+        monkeypatch.setattr(
+            "operations_center.entrypoints.audit.main.get_global_registry",
+            lambda: type("R", (), {"store": store})(),
+        )
+        out = _runner.invoke(app, ["unlock", "--repo", "videofoundry"])
+        assert out.exit_code == 0
+        assert "Released stale" in out.output
+        assert store.read("videofoundry") is None
+
+
+class TestCmdDispatch:
+    def test_dispatch_alias_invokes_run(self, tmp_path: Path):
+        with patch(_DISPATCH_TARGET, return_value=_make_dispatch_result()):
+            out = _runner.invoke(app, ["dispatch", "videofoundry", "representative"])
+        assert out.exit_code == 0
+        assert "videofoundry" in out.output

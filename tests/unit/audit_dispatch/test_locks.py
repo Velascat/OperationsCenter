@@ -8,6 +8,8 @@ import threading
 
 import pytest
 
+import tempfile
+
 from operations_center.audit_dispatch.errors import RepoLockAlreadyHeldError
 from operations_center.audit_dispatch.locks import (
     ManagedRepoAuditLock,
@@ -16,7 +18,9 @@ from operations_center.audit_dispatch.locks import (
 
 
 def _registry() -> ManagedRepoAuditLockRegistry:
-    return ManagedRepoAuditLockRegistry()
+    """Build a registry with an isolated temp state_dir so tests don't pollute
+    the real OpsCenter state/audit_dispatch/locks/ directory."""
+    return ManagedRepoAuditLockRegistry(state_dir=tempfile.mkdtemp())
 
 
 class TestLockAcquire:
@@ -114,6 +118,111 @@ class TestRegistryState:
         lock.release()
         # snapshot is a frozenset taken before release — it remains unchanged
         assert "videofoundry" in snapshot
+
+
+class TestLazyStaleSweep:
+    """Slice C: registry reclaims stale locks on first use (post-OC-restart safety)."""
+
+    def test_sweep_clears_dead_lock_before_first_acquire(self, tmp_path) -> None:
+        import os
+        import subprocess
+        import sys
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        # Plant a stale lock from a "previous OC process" using a real-then-dead PID.
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        proc.wait()
+        store = PersistentLockStore(tmp_path)
+        store._write_atomic(
+            tmp_path / "videofoundry.lock",
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="leftover",
+                audit_type="representative",
+                oc_pid=proc.pid,
+                started_at="2026-05-04T00:00:00Z",
+                command="x",
+                expected_run_status_path="/tmp/x",
+            ),
+        )
+
+        # Fresh registry (simulates OC restart) — first acquire sweeps + succeeds.
+        reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
+        lock = reg.acquire("videofoundry", run_id="new")
+        assert lock.payload is not None
+        assert lock.payload.run_id == "new"
+        lock.release()
+
+    def test_sweep_only_runs_once_per_registry(self, tmp_path) -> None:
+        reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
+        # Trigger sweep
+        lock1 = reg.acquire("repo_a")
+        lock1.release()
+        # Plant a stale lock after the registry has already swept once
+        import os
+        import subprocess
+        import sys
+
+        from operations_center.audit_dispatch.lock_store import (
+            PersistentLockPayload,
+            PersistentLockStore,
+        )
+
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        proc.wait()
+        store = PersistentLockStore(tmp_path)
+        store._write_atomic(
+            tmp_path / "videofoundry.lock",
+            PersistentLockPayload(
+                repo_id="videofoundry",
+                run_id="leftover",
+                audit_type="representative",
+                oc_pid=proc.pid,
+                started_at="2026-05-04T00:00:00Z",
+                command="x",
+                expected_run_status_path="/tmp/x",
+            ),
+        )
+        # The lazy sweep won't run again — but try_acquire will still detect
+        # the stale lock at acquire time because is_alive() returns False.
+        lock2 = reg.acquire("videofoundry", run_id="new")
+        lock2.release()
+
+
+class TestIdentityWiring:
+    """Slice B: lock payload carries run_id / audit_type / pids."""
+
+    def test_acquire_payload_records_identity(self, tmp_path) -> None:
+        import os
+
+        reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
+        lock = reg.acquire(
+            "videofoundry",
+            run_id="vid_rep_xyz",
+            audit_type="representative",
+            command="python -m foo",
+            expected_run_status_path="/tmp/x",
+        )
+        assert lock.payload is not None
+        assert lock.payload.run_id == "vid_rep_xyz"
+        assert lock.payload.audit_type == "representative"
+        assert lock.payload.oc_pid == os.getpid()
+        assert lock.payload.audit_pid is None
+        lock.release()
+
+    def test_update_audit_pid_persists(self, tmp_path) -> None:
+        reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
+        lock = reg.acquire("videofoundry", run_id="r1")
+        lock.update_audit_pid(audit_pid=4242, audit_pgid=4242)
+        assert lock.payload is not None
+        assert lock.payload.audit_pid == 4242
+        on_disk = reg.store.read("videofoundry")
+        assert on_disk is not None and on_disk.audit_pid == 4242
+        lock.release()
 
 
 class TestThreadSafety:

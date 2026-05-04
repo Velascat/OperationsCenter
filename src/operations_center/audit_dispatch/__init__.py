@@ -27,11 +27,23 @@ RepoLockAlreadyHeldError
 """
 
 from .api import dispatch_managed_audit
-from .errors import AuditDispatchConfigError, AuditDispatchError, RepoLockAlreadyHeldError
+from .errors import (
+    AuditDispatchConfigError,
+    AuditDispatchError,
+    LockStoreCorruptError,
+    RepoLockAlreadyHeldError,
+    StaleLockReclaimedWarning,
+)
+from .lock_store import (
+    LOCK_SCHEMA_VERSION,
+    PersistentLockPayload,
+    PersistentLockStore,
+)
 from .locks import (
     ManagedRepoAuditLock,
     ManagedRepoAuditLockRegistry,
     acquire_audit_lock,
+    get_global_registry,
     is_audit_locked,
 )
 from .models import (
@@ -40,18 +52,27 @@ from .models import (
     ManagedAuditDispatchRequest,
     ManagedAuditDispatchResult,
 )
+from .watcher import RunStatusSnapshot, poll_run_status
 
 __all__ = [
     "dispatch_managed_audit",
     "AuditDispatchError",
     "AuditDispatchConfigError",
     "RepoLockAlreadyHeldError",
+    "LockStoreCorruptError",
+    "StaleLockReclaimedWarning",
+    "LOCK_SCHEMA_VERSION",
+    "PersistentLockPayload",
+    "PersistentLockStore",
     "ManagedRepoAuditLock",
     "ManagedRepoAuditLockRegistry",
     "acquire_audit_lock",
+    "get_global_registry",
     "is_audit_locked",
     "DispatchStatus",
     "FailureKind",
     "ManagedAuditDispatchRequest",
     "ManagedAuditDispatchResult",
+    "RunStatusSnapshot",
+    "poll_run_status",
 ]

@@ -42,3 +42,19 @@ class AuditDispatchConfigError(AuditDispatchError):
     These are not operational failures — they indicate the dispatch was
     incorrectly configured and must be fixed before retrying.
     """
+
+
+class LockStoreCorruptError(AuditDispatchError):
+    """A persistent lock file exists but is malformed (bad JSON or schema).
+
+    Recoverable via ``operations-center-audit unlock --repo X --force`` after
+    operator inspection.
+    """
+
+
+class StaleLockReclaimedWarning(UserWarning):
+    """Emitted when a stale persistent lock is reclaimed during normal dispatch.
+
+    A warning rather than an error — reclaim is the intended recovery path
+    after an OpsCenter crash.
+    """
