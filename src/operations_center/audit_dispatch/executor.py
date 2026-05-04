@@ -15,6 +15,7 @@ import platform
 import shlex
 import signal
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -65,6 +66,7 @@ class ManagedAuditExecutor:
         *,
         timeout_seconds: float | None = None,
         cwd_override: str | None = None,
+        on_spawn: Callable[[int, int | None], None] | None = None,
     ) -> ProcessResult:
         """Execute the managed audit command.
 
@@ -104,6 +106,18 @@ class ManagedAuditExecutor:
                 open(stderr_path, "w", encoding="utf-8", errors="replace") as err_f,
             ):
                 proc = subprocess.Popen(args, stdout=out_f, stderr=err_f, **popen_kwargs)
+                if on_spawn is not None:
+                    pgid: int | None = None
+                    if platform.system() != "Windows":
+                        try:
+                            pgid = os.getpgid(proc.pid)
+                        except (ProcessLookupError, OSError):
+                            pgid = None
+                    try:
+                        on_spawn(proc.pid, pgid)
+                    except Exception:
+                        # on_spawn must never break dispatch — best-effort hook.
+                        pass
                 try:
                     proc.wait(timeout=timeout_seconds)
                 except subprocess.TimeoutExpired:

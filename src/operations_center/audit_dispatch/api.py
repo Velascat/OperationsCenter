@@ -169,12 +169,26 @@ def dispatch_managed_audit(
     )
     executor = ManagedAuditExecutor(effective_log_dir)
 
-    # Step 3: Acquire per-repo lock — raises if already held.
-    lock = acquire_audit_lock(request.repo_id)
+    # Step 3: Acquire per-repo lock with full identity payload — raises if held.
+    # The actual run_status.json path is not known until VF creates the per-run
+    # bucket dir (named with run_id as a suffix). Persist the parent output dir
+    # so external observers can discover the bucket via the same logic as lifecycle.py.
+    expected_output_dir_abs = str(
+        (Path(working_dir_abs) / invocation.expected_output_dir).resolve()
+    )
+    lock = acquire_audit_lock(
+        request.repo_id,
+        run_id=run_id,
+        audit_type=request.audit_type,
+        oc_pid=os.getpid(),
+        command=invocation.command,
+        expected_run_status_path=expected_output_dir_abs,
+    )
     try:
         proc_result = executor.execute(
             invocation,
             timeout_seconds=request.timeout_seconds,
+            on_spawn=lock.update_audit_pid,
         )
     finally:
         lock.release()

@@ -39,6 +39,7 @@ from operations_center.audit_dispatch import (
     RepoLockAlreadyHeldError,
     dispatch_managed_audit,
 )
+from operations_center.audit_dispatch.locks import get_global_registry
 from operations_center.audit_toolset import (
     ArtifactManifestPathMissingError,
     RunStatusContractError,
@@ -157,6 +158,177 @@ def cmd_resolve_manifest(
         raise typer.Exit(code=3) from exc
 
     typer.echo(str(manifest_path))
+
+
+@app.command("dispatch")
+def cmd_dispatch(
+    repo_id: str = typer.Argument(..., help="Managed repo ID."),
+    audit_type: str = typer.Argument(..., help="Audit type."),
+    allow_unverified: bool = typer.Option(False, "--allow-unverified"),
+    timeout: float | None = typer.Option(None, "--timeout"),
+    requested_by: str | None = typer.Option(None, "--requested-by"),
+    log_dir: str | None = typer.Option(None, "--log-dir"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Positional alias for ``run`` (matches the Phase 6 spec invocation form)."""
+    cmd_run(
+        repo=repo_id,
+        audit_type=audit_type,
+        allow_unverified=allow_unverified,
+        timeout=timeout,
+        requested_by=requested_by,
+        log_dir=log_dir,
+        json_output=json_output,
+    )
+
+
+@app.command("list-active")
+def cmd_list_active(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """List currently-held audit dispatch locks across all OpsCenter processes."""
+    import json as _json
+    from datetime import UTC, datetime
+
+    store = get_global_registry().store
+    active = store.list_active()
+
+    if json_output:
+        typer.echo(
+            _json.dumps(
+                [
+                    {
+                        **p.to_json(),
+                        **p.liveness_summary(),
+                    }
+                    for p in active
+                ],
+                indent=2,
+            )
+        )
+        return
+
+    if not active:
+        console.print("[dim]no active audit locks[/dim]")
+        return
+
+    t = Table(title="Active Audit Locks")
+    t.add_column("repo_id")
+    t.add_column("audit_type")
+    t.add_column("run_id")
+    t.add_column("oc_pid")
+    t.add_column("audit_pid")
+    t.add_column("liveness")
+    t.add_column("started_at")
+    t.add_column("age")
+    t.add_column("expected_output_dir")
+    now = datetime.now(UTC)
+    for p in active:
+        liveness = p.liveness_summary()
+        live_str = (
+            f"oc={'✓' if liveness['oc_pid_alive'] else '✗'} "
+            f"audit={'✓' if liveness['audit_pid_alive'] else '✗'}"
+        )
+        try:
+            started = datetime.fromisoformat(p.started_at.replace("Z", "+00:00"))
+            age = f"{(now - started).total_seconds():.0f}s"
+        except ValueError:
+            age = "?"
+        t.add_row(
+            p.repo_id,
+            p.audit_type,
+            p.run_id,
+            str(p.oc_pid),
+            str(p.audit_pid) if p.audit_pid is not None else "—",
+            live_str,
+            p.started_at,
+            age,
+            p.expected_run_status_path,
+        )
+    console.print(t)
+
+
+@app.command("watch")
+def cmd_watch(
+    repo: str = typer.Option(..., "--repo", "-r", help="Managed repo ID."),
+    poll_interval: float = typer.Option(2.0, "--interval", help="Poll interval in seconds."),
+    timeout: float | None = typer.Option(
+        None, "--timeout", help="Stop watching after this many seconds."
+    ),
+) -> None:
+    """Stream run_status.json transitions for the audit currently held by ``repo``.
+
+    Reads the held lock to discover ``expected_run_status_path`` (the parent
+    output dir) and ``run_id``, then polls the bucket for status changes.
+    """
+    from pathlib import Path as _Path
+
+    from operations_center.audit_dispatch.watcher import poll_run_status
+
+    store = get_global_registry().store
+    payload = store.read(repo)
+    if payload is None:
+        console.print(f"[yellow]No audit lock held for {repo!r}.[/yellow]")
+        raise typer.Exit(code=1)
+
+    output_dir = _Path(payload.expected_run_status_path)
+    console.print(
+        f"[dim]watching run_id={payload.run_id} under {output_dir}[/dim]"
+    )
+    for snapshot in poll_run_status(
+        output_dir,
+        payload.run_id,
+        poll_interval_s=poll_interval,
+        timeout_s=timeout,
+    ):
+        console.print(
+            f"[bold]{snapshot.status}[/bold] "
+            f"phase={snapshot.current_phase or '—'} "
+            f"path={snapshot.path}"
+        )
+        if snapshot.is_terminal:
+            break
+
+
+@app.command("unlock")
+def cmd_unlock(
+    repo: str = typer.Option(..., "--repo", "-r", help="Managed repo ID to unlock."),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Force-release even if a recorded PID is still alive.",
+    ),
+) -> None:
+    """Release a held audit dispatch lock for ``repo``.
+
+    Without ``--force``, the lock is only released if all recorded PIDs are
+    dead (i.e., the lock is genuinely stale). With ``--force``, the lock is
+    released regardless — use only when an operator has confirmed the held
+    audit is not running.
+    """
+    store = get_global_registry().store
+    payload = store.read(repo)
+    if payload is None:
+        console.print(f"[yellow]No lock held for repo {repo!r}.[/yellow]")
+        raise typer.Exit(code=0)
+
+    if force:
+        store.release(repo)
+        console.print(f"[green]Force-released lock for {repo}.[/green]")
+        raise typer.Exit(code=0)
+
+    if payload.is_alive():
+        liveness = payload.liveness_summary()
+        console.print(
+            f"[red]Lock for {repo!r} is still alive[/red] "
+            f"(oc_pid={payload.oc_pid} alive={liveness['oc_pid_alive']}, "
+            f"audit_pid={payload.audit_pid} alive={liveness['audit_pid_alive']}). "
+            "Re-run with --force to override."
+        )
+        raise typer.Exit(code=1)
+
+    store.release(repo)
+    console.print(f"[green]Released stale lock for {repo}.[/green]")
 
 
 def _print_dispatch_result(result) -> None:
