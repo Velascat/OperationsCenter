@@ -33,6 +33,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from operations_center.artifact_index.cli import app as _index_app
 from operations_center.audit_dispatch import (
     AuditDispatchConfigError,
     ManagedAuditDispatchRequest,
@@ -53,6 +54,10 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+# Phase 7 — flat-mount historical index commands (`index`, `index-show`, `get-artifact`).
+for _index_cmd in _index_app.registered_commands:
+    app.registered_commands.append(_index_cmd)
 
 
 @app.command("run")

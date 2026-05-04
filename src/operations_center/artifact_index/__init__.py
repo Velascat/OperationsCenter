@@ -2,10 +2,12 @@
 # Copyright (C) 2026 Velascat
 """Phase 7 — Artifact Index and Retrieval.
 
-Provides manifest loading, artifact indexing, query, and retrieval APIs
-for managed repo audit artifacts.
+Provides manifest loading, single-run indexing, multi-run historical indexing,
+querying, and retrieval APIs for managed repo audit artifacts.
 
-The manifest is the source of truth. No directory scanning is performed.
+The on-disk manifest is the source of truth. The single-run layer never scans
+directories; the multi-run layer walks a search root looking for manifests
+(but never inside them).
 """
 
 from .errors import (
@@ -23,6 +25,12 @@ from .models import (
     ArtifactQuery,
     IndexedArtifact,
     ManagedArtifactIndex,
+)
+from .multi_run import (
+    IndexedRun,
+    MultiRunArtifactIndex,
+    build_multi_run_index,
+    discover_manifest_files,
 )
 from .query import query_artifacts
 from .retrieval import (
@@ -45,8 +53,10 @@ __all__ = [
     "ArtifactIndexSource",
     "ArtifactQuery",
     "IndexedArtifact",
+    "IndexedRun",
     "ManagedArtifactIndex",
-    # functions
+    "MultiRunArtifactIndex",
+    # single-run functions
     "build_artifact_index",
     "get_artifact_by_id",
     "index_dispatch_result",
@@ -55,4 +65,7 @@ __all__ = [
     "read_json_artifact",
     "read_text_artifact",
     "resolve_artifact_path",
+    # multi-run functions
+    "build_multi_run_index",
+    "discover_manifest_files",
 ]

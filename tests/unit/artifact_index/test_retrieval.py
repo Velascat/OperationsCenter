@@ -241,14 +241,22 @@ class TestNoBoundaryViolation:
                             f"{py_file.name} imports managed repo code: {node.module}"
                         )
 
-    def test_no_directory_scanning(self) -> None:
+    def test_no_directory_scanning_in_single_run_layer(self) -> None:
+        """Single-run loader/index/query/retrieval must not scan directories.
+
+        The Phase 7 multi-run discovery layer (multi_run.py) is *explicitly*
+        allowed to walk the filesystem — that's its job. CLI is also exempt
+        since it composes the multi-run layer. All other modules must consume
+        the manifest as the source of truth, not infer artifacts from disk.
+        """
         from pathlib import Path
 
-        _FORBIDDEN = {"os.scandir", "os.listdir", "os.walk", "glob.glob", "glob.iglob", "Path.glob", "Path.rglob"}
         pkg_root = Path(__file__).resolve().parents[3] / "src" / "operations_center" / "artifact_index"
+        exempt = {"multi_run.py", "cli.py"}
         for py_file in pkg_root.glob("*.py"):
+            if py_file.name in exempt:
+                continue
             source = py_file.read_text(encoding="utf-8")
-            # Check that none of the obvious scandir/walk patterns appear
             for forbidden in ("os.scandir", "os.listdir", "os.walk"):
                 assert forbidden not in source, (
                     f"{py_file.name} uses directory scanning: {forbidden}"
