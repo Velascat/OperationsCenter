@@ -23,6 +23,7 @@ from operations_center.audit_dispatch import (
 
 from .budgets import increment_budget_after_dispatch, load_budget_state
 from .cooldowns import load_cooldown_state, update_cooldown_after_dispatch
+from .coverage_analysis import run_post_dispatch_coverage_audit
 from .errors import ManualApprovalError
 from .models import (
     AuditBudgetState,
@@ -33,6 +34,7 @@ from .models import (
     AuditManualApproval,
     BudgetStateSummary,
     CooldownStateSummary,
+    CoverageAuditSummary,
     DispatchResultSummary,
     GovernanceConfig,
     GovernanceStatus,
@@ -311,6 +313,22 @@ def run_governed_audit(
         error=dispatch_result.error,
     )
 
+    # --- Optional post-dispatch coverage audit ---
+    # When the request opts in AND the dispatch produced a manifest, invoke
+    # Custodian against the consuming repo with --enable-coverage pointed at
+    # the coverage.json discovered in the manifest.
+    coverage_summary: CoverageAuditSummary | None = None
+    if request.run_coverage_audit and dispatch_result.succeeded and dispatch_result.artifact_manifest_path:
+        try:
+            consuming_repo = _resolve_consuming_repo_root(request.repo_id, config_dir)
+            coverage_summary = run_post_dispatch_coverage_audit(
+                artifact_manifest_path=dispatch_result.artifact_manifest_path,
+                consuming_repo_root=consuming_repo,
+            )
+        except Exception as exc:
+            logger.warning("Coverage audit failed (non-fatal): %s", exc)
+            coverage_summary = CoverageAuditSummary(error=str(exc))
+
     report = AuditGovernanceReport(
         request=request,
         decision=decision,
@@ -320,6 +338,7 @@ def run_governed_audit(
         dispatch_result_summary=dispatch_summary,
         budget_state_summary=_make_budget_summary(budget_state),
         cooldown_state_summary=_make_cooldown_summary(cooldown_state),
+        coverage_audit_summary=coverage_summary,
     )
     report_path = _write_report_safe(report, out)
 
@@ -335,6 +354,23 @@ def run_governed_audit(
 def _write_report_safe(report: AuditGovernanceReport, output_dir: Path) -> Path:
     """Write report, raising GovernanceReportError on failure."""
     return write_governance_report(report, output_dir)
+
+
+# OpsCenter root — used to resolve managed-repo relative paths.
+# runner.py at: src/operations_center/audit_governance/runner.py
+# parents[0]=audit_governance/, [1]=operations_center/, [2]=src/, [3]=OC root
+_OC_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _resolve_consuming_repo_root(repo_id: str, config_dir: Path | str | None) -> Path:
+    """Absolute working tree of the managed repo identified by ``repo_id``.
+
+    Re-uses the same loader audit_dispatch.api uses, then resolves the YAML's
+    relative repo_root against the OpsCenter root.
+    """
+    from operations_center.managed_repos.loader import load_managed_repo_config
+    config = load_managed_repo_config(repo_id, config_dir=config_dir)
+    return (_OC_ROOT / config.repo_root).resolve()
 
 
 __all__ = ["run_governed_audit"]

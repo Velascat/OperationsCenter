@@ -90,6 +90,12 @@ class AuditGovernanceRequest(BaseModel, frozen=True):
     requested_time_window: str | None = None
     allow_if_recent_success: bool = False
 
+    # Post-dispatch coverage analysis: when True, the governance runner
+    # invokes Custodian against the consuming repo with --enable-coverage
+    # pointed at the produced coverage.json (located via Phase 7 artifact
+    # index). Findings are attached to the governance report. Default OFF.
+    run_coverage_audit: bool = False
+
     @field_validator("repo_id")
     @classmethod
     def _repo_id_not_empty(cls, v: str) -> str:
@@ -343,13 +349,31 @@ class CooldownStateSummary(BaseModel, frozen=True):
     last_run_at: datetime | None = None
 
 
+class CoverageAuditSummary(BaseModel, frozen=True):
+    """Summary of post-dispatch Custodian coverage analysis.
+
+    Populated only when ``request.run_coverage_audit`` is True and a
+    coverage.json was produced and successfully analyzed. ``cv1_count`` /
+    ``cv2_count`` / ``cv3_count`` map to the adapter's three rule IDs.
+    """
+
+    coverage_json_path: str | None = None
+    custodian_exit_code: int | None = None
+    findings_total: int = 0
+    cv1_count: int = 0
+    cv2_count: int = 0
+    cv3_count: int = 0
+    sample_findings: list[str] = Field(default_factory=list)
+    error: str | None = None
+
+
 class AuditGovernanceReport(BaseModel):
     """Durable governance evidence for every request.
 
     Written to: {output_dir}/{repo_id}/{audit_type}/{request_id}/governance_report.json
     """
 
-    schema_version: str = "1.1"
+    schema_version: str = "1.2"
     request: AuditGovernanceRequest
     decision: AuditGovernanceDecision
     policy_results: list[PolicyResult]
@@ -358,6 +382,7 @@ class AuditGovernanceReport(BaseModel):
     dispatch_result_summary: DispatchResultSummary | None = None
     budget_state_summary: BudgetStateSummary | None = None
     cooldown_state_summary: CooldownStateSummary | None = None
+    coverage_audit_summary: CoverageAuditSummary | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -381,6 +406,7 @@ __all__ = [
     "BudgetConfig",
     "BudgetStateSummary",
     "CooldownConfig",
+    "CoverageAuditSummary",
     "CooldownStateSummary",
     "DispatchResultSummary",
     "GovernanceConfig",
