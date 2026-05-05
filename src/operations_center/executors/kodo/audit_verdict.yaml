@@ -1,0 +1,16 @@
+# Phase 9 — Kodo audit verdict.
+# Per the spec's initial expectation: adapter_plus_wrapper, gated by G-001.
+backend_id: kodo
+audited_at: "2026-05-05"
+audited_against_cxrp_version: "0.2"
+backend_version: unknown
+per_phase:
+  runtime_control: PARTIAL          # OC cannot bind runtime; team config is the workaround
+  capability_control: PASS          # CLI scope is bounded; tools.audit / shell controlled at OC layer
+  drift_detection: PASS             # synthetic injection tests pass (test_kodo_drift.py)
+  failure_observability: PASS       # exit codes, stdout/stderr, structured rate-limit signals
+  internal_routing: "N/A"           # single-agent backend
+outcome: adapter_plus_wrapper
+gap_refs:
+  - G-001
+next_review_by: "2026-08-05"

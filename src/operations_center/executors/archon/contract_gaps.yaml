@@ -1,0 +1,21 @@
+# Phase 7 — contract gaps for the Archon executor.
+
+- id: G-001
+  gap: "Archon adapter has no per-request runtime/model/provider parameter — ArchonAdapter.run(config) accepts only ArchonWorkflowConfig (workflow shape, no LLM binding)"
+  discovered_at: "2026-05-05"
+  backend_version: "unknown"
+  impact: "OC cannot bind RuntimeBinding to a specific runtime; Archon decides its own LLM internally"
+  workaround: "set process-global env vars (e.g. ANTHROPIC_API_KEY) before invocation — racy with concurrent runs"
+  fork_threshold: "if Archon does not expose a per-workflow LLM-provider hook in its API/CLI"
+  status: open
+  patch_deadline: "2026-06-19"
+
+- id: G-002
+  gap: "Archon's internal multi-agent routing decisions are not observable from OC — workflow_events surface step kinds but not always per-agent model/tool choices"
+  discovered_at: "2026-05-05"
+  backend_version: "unknown"
+  impact: "OC cannot verify internal routing matches policy; drift detection for internal routing relies on Archon emitting agent identity in events"
+  workaround: "normalizer flattens workflow_events into evidence.extensions.internal_trace_summary; drift fires only if observed_agent_models is supplied"
+  fork_threshold: "if Archon refuses to emit per-agent model/tool metadata in workflow events"
+  status: open
+  patch_deadline: null

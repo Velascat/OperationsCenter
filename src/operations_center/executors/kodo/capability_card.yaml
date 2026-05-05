@@ -1,0 +1,12 @@
+# Phase 8 — Kodo capability card. Objective fields ONLY.
+# Subjective commentary lives in recommendations.md.
+backend_id: kodo
+backend_version: unknown
+advertised_capabilities:
+  - repo_read
+  - repo_patch
+  - test_run
+  - shell_read
+  - shell_write
+measured_constraints: {}     # populated from Phase 1 sample analysis
+known_capability_gaps: []

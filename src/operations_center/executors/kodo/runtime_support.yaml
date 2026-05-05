@@ -1,0 +1,11 @@
+# Phase 8 — Kodo runtime support card.
+backend_id: kodo
+backend_version: unknown
+supported_runtime_kinds:
+  - cli_subscription
+  - hosted_api
+supported_selection_modes:
+  - backend_default
+  - explicit_request
+known_runtime_gaps:
+  - G-001

@@ -1,0 +1,12 @@
+# Phase 7 — contract gaps for the Kodo executor.
+# Justification trail for any non-adapter_only verdict.
+
+- id: G-001
+  gap: "runtime selection lives in Kodo team config (e.g. _CLAUDE_FALLBACK_TEAM), not in OC RuntimeBinding"
+  discovered_at: "2026-05-05"
+  backend_version: "unknown"
+  impact: "OC cannot bind RuntimeBinding per request; runtime is decided by which team config the adapter passes to Kodo"
+  workaround: "wrap Kodo invocation in OC layer that translates RuntimeBinding -> team config selection"
+  fork_threshold: "if Kodo refuses to accept a per-invocation team override and config files cannot be templated per request"
+  status: open
+  patch_deadline: null

@@ -1,0 +1,8 @@
+# Phase 8 — Archon runtime support card.
+backend_id: archon
+backend_version: unknown
+supported_runtime_kinds: []     # no observed support — adapter has no binder layer (G-001)
+supported_selection_modes: []
+known_runtime_gaps:
+  - G-001
+  - G-002

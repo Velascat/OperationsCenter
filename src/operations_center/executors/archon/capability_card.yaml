@@ -1,0 +1,10 @@
+# Phase 8 — Archon capability card. Objective fields ONLY.
+backend_id: archon
+backend_version: unknown
+advertised_capabilities:
+  - repo_read
+  - repo_patch
+  - test_run
+  - network_access
+measured_constraints: {}
+known_capability_gaps: []
