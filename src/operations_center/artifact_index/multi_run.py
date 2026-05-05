@@ -182,13 +182,15 @@ class MultiRunArtifactIndex:
         """Federate ``query_artifacts`` across every successfully-loaded run."""
         out: list[IndexedArtifact] = []
         for run in self.loaded_runs:
-            assert run.index is not None
+            if run.index is None:
+                continue  # Defensive — loaded_runs already filters this out.
             out.extend(query_artifacts(run.index, query))
         return out
 
     def iter_artifacts(self) -> Iterator[IndexedArtifact]:
         for run in self.loaded_runs:
-            assert run.index is not None
+            if run.index is None:
+                continue
             yield from run.index.artifacts
 
     # ------------------------------------------------------------------

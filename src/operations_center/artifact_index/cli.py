@@ -19,7 +19,6 @@ codes per failure class):
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +32,6 @@ from .errors import (
 )
 from .multi_run import (
     IndexedRun,
-    MultiRunArtifactIndex,
     build_multi_run_index,
 )
 from .retrieval import read_json_artifact, read_text_artifact
@@ -105,6 +103,7 @@ def cmd_index(
                 },
                 indent=2,
                 default=_path_default,
+                ensure_ascii=False,
             )
         )
         if not idx.runs:
@@ -129,7 +128,7 @@ def cmd_index(
         if run.is_partial:
             note_parts.append("[yellow]partial[/yellow]")
         if run.load_error:
-            note_parts.append(f"[red]load error[/red]")
+            note_parts.append("[red]load error[/red]")
         t.add_row(
             run.run_id or "[dim]?[/dim]",
             run.repo_id or "—",
@@ -208,6 +207,7 @@ def cmd_index_show(
                 },
                 indent=2,
                 default=_path_default,
+                ensure_ascii=False,
             )
         )
         return
@@ -288,11 +288,13 @@ def cmd_get_artifact(
 
     # Print content. Use read_json_artifact for json content_type, else text.
     indexed = run.index.get_by_id(artifact_id)
-    assert indexed is not None
+    if indexed is None:
+        console.print(f"[red]Artifact {artifact_id!r} disappeared from index[/red]")
+        raise typer.Exit(code=1)
     if indexed.content_type == "application/json":
         try:
             data = read_json_artifact(run.index, artifact_id)
-            text = json.dumps(data, indent=2, default=_path_default)
+            text = json.dumps(data, indent=2, default=_path_default, ensure_ascii=False)
         except Exception as exc:  # noqa: BLE001
             console.print(f"[red]read_json_artifact failed:[/red] {exc}")
             raise typer.Exit(code=4) from exc

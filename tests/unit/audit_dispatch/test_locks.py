@@ -190,6 +190,8 @@ class TestLazyStaleSweep:
         # The lazy sweep won't run again — but try_acquire will still detect
         # the stale lock at acquire time because is_alive() returns False.
         lock2 = reg.acquire("videofoundry", run_id="new")
+        assert lock2.payload is not None
+        assert lock2.payload.run_id == "new"
         lock2.release()
 
 

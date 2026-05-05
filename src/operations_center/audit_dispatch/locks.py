@@ -171,7 +171,12 @@ class ManagedRepoAuditLockRegistry:
                 self._store.release(repo_id)
             except Exception:
                 # Release must never raise — best-effort cleanup.
-                pass
+                # Log so operators can investigate stuck/corrupt locks instead
+                # of silently leaking them.
+                import logging
+                logging.getLogger(__name__).warning(
+                    "lock_release_failed", exc_info=True, extra={"repo_id": repo_id}
+                )
 
     def _update_payload(
         self,

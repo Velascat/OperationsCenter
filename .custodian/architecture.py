@@ -29,12 +29,19 @@ from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult,
 _AI3_FORBIDDEN_NAMES: set[str] = {"glob", "iglob", "scandir", "listdir"}
 _AI3_FORBIDDEN_ATTRS: set[str] = {"glob", "rglob", "scandir", "listdir", "walk"}
 
+# Phase 7 multi-run discovery (multi_run.py) and its CLI (cli.py) are
+# explicitly allowed to walk the filesystem — that's their job. The single-run
+# loader/index/query/retrieval modules remain scan-free.
+_AI3_EXEMPT_FILES: frozenset[str] = frozenset({"multi_run.py", "cli.py"})
+
 
 def _detect_ai3_no_directory_scanning(ctx: AuditContext) -> DetectorResult:
     index_dir = ctx.repo_root / "src" / "operations_center" / "artifact_index"
     samples: list[str] = []
     count = 0
     for py_file in sorted(index_dir.rglob("*.py")):
+        if py_file.name in _AI3_EXEMPT_FILES:
+            continue
         try:
             tree = ast.parse(py_file.read_text(encoding="utf-8", errors="replace"))
         except SyntaxError:
