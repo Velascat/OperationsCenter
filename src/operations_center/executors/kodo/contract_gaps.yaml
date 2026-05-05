@@ -16,20 +16,20 @@
   discovered_at: "2026-05-05"
   backend_version: "0.4.272"
   impact: "When KodoSettings.orchestrator='claude' but RuntimeBinding=cli_subscription/opus, kodo expects ANTHROPIC_API_KEY because 'claude' selects API path. CLI backends need 'claude-code:opus' format. Discovered during the real R6 end-to-end test."
-  workaround: "callers must pass orchestrator='claude-code:opus' in KodoSettings explicitly. Binder should derive this from RuntimeBinding."
+  workaround: "MITIGATED 2026-05-05: KodoTeamSelection now carries .orchestrator (derived via _orchestrator_for_cli). KodoBackendAdapter sets prepared.orchestrator_override; invoker passes a per-call profile to kodo.run. Verified by R6-retry-2 against real kodo 0.4.272."
   fork_threshold: "no fork needed — binder enhancement only"
-  status: open
-  patch_deadline: "2026-05-19"
+  status: mitigated
+  patch_deadline: null
 
 - id: G-003
   gap: "Kodo normalizer trusts exit_code; misses internal stage failures"
   discovered_at: "2026-05-05"
   backend_version: "0.4.272"
   impact: "Real R6 run: kodo exit_code=0 even though 'Done: 0/1 stage completed; Stage crashed: ...' appeared in stdout. Normalizer reported success=True for what was actually a failed run."
-  workaround: "extend kodo/normalizer.py to scan stdout for 'Done: 0/N' or 'crashed' markers and override status to FAILED when found"
+  workaround: "MITIGATED 2026-05-05: backends/kodo/normalize.py now runs _scan_stdout_for_internal_failure(). Patterns catch 'Done: 0/N stage completed', 'Stage X crashed', 'crashed:', 'Stopping run'. Status flips to FAILED + failure_reason populated even when exit_code=0. Verified by R6-retry-2."
   fork_threshold: "no fork needed — normalizer enhancement only"
-  status: open
-  patch_deadline: "2026-05-19"
+  status: mitigated
+  patch_deadline: null
 
 - id: G-004
   gap: "kodo 0.4.272 ClaudeCodeOrchestrator.cycle() rejects 'coach' kwarg"
