@@ -33,6 +33,16 @@ from operations_center.policy.engine import PolicyEngine
 from operations_center.policy.models import PolicyDecision, PolicyStatus
 
 from .handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
+from .recovery_loop import (
+    RecoveryAction,
+    RecoveryContext,
+    RecoveryDecision,
+    RecoveryEngine,
+    RecoveryPolicy,
+    attach_recovery_metadata,
+    bounded_sleep,
+    build_default_engine,
+)
 from .workspace import WorkspaceManager
 
 logger = logging.getLogger(__name__)
@@ -71,12 +81,19 @@ class ExecutionCoordinator:
         request_builder: ExecutionRequestBuilder | None = None,
         observability_service: ExecutionObservabilityService | None = None,
         workspace_manager: WorkspaceManager | None = None,
+        recovery_engine: RecoveryEngine | None = None,
+        recovery_policy: RecoveryPolicy | None = None,
     ) -> None:
         self._registry = adapter_registry
         self._policy = policy_engine or PolicyEngine.from_defaults()
         self._builder = request_builder or ExecutionRequestBuilder()
         self._observability = observability_service or ExecutionObservabilityService.default()
         self._workspace = workspace_manager
+        # Recovery loop wiring. Defaults are conservative — max_attempts=1
+        # means "no retry beyond the first attempt" so existing behavior is
+        # preserved unless callers explicitly enable retry policy.
+        self._recovery_policy = recovery_policy or RecoveryPolicy()
+        self._recovery_engine = recovery_engine or build_default_engine(self._recovery_policy)
 
     def execute(
         self,
@@ -122,7 +139,17 @@ class ExecutionCoordinator:
                 )
 
         adapter = self._registry.for_backend(bundle.decision.selected_backend)
-        result, raw_detail_refs, runtime_metadata = self._execute_adapter(adapter, request)
+        result, raw_detail_refs, runtime_metadata, recovery_actions, policy_decision = (
+            self._run_with_recovery_loop(
+                adapter=adapter,
+                bundle=bundle,
+                runtime=runtime,
+                request=request,
+                policy_decision=policy_decision,
+            )
+        )
+        if recovery_actions:
+            result = attach_recovery_metadata(result, tuple(recovery_actions))
 
         # Post-execution: commit any pending changes, push the task branch,
         # optionally open a PR. Failures are logged but non-fatal — the
@@ -186,6 +213,117 @@ class ExecutionCoordinator:
             logger.error("Adapter raised unexpected exception for run %s: %s", request.run_id, exc)
             return _adapter_crash_result(request, exc), [], {}
 
+    def _run_with_recovery_loop(
+        self,
+        *,
+        adapter,
+        bundle: ProposalDecisionBundle,
+        runtime: ExecutionRuntimeContext,  # noqa: ARG002 — reserved for future request rebuild
+        request: ExecutionRequest,
+        policy_decision: PolicyDecision,
+    ) -> tuple[
+        ExecutionResult,
+        list[BackendDetailRef],
+        dict[str, Any],
+        list[RecoveryAction],
+        PolicyDecision,
+    ]:
+        """Bounded recovery loop wrapping ``_execute_adapter``.
+
+        See ``docs/architecture/recovery_loop_design.md`` for the design.
+        Per-call state is local to this method; the coordinator instance
+        holds no mutable retry state, so concurrent ``execute()`` calls are
+        safe.
+        """
+        current_request = request
+        current_policy = policy_decision
+        recovery_actions: list[RecoveryAction] = []
+        last_result: ExecutionResult
+        last_refs: list[BackendDetailRef] = []
+        last_meta: dict[str, Any] = {}
+
+        max_attempts = max(1, int(self._recovery_policy.max_attempts))
+        for attempt in range(1, max_attempts + 1):
+            last_result, last_refs, last_meta = self._execute_adapter(adapter, current_request)
+
+            ctx = RecoveryContext(
+                original_request=request,
+                current_request=current_request,
+                attempt=attempt,
+                previous_actions=tuple(recovery_actions),
+            )
+
+            try:
+                outcome = self._recovery_engine.evaluate(last_result, ctx)
+            except Exception as exc:
+                logger.exception(
+                    "RecoveryEngine.evaluate raised for run %s: %s",
+                    request.run_id, exc,
+                )
+                synthetic = RecoveryAction(
+                    attempt=attempt,
+                    failure_kind=__import__(
+                        "operations_center.execution.recovery_loop",
+                        fromlist=["ExecutionFailureKind"],
+                    ).ExecutionFailureKind.UNKNOWN,
+                    decision=RecoveryDecision.REJECT_UNRECOVERABLE,
+                    reason=f"recovery engine raised: {exc!r}",
+                    handler_name=None,
+                )
+                recovery_actions.append(synthetic)
+                last_result = _recovery_engine_crash_result(current_request, exc)
+                break
+
+            recovery_actions.append(outcome.action)
+
+            if outcome.decision == RecoveryDecision.ACCEPT:
+                break
+            if outcome.next_request is None:
+                break
+
+            # Bounded synchronous sleep before retry, if requested. The
+            # bounded_sleep helper clamps to policy.max_delay_seconds.
+            actual_delay: float | None = None
+            if outcome.delay_seconds is not None:
+                actual_delay = bounded_sleep(
+                    outcome.delay_seconds,
+                    self._recovery_policy.max_delay_seconds,
+                )
+                # Re-record the action with the actual slept duration.
+                recovery_actions[-1] = RecoveryAction(
+                    attempt=outcome.action.attempt,
+                    failure_kind=outcome.action.failure_kind,
+                    decision=outcome.action.decision,
+                    reason=outcome.action.reason,
+                    handler_name=outcome.action.handler_name,
+                    modified_fields=outcome.action.modified_fields,
+                    delay_seconds=actual_delay,
+                )
+
+            request_changed = outcome.next_request is not current_request
+            current_request = outcome.next_request
+
+            if request_changed or outcome.requires_policy_revalidation:
+                # Modified request must be re-validated through PolicyEngine.
+                # Defensive: if PolicyEngine raises, terminate the loop with
+                # a synthetic crash result rather than propagating.
+                try:
+                    current_policy = self._policy.evaluate(
+                        bundle.proposal, bundle.decision, current_request,
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "PolicyEngine.evaluate raised for run %s: %s",
+                        request.run_id, exc,
+                    )
+                    last_result = _policy_engine_crash_result(current_request, exc)
+                    break
+                if current_policy.status in {PolicyStatus.BLOCK, PolicyStatus.REQUIRE_REVIEW}:
+                    last_result = _policy_blocked_result(current_request, current_policy)
+                    break
+
+        return last_result, last_refs, last_meta, recovery_actions, current_policy
+
     def _build_detail_refs(self, adapter, request, capture) -> list[BackendDetailRef]:
         if capture is None:
             return []
@@ -222,6 +360,43 @@ def _adapter_crash_result(request, exc: Exception) -> ExecutionResult:
         validation=ValidationSummary(status=ValidationStatus.SKIPPED),
         failure_category=FailureReasonCategory.BACKEND_ERROR,
         failure_reason=f"Adapter raised unexpected exception: {exc}",
+    )
+
+
+def _recovery_engine_crash_result(request, exc: Exception) -> ExecutionResult:
+    """Synthetic result when ``RecoveryEngine.evaluate`` raises mid-loop.
+
+    Defensive — recovery-layer exceptions must not propagate to the caller
+    as uncategorized runtime errors.
+    """
+    return ExecutionResult(
+        run_id=request.run_id,
+        proposal_id=request.proposal_id,
+        decision_id=request.decision_id,
+        status=ExecutionStatus.FAILED,
+        success=False,
+        validation=ValidationSummary(status=ValidationStatus.SKIPPED),
+        failure_category=FailureReasonCategory.BACKEND_ERROR,
+        failure_reason=f"RecoveryEngine raised unexpected exception: {exc}",
+    )
+
+
+def _policy_engine_crash_result(request, exc: Exception) -> ExecutionResult:
+    """Synthetic result when ``PolicyEngine.evaluate`` raises mid-loop.
+
+    Defensive — recovery-layer exceptions must not propagate to the caller
+    as uncategorized runtime errors. Uses POLICY_BLOCKED so observers see
+    this as a policy-side failure (which it effectively is).
+    """
+    return ExecutionResult(
+        run_id=request.run_id,
+        proposal_id=request.proposal_id,
+        decision_id=request.decision_id,
+        status=ExecutionStatus.FAILED,
+        success=False,
+        validation=ValidationSummary(status=ValidationStatus.SKIPPED),
+        failure_category=FailureReasonCategory.POLICY_BLOCKED,
+        failure_reason=f"PolicyEngine.evaluate raised mid-loop: {exc}",
     )
 
 

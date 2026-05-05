@@ -72,6 +72,13 @@ class ExecutionRequest(BaseModel):
     require_clean_validation: bool = True
     validation_commands: list[str] = Field(default_factory=list)
 
+    # Recovery loop signal — see execution/recovery_loop/. Defaults to False
+    # because most backend adapter calls have side effects (file writes, git
+    # commits, branch pushes, PR creation). Callers that produce a side-effect-
+    # free request may set ``idempotent=True`` to opt in to retry on transient
+    # failures.
+    idempotent: bool = False
+
     # Metadata
     requested_at: datetime = Field(default_factory=_utcnow)
 
@@ -205,7 +212,49 @@ class ExecutionResult(BaseModel):
     # Artifacts
     artifacts: list[ExecutionArtifact] = Field(default_factory=list)
 
+    # Recovery audit trail — populated by ExecutionCoordinator when the
+    # bounded recovery loop runs. None on legacy results / single-attempt
+    # paths that never engaged the loop. See execution/recovery_loop/.
+    recovery: Optional["RecoveryMetadataSummary"] = None
+
     # Metadata
     completed_at: datetime = Field(default_factory=_utcnow)
 
     model_config = {"frozen": True}
+
+
+# ---------------------------------------------------------------------------
+# Recovery metadata (mirror of recovery_loop.RecoveryMetadata, kept in the
+# contracts layer to avoid a circular dependency between contracts and the
+# recovery_loop package). Enum values are stored as plain strings here so
+# the contract does not depend on recovery_loop's enum classes.
+# ---------------------------------------------------------------------------
+
+
+class RecoveryActionSummary(BaseModel):
+    """One recorded recovery decision for a single attempt."""
+
+    attempt: int = Field(ge=1)
+    failure_kind: str
+    decision: str
+    reason: str
+    handler_name: Optional[str] = None
+    modified_fields: list[str] = Field(default_factory=list)
+    delay_seconds: Optional[float] = None
+
+    model_config = {"frozen": True}
+
+
+class RecoveryMetadataSummary(BaseModel):
+    """Recovery audit trail attached to ``ExecutionResult.recovery``."""
+
+    attempts: int = Field(ge=1)
+    actions: list[RecoveryActionSummary] = Field(default_factory=list)
+    final_decision: str
+    retry_refused_reason: Optional[str] = None
+
+    model_config = {"frozen": True}
+
+
+# Resolve the forward reference now that RecoveryMetadataSummary is defined.
+ExecutionResult.model_rebuild()
