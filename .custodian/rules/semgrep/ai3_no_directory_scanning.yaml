@@ -1,0 +1,38 @@
+# Semgrep equivalent of the legacy custom Python AI3 detector.
+#
+# AI3 — no directory scanning in artifact_index/. The single-run
+# loader/index/query/retrieval modules must consume the manifest as the
+# source of truth. Multi-run discovery (multi_run.py) and CLI (cli.py) are
+# the explicit Phase 7 exemptions — they're allowed to walk the filesystem.
+#
+# When this rule reaches stable parity with the Python detector, the
+# Python implementation in .custodian/architecture.py
+# (_detect_ai3_no_directory_scanning) can be removed.
+
+rules:
+  - id: ai3-no-directory-scanning-in-artifact-index
+    message: >-
+      AI3: directory scanning is forbidden in artifact_index/. The
+      single-run layer must consume the manifest as the source of truth.
+      multi_run.py and cli.py are explicitly exempt.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "src/operations_center/artifact_index/"
+      exclude:
+        - "src/operations_center/artifact_index/multi_run.py"
+        - "src/operations_center/artifact_index/cli.py"
+    pattern-either:
+      # Method-call form: anything.glob(...), anything.rglob(...), etc.
+      - pattern: $X.glob(...)
+      - pattern: $X.rglob(...)
+      - pattern: $X.scandir(...)
+      - pattern: $X.listdir(...)
+      - pattern: $X.walk(...)
+      - pattern: $X.iglob(...)
+      # Bare-name form: from glob import glob; glob(...)
+      - pattern: glob(...)
+      - pattern: iglob(...)
+      - pattern: scandir(...)
+      - pattern: listdir(...)

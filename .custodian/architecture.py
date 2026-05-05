@@ -2,65 +2,29 @@
 # Copyright (C) 2026 Velascat
 """Architecture-invariant detectors as a Custodian plugin contributor.
 
-Two invariants requiring custom AST analysis:
+Single remaining custom detector:
 
-  AI3  no_directory_scanning — artifact_index/ must not call directory
-                               traversal at runtime (glob, rglob, scandir, etc.)
-                               [TRANSITIONAL] call-pattern check; replace with semgrep
-                               rule when semgrep is enabled (Phase 4).
-  AI4  anti_collapse         — behavior_calibration's _FORBIDDEN_MUTATION_FIELDS
-                               guardrail is structurally present and non-empty
-                               (structural assignment check — custom logic required)
+  AI4  anti_collapse — behavior_calibration's _FORBIDDEN_MUTATION_FIELDS
+                       guardrail is structurally present and non-empty
+                       (structural assignment check on a specific file —
+                       custom Python policy required).
 
-Import-direction rules live in .custodian.yaml:
+Boundary refinement (per Custodian Boundary Refinement spec):
+
   AI1 (managed-repo imports) → architecture.invariants[forbidden_import_prefix] (A1)
-  AI2 (layer direction)      → architecture.layers                               (S1)
+  AI2 (layer direction)      → architecture.layers (S1)
+  AI3 (no directory scanning) → Semgrep rule at
+       .custodian/rules/semgrep/ai3_no_directory_scanning.yaml
+  AI4 (anti-collapse)        → custom Python (this file) — structural
+                                assignment check requires AST walking.
+
+The legacy Python AI3 detector was removed once Semgrep parity landed.
 """
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult, HIGH, MEDIUM
-
-
-# ── AI3: no directory scanning in artifact_index ──────────────────────────────
-
-_AI3_FORBIDDEN_NAMES: set[str] = {"glob", "iglob", "scandir", "listdir"}
-_AI3_FORBIDDEN_ATTRS: set[str] = {"glob", "rglob", "scandir", "listdir", "walk"}
-
-# Phase 7 multi-run discovery (multi_run.py) and its CLI (cli.py) are
-# explicitly allowed to walk the filesystem — that's their job. The single-run
-# loader/index/query/retrieval modules remain scan-free.
-_AI3_EXEMPT_FILES: frozenset[str] = frozenset({"multi_run.py", "cli.py"})
-
-
-def _detect_ai3_no_directory_scanning(ctx: AuditContext) -> DetectorResult:
-    index_dir = ctx.repo_root / "src" / "operations_center" / "artifact_index"
-    samples: list[str] = []
-    count = 0
-    for py_file in sorted(index_dir.rglob("*.py")):
-        if py_file.name in _AI3_EXEMPT_FILES:
-            continue
-        try:
-            tree = ast.parse(py_file.read_text(encoding="utf-8", errors="replace"))
-        except SyntaxError:
-            continue
-        rel = py_file.relative_to(ctx.repo_root).as_posix()
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            evidence: str | None = None
-            if isinstance(func, ast.Name) and func.id in _AI3_FORBIDDEN_NAMES:
-                evidence = f"{func.id}(...)"
-            elif isinstance(func, ast.Attribute) and func.attr in _AI3_FORBIDDEN_ATTRS:
-                evidence = f".{func.attr}(...)"
-            if evidence:
-                count += 1
-                if len(samples) < 8:
-                    samples.append(f"{rel}:{node.lineno}: {evidence}")
-    return DetectorResult(count=count, samples=samples)
+from custodian.audit_kit.detector import AuditContext, Detector, DetectorResult, HIGH
 
 
 # ── AI4: anti-collapse guardrail structurally present ─────────────────────────
@@ -124,12 +88,11 @@ def _detect_ai4_anti_collapse(ctx: AuditContext) -> DetectorResult:
 def build_oc_architecture_detectors() -> list[Detector]:
     """Custodian plugin contributor for OC's architecture invariants.
 
-    AI1 (managed-repo imports) and AI2 (layer direction) are now enforced
-    declaratively via architecture.invariants and architecture.layers in
-    .custodian.yaml (A1 and S1 detectors respectively).
+    Per the boundary refinement:
+      AI1, AI2 → declarative .custodian.yaml (forbidden_import_prefix, layers)
+      AI3      → Semgrep rule (.custodian/rules/semgrep/ai3_no_directory_scanning.yaml)
+      AI4      → custom Python (this file)
     """
     return [
-        # TRANSITIONAL: replace with semgrep rule (AI3 glob/rglob pattern) in Phase 4
-        Detector("AI3", "directory-scanning in artifact_index",         "fixed", _detect_ai3_no_directory_scanning, MEDIUM),
-        Detector("AI4", "anti-collapse guardrail structurally present", "fixed", _detect_ai4_anti_collapse,         HIGH),
+        Detector("AI4", "anti-collapse guardrail structurally present", "fixed", _detect_ai4_anti_collapse, HIGH),
     ]

@@ -449,4 +449,8 @@ maintenance:
 tools:
   ruff: true
   vulture: true
-  # semgrep: true  # for AI3 (.glob/.rglob in artifact_index) once Phase 4 lands
+  # AI3 is now expressed as a Semgrep rule (no Python AST walker).
+  # See .custodian/rules/semgrep/ai3_no_directory_scanning.yaml.
+  semgrep:
+    configs:
+      - .custodian/rules/semgrep
