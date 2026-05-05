@@ -27,8 +27,9 @@ def test_sb_adapter_capability_query():
 def test_sb_adapter_outcome_query():
     cat = load_catalog(_REAL_DIR)
     sb_cat = SwitchboardCatalogAdapter(cat)
-    assert sb_cat.backends_by_outcome(outcome="adapter_plus_wrapper") == ["kodo"]
-    assert sb_cat.backends_by_outcome(outcome="upstream_patch_pending") == ["archon"]
+    # Post-spike: archon also adapter_plus_wrapper, no patch pending
+    assert sb_cat.backends_by_outcome(outcome="adapter_plus_wrapper") == ["archon", "kodo"]
+    assert sb_cat.backends_by_outcome(outcome="upstream_patch_pending") == []
 
 
 def test_sb_adapter_satisfies_protocol():

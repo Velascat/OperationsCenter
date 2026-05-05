@@ -41,7 +41,8 @@ class TestRealCatalog:
         cat = load_catalog(_REAL_DIR)
         archon = cat.get("archon")
         assert archon is not None
-        assert archon.audit_verdict.outcome == AuditOutcome.UPSTREAM_PATCH_PENDING
+        # Post-spike (2026-05-05): G-001 mitigated, outcome moved to wrapper
+        assert archon.audit_verdict.outcome == AuditOutcome.ADAPTER_PLUS_WRAPPER
 
 
 # ── Query 1: runtime support ────────────────────────────────────────────
@@ -52,8 +53,8 @@ class TestRuntimeQuery:
         cat = load_catalog(_REAL_DIR)
         out = backends_supporting_runtime(cat, runtime_kind="cli_subscription")
         assert "kodo" in out
-        # Archon's runtime_support is empty until G-001 closes
-        assert "archon" not in out
+        # Post-spike: archon also supports cli_subscription via YAML wrapper
+        assert "archon" in out
 
     def test_returns_empty_for_unsupported_kind(self):
         cat = load_catalog(_REAL_DIR)
@@ -88,11 +89,13 @@ class TestCapabilityQuery:
 class TestVerdictQuery:
     def test_adapter_plus_wrapper(self):
         cat = load_catalog(_REAL_DIR)
-        assert backends_by_outcome(cat, outcome="adapter_plus_wrapper") == ["kodo"]
+        # Post-spike: both kodo and archon now wrappers
+        assert backends_by_outcome(cat, outcome="adapter_plus_wrapper") == ["archon", "kodo"]
 
     def test_upstream_patch_pending(self):
         cat = load_catalog(_REAL_DIR)
-        assert backends_by_outcome(cat, outcome=AuditOutcome.UPSTREAM_PATCH_PENDING) == ["archon"]
+        # Empty after G-001 spike closed Archon's patch dependency
+        assert backends_by_outcome(cat, outcome=AuditOutcome.UPSTREAM_PATCH_PENDING) == []
 
     def test_no_forks_yet(self):
         cat = load_catalog(_REAL_DIR)

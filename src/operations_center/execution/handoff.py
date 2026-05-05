@@ -12,18 +12,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from operations_center.contracts.execution import ExecutionRequest
+from operations_center.contracts.execution import ExecutionRequest, RuntimeBindingSummary
 from operations_center.planning.models import ProposalDecisionBundle
 from operations_center.policy.models import PolicyDecision
 
 
 @dataclass(frozen=True)
 class ExecutionRuntimeContext:
-    """Runtime-resolved details needed to build an ExecutionRequest."""
+    """Runtime-resolved details needed to build an ExecutionRequest.
+
+    ``runtime_binding`` is optional and sourced from OC's policy/binder
+    layer (not from SwitchBoard's LaneDecision — SB picks lane/backend,
+    OC binds the runtime). When set, the coordinator's drift detection
+    becomes active for this run.
+    """
 
     workspace_path: Path
     task_branch: str
     goal_file_path: Path | None = None
+    runtime_binding: RuntimeBindingSummary | None = None
 
 
 class ExecutionRequestBuilder:
@@ -58,4 +65,5 @@ class ExecutionRequestBuilder:
             timeout_seconds=proposal.constraints.timeout_seconds,
             require_clean_validation=proposal.constraints.require_clean_validation,
             validation_commands=list(proposal.validation_profile.commands),
+            runtime_binding=runtime.runtime_binding,
         )

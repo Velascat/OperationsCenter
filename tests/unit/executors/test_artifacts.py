@@ -48,21 +48,27 @@ class TestShippedArtifacts:
         assert "G-001" in v.gap_refs
 
     def test_archon_contract_gaps(self):
+        # Post-spike: G-001 mitigated (worktree-isolated YAML wrapper),
+        # G-002 still open without deadline (internal-routing observability)
         gaps = load_contract_gaps(_ARCHON_DIR / "contract_gaps.yaml")
-        assert any(g.id == "G-001" and g.patch_deadline for g in gaps)
+        g001 = next(g for g in gaps if g.id == "G-001")
+        assert g001.status == GapStatus.MITIGATED
+        assert g001.patch_deadline is None
 
     def test_archon_capability_card(self):
         card = load_capability_card(_ARCHON_DIR / "capability_card.yaml")
         assert card.backend_id == "archon"
 
     def test_archon_runtime_support(self):
+        # Post-spike: Archon supports cli_subscription + hosted_api
+        # via per-workflow YAML override.
         rs = load_runtime_support(_ARCHON_DIR / "runtime_support.yaml")
-        # Archon currently supports nothing — adapter is transport-shaped
-        assert rs.supported_runtime_kinds == []
+        assert "cli_subscription" in rs.supported_runtime_kinds
+        assert "hosted_api" in rs.supported_runtime_kinds
 
     def test_archon_verdict(self):
         v = load_audit_verdict(_ARCHON_DIR / "audit_verdict.yaml")
-        assert v.outcome == AuditOutcome.UPSTREAM_PATCH_PENDING
+        assert v.outcome == AuditOutcome.ADAPTER_PLUS_WRAPPER
 
 
 # ── validation rejects bad data ─────────────────────────────────────────

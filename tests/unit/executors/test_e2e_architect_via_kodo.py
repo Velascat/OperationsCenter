@@ -95,7 +95,9 @@ def test_special_use_case_end_to_end():
     catalog = load_catalog(_EXECUTORS_DIR)
     sb_cat = SwitchboardCatalogAdapter(catalog)
     assert "kodo" in sb_cat.backends_supporting_runtime(runtime_kind="cli_subscription")
-    assert sb_cat.backends_by_outcome(outcome="adapter_plus_wrapper") == ["kodo"]
+    # Post-spike both Kodo and Archon are adapter_plus_wrapper; the e2e
+    # path picks Kodo for the architect role per the recommendations.
+    assert "kodo" in sb_cat.backends_by_outcome(outcome="adapter_plus_wrapper")
 
     # 2. Build the architect-role binding
     binding = RuntimeBindingSummary(

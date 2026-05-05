@@ -1,17 +1,18 @@
 # Phase 9 — Archon audit verdict.
-# Per the spec's initial expectation: upstream_patch_pending while G-001 is open.
+# Updated 2026-05-05 after the G-001 spike: Archon supports per-workflow
+# provider/model via YAML + worktree-isolated config. Wrapper sufficient.
 backend_id: archon
 audited_at: "2026-05-05"
 audited_against_cxrp_version: "0.2"
 backend_version: unknown
 per_phase:
-  runtime_control: FAIL              # adapter has no per-request runtime parameter (G-001)
+  runtime_control: PARTIAL           # YAML/config wrapper required (G-001 mitigated)
   capability_control: PARTIAL        # tool/network surface bounded only via process env
   drift_detection: PASS              # synthetic injection tests pass (test_archon_drift.py)
   failure_observability: PARTIAL     # outcome enum + error_text — partial agent-step granularity
   internal_routing: PARTIAL          # workflow_events emit agent identity inconsistently (G-002)
-outcome: upstream_patch_pending
+outcome: adapter_plus_wrapper
 gap_refs:
   - G-001
   - G-002
-next_review_by: "2026-06-19"
+next_review_by: "2026-08-05"

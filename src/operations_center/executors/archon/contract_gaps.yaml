@@ -4,11 +4,11 @@
   gap: "Archon adapter has no per-request runtime/model/provider parameter — ArchonAdapter.run(config) accepts only ArchonWorkflowConfig (workflow shape, no LLM binding)"
   discovered_at: "2026-05-05"
   backend_version: "unknown"
-  impact: "OC cannot bind RuntimeBinding to a specific runtime; Archon decides its own LLM internally"
-  workaround: "set process-global env vars (e.g. ANTHROPIC_API_KEY) before invocation — racy with concurrent runs"
-  fork_threshold: "if Archon does not expose a per-workflow LLM-provider hook in its API/CLI"
-  status: open
-  patch_deadline: "2026-06-19"
+  impact: "OC cannot bind RuntimeBinding to a specific runtime via the CLI; Archon reads provider/model from workflow YAML or .archon/config.yaml"
+  workaround: "Per spike (2026-05-05): worktree-isolated per-invocation override is supported. Either (a) template the workflow YAML's provider:/model: fields per call, or (b) write .archon/config.yaml into the worktree before `archon workflow run`. Both are documented config surfaces — no Archon source changes required. The wrapper approach gives race-free per-invocation runtime binding when paired with worktree isolation."
+  fork_threshold: "no longer applies — wrapper is sufficient given existing worktree isolation pattern"
+  status: mitigated
+  patch_deadline: null
 
 - id: G-002
   gap: "Archon's internal multi-agent routing decisions are not observable from OC — workflow_events surface step kinds but not always per-agent model/tool choices"

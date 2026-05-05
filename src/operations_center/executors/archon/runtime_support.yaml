@@ -1,8 +1,13 @@
 # Phase 8 — Archon runtime support card.
+# Updated post-G-001 spike: Archon supports cli_subscription + hosted_api
+# via per-workflow YAML (provider:/model:) — see contract_gaps.yaml.
 backend_id: archon
 backend_version: unknown
-supported_runtime_kinds: []     # no observed support — adapter has no binder layer (G-001)
-supported_selection_modes: []
+supported_runtime_kinds:
+  - cli_subscription   # via YAML provider:/model: in worktree-isolated config
+  - hosted_api         # same mechanism
+supported_selection_modes:
+  - backend_default
+  - explicit_request
 known_runtime_gaps:
-  - G-001
   - G-002
