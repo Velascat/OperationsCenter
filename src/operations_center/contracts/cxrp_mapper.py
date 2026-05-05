@@ -36,13 +36,15 @@ from cxrp.contracts import (
     ExecutionResult as CxrpExecutionResult,
     LaneAlternative as CxrpLaneAlternative,
     LaneDecision as CxrpLaneDecision,
+    RuntimeBinding as CxrpRuntimeBinding,
     TaskProposal as CxrpTaskProposal,
 )
 from cxrp.vocabulary.lane import LaneType
+from cxrp.vocabulary.runtime import RuntimeKind, SelectionMode
 from cxrp.vocabulary.status import ExecutionStatus as CxrpExecutionStatus
 
 from .enums import BackendName, LaneName
-from .execution import ExecutionRequest, ExecutionResult
+from .execution import ExecutionRequest, ExecutionResult, RuntimeBindingSummary
 from .proposal import TaskProposal
 from .routing import LaneDecision
 
@@ -172,6 +174,11 @@ def to_cxrp_execution_request(oc: ExecutionRequest, *, executor: str, backend: s
         "allowed_paths": list(oc.allowed_paths),
         "validation_commands": list(oc.validation_commands),
     }
+    runtime_binding_cxrp = (
+        runtime_binding_from_summary(oc.runtime_binding)
+        if oc.runtime_binding is not None
+        else None
+    )
     return CxrpExecutionRequest(
         request_id=oc.run_id,
         proposal_id=oc.proposal_id,
@@ -190,6 +197,7 @@ def to_cxrp_execution_request(oc: ExecutionRequest, *, executor: str, backend: s
             timeout_seconds=oc.timeout_seconds,
             require_clean_validation=oc.require_clean_validation,
         ),
+        runtime_binding=runtime_binding_cxrp,
     )
 
 
@@ -235,4 +243,41 @@ def to_cxrp_execution_result(oc: ExecutionResult) -> CxrpExecutionResult:
         status=_ecp_status_for(oc.status.value),
         artifacts=artifacts,
         diagnostics=diagnostics,
+    )
+
+
+# ---------------------------------------------------------------------------
+# RuntimeBinding mapping (CxRP <-> OC summary)
+# ---------------------------------------------------------------------------
+
+def runtime_binding_to_summary(rb: CxrpRuntimeBinding) -> RuntimeBindingSummary:
+    """Translate a CxRP RuntimeBinding (validated dataclass) into the
+    OC contract-layer summary that rides on ExecutionRequest.runtime_binding.
+    """
+    return RuntimeBindingSummary(
+        kind=rb.kind.value if isinstance(rb.kind, RuntimeKind) else str(rb.kind),
+        selection_mode=(
+            rb.selection_mode.value
+            if isinstance(rb.selection_mode, SelectionMode)
+            else str(rb.selection_mode)
+        ),
+        model=rb.model,
+        provider=rb.provider,
+        endpoint=rb.endpoint,
+        config_ref=rb.config_ref,
+    )
+
+
+def runtime_binding_from_summary(summary: RuntimeBindingSummary) -> CxrpRuntimeBinding:
+    """Inverse of ``runtime_binding_to_summary``. Re-validates against
+    CxRP's validity table + optional-field allow-list — raises ValueError
+    if the summary was constructed with an inconsistent shape.
+    """
+    return CxrpRuntimeBinding(
+        kind=RuntimeKind(summary.kind),
+        selection_mode=SelectionMode(summary.selection_mode),
+        model=summary.model,
+        provider=summary.provider,
+        endpoint=summary.endpoint,
+        config_ref=summary.config_ref,
     )

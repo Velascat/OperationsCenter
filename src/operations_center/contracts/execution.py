@@ -79,6 +79,11 @@ class ExecutionRequest(BaseModel):
     # failures.
     idempotent: bool = False
 
+    # Runtime binding — what powers the executor for this request.
+    # Mirror of cxrp.contracts.RuntimeBinding to avoid an import-cycle at
+    # the contract layer (same pattern as RecoveryMetadataSummary).
+    runtime_binding: Optional["RuntimeBindingSummary"] = None
+
     # Metadata
     requested_at: datetime = Field(default_factory=_utcnow)
 
@@ -256,5 +261,26 @@ class RecoveryMetadataSummary(BaseModel):
     model_config = {"frozen": True}
 
 
-# Resolve the forward reference now that RecoveryMetadataSummary is defined.
+class RuntimeBindingSummary(BaseModel):
+    """Mirror of cxrp.contracts.RuntimeBinding at OC's contract layer.
+
+    Carried on ``ExecutionRequest.runtime_binding`` so adapters know what
+    runtime OC bound for this call. Construction goes through CxRP's
+    validating dataclass — by the time it lands here, kind/selection_mode
+    have already been validated against the validity table and
+    optional-field allow-list.
+    """
+
+    kind: str
+    selection_mode: str
+    model: Optional[str] = None
+    provider: Optional[str] = None
+    endpoint: Optional[str] = None
+    config_ref: Optional[str] = None
+
+    model_config = {"frozen": True}
+
+
+# Resolve forward references now that the summary types are defined.
 ExecutionResult.model_rebuild()
+ExecutionRequest.model_rebuild()

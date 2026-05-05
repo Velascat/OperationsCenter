@@ -168,6 +168,7 @@ class ExecutionCoordinator:
             policy_decision,
             raw_detail_refs=raw_detail_refs,
             runtime_metadata=runtime_metadata,
+            request=request,
         )
         return ExecutionRunOutcome(
             request=request,
@@ -185,6 +186,7 @@ class ExecutionCoordinator:
         policy_decision: PolicyDecision,
         raw_detail_refs: list[BackendDetailRef] | None = None,
         runtime_metadata: dict[str, Any] | None = None,
+        request: ExecutionRequest | None = None,
     ) -> tuple[ExecutionRecord, ExecutionTrace]:
         metadata: dict[str, Any] = {
             "policy": policy_decision.model_dump(mode="json"),
@@ -193,6 +195,18 @@ class ExecutionCoordinator:
         }
         if runtime_metadata:
             metadata.update(runtime_metadata)
+
+        # Drift detection — only runs when the request carried a binding
+        # AND the adapter reported what it observed via runtime_metadata.
+        if request is not None and request.runtime_binding is not None:
+            drift = _evaluate_runtime_drift(
+                backend_id=bundle.decision.selected_backend.value,
+                request=request,
+                runtime_metadata=runtime_metadata or {},
+            )
+            if drift is not None:
+                metadata["backend_drift"] = drift
+
         return self._observability.observe(
             result,
             backend=bundle.decision.selected_backend.value,
@@ -423,10 +437,58 @@ def _runtime_metadata_from_capture(capture: object | None) -> dict[str, Any]:
         return {}
 
     duration_ms = getattr(capture, "duration_ms", None)
-    if duration_ms is None:
-        return {}
+    metadata: dict[str, Any] = {}
+    if duration_ms is not None:
+        try:
+            metadata["duration_ms"] = int(duration_ms)
+        except (TypeError, ValueError):
+            pass
 
-    try:
-        return {"duration_ms": int(duration_ms)}
-    except (TypeError, ValueError):
-        return {}
+    # Optional drift inputs — adapters that can report what they actually
+    # ran can populate these on their capture for the drift detection layer.
+    observed_runtime = getattr(capture, "observed_runtime", None)
+    if isinstance(observed_runtime, dict):
+        metadata["observed_runtime"] = dict(observed_runtime)
+
+    used_capabilities = getattr(capture, "used_capabilities", None)
+    if isinstance(used_capabilities, (list, tuple, set)):
+        metadata["used_capabilities"] = sorted(str(c) for c in used_capabilities)
+
+    return metadata
+
+
+def _evaluate_runtime_drift(
+    *,
+    backend_id: str,
+    request: ExecutionRequest,
+    runtime_metadata: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Compute BACKEND_DRIFT findings for a single execution.
+
+    Returns a serializable dict (the drift payload) or None when there is
+    no drift / the adapter didn't report observable fields.
+    """
+    rb = request.runtime_binding
+    if rb is None:
+        return None
+
+    from operations_center.drift import detect_runtime_drift
+
+    observed = runtime_metadata.get("observed_runtime") or {}
+    bound = {
+        k: v
+        for k, v in (
+            ("kind", rb.kind),
+            ("model", rb.model),
+            ("provider", rb.provider),
+            ("endpoint", rb.endpoint),
+        )
+        if v is not None
+    }
+    finding = detect_runtime_drift(
+        backend_id=backend_id,
+        request_id=request.run_id,
+        bound_runtime=bound,
+        observed_runtime=observed,
+    )
+    return finding.to_dict() if finding is not None else None
