@@ -57,6 +57,31 @@ class KodoTeamSelection:
     """The result of binding a RuntimeBinding into Kodo team-config terms."""
     team_config: Optional[dict]    # None means "let Kodo use its default"
     label: str                     # human-readable selection name
+    orchestrator: Optional[str] = None
+    """``--orchestrator`` flag value. None = use KodoSettings default.
+
+    For CLI backends Kodo expects ``claude-code:opus`` / ``codex:sonnet``
+    style. The 'claude' / 'opus' bare forms select the API path, which
+    requires ANTHROPIC_API_KEY. Closes G-002 (discovered 2026-05-05).
+    """
+
+
+# Provider+model → Kodo --orchestrator string for CLI backends.
+# See kodo --help: "For CLI backends: claude-code:opus, cursor:sonnet-4-6,
+# gemini-cli:gemini-3-flash."
+_CLI_ORCHESTRATOR_PREFIX_BY_PROVIDER = {
+    "anthropic": "claude-code",
+}
+
+
+def _orchestrator_for_cli(provider: str, model: str) -> str:
+    prefix = _CLI_ORCHESTRATOR_PREFIX_BY_PROVIDER.get(provider)
+    if prefix is None:
+        raise BindError(
+            f"no CLI orchestrator prefix known for provider={provider!r}. "
+            "Extend _CLI_ORCHESTRATOR_PREFIX_BY_PROVIDER."
+        )
+    return f"{prefix}:{model}"
 
 
 def bind(rb: Optional[RuntimeBindingSummary]) -> KodoTeamSelection:
@@ -81,14 +106,17 @@ def bind(rb: Optional[RuntimeBindingSummary]) -> KodoTeamSelection:
 
     model = (rb.model or "").lower()
     if model in ("opus", "sonnet", ""):
+        chosen_model = model or "sonnet"
         return KodoTeamSelection(
             team_config=_CLAUDE_FALLBACK_TEAM,
             label="claude_fallback_team",
+            orchestrator=_orchestrator_for_cli(provider, chosen_model),
         )
     if model == "haiku":
         return KodoTeamSelection(
             team_config=_OPUS_HAIKU_FALLBACK_TEAM,
             label="opus_haiku_fallback_team",
+            orchestrator=_orchestrator_for_cli(provider, "haiku"),
         )
 
     raise BindError(

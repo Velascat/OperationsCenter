@@ -33,6 +33,10 @@ class KodoPreparedRun:
     timeout_seconds: int
     kodo_mode: str = "goal"
     env_overrides: dict[str, str] = field(default_factory=dict)
+    # Per-call override of KodoSettings.orchestrator. Populated by the
+    # binder when a RuntimeBinding pins a CLI runtime (e.g. claude-code:opus).
+    # None = use the adapter's default. Closes G-002 (2026-05-05).
+    orchestrator_override: Optional[str] = None
 
 
 @dataclass

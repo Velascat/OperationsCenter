@@ -9,6 +9,7 @@ backend-specific leaks past this layer (enforced by the schema's
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from cxrp.contracts import Evidence, ExecutionResult
@@ -19,10 +20,36 @@ class NormalizationError(ValueError):
     """Raised when raw Kodo output cannot be mapped to ExecutionResult."""
 
 
+# G-003 fix (2026-05-05): Kodo can return exit_code=0 even when its
+# internal stage execution crashed. Scan stdout for these markers and
+# override status to FAILED.
+_STDOUT_FAILURE_PATTERNS = (
+    re.compile(r"Done:\s*0/\d+\s+stage(?:s)?\s+completed", re.IGNORECASE),
+    re.compile(r"\bStage\s+\d+\s+\([^)]*\)\s+crashed", re.IGNORECASE),
+    re.compile(r"\bcrashed:\s+\S", re.IGNORECASE),
+    re.compile(r"\bStopping run\b", re.IGNORECASE),
+)
+
+
 def _status_from_exit(exit_code: int) -> ExecutionStatus:
     if exit_code == 0:
         return ExecutionStatus.SUCCEEDED
     return ExecutionStatus.FAILED
+
+
+def _stdout_failure_reason(stdout: str) -> str | None:
+    """Return a failure reason if stdout contains a Kodo internal-failure marker."""
+    if not stdout:
+        return None
+    for pattern in _STDOUT_FAILURE_PATTERNS:
+        match = pattern.search(stdout)
+        if match:
+            # Surface the matched line for the audit trail
+            line_start = stdout.rfind("\n", 0, match.start()) + 1
+            line_end = stdout.find("\n", match.end())
+            line = stdout[line_start:line_end if line_end != -1 else None].strip()
+            return f"internal stage failure: {line[:160]}"
+    return None
 
 
 def normalize(raw: dict[str, Any], *, request_id: str = "", result_id: str = "") -> ExecutionResult:
@@ -45,12 +72,23 @@ def normalize(raw: dict[str, Any], *, request_id: str = "", result_id: str = "")
         raise NormalizationError(f"exit_code must be int, got {type(exit_code).__name__}")
 
     status = _status_from_exit(exit_code)
+    stdout = raw.get("stdout") or ""
+
+    # G-003: even with exit_code=0, scan stdout for stage failures.
+    stdout_failure = _stdout_failure_reason(stdout)
+    if status == ExecutionStatus.SUCCEEDED and stdout_failure is not None:
+        status = ExecutionStatus.FAILED
     ok = status == ExecutionStatus.SUCCEEDED
 
     failure_reason: str | None = None
     if not ok:
         stderr = raw.get("stderr") or ""
-        failure_reason = stderr.strip().splitlines()[-1] if stderr.strip() else f"exit_code={exit_code}"
+        if stderr.strip():
+            failure_reason = stderr.strip().splitlines()[-1]
+        elif stdout_failure is not None:
+            failure_reason = stdout_failure
+        else:
+            failure_reason = f"exit_code={exit_code}"
 
     known_keys = {"exit_code", "stdout", "stderr", "files_changed", "commands_run",
                   "tests_run", "artifacts", "summary"}

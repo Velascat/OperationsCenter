@@ -56,8 +56,17 @@ def normalize(
         validation_excerpt:   First failure output if validation failed.
         validation_duration_ms: Validation wall-clock time.
     """
-    status = ExecutionStatus.SUCCEEDED if capture.succeeded else _map_failure_status(capture)
-    success = capture.succeeded
+    # G-003 (2026-05-05): Kodo can return exit_code=0 even when its
+    # internal stage execution crashed (e.g. "Done: 0/1 stage completed,
+    # Stage X crashed"). Trust capture.succeeded only when stdout is
+    # also free of the documented failure markers.
+    stdout_failure = _scan_stdout_for_internal_failure(capture.stdout or "")
+    if capture.succeeded and stdout_failure is not None:
+        status = ExecutionStatus.FAILED
+        success = False
+    else:
+        status = ExecutionStatus.SUCCEEDED if capture.succeeded else _map_failure_status(capture)
+        success = capture.succeeded
 
     changed_files, changed_files_source, changed_files_confidence = (
         _discover_changed_files(workspace_path) if workspace_path else ([], "unknown", 0.0)
@@ -76,6 +85,14 @@ def normalize(
     failure_info = _extract_failure_info(capture) if not success else None
     failure_category = FailureReasonCategory(failure_info.failure_category_value) if failure_info else None
     failure_reason = failure_info.failure_reason if failure_info else None
+
+    # G-003: when we flipped status to FAILED via stdout scan but the
+    # underlying capture exited 0, _extract_failure_info short-circuits
+    # to None. Surface the stdout-derived reason so audit + recovery
+    # have something to act on.
+    if not success and failure_reason is None and stdout_failure is not None:
+        failure_reason = stdout_failure
+        failure_category = FailureReasonCategory.UNKNOWN
 
     return ExecutionResult(
         run_id=capture.run_id,
@@ -110,6 +127,32 @@ _QUOTA_EXHAUSTED_SIGNALS = (
     "you have run out of credits",
     "payment required",
 )
+
+# G-003 (2026-05-05): patterns that indicate Kodo's internal stage
+# execution failed even when exit_code=0. Discovered during the real
+# R6 run where ClaudeCodeOrchestrator crashed mid-stage.
+import re as _re
+
+_INTERNAL_FAILURE_PATTERNS = (
+    _re.compile(r"Done:\s*0/\d+\s+stage(?:s)?\s+completed", _re.IGNORECASE),
+    _re.compile(r"\bStage\s+\d+\s+\([^)]*\)\s+crashed", _re.IGNORECASE),
+    _re.compile(r"\bcrashed:\s+\S", _re.IGNORECASE),
+    _re.compile(r"\bStopping run\b", _re.IGNORECASE),
+)
+
+
+def _scan_stdout_for_internal_failure(stdout: str) -> Optional[str]:
+    """Return the matched-line excerpt if stdout signals an internal stage failure."""
+    if not stdout:
+        return None
+    for pattern in _INTERNAL_FAILURE_PATTERNS:
+        match = pattern.search(stdout)
+        if match:
+            line_start = stdout.rfind("\n", 0, match.start()) + 1
+            line_end = stdout.find("\n", match.end())
+            line = stdout[line_start:line_end if line_end != -1 else None].strip()
+            return f"internal stage failure: {line[:160]}"
+    return None
 
 
 def _extract_failure_info(capture: KodoRunCapture) -> KodoFailureInfo | None:

@@ -55,12 +55,18 @@ class KodoBackendInvoker:
         )
 
         env = self._build_env(prepared.env_overrides)
+        # Build a per-call profile override when binder pinned an orchestrator.
+        profile = None
+        if prepared.orchestrator_override is not None:
+            base = self._kodo.settings
+            profile = base.model_copy(update={"orchestrator": prepared.orchestrator_override})
         try:
             raw = self._kodo.run(
                 prepared.goal_file_path,
                 prepared.repo_path,
                 env=env,
                 kodo_mode=prepared.kodo_mode,
+                profile=profile,
             )
         finally:
             try:

@@ -281,7 +281,7 @@ def test_kodo_adapter_retains_backend_detail_refs_and_duration_metadata(tmp_path
 
     kodo = KodoAdapter.__new__(KodoAdapter)
     kodo.write_goal_file = lambda path, goal_text, constraints_text=None: path.write_text(goal_text, encoding="utf-8")
-    kodo.run = lambda goal_file_path, repo_path, env=None, kodo_mode="goal": KodoRunResult(
+    kodo.run = lambda goal_file_path, repo_path, env=None, kodo_mode="goal", profile=None: KodoRunResult(
         exit_code=0,
         stdout="kodo stdout",
         stderr="",

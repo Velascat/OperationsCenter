@@ -138,6 +138,14 @@ class KodoBackendAdapter:
                         "KodoBackendAdapter: bound runtime to team=%s for run=%s",
                         binder_label, request.run_id,
                     )
+                # G-002 fix: pass the binder's CLI orchestrator string
+                # through to the underlying kodo invocation.
+                if selection.orchestrator is not None:
+                    prepared.orchestrator_override = selection.orchestrator
+                    logger.info(
+                        "KodoBackendAdapter: bound orchestrator=%s for run=%s",
+                        selection.orchestrator, request.run_id,
+                    )
             except BindError as exc:
                 logger.error(
                     "KodoBackendAdapter: cannot bind RuntimeBinding for run %s: %s",

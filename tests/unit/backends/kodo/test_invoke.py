@@ -123,7 +123,7 @@ def test_invoker_does_not_inject_openai_api_base(tmp_path: Path, monkeypatch: py
 
     captured_env = {}
 
-    def capture_env(goal_file, repo_path, env=None, kodo_mode="goal"):
+    def capture_env(goal_file, repo_path, env=None, kodo_mode="goal", profile=None):
         captured_env.update(env or {})
         return KodoRunResult(0, "", "", ["kodo"])
 
