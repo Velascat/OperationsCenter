@@ -71,5 +71,27 @@ markers = [
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+# Tool-side replacements for Custodian native detectors deprecated under the
+# "use the tool first" principle. See Custodian docs/design/detector_disposition_matrix.md.
+extend-select = [
+    "T201",                                              # C2  — print()
+    "S101",                                              # C40 — assert in prod
+    "S110",                                              # C4  — try/except/pass
+    "S324",                                              # C31 — weak hash
+    "S602", "S603",                                      # C23 — subprocess shell=True
+    "BLE001",                                            # C9  — blind Exception
+    "DTZ001", "DTZ003", "DTZ005", "DTZ006", "DTZ007",   # C10 — naive datetime
+    "G004",                                              # C15 — f-string in logger
+    "B006",                                              # C38 — mutable default arg
+    "B028",                                              # C42 — warnings.warn no stacklevel
+    "PLC1802",                                           # C17 — len(x) == 0
+    "TRY002",                                            # C20 — raise vanilla Exception
+    "TRY203",                                            # D9  — useless try/except
+    "PGH003",                                            # C35 — bare # type: ignore
+    "RET503",                                            # D8  — implicit return
+    "N818",                                              # N1  — exception class naming
+]
+
 [tool.ty.environment]
 python-version = "3.11"
