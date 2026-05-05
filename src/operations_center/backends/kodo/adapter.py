@@ -113,6 +113,38 @@ class KodoBackendAdapter:
             self._kodo_mode,
         )
 
+        # Honor RuntimeBinding when present — bind it to a Kodo team
+        # config and write to .kodo/team.json before invocation. This
+        # closes G-001 in code: OC's bound runtime takes effect on the
+        # actual kodo subprocess.
+        team_override_path: Path | None = None
+        binder_label: str | None = None
+        if request.runtime_binding is not None:
+            from operations_center.executors.kodo.binder import (
+                BindError, bind as kodo_bind,
+            )
+            try:
+                selection = kodo_bind(request.runtime_binding)
+                binder_label = selection.label
+                if selection.team_config is not None:
+                    workspace = Path(request.workspace_path)
+                    team_override_path = workspace / ".kodo" / "team.json"
+                    team_override_path.parent.mkdir(exist_ok=True, parents=True)
+                    team_override_path.write_text(
+                        json.dumps(selection.team_config, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                    logger.info(
+                        "KodoBackendAdapter: bound runtime to team=%s for run=%s",
+                        binder_label, request.run_id,
+                    )
+            except BindError as exc:
+                logger.error(
+                    "KodoBackendAdapter: cannot bind RuntimeBinding for run %s: %s",
+                    request.run_id, exc,
+                )
+                return _invocation_error_result(request, f"binder error: {exc}"), None
+
         try:
             capture = self._invoker.invoke(prepared)
         except Exception as exc:
@@ -122,6 +154,9 @@ class KodoBackendAdapter:
                 exc,
             )
             return _invocation_error_result(request, str(exc)), None
+        finally:
+            if team_override_path is not None:
+                team_override_path.unlink(missing_ok=True)
 
         logger.info(
             "KodoBackendAdapter: run=%s exit_code=%d duration_ms=%d",
@@ -129,6 +164,22 @@ class KodoBackendAdapter:
             capture.exit_code,
             capture.duration_ms,
         )
+
+        # Attach observed_runtime to the capture so the coordinator's
+        # drift detection can compare bound vs observed. Best-effort:
+        # Kodo does not report which model the underlying CLI actually
+        # used, so observed = what the binder asserted.
+        if request.runtime_binding is not None and binder_label is not None:
+            observed = {"kind": request.runtime_binding.kind}
+            if request.runtime_binding.model:
+                observed["model"] = request.runtime_binding.model
+            if request.runtime_binding.provider:
+                observed["provider"] = request.runtime_binding.provider
+            try:
+                setattr(capture, "observed_runtime", observed)
+                setattr(capture, "binder_label", binder_label)
+            except (AttributeError, TypeError):
+                pass
 
         result = normalize(
             capture=capture,

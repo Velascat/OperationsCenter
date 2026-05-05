@@ -65,6 +65,7 @@ def needs_reaudit(
 
     if (
         verdict.backend_version != "unknown"
+        and current_backend_version != "unknown"
         and verdict.backend_version != current_backend_version
     ):
         reasons.append(ReauditReason.BACKEND_VERSION_CHANGED)

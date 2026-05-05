@@ -131,6 +131,39 @@ class ArchonBackendAdapter:
             self._workflow_type,
         )
 
+        # Honor RuntimeBinding when present — template .archon/config.yaml
+        # into the worktree before invocation. Worktree isolation makes
+        # this race-free under concurrent runs (closes G-001 in code).
+        binder_provider: str | None = None
+        binder_model: str | None = None
+        binder_label: str | None = None
+        if request.runtime_binding is not None:
+            from operations_center.executors.archon.binder import (
+                BindError as ArchonBindError,
+                bind as archon_bind,
+                write_worktree_config,
+            )
+            try:
+                selection = archon_bind(request.runtime_binding)
+                binder_label = selection.label
+                binder_provider = selection.provider
+                binder_model = selection.model
+                config_path = write_worktree_config(
+                    Path(request.workspace_path), selection,
+                )
+                if config_path is not None:
+                    logger.info(
+                        "ArchonBackendAdapter: wrote %s for run=%s (provider=%s model=%s)",
+                        config_path, request.run_id,
+                        selection.provider, selection.model,
+                    )
+            except ArchonBindError as exc:
+                logger.error(
+                    "ArchonBackendAdapter: cannot bind RuntimeBinding for run %s: %s",
+                    request.run_id, exc,
+                )
+                return _invocation_error_result(request, f"binder error: {exc}"), None
+
         try:
             capture = self._invoker.invoke(prepared)
         except Exception as exc:
@@ -140,6 +173,19 @@ class ArchonBackendAdapter:
                 exc,
             )
             return _invocation_error_result(request, str(exc)), None
+
+        # Attach observed_runtime to the capture for drift detection.
+        if request.runtime_binding is not None and binder_label is not None:
+            observed = {"kind": request.runtime_binding.kind}
+            if binder_provider:
+                observed["provider"] = binder_provider
+            if binder_model:
+                observed["model"] = binder_model
+            try:
+                setattr(capture, "observed_runtime", observed)
+                setattr(capture, "binder_label", binder_label)
+            except (AttributeError, TypeError):
+                pass
 
         logger.info(
             "ArchonBackendAdapter: run=%s outcome=%s duration_ms=%d events=%d",

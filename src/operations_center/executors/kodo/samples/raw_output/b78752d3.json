@@ -1,0 +1,19 @@
+{
+  "run_id": "b78752d3",
+  "invoked_at": "2026-05-05T20:36:27.719890+00:00",
+  "lane": "coding_agent",
+  "duration_seconds": 4.7,
+  "raw_output": {
+    "exit_code": 1,
+    "stdout": "🦉 kodo v0.4.272 — autonomous multi-agent coding\nProject: /tmp/r6_run/repo",
+    "stderr": "Error: ANTHROPIC_API_KEY not set — required for API orchestrator with Claude models",
+    "files_changed": [],
+    "commands_run": [],
+    "tests_run": []
+  },
+  "extras": {
+    "runtime_kind": "cli_subscription",
+    "selection_mode": "explicit_request",
+    "discovered_gap": "orchestrator string 'claude' is not CLI-prefixed"
+  }
+}

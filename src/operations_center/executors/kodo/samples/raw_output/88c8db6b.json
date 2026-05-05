@@ -1,0 +1,20 @@
+{
+  "run_id": "88c8db6b",
+  "invoked_at": "2026-05-05T20:36:27.722340+00:00",
+  "lane": "coding_agent",
+  "duration_seconds": 39.4,
+  "raw_output": {
+    "exit_code": 0,
+    "stdout": "Done: 0/1 stage completed; Stage 1 crashed: ClaudeCodeOrchestrator.cycle() got an unexpected keyword argument 'coach'",
+    "stderr": "",
+    "files_changed": [],
+    "commands_run": [],
+    "tests_run": []
+  },
+  "extras": {
+    "runtime_kind": "cli_subscription",
+    "selection_mode": "explicit_request",
+    "discovered_gap": "kodo 0.4.272 ClaudeCodeOrchestrator missing 'coach' kwarg",
+    "discovered_gap_2": "exit_code=0 despite stage crash — normalizer needs stdout heuristic"
+  }
+}

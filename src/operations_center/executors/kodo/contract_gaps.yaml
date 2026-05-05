@@ -4,9 +4,39 @@
 - id: G-001
   gap: "runtime selection lives in Kodo team config (e.g. _CLAUDE_FALLBACK_TEAM), not in OC RuntimeBinding"
   discovered_at: "2026-05-05"
-  backend_version: "unknown"
+  backend_version: "0.4.272"
   impact: "OC cannot bind RuntimeBinding per request; runtime is decided by which team config the adapter passes to Kodo"
-  workaround: "wrap Kodo invocation in OC layer that translates RuntimeBinding -> team config selection"
+  workaround: "executors/kodo/binder.py + KodoBackendAdapter wraps invocation, writes .kodo/team.json per call. CONFIRMED WORKING via real Kodo run 2026-05-05."
   fork_threshold: "if Kodo refuses to accept a per-invocation team override and config files cannot be templated per request"
-  status: open
+  status: mitigated
   patch_deadline: null
+
+- id: G-002
+  gap: "Kodo binder doesn't derive the --orchestrator string from RuntimeBinding"
+  discovered_at: "2026-05-05"
+  backend_version: "0.4.272"
+  impact: "When KodoSettings.orchestrator='claude' but RuntimeBinding=cli_subscription/opus, kodo expects ANTHROPIC_API_KEY because 'claude' selects API path. CLI backends need 'claude-code:opus' format. Discovered during the real R6 end-to-end test."
+  workaround: "callers must pass orchestrator='claude-code:opus' in KodoSettings explicitly. Binder should derive this from RuntimeBinding."
+  fork_threshold: "no fork needed — binder enhancement only"
+  status: open
+  patch_deadline: "2026-05-19"
+
+- id: G-003
+  gap: "Kodo normalizer trusts exit_code; misses internal stage failures"
+  discovered_at: "2026-05-05"
+  backend_version: "0.4.272"
+  impact: "Real R6 run: kodo exit_code=0 even though 'Done: 0/1 stage completed; Stage crashed: ...' appeared in stdout. Normalizer reported success=True for what was actually a failed run."
+  workaround: "extend kodo/normalizer.py to scan stdout for 'Done: 0/N' or 'crashed' markers and override status to FAILED when found"
+  fork_threshold: "no fork needed — normalizer enhancement only"
+  status: open
+  patch_deadline: "2026-05-19"
+
+- id: G-004
+  gap: "kodo 0.4.272 ClaudeCodeOrchestrator.cycle() rejects 'coach' kwarg"
+  discovered_at: "2026-05-05"
+  backend_version: "0.4.272"
+  impact: "Internal Kodo bug crashes the orchestrator on the first cycle when using claude-code backend. Workaround: pass --no-coach (if supported) or upgrade Kodo when fixed upstream."
+  workaround: "track Kodo upstream for fix; downgrade unaffected versions"
+  fork_threshold: "no fork needed — upstream Kodo bug"
+  status: open
+  patch_deadline: "2026-06-19"

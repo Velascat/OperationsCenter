@@ -45,6 +45,8 @@ operations-center-triage-scan       = "operations_center.entrypoints.maintenance
 # Operator one-shots — added 2026-04-28 from audit triage Group B.
 operations-center-autonomy-tiers    = "operations_center.entrypoints.autonomy_tiers.main:main"
 operations-center-ci-monitor        = "operations_center.entrypoints.ci_monitor.main:main"
+# Phase 13 — re-audit trigger evaluator. Cron-friendly; nonzero exit when stale.
+operations-center-reaudit-check     = "operations_center.entrypoints.reaudit_check.main:main"
 
 [project.optional-dependencies]
 dev = [

@@ -1,0 +1,15 @@
+{
+  "run_id": "b78752d3",
+  "invoked_at": "2026-05-05T20:36:27.719890+00:00",
+  "lane": "coding_agent",
+  "invocation": {
+    "binary": "kodo",
+    "orchestrator": "claude",
+    "team": "claude_fallback_team",
+    "binding": {
+      "kind": "cli_subscription",
+      "model": "opus",
+      "provider": "anthropic"
+    }
+  }
+}

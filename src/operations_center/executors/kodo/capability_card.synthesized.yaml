@@ -1,0 +1,15 @@
+backend_id: kodo
+backend_version: unknown
+advertised_capabilities:
+- repo_patch
+- repo_read
+- shell_read
+- shell_write
+- test_run
+measured_constraints:
+  max_observed_files_changed: 0
+  max_observed_commands_run: 0
+  max_observed_tests_run: 0
+  sample_count: 2
+  success_rate: 0.5
+known_capability_gaps: []
