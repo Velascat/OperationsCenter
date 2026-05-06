@@ -34,8 +34,15 @@ def _prepared(tmp_path: Path, **kw) -> KodoPreparedRun:
 
 
 def _mock_kodo(exit_code: int = 0, stdout: str = "done", stderr: str = "") -> KodoAdapter:
-    kodo = MagicMock(spec=KodoAdapter)
-    kodo.run.return_value = KodoRunResult(exit_code=exit_code, stdout=stdout, stderr=stderr, command=["kodo"])
+    # Plain MagicMock (not spec=KodoAdapter) so we can attach instance
+    # attributes like ``settings``. The invoker's contract is what we
+    # care about, not Adapter's class introspection.
+    kodo = MagicMock()
+    kodo.build_command.return_value = ["kodo", "--goal-file", ".kodo_goal.md"]
+    kodo._run_subprocess.return_value = KodoRunResult(
+        exit_code=exit_code, stdout=stdout, stderr=stderr,
+        command=["kodo", "--goal-file", ".kodo_goal.md"],
+    )
     kodo.write_goal_file = MagicMock()
     return kodo
 
@@ -55,7 +62,7 @@ class TestInvocation:
         kodo = _mock_kodo()
         invoker = _invoker(kodo)
         _capture = invoker.invoke(_prepared(tmp_path))
-        kodo.run.assert_called_once()
+        kodo._run_subprocess.assert_called_once()
 
     def test_invoke_calls_write_goal_file(self, tmp_path: Path):
         repo = tmp_path / "repo"
@@ -123,11 +130,11 @@ def test_invoker_does_not_inject_openai_api_base(tmp_path: Path, monkeypatch: py
 
     captured_env = {}
 
-    def capture_env(goal_file, repo_path, env=None, kodo_mode="goal", profile=None):
+    def capture_env(command, *, cwd, timeout, env=None):
         captured_env.update(env or {})
-        return KodoRunResult(0, "", "", ["kodo"])
+        return KodoRunResult(0, "", "", list(command))
 
-    kodo.run.side_effect = capture_env
+    kodo._run_subprocess.side_effect = capture_env
     invoker.invoke(_prepared(tmp_path))
     assert "OPENAI_API_BASE" not in captured_env
 
