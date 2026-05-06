@@ -71,8 +71,9 @@ class ArchonBackendAdapter:
         self,
         archon_adapter: ArchonAdapter,
         workflow_type: str = "goal",
+        runtime=None,
     ) -> None:
-        self._invoker = ArchonBackendInvoker(archon_adapter)
+        self._invoker = ArchonBackendInvoker(archon_adapter, runtime=runtime)
         self._workflow_type = workflow_type
 
     def supports(self, request: ExecutionRequest) -> SupportCheck:

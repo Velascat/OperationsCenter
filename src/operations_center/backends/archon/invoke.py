@@ -7,17 +7,20 @@ ArchonAdapter is the low-level interface to the Archon workflow service.
 Subclass it to provide a real implementation; use the provided stub or a
 MagicMock(spec=ArchonAdapter) in tests.
 
-ArchonBackendInvoker wraps ArchonAdapter, constructs an RxP
-``RuntimeInvocation`` record describing the workflow that's about to
-run, dispatches to the adapter, and converts the raw result back into
-an ``ArchonRunCapture`` for the normalizer plus an RxP
-``RuntimeResult`` for telemetry.
+ArchonBackendInvoker constructs an RxP ``RuntimeInvocation``, hands it
+to ``ExecutorRuntime`` (which routes ``runtime_kind="manual"`` to a
+``ManualRunner`` registered with an archon-specific dispatcher),
+receives an RxP ``RuntimeResult`` back, and assembles the
+``ArchonRunCapture`` for the normalizer.
 
-Phase 2 of the OC runtime extraction: archon's adapter call is not
-yet driven by the ExecutorRuntime — archon is an out-of-process
-service, not a subprocess. The RxP types here document what's
-running so a future HTTP/manual runner extraction can land without a
-contract change.
+Phase 3 (this PR): archon goes through ExecutorRuntime. Because
+archon's abstract adapter needs the full ``ArchonWorkflowConfig``
+(goal_text / constraints / validation_commands / etc. don't fit in
+``RuntimeInvocation.metadata: dict[str, str]``), the dispatcher is a
+per-call closure that captures ``effective_config`` and returns the
+``RuntimeResult`` synthesized from the raw archon response. The
+invoker is single-threaded by design — concurrent calls would race
+on the registered runner.
 """
 
 from __future__ import annotations
@@ -27,6 +30,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from executor_runtime import ExecutorRuntime
+from executor_runtime.runners import ManualRunner
 from rxp.contracts import RuntimeInvocation, RuntimeResult
 
 from .models import ArchonArtifactCapture, ArchonRunCapture, ArchonWorkflowConfig
@@ -84,19 +89,28 @@ class StubArchonAdapter(ArchonAdapter):
 class ArchonBackendInvoker:
     """Invokes Archon for a prepared workflow run and returns ArchonRunCapture.
 
-    Phase 2 (RxP wire):
-      1. Build an RxP ``RuntimeInvocation`` describing the workflow.
-      2. Dispatch to the abstract ``ArchonAdapter``.
-      3. Synthesize an RxP ``RuntimeResult`` from the raw archon
-         output (telemetry; not yet plumbed into observability).
-      4. Assemble ``ArchonRunCapture`` for the normalizer.
+    Phase 3 (ExecutorRuntime delegation, manual kind):
+      1. Build an RxP ``RuntimeInvocation`` (runtime_kind="manual").
+      2. Register a per-call dispatcher closure with ExecutorRuntime
+         that captures the effective config; the dispatcher calls
+         the abstract ``ArchonAdapter`` and synthesizes the RxP
+         ``RuntimeResult``.
+      3. ``ExecutorRuntime.run(invocation)`` routes through the
+         registered ``ManualRunner`` to the dispatcher.
+      4. The captured raw result populates ``ArchonRunCapture`` for
+         the normalizer.
+
+    Single-threaded by design: concurrent calls would race on the
+    registered "manual" runner. Archon dispatches are serial today.
     """
 
     def __init__(
         self,
         archon_adapter: ArchonAdapter,
+        runtime: ExecutorRuntime | None = None,
     ) -> None:
         self._archon = archon_adapter
+        self._runtime = runtime or ExecutorRuntime()
 
     def invoke(self, config: ArchonWorkflowConfig) -> ArchonRunCapture:
         """Execute the Archon workflow and return structured capture."""
@@ -110,22 +124,36 @@ class ArchonBackendInvoker:
 
         invocation = _build_invocation(effective_config)
 
-        raw = self._archon.run(effective_config)
+        # Per-call dispatcher captures the full ArchonWorkflowConfig
+        # (the abstract adapter needs goal_text / validation_commands
+        # / etc. that don't fit in RuntimeInvocation.metadata's
+        # dict[str, str] shape).
+        raw_holder: list[ArchonRunResult] = []
 
-        finished_at = _now()
+        def _dispatcher(inv: RuntimeInvocation) -> RuntimeResult:
+            raw = self._archon.run(effective_config)
+            raw_holder.append(raw)
+            timeout = _detect_timeout(raw)
+            return _build_runtime_result(
+                invocation=inv, raw=raw, timeout_hit=timeout,
+                started_at=started_at, finished_at=_now(),
+            )
+
+        self._runtime.register("manual", ManualRunner(_dispatcher))
+        rxp_result = self._runtime.run(invocation)
+
+        if not raw_holder:
+            # ExecutorRuntime rejected the invocation before our
+            # dispatcher ran (e.g. no runner registered for the kind).
+            return _capture_from_rejection(
+                config=config, rxp_result=rxp_result,
+                started_at=started_at, finished_at=_now(),
+            )
+        raw = raw_holder[0]
+
+        finished_at = _parse_iso(rxp_result.finished_at)
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
-
-        timeout_hit = (
-            raw.outcome == "timeout"
-            or any(s in (raw.error_text or "").lower() for s in ("[timeout:", "deadline exceeded"))
-        )
-
-        # RxP RuntimeResult — telemetry only for now; not on the
-        # canonical surface. Future observability layers will consume this.
-        _rxp_result = _build_runtime_result(
-            invocation=invocation, raw=raw, timeout_hit=timeout_hit,
-            started_at=started_at, finished_at=finished_at,
-        )
+        timeout_hit = rxp_result.status == "timed_out"
 
         artifacts = _extract_artifacts(raw.output_text or "", raw.error_text or "")
 
@@ -186,6 +214,46 @@ def _build_invocation(config: ArchonWorkflowConfig) -> RuntimeInvocation:
         environment=dict(config.env_overrides),
         timeout_seconds=config.timeout_seconds if config.timeout_seconds > 0 else None,
         metadata=metadata,
+    )
+
+
+def _detect_timeout(raw: "ArchonRunResult") -> bool:
+    if raw.outcome == "timeout":
+        return True
+    err = (raw.error_text or "").lower()
+    return any(s in err for s in ("[timeout:", "deadline exceeded"))
+
+
+def _parse_iso(iso: str) -> datetime:
+    return datetime.fromisoformat(iso)
+
+
+def _capture_from_rejection(
+    *,
+    config: ArchonWorkflowConfig,
+    rxp_result: RuntimeResult,
+    started_at: datetime,
+    finished_at: datetime,
+) -> ArchonRunCapture:
+    """ExecutorRuntime rejected the invocation before dispatcher ran.
+
+    This shouldn't happen in normal flow (we register the manual
+    runner before calling run), but the rejection path keeps the
+    invariant that ``invoke`` always returns an ArchonRunCapture.
+    """
+    duration_ms = int((finished_at - started_at).total_seconds() * 1000)
+    return ArchonRunCapture(
+        run_id=config.run_id,
+        outcome="failure",
+        exit_code=-1,
+        output_text="",
+        error_text=rxp_result.error_summary or "executor runtime rejected invocation",
+        workflow_events=[],
+        artifacts=[],
+        started_at=started_at,
+        finished_at=finished_at,
+        duration_ms=duration_ms,
+        timeout_hit=False,
     )
 
 

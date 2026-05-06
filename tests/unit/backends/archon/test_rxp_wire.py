@@ -131,3 +131,84 @@ class TestBuildRuntimeResult:
             started_at=self._now(), finished_at=self._now(),
         )
         assert result.status == "succeeded"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — ExecutorRuntime delegation through ManualRunner
+# ---------------------------------------------------------------------------
+
+
+from executor_runtime import ExecutorRuntime
+from executor_runtime.runners import ManualRunner
+
+from operations_center.backends.archon.invoke import (
+    ArchonBackendInvoker,
+    StubArchonAdapter,
+)
+
+
+class TestExecutorRuntimeDelegation:
+    def test_invoker_routes_through_executor_runtime(self, tmp_path):
+        """Invoking archon goes through ExecutorRuntime.run, not directly to the adapter."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        adapter = StubArchonAdapter(
+            ArchonRunResult(outcome="success", exit_code=0, output_text="ok"),
+        )
+        runtime = ExecutorRuntime()  # default — no manual runner pre-registered
+        invoker = ArchonBackendInvoker(adapter, runtime=runtime)
+        capture = invoker.invoke(_config(tmp_path))
+        assert capture.outcome == "success"
+        # The invoker should have registered a manual runner in the runtime.
+        assert "manual" in runtime._runners
+
+    def test_default_runtime_works_without_explicit_arg(self, tmp_path):
+        """Constructing without runtime= still wires correctly."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        adapter = StubArchonAdapter(ArchonRunResult(outcome="success"))
+        invoker = ArchonBackendInvoker(adapter)  # default ExecutorRuntime
+        capture = invoker.invoke(_config(tmp_path))
+        assert capture.outcome == "success"
+
+    def test_dispatcher_receives_runtime_invocation(self, tmp_path):
+        """The ManualRunner's dispatcher gets exactly the built RuntimeInvocation."""
+        captured: list[RuntimeInvocation] = []
+
+        class _SpyAdapter(StubArchonAdapter):
+            def __init__(self):
+                super().__init__(ArchonRunResult(outcome="success"))
+
+        # Wrap the runtime so we can intercept what gets dispatched.
+        runtime = ExecutorRuntime()
+        original_register = runtime.register
+
+        def _spy_register(kind, runner):
+            # Wrap the runner so we capture the invocation
+            inner = runner._dispatcher
+
+            def _wrapped(invocation):
+                captured.append(invocation)
+                return inner(invocation)
+
+            wrapped = ManualRunner(_wrapped)
+            original_register(kind, wrapped)
+
+        runtime.register = _spy_register
+
+        invoker = ArchonBackendInvoker(_SpyAdapter(), runtime=runtime)
+        invoker.invoke(_config(tmp_path, run_id="run-spy"))
+
+        assert len(captured) == 1
+        assert captured[0].invocation_id == "run-spy"
+        assert captured[0].runtime_kind == "manual"
+        assert captured[0].runtime_name == "archon"
+
+    def test_runtime_result_status_propagates_to_capture(self, tmp_path):
+        """Timeout outcomes from the dispatcher → timeout_hit on the capture."""
+        adapter = StubArchonAdapter(
+            ArchonRunResult(outcome="timeout", exit_code=124),
+        )
+        invoker = ArchonBackendInvoker(adapter)
+        capture = invoker.invoke(_config(tmp_path))
+        assert capture.timeout_hit is True
