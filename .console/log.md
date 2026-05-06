@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- Phase 2 + 3 — RxP wire + ExecutorRuntime delegation (openclaw, manual kind) (2026-05-06, on `oc-openclaw-runtime-wire`): Same shape as archon's Phase 3. OpenClaw goes through ExecutorRuntime via ManualRunner; per-call closure dispatcher captures the prepared run and calls the abstract `OpenClawRunner` subclass. New `runtime=` parameter on both `OpenClawBackendInvoker` and `OpenClawBackendAdapter`. 13 new tests pinning RuntimeInvocation shape, RuntimeResult status mapping, and ExecutorRuntime delegation. 2451 unit tests pass (+13).
+
 - HttpArchonAdapter (health-only) + archon-probe CLI (2026-05-06, on `oc-archon-health-adapter`): Concrete `HttpArchonAdapter` subclass of `ArchonAdapter` that probes `GET /api/health` against a running Archon (deployed by WorkStation's `compose/profiles/archon.yml`). The seam is in place — abstract-adapter-only is gone — but workflow dispatch is **not** wired. `run(config)` returns `outcome="failure"` with explicit `"workflow dispatch not yet implemented"` message rather than crashing or silently succeeding. New `archon_health_probe(base_url, timeout)` standalone helper + `operations-center-archon-probe` CLI for ops/monitoring (exit 0 healthy / 1 unhealthy or unreachable). Re-exported `HttpArchonAdapter` + `archon_health_probe` from `operations_center.backends.archon` package. 7 new tests in `test_http_client.py`. 2438 unit tests pass (+7).
 
 ## Backlog

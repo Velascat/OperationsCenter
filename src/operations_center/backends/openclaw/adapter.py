@@ -79,8 +79,9 @@ class OpenClawBackendAdapter:
         self,
         runner: OpenClawRunner,
         run_mode: str = "goal",
+        runtime=None,
     ) -> None:
-        self._invoker = OpenClawBackendInvoker(runner)
+        self._invoker = OpenClawBackendInvoker(runner, runtime=runtime)
         self._run_mode = run_mode
 
     def supports(self, request: ExecutionRequest) -> SupportCheck:
