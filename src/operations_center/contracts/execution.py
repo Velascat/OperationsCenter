@@ -89,6 +89,10 @@ class ExecutionRequest(BaseModel):
     # (BoundExecutionTarget references RuntimeBindingSummary in turn).
     bound_target: Optional["BoundExecutionTargetMirror"] = None
 
+    # ER-003 — optional lifecycle metadata. Absence preserves one-shot
+    # behavior; presence drives operations_center.lifecycle.LifecycleRunner.
+    lifecycle: Optional["LifecycleMetadata"] = None
+
     # Metadata
     requested_at: datetime = Field(default_factory=_utcnow)
 
@@ -234,6 +238,10 @@ class ExecutionResult(BaseModel):
     # See docs/architecture/execution_target.md.
     bound_target: Optional["BoundExecutionTargetMirror"] = None
 
+    # ER-003 — lifecycle outcome attached when the request carried lifecycle
+    # metadata. Reports completed/failed/skipped stages.
+    lifecycle_outcome: Optional["LifecycleOutcome"] = None
+
     # Metadata
     completed_at: datetime = Field(default_factory=_utcnow)
 
@@ -321,6 +329,13 @@ class RuntimeBindingSummary(BaseModel):
 
     model_config = {"frozen": True}
 
+
+# ER-003 — pull lifecycle types into local scope so the forward refs on
+# ExecutionRequest.lifecycle and ExecutionResult.lifecycle_outcome resolve.
+from operations_center.lifecycle.models import (  # noqa: E402,F401
+    LifecycleMetadata,
+    LifecycleOutcome,
+)
 
 # Resolve forward references now that the summary types are defined.
 ExecutionResult.model_rebuild()

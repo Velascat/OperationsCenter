@@ -49,6 +49,10 @@ operations-center-ci-monitor        = "operations_center.entrypoints.ci_monitor.
 operations-center-reaudit-check     = "operations_center.entrypoints.reaudit_check.main:main"
 # Phase 14 — fork-first upstream dependency management.
 operations-center-upstream          = "operations_center.entrypoints.upstream.main:main"
+# ER-001 — Repo Graph primitive.
+operations-center-repo-graph        = "operations_center.repo_graph.cli:app"
+# ER-002 — Run Memory primitive.
+operations-center-run-memory        = "operations_center.run_memory.cli:app"
 
 [project.optional-dependencies]
 dev = [
