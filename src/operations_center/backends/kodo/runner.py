@@ -1,32 +1,25 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
-"""Kodo binary runner — raw subprocess layer.
+"""Kodo binary helpers.
 
-``KodoAdapter`` builds the kodo command, runs it as a process group, and
-returns a ``KodoRunResult`` (exit code + stdout + stderr + command).
-This is the lower layer the backend's ``KodoBackendInvoker`` consumes.
+After Phase 3 of the runtime extraction, this module no longer runs
+the kodo binary itself — that's ExecutorRuntime's job. What stays
+here is the kodo-specific knowledge the OC backend needs:
 
-Generic subprocess mechanics (``_run_subprocess``) are still local to
-this module pending Phase 3 extraction into ExecutorRuntime.
+  - ``KodoAdapter.write_goal_file`` — assembles the goal markdown
+  - ``KodoAdapter.build_command`` — composes the kodo CLI argv
+  - ``KodoAdapter.get_version`` — reads ``kodo --version``
+
+The actual subprocess invocation is performed by
+``executor_runtime.ExecutorRuntime`` against the RxP RuntimeInvocation
+that the kodo backend's invoker constructs.
 """
 from __future__ import annotations
 
-import json
-import os
-import signal
 import subprocess
 from pathlib import Path
-from typing import NoReturn
 
 from operations_center.config.settings import KodoSettings
-
-
-class KodoRunResult:
-    def __init__(self, exit_code: int, stdout: str, stderr: str, command: list[str]) -> None:
-        self.exit_code = exit_code
-        self.stdout = stdout
-        self.stderr = stderr
-        self.command = command
 
 
 class KodoAdapter:
@@ -86,87 +79,6 @@ class KodoAdapter:
         if kodo_mode == "improve":
             return [s.binary, "--improve"] + tail
         return [s.binary, "--goal-file", str(goal_file)] + tail
-
-    @staticmethod
-    def _run_subprocess(
-        command: list[str],
-        *,
-        cwd: Path,
-        timeout: int,
-        env: dict[str, str] | None,
-    ) -> KodoRunResult:
-        """Run *command* in a new process session and return the result.
-
-        Uses ``start_new_session=True`` so that the spawned process becomes the
-        leader of a fresh process group.  On timeout, the **entire group** is
-        killed via ``os.killpg`` — this reaps kodo subprocesses (e.g. Claude
-        worker processes) that would otherwise become orphans and continue
-        consuming CPU / API quota.
-        """
-        proc = subprocess.Popen(
-            command,
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env,
-            start_new_session=True,
-        )
-
-        try:
-            _pgid: int | None = os.getpgid(proc.pid) if proc.pid else None
-        except OSError:
-            _pgid = None
-
-        def _kill_group() -> None:
-            if _pgid is not None:
-                try:
-                    os.killpg(_pgid, signal.SIGKILL)
-                except (ProcessLookupError, OSError):
-                    pass
-
-        _prev_sigterm = signal.getsignal(signal.SIGTERM)
-
-        def _sigterm_handler(signum: int, _frame: object) -> NoReturn:
-            _kill_group()
-            signal.signal(signal.SIGTERM, _prev_sigterm)
-            raise SystemExit(128 + signum)
-
-        signal.signal(signal.SIGTERM, _sigterm_handler)
-        try:
-            stdout, stderr = proc.communicate(timeout=timeout)
-            return KodoRunResult(proc.returncode, stdout, stderr, command)
-        except subprocess.TimeoutExpired:
-            _kill_group()
-            try:
-                stdout, stderr = proc.communicate(timeout=5)
-            except subprocess.TimeoutExpired:
-                stdout, stderr = "", ""
-            timeout_note = f"\n[timeout: process group killed after {timeout}s]"
-            return KodoRunResult(-1, stdout or "", (stderr or "") + timeout_note, command)
-        finally:
-            signal.signal(signal.SIGTERM, _prev_sigterm)
-
-    def run(
-        self,
-        goal_file: Path,
-        repo_path: Path,
-        env: dict[str, str] | None = None,
-        profile: "KodoSettings | None" = None,
-        kodo_mode: str = "goal",
-    ) -> KodoRunResult:
-        """Execute Kodo. *profile* overrides individual settings fields.
-
-        Build command, run once, return result. Backend-specific retry/
-        fallback policy belongs in the OC backend layer, not here.
-        """
-        timeout = (profile.timeout_seconds if profile else self.settings.timeout_seconds)
-        command = self.build_command(goal_file, repo_path, profile=profile, kodo_mode=kodo_mode)
-        return self._run_subprocess(command, cwd=repo_path, timeout=timeout, env=env)
-
-    @staticmethod
-    def command_to_json(command: list[str]) -> str:
-        return json.dumps({"command": command}, indent=2, ensure_ascii=False)
 
     @staticmethod
     def get_version(binary: str) -> str | None:

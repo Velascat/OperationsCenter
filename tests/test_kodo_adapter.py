@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
-import pytest
 from pathlib import Path
 
 from operations_center.backends.kodo.runner import KodoAdapter
@@ -35,35 +34,7 @@ def test_build_command_uses_configured_orchestrator(tmp_path: Path) -> None:
     assert command[idx + 1] == "claude-code:opus"
 
 
-def test_run_returns_subprocess_result_unmodified(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Adapter.run() builds the command, runs once, returns the result.
-    Backend-specific retry/fallback policy belongs in the OC backend layer.
-    """
-    repo_path = tmp_path / "repo"
-    repo_path.mkdir()
-    goal_file = tmp_path / "goal.md"
-    goal_file.write_text("## Goal\nDo something.\n")
-
-    calls: list[list[str]] = []
-
-    class FakePopen:
-        pid = 0
-        returncode = 1
-
-        def __init__(self, command, **kwargs):
-            calls.append(command)
-
-        def communicate(self, timeout=None):
-            return ("", "some error")
-
-    monkeypatch.setattr("subprocess.Popen", FakePopen)
-
-    adapter = KodoAdapter(KodoSettings())
-    result = adapter.run(goal_file, repo_path)
-
-    assert len(calls) == 1
-    assert result.exit_code == 1
-    # No fallback team JSON ever created.
-    assert not (repo_path / ".kodo" / "team.json").exists()
+# Removed: test_run_returns_subprocess_result_unmodified — KodoAdapter.run()
+# was deleted in Phase 3 cleanup. The actual subprocess execution lives in
+# ExecutorRuntime now. Kodo backend wire-level coverage is in
+# tests/unit/backends/kodo/test_invoke.py and test_rxp_wire.py.
