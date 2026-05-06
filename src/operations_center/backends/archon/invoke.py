@@ -81,6 +81,58 @@ class StubArchonAdapter(ArchonAdapter):
         return self._result
 
 
+class HttpArchonAdapter(ArchonAdapter):
+    """Concrete archon adapter — health-probe only.
+
+    Connects to a running Archon instance (deployed by WorkStation
+    via ``compose/profiles/archon.yml``) and verifies reachability
+    via ``GET /api/health``. **Does not yet dispatch workflows** —
+    Archon's actual API is conversation-driven and async, and OC's
+    integration with that surface needs design work (see
+    ``.console/log.md`` backlog item *"Archon real workflow
+    integration"*).
+
+    What this adapter gives you today:
+      - the seam is in place (no longer abstract-only)
+      - operators can verify archon is up via the standalone
+        health probe
+      - any caller that ``adapter.run(config)`` invokes gets a
+        clear ``"workflow dispatch not implemented"`` failure
+        rather than a misleading success or a NotImplementedError
+        crash mid-pipeline
+    """
+
+    def __init__(self, base_url: str | None = None) -> None:
+        # Lazy import keeps the abstract module loadable without httpx.
+        from operations_center.backends.archon.http_client import DEFAULT_BASE_URL
+        self._base_url = base_url or DEFAULT_BASE_URL
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
+    def run(self, config: ArchonWorkflowConfig) -> ArchonRunResult:
+        from operations_center.backends.archon.http_client import archon_health_probe
+        probe = archon_health_probe(self._base_url)
+        if not probe.ok:
+            return ArchonRunResult(
+                outcome="failure",
+                exit_code=-1,
+                output_text="",
+                error_text=f"archon unreachable at {self._base_url}: {probe.summary}",
+            )
+        return ArchonRunResult(
+            outcome="failure",
+            exit_code=-1,
+            output_text="",
+            error_text=(
+                "archon health probe ok but workflow dispatch is not yet "
+                "implemented in HttpArchonAdapter — see backlog item "
+                "'Archon real workflow integration'"
+            ),
+        )
+
+
 # ---------------------------------------------------------------------------
 # ArchonBackendInvoker
 # ---------------------------------------------------------------------------
