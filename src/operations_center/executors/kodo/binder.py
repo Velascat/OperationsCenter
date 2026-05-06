@@ -30,7 +30,7 @@ from typing import Optional
 
 from operations_center.contracts.execution import RuntimeBindingSummary
 
-# Mirror the team configs from operations_center.adapters.kodo.adapter so
+# Mirror the team configs from operations_center.backends.kodo.runner so
 # tests don't need to import the full adapter module (which pulls in
 # subprocess + signal). Kept in sync via test_team_config_alignment.
 _CLAUDE_FALLBACK_TEAM = {

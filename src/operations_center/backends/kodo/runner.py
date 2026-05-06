@@ -1,15 +1,25 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
+"""Kodo binary runner — raw subprocess layer.
+
+``KodoAdapter`` builds the kodo command, runs it as a process group, and
+returns a ``KodoRunResult`` (exit code + stdout + stderr + command).
+This is the lower layer the backend's ``KodoBackendInvoker`` consumes.
+
+Generic subprocess mechanics (``_run_subprocess``) are still local to
+this module pending Phase 3 extraction into ExecutorRuntime.
+"""
 from __future__ import annotations
 
 import json
-from typing import NoReturn
 import os
 import signal
 import subprocess
 from pathlib import Path
+from typing import NoReturn
 
 from operations_center.config.settings import KodoSettings
+
 
 class KodoRunResult:
     def __init__(self, exit_code: int, stdout: str, stderr: str, command: list[str]) -> None:
@@ -103,8 +113,6 @@ class KodoAdapter:
             start_new_session=True,
         )
 
-        # Capture the pgid immediately — used by both the timeout path and the
-        # SIGTERM handler below.  pid==0 means the test used a fake Popen; skip.
         try:
             _pgid: int | None = os.getpgid(proc.pid) if proc.pid else None
         except OSError:
@@ -117,22 +125,10 @@ class KodoAdapter:
                 except (ProcessLookupError, OSError):
                     pass
 
-        # Install a SIGTERM handler so that when the worker Python process is
-        # killed (supervisor stop, OOM killer) the kodo process group — which
-        # runs in its own session and would otherwise be orphaned — is also
-        # killed before we exit.
         _prev_sigterm = signal.getsignal(signal.SIGTERM)
 
         def _sigterm_handler(signum: int, _frame: object) -> NoReturn:
             _kill_group()
-            # Restore the previous handler.  We raise SystemExit rather than
-            # re-sending the signal via os.kill: re-sending with SIG_DFL causes
-            # the OS to terminate the process immediately, bypassing Python's
-            # finally blocks (including workspace cleanup in service.py).
-            # SystemExit is a BaseException so it is NOT caught by bare
-            # "except Exception" handlers — it unwinds the stack normally,
-            # runs every finally clause, then exits.  Exit code 128+SIGTERM
-            # (143) follows the shell convention for signal-terminated processes.
             signal.signal(signal.SIGTERM, _prev_sigterm)
             raise SystemExit(128 + signum)
 
@@ -141,7 +137,6 @@ class KodoAdapter:
             stdout, stderr = proc.communicate(timeout=timeout)
             return KodoRunResult(proc.returncode, stdout, stderr, command)
         except subprocess.TimeoutExpired:
-            # Kill the whole process group so no orphan sub-processes remain.
             _kill_group()
             try:
                 stdout, stderr = proc.communicate(timeout=5)
@@ -183,8 +178,7 @@ class KodoAdapter:
         they need to avoid repeated subprocess calls.
         """
         try:
-            import subprocess as _sub
-            result = _sub.run(
+            result = subprocess.run(
                 [binary, "--version"],
                 capture_output=True,
                 text=True,
@@ -210,5 +204,3 @@ def _get_kodo_version(binary: str | None = None) -> str | None:
     if binary is None:
         binary = "kodo"
     return KodoAdapter.get_version(binary)
-
-

@@ -162,5 +162,5 @@ def test_maintenance_window_defensive_against_missing_fields():
 # ── _get_kodo_version is a thin shim ─────────────────────────────────────────
 
 def test_get_kodo_version_returns_none_for_missing_binary():
-    from operations_center.adapters.kodo.adapter import _get_kodo_version
+    from operations_center.backends.kodo.runner import _get_kodo_version
     assert _get_kodo_version("no-such-binary-anywhere") is None

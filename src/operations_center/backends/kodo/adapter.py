@@ -24,7 +24,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from operations_center.adapters.kodo.adapter import KodoAdapter
+from operations_center.backends.kodo.runner import KodoAdapter
 from operations_center.config.settings import KodoSettings
 from operations_center.contracts.execution import ExecutionRequest, ExecutionResult
 from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory

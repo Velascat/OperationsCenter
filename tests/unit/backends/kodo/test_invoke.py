@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.runner import KodoAdapter, KodoRunResult
 from operations_center.backends.kodo.invoke import KodoBackendInvoker, _extract_artifacts
 from operations_center.backends.kodo.models import KodoPreparedRun
 

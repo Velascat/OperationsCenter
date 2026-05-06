@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from operations_center.adapters.kodo.adapter import KodoAdapter
+from operations_center.backends.kodo.runner import KodoAdapter
 from operations_center.config.settings import KodoSettings
 
 

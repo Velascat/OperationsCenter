@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 
-from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.runner import KodoAdapter, KodoRunResult
 from operations_center.backends.kodo.adapter import KodoBackendAdapter
 from operations_center.backends.kodo.models import KodoRunCapture
 from operations_center.contracts.execution import ExecutionRequest

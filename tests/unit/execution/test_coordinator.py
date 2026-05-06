@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from operations_center.adapters.kodo.adapter import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.runner import KodoAdapter, KodoRunResult
 from operations_center.backends.kodo.adapter import KodoBackendAdapter
 from operations_center.contracts.common import ChangedFileRef, ValidationSummary
 from operations_center.contracts.enums import (
