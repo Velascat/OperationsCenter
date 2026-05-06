@@ -58,6 +58,9 @@ operations-center-reaudit-check     = "operations_center.entrypoints.reaudit_che
 operations-center-repo-graph        = "operations_center.repo_graph.cli:app"
 # ER-002 — Run Memory primitive.
 operations-center-run-memory        = "operations_center.run_memory.cli:app"
+# Archon health probe (see WorkStation compose/profiles/archon.yml).
+# Workflow dispatch is not yet wired — see backlog.
+operations-center-archon-probe      = "operations_center.entrypoints.archon_probe.main:main"
 
 [project.optional-dependencies]
 dev = [
