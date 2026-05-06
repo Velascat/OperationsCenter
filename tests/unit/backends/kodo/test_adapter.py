@@ -242,10 +242,13 @@ class TestInvocationError:
     def test_kodo_crash_returns_backend_error(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        kodo = MagicMock(spec=KodoAdapter)
-        kodo.run.side_effect = RuntimeError("kodo crashed unexpectedly")
-        kodo.write_goal_file = MagicMock()
-        adapter = _adapter(kodo)
+        kodo = _mock_kodo()
+
+        class _CrashingRuntime:
+            def run(self, invocation):
+                raise RuntimeError("kodo crashed unexpectedly")
+
+        adapter = KodoBackendAdapter(kodo, runtime=_CrashingRuntime())
         result = adapter.execute(_request(tmp_path))
         assert result.success is False
         assert result.failure_category == FailureReasonCategory.BACKEND_ERROR
