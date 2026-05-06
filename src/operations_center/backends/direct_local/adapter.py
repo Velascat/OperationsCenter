@@ -5,14 +5,25 @@ backends/direct_local/adapter.py — DirectLocalBackendAdapter.
 
 This adapter runs the Aider CLI behind the canonical
 ExecutionRequest -> ExecutionResult contract for the local execution lane.
+
+Phase 2 + 3 of the OC runtime extraction: subprocess invocation is
+delegated to ``ExecutorRuntime`` (subprocess kind). The adapter
+constructs an RxP ``RuntimeInvocation``, hands it to
+``ExecutorRuntime.run``, reads stdout/stderr from the paths in the
+returned ``RuntimeResult``, and assembles the existing
+``_DirectLocalRunResult`` for the adapter's downstream code.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 import os
 import subprocess
+import tempfile
+from pathlib import Path
 from typing import Optional
+
+from executor_runtime import ExecutorRuntime
+from rxp.contracts import RuntimeInvocation
 
 from operations_center.config.settings import AiderSettings
 from operations_center.contracts.common import ChangedFileRef, ValidationSummary
@@ -28,8 +39,13 @@ from operations_center.contracts.execution import ExecutionArtifact, ExecutionRe
 class DirectLocalBackendAdapter:
     """Canonical adapter for the local direct execution backend."""
 
-    def __init__(self, settings: AiderSettings) -> None:
+    def __init__(
+        self,
+        settings: AiderSettings,
+        runtime: ExecutorRuntime | None = None,
+    ) -> None:
         self._settings = settings
+        self._runtime = runtime or ExecutorRuntime()
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
         repo_path = Path(request.workspace_path)
@@ -104,21 +120,25 @@ class DirectLocalBackendAdapter:
         return command, env
 
     def _run(self, *, command: list[str], repo_path: Path, env: dict[str, str]) -> "_DirectLocalRunResult":
+        # Per-call artifact dir so ER's stdout/stderr capture doesn't
+        # pollute the workspace.
+        artifact_dir = tempfile.mkdtemp(prefix="direct-local-")
+
+        invocation = RuntimeInvocation(
+            invocation_id=_short_id(),
+            runtime_name="direct_local",
+            runtime_kind="subprocess",
+            working_directory=str(repo_path),
+            command=list(command),
+            environment=dict(env),
+            timeout_seconds=self._settings.timeout_seconds
+            if self._settings.timeout_seconds and self._settings.timeout_seconds > 0
+            else None,
+            artifact_directory=artifact_dir,
+        )
+
         try:
-            proc = subprocess.run(
-                command,
-                cwd=repo_path,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=self._settings.timeout_seconds,
-            )
-        except subprocess.TimeoutExpired:
-            return _DirectLocalRunResult(
-                success=False,
-                output=f"[aider] Timed out after {self._settings.timeout_seconds}s",
-                metadata={"command": command, "timeout_hit": True},
-            )
+            rxp_result = self._runtime.run(invocation)
         except FileNotFoundError:
             return _DirectLocalRunResult(
                 success=False,
@@ -126,11 +146,26 @@ class DirectLocalBackendAdapter:
                 metadata={"command": command},
             )
 
-        output = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        if rxp_result.status == "rejected":
+            return _DirectLocalRunResult(
+                success=False,
+                output=rxp_result.error_summary or "executor runtime rejected invocation",
+                metadata={"command": command},
+            )
+        if rxp_result.status == "timed_out":
+            return _DirectLocalRunResult(
+                success=False,
+                output=f"[aider] Timed out after {self._settings.timeout_seconds}s",
+                metadata={"command": command, "timeout_hit": True},
+            )
+
+        stdout = _read_capture(rxp_result.stdout_path)
+        stderr = _read_capture(rxp_result.stderr_path)
+        output = (stdout + stderr).strip()
         return _DirectLocalRunResult(
-            success=proc.returncode == 0,
+            success=rxp_result.status == "succeeded",
             output=output,
-            exit_code=proc.returncode,
+            exit_code=rxp_result.exit_code,
             metadata={"command": command, "model": command[2]},
         )
 
@@ -148,6 +183,25 @@ class _DirectLocalRunResult:
         self.output = output
         self.exit_code = exit_code
         self.metadata = metadata or {}
+
+
+def _read_capture(path: str | None) -> str:
+    """Read a captured stdout/stderr file produced by ExecutorRuntime."""
+    if not path:
+        return ""
+    p = Path(path)
+    if not p.exists():
+        return ""
+    try:
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _short_id() -> str:
+    """Cheap unique-enough invocation id for direct_local runs."""
+    import uuid
+    return f"direct-local-{uuid.uuid4().hex[:8]}"
 
 
 def _failure_status(result) -> ExecutionStatus:

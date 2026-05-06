@@ -17,6 +17,9 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+from executor_runtime import ExecutorRuntime
+from rxp.contracts import RuntimeInvocation
+
 from operations_center.config.settings import AiderLocalSettings
 from operations_center.contracts.common import ChangedFileRef, ValidationSummary
 from operations_center.contracts.enums import (
@@ -29,9 +32,19 @@ from operations_center.contracts.execution import ExecutionArtifact, ExecutionRe
 
 
 class AiderLocalBackendAdapter:
-    """Canonical adapter for the aider_local CPU execution backend."""
+    """Canonical adapter for the aider_local CPU execution backend.
 
-    def __init__(self, settings: AiderLocalSettings) -> None:
+    Phase 2 + 3 of the OC runtime extraction: subprocess invocation
+    is delegated to ``ExecutorRuntime`` (subprocess kind). Same pattern
+    as kodo and direct_local.
+    """
+
+    def __init__(
+        self,
+        settings: AiderLocalSettings,
+        runtime: ExecutorRuntime | None = None,
+    ) -> None:
+        self._runtime = runtime or ExecutorRuntime()
         self._settings = settings
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
@@ -109,21 +122,23 @@ class AiderLocalBackendAdapter:
         if not env.get("OPENAI_API_KEY"):
             env["OPENAI_API_KEY"] = "sk-local-ollama"
 
+        artifact_dir = tempfile.mkdtemp(prefix="aider-local-")
+
+        invocation = RuntimeInvocation(
+            invocation_id=_short_id(),
+            runtime_name="aider_local",
+            runtime_kind="subprocess",
+            working_directory=str(repo_path),
+            command=list(command),
+            environment=dict(env),
+            timeout_seconds=self._settings.timeout_seconds
+            if self._settings.timeout_seconds and self._settings.timeout_seconds > 0
+            else None,
+            artifact_directory=artifact_dir,
+        )
+
         try:
-            proc = subprocess.run(
-                command,
-                cwd=repo_path,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=self._settings.timeout_seconds,
-            )
-        except subprocess.TimeoutExpired:
-            return _AiderLocalRunResult(
-                success=False,
-                output=f"[aider_local] Timed out after {self._settings.timeout_seconds}s",
-                metadata={"command": command, "timeout_hit": True},
-            )
+            rxp_result = self._runtime.run(invocation)
         except FileNotFoundError:
             return _AiderLocalRunResult(
                 success=False,
@@ -131,11 +146,26 @@ class AiderLocalBackendAdapter:
                 metadata={"command": command, "binary_missing": True},
             )
 
-        output = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        if rxp_result.status == "rejected":
+            return _AiderLocalRunResult(
+                success=False,
+                output=rxp_result.error_summary or "executor runtime rejected invocation",
+                metadata={"command": command},
+            )
+        if rxp_result.status == "timed_out":
+            return _AiderLocalRunResult(
+                success=False,
+                output=f"[aider_local] Timed out after {self._settings.timeout_seconds}s",
+                metadata={"command": command, "timeout_hit": True},
+            )
+
+        stdout = _read_capture(rxp_result.stdout_path)
+        stderr = _read_capture(rxp_result.stderr_path)
+        output = (stdout + stderr).strip()
         return _AiderLocalRunResult(
-            success=proc.returncode == 0,
+            success=rxp_result.status == "succeeded",
             output=output,
-            exit_code=proc.returncode,
+            exit_code=rxp_result.exit_code,
             metadata={"command": command, "model": self._settings.model},
         )
 
@@ -153,6 +183,25 @@ class _AiderLocalRunResult:
         self.output = output
         self.exit_code = exit_code
         self.metadata = metadata or {}
+
+
+def _read_capture(path: str | None) -> str:
+    """Read a captured stdout/stderr file produced by ExecutorRuntime."""
+    if not path:
+        return ""
+    p = Path(path)
+    if not p.exists():
+        return ""
+    try:
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _short_id() -> str:
+    """Cheap unique-enough invocation id for aider_local runs."""
+    import uuid
+    return f"aider-local-{uuid.uuid4().hex[:8]}"
 
 
 def _failure_status(result: _AiderLocalRunResult) -> ExecutionStatus:
