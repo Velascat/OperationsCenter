@@ -39,8 +39,6 @@ def _mock_kodo(exit_code: int = 0, stdout: str = "done", stderr: str = "") -> Ko
     kodo = MagicMock(spec=KodoAdapter)
     kodo.run.return_value = KodoRunResult(exit_code=exit_code, stdout=stdout, stderr=stderr, command=["kodo"])
     kodo.write_goal_file = MagicMock()
-    KodoAdapter.is_orchestrator_rate_limited = staticmethod(lambda r: False)
-    KodoAdapter.is_quota_exhausted = staticmethod(lambda r: False)
     return kodo
 
 
@@ -207,8 +205,6 @@ class TestInvocationError:
         kodo = MagicMock(spec=KodoAdapter)
         kodo.run.side_effect = RuntimeError("kodo crashed unexpectedly")
         kodo.write_goal_file = MagicMock()
-        KodoAdapter.is_orchestrator_rate_limited = staticmethod(lambda r: False)
-        KodoAdapter.is_quota_exhausted = staticmethod(lambda r: False)
         adapter = _adapter(kodo)
         result = adapter.execute(_request(tmp_path))
         assert result.success is False

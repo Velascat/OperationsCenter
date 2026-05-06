@@ -118,16 +118,6 @@ def normalize(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-_RATE_LIMITED_SIGNALS = ("rate limit exceeded", "too many requests", "429")
-_QUOTA_EXHAUSTED_SIGNALS = (
-    "quota exceeded",
-    "insufficient_quota",
-    "you've hit your limit",
-    "usage limit reached",
-    "you have run out of credits",
-    "payment required",
-)
-
 # G-003 (2026-05-05): patterns that indicate Kodo's internal stage
 # execution failed even when exit_code=0. Discovered during the real
 # R6 run where ClaudeCodeOrchestrator crashed mid-stage.
@@ -158,16 +148,11 @@ def _scan_stdout_for_internal_failure(stdout: str) -> Optional[str]:
 def _extract_failure_info(capture: KodoRunCapture) -> KodoFailureInfo | None:
     if capture.exit_code == 0 and capture.succeeded:
         return None
-    lower = capture.combined_output.lower()
-    is_rate_limited = any(s in lower for s in _RATE_LIMITED_SIGNALS)
-    is_quota_exhausted = any(s in lower for s in _QUOTA_EXHAUSTED_SIGNALS)
     return KodoFailureInfo(
         exit_code=capture.exit_code,
         failure_category_value=categorize_failure(capture.exit_code, capture.combined_output).value,
         failure_reason=build_failure_reason(capture.exit_code, capture.stderr, capture.stdout),
         is_timeout=capture.timeout_hit,
-        is_rate_limited=is_rate_limited,
-        is_quota_exhausted=is_quota_exhausted,
     )
 
 

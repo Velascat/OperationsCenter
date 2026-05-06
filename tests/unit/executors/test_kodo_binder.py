@@ -74,12 +74,7 @@ class TestBind:
             bind(rb)
 
 
-def test_team_config_alignment_with_kodo_adapter():
-    """The binder's team configs must stay in sync with the kodo adapter
-    module's team configs. If this drifts, fix the binder mirror."""
-    from operations_center.adapters.kodo.adapter import (
-        _CLAUDE_FALLBACK_TEAM as adapter_claude,
-        _OPUS_HAIKU_FALLBACK_TEAM as adapter_opus_haiku,
-    )
-    assert _CLAUDE_FALLBACK_TEAM == adapter_claude
-    assert _OPUS_HAIKU_FALLBACK_TEAM == adapter_opus_haiku
+# Removed: test_team_config_alignment_with_kodo_adapter — the adapter
+# no longer carries fallback team configs (the dead-fallback code was
+# cut). The binder's team configs are now the canonical source and
+# don't need to mirror anything.

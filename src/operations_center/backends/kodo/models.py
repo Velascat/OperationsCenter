@@ -65,8 +65,6 @@ class KodoRunCapture:
     finished_at: datetime
     duration_ms: int
     timeout_hit: bool = False
-    rate_limited: bool = False
-    quota_exhausted: bool = False
     artifacts: list[KodoArtifactCapture] = field(default_factory=list)
 
     @property
@@ -85,8 +83,6 @@ class KodoFailureInfo:
     failure_category_value: str  # matches FailureReasonCategory values
     failure_reason: str
     is_timeout: bool = False
-    is_rate_limited: bool = False
-    is_quota_exhausted: bool = False
 
 
 @dataclass

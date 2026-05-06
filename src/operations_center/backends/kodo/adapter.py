@@ -240,8 +240,6 @@ class KodoBackendAdapter:
             "finished_at": capture.finished_at.isoformat(),
             "duration_ms": capture.duration_ms,
             "timeout_hit": capture.timeout_hit,
-            "rate_limited": capture.rate_limited,
-            "quota_exhausted": capture.quota_exhausted,
             "artifacts": [
                 {
                     "label": artifact.label,
