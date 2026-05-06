@@ -55,6 +55,28 @@ app = typer.Typer(
 )
 console = Console()
 
+
+def _validate_executor_catalog_if_requested() -> None:
+    """Phase 12 — opt-in fail-fast catalog validation at process start.
+
+    Set ``OC_VALIDATE_CATALOG_AT_STARTUP=1`` to enable. When set, any
+    invalid backend artifact (unknown CapabilitySet/RuntimeKind enum,
+    missing gap_refs, matrix-inconsistent verdicts) raises before any
+    command runs. CI uses this to catch drift; local dev keeps the
+    default off.
+    """
+    import os
+    if os.environ.get("OC_VALIDATE_CATALOG_AT_STARTUP", "").lower() not in ("1", "true", "yes"):
+        return
+    from operations_center.executors.startup import initialize_catalog
+    initialize_catalog(fail_fast=True)
+
+
+@app.callback()
+def _audit_app_callback() -> None:
+    _validate_executor_catalog_if_requested()
+
+
 # Phase 7 — flat-mount historical index commands (`index`, `index-show`, `get-artifact`).
 for _index_cmd in _index_app.registered_commands:
     app.registered_commands.append(_index_cmd)

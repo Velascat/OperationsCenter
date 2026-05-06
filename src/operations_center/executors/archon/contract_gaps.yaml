@@ -19,3 +19,13 @@
   fork_threshold: "if Archon refuses to emit per-agent model/tool metadata in workflow events"
   status: open
   patch_deadline: null
+
+- id: G-003
+  gap: "real Archon end-to-end run not yet performed — no actual samples in archon/samples/raw_output/"
+  discovered_at: "2026-05-05"
+  backend_version: "unknown"
+  impact: "Cannot empirically confirm the binder + wrapper actually works against real Archon. Unit tests cover the framework code paths but no real LLM/workflow has been observed. PyPI 'archon-ai' is a different package; coleam00/Archon needs git+pip install plus a server stack."
+  workaround: "OPERATIONAL — install Archon (git clone + dependencies), run a trivial workflow with explicit RuntimeBinding, capture samples, confirm binder writes .archon/config.yaml correctly. ~half-day operational task, not framework code."
+  fork_threshold: "no fork — empirical validation only"
+  status: open
+  patch_deadline: "2026-06-19"
