@@ -1,0 +1,28 @@
+# Phase 14 — fork-first dependency registry.
+#
+# Every dependency we'd otherwise pull from upstream is registered here.
+# Production never installs from the upstream URL — only from our fork.
+#
+# See docs/architecture/backend_control_audit.md (Phase 14).
+
+forks:
+
+  kodo:
+    upstream:
+      repo: ikamensh/kodo
+      latest_known_release: "0.4.272"
+      latest_commit_sha: "90bdf8a"
+    fork:
+      repo: Velascat/kodo
+      branch: dev
+    base_commit: "90bdf8a"
+    fork_commit: "84a28f6"
+    install:
+      kind: cli_tool
+      modes:
+        prod: "uv tool install --reinstall --force git+ssh://git@github.com/Velascat/kodo.git@{fork_commit}"
+        ci:   "uv tool install --reinstall --force git+https://github.com/Velascat/kodo.git@{fork_commit}"
+        dev:  "uv tool install --reinstall --force {local_clone}"
+      local_clone_hint: ~/Documents/GitHub/kodo
+    poll_cadence_hours: 24
+    auto_pr_push: true

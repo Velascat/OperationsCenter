@@ -1,0 +1,30 @@
+# Phase 14 — Kodo PATCH-001
+# Closes Kodo G-004 in code, parallel to upstream PR #49 (syamai's fix).
+id: PATCH-001
+title: "Pass coach kwarg through orchestrator subclasses"
+applied_at: "2026-05-05"
+fork_branch: "fix/coach-kwarg-orchestrator-subclasses"
+fork_dev_commit: "84a28f6"
+
+contract_gap_ref: "kodo:G-004"
+
+upstream:
+  related_pr: "https://github.com/ikamensh/kodo/pull/49"
+  related_issue: null
+  upstream_status: pending_review
+  last_upstream_activity: "2026-04-13"
+
+reconcile_when_any:
+  - upstream_pr_merged: 49
+  - upstream_release_includes: "0.4.273"
+  - patched_files_changed_upstream: true
+
+touched_files:
+  - kodo/orchestrators/claude_code.py
+  - kodo/orchestrators/kimi_code.py
+  - tests/orchestrators/test_orchestrator_signatures.py
+
+push_to_upstream:
+  enabled: true
+  pushed: false
+  pushed_pr_url: null
