@@ -18,20 +18,18 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .loader import load_repo_graph
+from .loader import default_config_path, load_repo_graph
 from .models import RepoGraphConfigError
 
 app = typer.Typer(help="Repo Graph (ER-001) inspection commands.")
 _console = Console()
 
 
-def _default_config_path() -> Path:
-    # config/repo_graph.yaml at the repo root, found via this file's location.
-    return Path(__file__).resolve().parents[3] / "config" / "repo_graph.yaml"
+_default_config_path = default_config_path  # back-compat alias for tests
 
 
 def _load(config: Path | None):
-    path = config or _default_config_path()
+    path = config or default_config_path()
     try:
         return load_repo_graph(path)
     except RepoGraphConfigError as exc:
