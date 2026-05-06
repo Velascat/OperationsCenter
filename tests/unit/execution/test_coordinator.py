@@ -287,9 +287,6 @@ def test_kodo_adapter_retains_backend_detail_refs_and_duration_metadata(tmp_path
         stderr="",
         command=["kodo", "run"],
     )
-    KodoAdapter.is_orchestrator_rate_limited = staticmethod(lambda r: False)
-    KodoAdapter.is_quota_exhausted = staticmethod(lambda r: False)
-
     coordinator = ExecutionCoordinator(
         adapter_registry=_Registry(KodoBackendAdapter(kodo)),
         policy_engine=_StubPolicyEngine(PolicyDecision(status=PolicyStatus.ALLOW)),

@@ -78,8 +78,6 @@ class KodoBackendInvoker:
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
 
         timeout_hit = "[timeout:" in (raw.stderr or "")
-        rate_limited = KodoAdapter.is_orchestrator_rate_limited(raw)
-        quota_exhausted = KodoAdapter.is_quota_exhausted(raw)
 
         artifacts = _extract_artifacts(raw.stdout or "", raw.stderr or "")
 
@@ -93,8 +91,6 @@ class KodoBackendInvoker:
             finished_at=finished_at,
             duration_ms=duration_ms,
             timeout_hit=timeout_hit,
-            rate_limited=rate_limited,
-            quota_exhausted=quota_exhausted,
             artifacts=artifacts,
         )
 

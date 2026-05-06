@@ -159,25 +159,8 @@ def test_maintenance_window_defensive_against_missing_fields():
     assert not _in_maintenance_window(s, datetime(2026, 1, 1, 12, 0, tzinfo=UTC))
 
 
-# ── _get_kodo_version + _is_quota_exhausted_result are thin shims ────────────
+# ── _get_kodo_version is a thin shim ─────────────────────────────────────────
 
 def test_get_kodo_version_returns_none_for_missing_binary():
     from operations_center.adapters.kodo.adapter import _get_kodo_version
     assert _get_kodo_version("no-such-binary-anywhere") is None
-
-
-def test_is_quota_exhausted_result_recognises_quota_phrases():
-    from operations_center.adapters.kodo.adapter import (
-        KodoRunResult,
-        _is_quota_exhausted_result,
-    )
-    quota_hit = KodoRunResult(
-        exit_code=1,
-        stdout="",
-        stderr="You've exceeded your usage limit. upgrade your plan",
-        command=[],
-    )
-    assert _is_quota_exhausted_result(quota_hit)
-
-    benign = KodoRunResult(exit_code=0, stdout="ok", stderr="", command=[])
-    assert not _is_quota_exhausted_result(benign)

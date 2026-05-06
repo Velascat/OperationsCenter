@@ -32,7 +32,6 @@ def _capture(
     stderr: str = "",
     run_id: str = "run-1",
     timeout_hit: bool = False,
-    rate_limited: bool = False,
     artifacts=None,
 ) -> KodoRunCapture:
     started = _now()
@@ -46,7 +45,6 @@ def _capture(
         finished_at=started,
         duration_ms=1000,
         timeout_hit=timeout_hit,
-        rate_limited=rate_limited,
         artifacts=artifacts or [],
     )
 
