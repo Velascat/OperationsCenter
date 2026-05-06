@@ -42,6 +42,15 @@ DEFAULT_SWITCHBOARD_DENYLIST: tuple[str, ...] = (
     # ER-001 repo graph (graph itself is OC-owned; SB consumes it as input only)
     "RepoGraphLoader",
     "RepoGraphIndexer",
+    # Runtime dispatch (ExecutorRuntime + RxP) — runtime execution is not
+    # SwitchBoard's job. SB picks lanes/backends; ExecutorRuntime invokes them.
+    "ExecutorRuntime",
+    "RuntimeRunner",
+    "SubprocessRunner",
+    "RuntimeInvocation",
+    "RuntimeResult",
+    # Fork management — SourceRegistry owns this; SB has no business with forks.
+    "SourceRegistry",
 )
 
 

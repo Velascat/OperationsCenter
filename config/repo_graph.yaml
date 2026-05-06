@@ -42,6 +42,24 @@ repos:
     github_url: https://github.com/Velascat/CxRP
     runtime_role: contracts
 
+  rxp:
+    canonical_name: RxP
+    legacy_names: []
+    github_url: https://github.com/Velascat/RxP
+    runtime_role: contracts
+
+  executor_runtime:
+    canonical_name: ExecutorRuntime
+    legacy_names: []
+    github_url: https://github.com/Velascat/ExecutorRuntime
+    runtime_role: runtime_dispatch
+
+  source_registry:
+    canonical_name: SourceRegistry
+    legacy_names: []
+    github_url: https://github.com/Velascat/SourceRegistry
+    runtime_role: fork_management
+
   videofoundry:
     canonical_name: VideoFoundry
     legacy_names: []
@@ -66,3 +84,14 @@ edges:
   - {from: OperationsCenter, to: CxRP, type: depends_on_contracts_from}
   - {from: SwitchBoard,      to: CxRP, type: depends_on_contracts_from}
   - {from: OperatorConsole,  to: CxRP, type: depends_on_contracts_from}
+
+  # Contract dependencies on RxP — runtime invocation/result shape.
+  # Verified via grep: OC backends import rxp.contracts; ExecutorRuntime
+  # mirrors RxP types in its own contracts module.
+  - {from: OperationsCenter, to: RxP, type: depends_on_contracts_from}
+  - {from: ExecutorRuntime,  to: RxP, type: depends_on_contracts_from}
+
+  # OperationsCenter dispatches to ExecutorRuntime for actual runtime
+  # execution and to SourceRegistry for fork-management commands.
+  - {from: OperationsCenter, to: ExecutorRuntime, type: dispatches_to}
+  - {from: OperationsCenter, to: SourceRegistry,  type: dispatches_to}
