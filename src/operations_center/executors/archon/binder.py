@@ -30,12 +30,21 @@ import yaml
 
 from operations_center.contracts.execution import RuntimeBindingSummary
 
-# Friendly model aliases → Archon-recognized model identifiers.
-# Kept tight; expand only when needed.
-_MODEL_ALIASES = {
-    ("anthropic", "opus"):   "claude-opus-4",
-    ("anthropic", "sonnet"): "claude-sonnet-4",
-    ("anthropic", "haiku"):  "claude-haiku-4",
+# Verified against real Archon source 2026-05-05 (Velascat/Archon @ fa6fc46f):
+#   - provider literals on the wire: 'claude' | 'codex' (NOT 'anthropic'/'openai')
+#   - claude models: 'opus' | 'sonnet' | 'haiku' | 'claude-*' | 'inherit' (verbatim)
+#   - workflow YAML uses bare model names directly — no '-4' aliasing needed
+#
+# Earlier versions of this binder rewrote opus → claude-opus-4 and used
+# provider: anthropic. Both wrong; Archon's loader rejected the result.
+# See Archon G-004 for the discovery trail.
+
+# CxRP RuntimeBinding.provider → Archon's provider literal.
+# RuntimeBinding uses industry-standard provider names; Archon uses its
+# own short labels. This is the conversion table.
+_PROVIDER_TO_ARCHON = {
+    "anthropic": "claude",
+    "openai":    "codex",
 }
 
 
@@ -52,9 +61,9 @@ class ArchonConfigSelection:
     model: Optional[str] = None
 
 
-def _resolve_model(provider: str, model: str) -> str:
-    """Resolve a friendly alias (e.g. opus → claude-opus-4) for known providers."""
-    return _MODEL_ALIASES.get((provider, model), model)
+def _archon_provider(rb_provider: str) -> Optional[str]:
+    """Map a CxRP RuntimeBinding provider name to Archon's literal."""
+    return _PROVIDER_TO_ARCHON.get(rb_provider)
 
 
 def bind(rb: Optional[RuntimeBindingSummary]) -> ArchonConfigSelection:
@@ -62,33 +71,37 @@ def bind(rb: Optional[RuntimeBindingSummary]) -> ArchonConfigSelection:
         return ArchonConfigSelection(config_yaml=None, label="archon_default")
 
     if rb.kind == "cli_subscription":
-        provider = (rb.provider or "anthropic").lower()
-        if provider != "anthropic":
+        rb_provider = (rb.provider or "anthropic").lower()
+        archon_provider = _archon_provider(rb_provider)
+        if archon_provider != "claude":
             raise BindError(
                 f"cli_subscription only supports provider=anthropic for Archon today; "
                 f"got provider={rb.provider!r}"
             )
-        model = (rb.model or "sonnet").lower()
-        resolved = _resolve_model(provider, model)
-        cfg = {"provider": provider, "model": resolved}
+        model = (rb.model or "sonnet").lower()  # 'opus'|'sonnet'|'haiku' verbatim
+        cfg = {"provider": archon_provider, "model": model}
         return ArchonConfigSelection(
             config_yaml=cfg, label=f"cli_subscription_{model}",
-            provider=provider, model=resolved,
+            provider=archon_provider, model=model,
         )
 
     if rb.kind == "hosted_api":
-        provider = (rb.provider or "").lower()
-        if not provider:
-            raise BindError("hosted_api binding requires provider")
+        rb_provider = (rb.provider or "").lower()
+        archon_provider = _archon_provider(rb_provider)
+        if not archon_provider:
+            raise BindError(
+                f"hosted_api binding requires a known provider "
+                f"(anthropic|openai); got {rb.provider!r}"
+            )
         if not rb.model:
             raise BindError("hosted_api binding requires model")
-        model = _resolve_model(provider, rb.model.lower())
-        cfg = {"provider": provider, "model": model}
+        model = rb.model.lower()  # passed verbatim — Archon validates per-provider
+        cfg = {"provider": archon_provider, "model": model}
         if rb.endpoint:
             cfg["base_url"] = rb.endpoint
         return ArchonConfigSelection(
-            config_yaml=cfg, label=f"hosted_{provider}_{model}",
-            provider=provider, model=model,
+            config_yaml=cfg, label=f"hosted_{archon_provider}_{model}",
+            provider=archon_provider, model=model,
         )
 
     raise BindError(

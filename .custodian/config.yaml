@@ -58,6 +58,11 @@ audit:
     C2:
       - src/operations_center/entrypoints/**
       - src/operations_center/execution/campaign_store.py
+    D3:
+      # Typer command handlers end in `raise typer.Exit(code)` — they're
+      # supposed to exit, not return. D3 (NoReturn missing) misclassifies
+      # them as stubs. Discovered 2026-05-06 during while-away triage sweep.
+      - src/operations_center/entrypoints/**
       - src/operations_center/tuning/calibration.py
     C4:
       # Entrypoints are polling workers — pass-in-except is correct in loops

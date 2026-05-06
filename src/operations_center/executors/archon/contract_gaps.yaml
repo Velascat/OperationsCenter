@@ -29,3 +29,13 @@
   fork_threshold: "no fork — empirical validation only"
   status: open
   patch_deadline: "2026-06-19"
+
+- id: G-004
+  gap: "Archon binder produced wrong provider/model values (would have written a config Archon's loader rejects)"
+  discovered_at: "2026-05-05"
+  backend_version: "0.3.6 (Velascat/Archon @ fa6fc46f)"
+  impact: "Pre-fix binder wrote `{provider: anthropic, model: claude-opus-4}` to .archon/config.yaml. Real Archon expects `{provider: claude, model: opus}` — verified against `packages/core/src/config/config-types.ts` (provider: 'claude' | 'codex') and 14 shipped workflow YAMLs in `.archon/workflows/defaults/`. Any real Archon dispatch from OC would have failed at config-load time. Discovered 2026-05-06 during while-away source-spike — bun not installed locally so couldn't invoke Archon directly; read source instead."
+  workaround: "MITIGATED 2026-05-06: binder fix landed (commit pending). _PROVIDER_TO_ARCHON maps anthropic→claude, openai→codex; model passes verbatim (no '-4' aliasing). 9 binder tests revalidated. Real-run validation still pending against G-003."
+  fork_threshold: "no fork — local binder fix"
+  status: mitigated
+  patch_deadline: null
