@@ -36,8 +36,12 @@ def _request(tmp_path: Path, **kw) -> ExecutionRequest:
 
 
 def _mock_kodo(exit_code: int = 0, stdout: str = "done", stderr: str = "") -> KodoAdapter:
-    kodo = MagicMock(spec=KodoAdapter)
-    kodo.run.return_value = KodoRunResult(exit_code=exit_code, stdout=stdout, stderr=stderr, command=["kodo"])
+    kodo = MagicMock()
+    kodo.build_command.return_value = ["kodo", "--goal-file", ".kodo_goal.md"]
+    kodo._run_subprocess.return_value = KodoRunResult(
+        exit_code=exit_code, stdout=stdout, stderr=stderr,
+        command=["kodo", "--goal-file", ".kodo_goal.md"],
+    )
     kodo.write_goal_file = MagicMock()
     return kodo
 
@@ -145,7 +149,7 @@ class TestBackendDetailRefs:
         payload = json.loads(Path(structured_ref.path).read_text(encoding="utf-8"))
         assert payload["run_id"] == req.run_id
         assert payload["duration_ms"] >= 0
-        assert payload["command"] == ["kodo"]
+        assert payload["command"] == ["kodo", "--goal-file", ".kodo_goal.md"]
 
 
 # ---------------------------------------------------------------------------
