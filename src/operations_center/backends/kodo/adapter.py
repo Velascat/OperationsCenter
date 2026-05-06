@@ -58,8 +58,9 @@ class KodoBackendAdapter:
         self,
         kodo_adapter: KodoAdapter,
         kodo_mode: str = "goal",
+        runtime=None,
     ) -> None:
-        self._invoker = KodoBackendInvoker(kodo_adapter)
+        self._invoker = KodoBackendInvoker(kodo_adapter, runtime=runtime)
         self._kodo_mode = kodo_mode
 
     def supports(self, request: ExecutionRequest) -> SupportCheck:
