@@ -7,22 +7,24 @@ KodoBackendInvoker isolates how kodo is launched. The rest of the system
 does not need to know whether kodo runs as a subprocess, through a shim,
 or via any other mechanism — that detail belongs here.
 
-Phase 2 (RxP wire): the actual subprocess call is now mediated by an
-RxP ``RuntimeInvocation`` → ``RuntimeResult`` round-trip. Kodo-specific
-data (goal_text, validation_commands, kodo_mode) stays on the
-PreparedRun/Capture envelope; the RxP types carry only the runtime
-mechanics that Phase 3 will hand off to ExecutorRuntime.
+Phase 3 (ExecutorRuntime extraction): the actual subprocess call is now
+delegated to ``executor_runtime.ExecutorRuntime``. Kodo-specific data
+(goal_text, validation_commands, kodo_mode, orchestrator_override)
+stays on the PreparedRun/Capture envelope; the RxP types carry the
+runtime mechanics ExecutorRuntime executes.
 """
 
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from executor_runtime import ExecutorRuntime
 from rxp.contracts import RuntimeInvocation, RuntimeResult
 
-from operations_center.backends.kodo.runner import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.runner import KodoAdapter
 
 from .models import KodoArtifactCapture, KodoPreparedRun, KodoRunCapture
 
@@ -33,16 +35,21 @@ class KodoBackendInvoker:
     Internally:
       1. writes the goal file
       2. builds an RxP ``RuntimeInvocation`` describing the subprocess call
-      3. runs it via the kodo runner (Phase 3 will replace this with a
-         direct ``ExecutorRuntime.run(invocation)`` call)
-      4. constructs an RxP ``RuntimeResult``
-      5. wraps the result + kodo-specific artifact extraction into
-         ``KodoRunCapture`` for the normalizer
-      6. cleans up the goal file
+      3. runs it via ``ExecutorRuntime`` (subprocess mechanics:
+         start_new_session, killpg-on-timeout, SIGTERM-handler)
+      4. reads back stdout/stderr from the captured paths
+      5. wraps the RxP ``RuntimeResult`` + kodo-specific artifact
+         extraction into ``KodoRunCapture`` for the normalizer
+      6. cleans up the goal file + the per-invocation artifact dir
     """
 
-    def __init__(self, kodo_adapter: KodoAdapter) -> None:
+    def __init__(
+        self,
+        kodo_adapter: KodoAdapter,
+        runtime: ExecutorRuntime | None = None,
+    ) -> None:
         self._kodo = kodo_adapter
+        self._runtime = runtime or ExecutorRuntime()
 
     def invoke(self, prepared: KodoPreparedRun) -> KodoRunCapture:
         """Execute kodo for the given prepared run and return structured capture.
@@ -60,24 +67,27 @@ class KodoBackendInvoker:
         invocation = self._build_invocation(prepared)
 
         try:
-            rxp_result, raw = _invoke_via_rxp(invocation, self._kodo, started_at)
+            rxp_result = self._runtime.run(invocation)
         finally:
             try:
                 prepared.goal_file_path.unlink(missing_ok=True)
             except Exception:
                 pass
 
+        stdout_text = _read_capture(rxp_result.stdout_path)
+        stderr_text = _read_capture(rxp_result.stderr_path)
+
         finished_at = _parse_iso(rxp_result.finished_at)
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
         timeout_hit = rxp_result.status == "timed_out"
 
-        artifacts = _extract_artifacts(raw.stdout or "", raw.stderr or "")
+        artifacts = _extract_artifacts(stdout_text, stderr_text)
 
         return KodoRunCapture(
             run_id=prepared.run_id,
             exit_code=rxp_result.exit_code if rxp_result.exit_code is not None else -1,
-            stdout=raw.stdout or "",
-            stderr=raw.stderr or "",
+            stdout=stdout_text,
+            stderr=stderr_text,
             command=list(invocation.command),
             started_at=started_at,
             finished_at=finished_at,
@@ -118,6 +128,10 @@ class KodoBackendInvoker:
         if prepared.orchestrator_override:
             metadata["orchestrator_override"] = prepared.orchestrator_override
 
+        # Per-invocation artifact directory under the system tmpdir keeps
+        # ExecutorRuntime's stdout/stderr capture out of the kodo workspace.
+        artifact_dir = tempfile.mkdtemp(prefix=f"kodo-{prepared.run_id}-")
+
         return RuntimeInvocation(
             invocation_id=prepared.run_id,
             runtime_name="kodo",
@@ -127,6 +141,7 @@ class KodoBackendInvoker:
             environment=env,
             timeout_seconds=timeout if timeout and timeout > 0 else None,
             input_payload_path=str(prepared.goal_file_path),
+            artifact_directory=artifact_dir,
             metadata=metadata,
         )
 
@@ -141,44 +156,21 @@ class KodoBackendInvoker:
 
 
 # ---------------------------------------------------------------------------
-# RxP wire (Phase 3 replaces this with ExecutorRuntime.run(invocation))
+# Capture helpers
 # ---------------------------------------------------------------------------
 
 
-def _invoke_via_rxp(
-    invocation: RuntimeInvocation,
-    runner: KodoAdapter,
-    started_at: datetime,
-) -> tuple[RuntimeResult, KodoRunResult]:
-    """Run a RuntimeInvocation via the kodo runner. Returns the RxP
-    RuntimeResult and the underlying raw kodo result (kept for kodo-
-    specific stdout/stderr capture used in the kodo capture envelope).
-    """
-    raw = runner._run_subprocess(
-        list(invocation.command),
-        cwd=Path(invocation.working_directory),
-        timeout=invocation.timeout_seconds or 0,
-        env=dict(invocation.environment) if invocation.environment else None,
-    )
-    finished_at = _now()
-    status = _status_from_raw(raw)
-
-    rxp_result = RuntimeResult(
-        invocation_id=invocation.invocation_id,
-        runtime_name=invocation.runtime_name,
-        runtime_kind=invocation.runtime_kind,
-        status=status,
-        exit_code=raw.exit_code,
-        started_at=started_at.isoformat(),
-        finished_at=finished_at.isoformat(),
-    )
-    return rxp_result, raw
-
-
-def _status_from_raw(raw: KodoRunResult) -> str:
-    if "[timeout:" in (raw.stderr or ""):
-        return "timed_out"
-    return "succeeded" if raw.exit_code == 0 else "failed"
+def _read_capture(path: str | None) -> str:
+    """Read a captured stdout/stderr file produced by ExecutorRuntime."""
+    if not path:
+        return ""
+    p = Path(path)
+    if not p.exists():
+        return ""
+    try:
+        return p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 def _parse_iso(iso: str) -> datetime:
@@ -186,7 +178,7 @@ def _parse_iso(iso: str) -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# Artifact extraction
+# Kodo-specific artifact extraction
 # ---------------------------------------------------------------------------
 
 

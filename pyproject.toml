@@ -16,6 +16,7 @@ dependencies = [
   "cxrp @ git+https://github.com/Velascat/CxRP.git",
   "source-registry @ git+https://github.com/Velascat/SourceRegistry.git",
   "rxp @ git+https://github.com/Velascat/RxP.git",
+  "executor-runtime @ git+https://github.com/Velascat/ExecutorRuntime.git",
 ]
 
 [project.scripts]

@@ -5,11 +5,13 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from rxp.contracts import RuntimeInvocation, RuntimeResult
 
-from operations_center.backends.kodo.runner import KodoAdapter, KodoRunResult
+from operations_center.backends.kodo.runner import KodoAdapter
 from operations_center.backends.kodo.adapter import KodoBackendAdapter
 from operations_center.backends.kodo.models import KodoRunCapture
 from operations_center.contracts.execution import ExecutionRequest
@@ -35,21 +37,55 @@ def _request(tmp_path: Path, **kw) -> ExecutionRequest:
     return ExecutionRequest(**defaults)
 
 
-def _mock_kodo(exit_code: int = 0, stdout: str = "done", stderr: str = "") -> KodoAdapter:
+def _mock_kodo() -> KodoAdapter:
     kodo = MagicMock()
     kodo.build_command.return_value = ["kodo", "--goal-file", ".kodo_goal.md"]
-    kodo._run_subprocess.return_value = KodoRunResult(
-        exit_code=exit_code, stdout=stdout, stderr=stderr,
-        command=["kodo", "--goal-file", ".kodo_goal.md"],
-    )
     kodo.write_goal_file = MagicMock()
     return kodo
 
 
-def _adapter(kodo: KodoAdapter = None) -> KodoBackendAdapter:
+class _FakeRuntime:
+    """ExecutorRuntime stand-in that writes the configured stdout/stderr
+    to the invocation's artifact_directory and returns a synthetic
+    RuntimeResult.
+    """
+    def __init__(self, *, stdout: str = "done", stderr: str = "",
+                 exit_code: int = 0, status: str = "succeeded") -> None:
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exit_code = exit_code
+        self.status = status
+
+    def run(self, invocation: RuntimeInvocation) -> RuntimeResult:
+        ar = Path(invocation.artifact_directory) if invocation.artifact_directory else Path("/tmp")
+        ar.mkdir(parents=True, exist_ok=True)
+        sout = ar / "stdout.txt"
+        serr = ar / "stderr.txt"
+        sout.write_text(self.stdout, encoding="utf-8")
+        serr.write_text(self.stderr, encoding="utf-8")
+        now = datetime.now(timezone.utc).isoformat()
+        return RuntimeResult(
+            invocation_id=invocation.invocation_id,
+            runtime_name=invocation.runtime_name,
+            runtime_kind=invocation.runtime_kind,
+            status=self.status,
+            exit_code=self.exit_code,
+            started_at=now, finished_at=now,
+            stdout_path=str(sout), stderr_path=str(serr),
+        )
+
+
+def _adapter(
+    kodo: KodoAdapter = None, *,
+    exit_code: int = 0, stdout: str = "done", stderr: str = "",
+    status: str = "succeeded",
+) -> KodoBackendAdapter:
     if kodo is None:
         kodo = _mock_kodo()
-    return KodoBackendAdapter(kodo)
+    runtime = _FakeRuntime(
+        exit_code=exit_code, stdout=stdout, stderr=stderr, status=status,
+    )
+    return KodoBackendAdapter(kodo, runtime=runtime)
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +117,7 @@ class TestExecuteSuccess:
     def test_returns_execution_result(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        adapter = _adapter(_mock_kodo(exit_code=0))
+        adapter = _adapter(_mock_kodo(), exit_code=0)
         result = adapter.execute(_request(tmp_path))
         from operations_center.contracts.execution import ExecutionResult
         assert isinstance(result, ExecutionResult)
@@ -89,7 +125,7 @@ class TestExecuteSuccess:
     def test_success_result(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        adapter = _adapter(_mock_kodo(exit_code=0))
+        adapter = _adapter(_mock_kodo(), exit_code=0)
         result = adapter.execute(_request(tmp_path))
         assert result.success is True
         assert result.status == ExecutionStatus.SUCCEEDED
@@ -134,7 +170,7 @@ class TestBackendDetailRefs:
         repo = tmp_path / "repo"
         repo.mkdir()
         req = _request(tmp_path)
-        adapter = _adapter(_mock_kodo(stdout="hello", stderr="warn"))
+        adapter = _adapter(_mock_kodo(), stdout="hello", stderr="warn")
 
         _, capture = adapter.execute_and_capture(req)
 
@@ -160,7 +196,7 @@ class TestExecuteFailure:
     def test_nonzero_exit_is_failure(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        adapter = _adapter(_mock_kodo(exit_code=1, stderr="something broke"))
+        adapter = _adapter(_mock_kodo(), exit_code=1, stderr="something broke", status="failed")
         result = adapter.execute(_request(tmp_path))
         assert result.success is False
         assert result.status == ExecutionStatus.FAILED
@@ -168,14 +204,14 @@ class TestExecuteFailure:
     def test_failure_reason_populated(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        adapter = _adapter(_mock_kodo(exit_code=1, stderr="kodo error detail"))
+        adapter = _adapter(_mock_kodo(), exit_code=1, stderr="kodo error detail", status="failed")
         result = adapter.execute(_request(tmp_path))
         assert result.failure_reason is not None
 
     def test_failure_category_set(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
-        adapter = _adapter(_mock_kodo(exit_code=1))
+        adapter = _adapter(_mock_kodo(), exit_code=1, status="failed")
         result = adapter.execute(_request(tmp_path))
         assert result.failure_category is not None
 

@@ -282,13 +282,31 @@ def test_kodo_adapter_retains_backend_detail_refs_and_duration_metadata(tmp_path
     kodo = KodoAdapter.__new__(KodoAdapter)
     kodo.write_goal_file = lambda path, goal_text, constraints_text=None: path.write_text(goal_text, encoding="utf-8")
     kodo.build_command = lambda goal_file, repo_path, profile=None, kodo_mode="goal": ["kodo", "run"]
-    kodo._run_subprocess = staticmethod(
-        lambda command, *, cwd, timeout, env=None: KodoRunResult(
-            exit_code=0, stdout="kodo stdout", stderr="", command=list(command),
-        )
-    )
+
+    # Phase 3: ExecutorRuntime drives the actual subprocess. Inject a
+    # tiny fake that writes the desired stdout/stderr to the
+    # invocation's artifact_directory and returns an RxP RuntimeResult.
+    from datetime import datetime, timezone
+    from rxp.contracts import RuntimeResult
+
+    class _FakeRuntime:
+        def run(self, invocation):
+            ar = Path(invocation.artifact_directory) if invocation.artifact_directory else Path("/tmp")
+            ar.mkdir(parents=True, exist_ok=True)
+            sout = ar / "stdout.txt"; sout.write_text("kodo stdout", encoding="utf-8")
+            serr = ar / "stderr.txt"; serr.write_text("", encoding="utf-8")
+            now = datetime.now(timezone.utc).isoformat()
+            return RuntimeResult(
+                invocation_id=invocation.invocation_id,
+                runtime_name=invocation.runtime_name,
+                runtime_kind=invocation.runtime_kind,
+                status="succeeded", exit_code=0,
+                started_at=now, finished_at=now,
+                stdout_path=str(sout), stderr_path=str(serr),
+            )
+
     coordinator = ExecutionCoordinator(
-        adapter_registry=_Registry(KodoBackendAdapter(kodo)),
+        adapter_registry=_Registry(KodoBackendAdapter(kodo, runtime=_FakeRuntime())),
         policy_engine=_StubPolicyEngine(PolicyDecision(status=PolicyStatus.ALLOW)),
     )
 
