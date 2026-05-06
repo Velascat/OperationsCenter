@@ -84,6 +84,11 @@ class ExecutionRequest(BaseModel):
     # the contract layer (same pattern as RecoveryMetadataSummary).
     runtime_binding: Optional["RuntimeBindingSummary"] = None
 
+    # Phase 6 — the strict, validated execution target this request was
+    # bound to. Forward-ref'd as a string to avoid the import cycle
+    # (BoundExecutionTarget references RuntimeBindingSummary in turn).
+    bound_target: Optional["BoundExecutionTargetMirror"] = None
+
     # Metadata
     requested_at: datetime = Field(default_factory=_utcnow)
 
@@ -222,6 +227,13 @@ class ExecutionResult(BaseModel):
     # paths that never engaged the loop. See execution/recovery_loop/.
     recovery: Optional["RecoveryMetadataSummary"] = None
 
+    # Phase 6 — the BoundExecutionTarget the coordinator used for this
+    # run. Recorded for audit/replay so any past run can answer:
+    # which lane was requested? which backend executed? which runtime
+    # powered it? which fork/ref/patches were actually used?
+    # See docs/architecture/execution_target.md.
+    bound_target: Optional["BoundExecutionTargetMirror"] = None
+
     # Metadata
     completed_at: datetime = Field(default_factory=_utcnow)
 
@@ -261,6 +273,35 @@ class RecoveryMetadataSummary(BaseModel):
     model_config = {"frozen": True}
 
 
+class BackendProvenanceMirror(BaseModel):
+    """Contract-layer mirror of execution.target.BackendProvenance.
+
+    Same import-cycle-avoiding pattern as RuntimeBindingSummary: the
+    contract layer can't import the execution layer. ExecutionRequest
+    carries the mirror; coordinator code converts to/from the real
+    BackendProvenance at the boundary.
+    """
+
+    source: str = "unknown"
+    repo: Optional[str] = None
+    ref: Optional[str] = None
+    patches: list[str] = Field(default_factory=list)
+
+    model_config = {"frozen": True}
+
+
+class BoundExecutionTargetMirror(BaseModel):
+    """Contract-layer mirror of execution.target.BoundExecutionTarget."""
+
+    lane: str
+    backend: str
+    executor: Optional[str] = None
+    runtime_binding: Optional["RuntimeBindingSummary"] = None
+    provenance: Optional[BackendProvenanceMirror] = None
+
+    model_config = {"frozen": True}
+
+
 class RuntimeBindingSummary(BaseModel):
     """Mirror of cxrp.contracts.RuntimeBinding at OC's contract layer.
 
@@ -284,3 +325,4 @@ class RuntimeBindingSummary(BaseModel):
 # Resolve forward references now that the summary types are defined.
 ExecutionResult.model_rebuild()
 ExecutionRequest.model_rebuild()
+BoundExecutionTargetMirror.model_rebuild()
