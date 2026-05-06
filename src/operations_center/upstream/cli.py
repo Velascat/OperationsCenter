@@ -193,7 +193,7 @@ def cmd_poll(
     json_output: bool = False,
 ) -> int:
     """Run one poll iteration; emits UPSTREAM_RECONCILE findings.
-    Exit non-zero when any reconciliation is suggested (cron-friendly).
+    Exit non-zero when any reconciliation is suggested.
     """
     from operations_center.upstream.poll import poll_all
     findings = poll_all(registry_path=registry_path)

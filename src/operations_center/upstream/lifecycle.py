@@ -453,7 +453,7 @@ def auto_sync_all(
     registry_path: Path | None = None,
     dry_run: bool = False,
 ) -> list[AutoSyncResult]:
-    """Run auto-sync for every fork in the registry. Useful from cron."""
+    """Run auto-sync for every fork in the registry."""
     registry = load_registry(registry_path or _default_registry_path())
     return [
         auto_sync_fork(e.fork_id, mode=mode,
