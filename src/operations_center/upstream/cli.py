@@ -136,6 +136,57 @@ def cmd_sync(
     return 0
 
 
+def cmd_auto_sync(
+    *,
+    fork_id: Optional[str],
+    all_forks: bool,
+    mode_str: str = "dev",
+    dry_run: bool = False,
+    registry_path: Path | None = None,
+) -> int:
+    """Silently apply safe reconcile actions. Cron-friendly.
+
+    Exit codes:
+      0 — clean (synced or no_op for all targets)
+      1 — at least one fork blocked (manual intervention needed)
+      2 — invalid args / registry error
+    """
+    from operations_center.upstream.lifecycle import (
+        AutoSyncResult, auto_sync_all, auto_sync_fork,
+    )
+    try:
+        mode = InstallMode(mode_str)
+    except ValueError:
+        print(f"ERROR: invalid mode {mode_str!r}", file=sys.stderr)
+        return 2
+
+    results: list[AutoSyncResult]
+    if all_forks:
+        results = auto_sync_all(mode=mode, registry_path=registry_path, dry_run=dry_run)
+    else:
+        if fork_id is None:
+            print("ERROR: provide a fork_id or pass --all", file=sys.stderr)
+            return 2
+        try:
+            results = [auto_sync_fork(fork_id, mode=mode,
+                                      registry_path=registry_path, dry_run=dry_run)]
+        except RegistryError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+
+    any_blocked = False
+    for r in results:
+        marker = "[OK]   " if r.ok else "[BLOCK]"
+        suffix = " (dry-run)" if dry_run else ""
+        print(f"{marker} {r.fork_id}: {r.final_state}{suffix}")
+        for action in r.actions_taken:
+            print(f"         + {action}")
+        for blocked in r.actions_blocked:
+            print(f"         ! {blocked}")
+            any_blocked = True
+    return 1 if any_blocked else 0
+
+
 def cmd_poll(
     *,
     registry_path: Path | None = None,

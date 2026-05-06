@@ -104,6 +104,13 @@ class ForkEntry:
     install: InstallSpec
     poll_cadence_hours: int = 24
     auto_pr_push: bool = False
+    # When True, `operations-center-upstream auto-sync` silently applies
+    # safe reconcile actions (DROP_PATCH after upstream merge, bump+
+    # reinstall when zero local patches, clean rebase) without human
+    # approval. Unsafe actions (rebase conflicts, auto-PR creation)
+    # always abort and emit findings instead. Default true: forks
+    # default-track upstream automatically.
+    auto_sync: bool = True
 
     def render_install_command(
         self,
@@ -231,6 +238,7 @@ def _parse_entry(fork_id: str, raw: dict) -> ForkEntry:
         install=install,
         poll_cadence_hours=int(raw.get("poll_cadence_hours", 24)),
         auto_pr_push=bool(raw.get("auto_pr_push", False)),
+        auto_sync=bool(raw.get("auto_sync", True)),
     )
 
 

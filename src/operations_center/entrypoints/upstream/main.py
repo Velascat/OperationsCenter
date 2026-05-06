@@ -18,8 +18,8 @@ from pathlib import Path
 import typer
 
 from operations_center.upstream.cli import (
-    cmd_bump, cmd_drop, cmd_install, cmd_poll, cmd_push, cmd_rebase,
-    cmd_status, cmd_sync, cmd_verify,
+    cmd_auto_sync, cmd_bump, cmd_drop, cmd_install, cmd_poll, cmd_push,
+    cmd_rebase, cmd_status, cmd_sync, cmd_verify,
 )
 from operations_center.upstream.registry import InstallMode
 
@@ -123,6 +123,27 @@ def push(
     """Push a patch's branch as an upstream PR (auto_pr_push opt-in required)."""
     code = cmd_push(patch_id=patch_id, dry_run=dry_run,
                     registry_path=_resolve_registry(registry))
+    raise typer.Exit(code)
+
+
+@app.command("auto-sync")
+def auto_sync(
+    fork_id: str = typer.Argument(None, help="Fork id (omit if --all)"),
+    all_forks: bool = typer.Option(False, "--all", help="Auto-sync every registered fork"),
+    mode: str = typer.Option("dev", "--mode", "-m"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Plan without applying"),
+    registry: Path = typer.Option(None, "--registry"),
+) -> None:
+    """Cron-friendly: silently apply safe reconcile actions.
+
+    Pulls upstream into forks that have zero local patches; drops patches
+    after upstream merge; aborts on conflicts (manual intervention).
+    Never opens upstream PRs (auto_pr_push stays opt-in via `push`).
+    """
+    code = cmd_auto_sync(
+        fork_id=fork_id, all_forks=all_forks, mode_str=mode,
+        dry_run=dry_run, registry_path=_resolve_registry(registry),
+    )
     raise typer.Exit(code)
 
 

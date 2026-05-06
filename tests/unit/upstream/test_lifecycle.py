@@ -166,3 +166,83 @@ class TestRebase:
         registry_path = _registry_with_kodo(tmp_path, clone, initial_sha[:7])
         with pytest.raises(LifecycleError, match="uncommitted"):
             rebase_fork("kodo", registry_path=registry_path)
+
+
+# ── Auto-sync ───────────────────────────────────────────────────────────
+
+
+class TestAutoSync:
+    def _setup_upstream_and_fork(self, tmp_path):
+        """Build an upstream + a fork-clone tracking it on branch 'dev'.
+        Returns (upstream, clone, fork_head)."""
+        upstream = tmp_path / "upstream-kodo"
+        _init_repo(upstream, with_files={"kodo/orchestrators/claude_code.py": "# upstream\n"})
+        # Rename master to dev for parity with registry config
+        _git(upstream, "branch", "-m", "dev")
+
+        clone = tmp_path / "kodo"
+        subprocess.run(["git", "clone", "-q", "-b", "dev", str(upstream), str(clone)], check=True)
+        _git(clone, "config", "user.email", "t@t")
+        _git(clone, "config", "user.name", "t")
+        _git(clone, "remote", "add", "upstream", str(upstream))
+        _git(clone, "fetch", "-q", "upstream")
+        head = _git(clone, "rev-parse", "HEAD").strip()
+        return upstream, clone, head
+
+    def test_no_op_when_upstream_unchanged(self, tmp_path, monkeypatch):
+        from operations_center.upstream.lifecycle import auto_sync_fork
+        monkeypatch.setenv("HOME", str(tmp_path / "fake-home"))
+        upstream, clone, head = self._setup_upstream_and_fork(tmp_path)
+        registry_path = _registry_with_kodo(tmp_path, clone, head[:7])
+
+        result = auto_sync_fork("kodo", registry_path=registry_path, dry_run=True)
+
+        assert result.ok
+        assert result.final_state == "no_op"
+        assert result.actions_taken == []
+
+    def test_dry_run_pulls_upstream_when_changed(self, tmp_path, monkeypatch):
+        from operations_center.upstream.lifecycle import auto_sync_fork
+        monkeypatch.setenv("HOME", str(tmp_path / "fake-home"))
+        upstream, clone, head = self._setup_upstream_and_fork(tmp_path)
+        registry_path = _registry_with_kodo(tmp_path, clone, head[:7])
+
+        # Add a new commit upstream
+        (upstream / "newfile.py").write_text("# new\n", encoding="utf-8")
+        _git(upstream, "add", "newfile.py")
+        _git(upstream, "commit", "-q", "-m", "upstream change")
+
+        result = auto_sync_fork("kodo", registry_path=registry_path, dry_run=True)
+
+        assert result.ok
+        assert result.final_state == "synced"
+        assert result.upstream_changed
+        assert any("would reset" in a for a in result.actions_taken)
+        # Registry is unchanged after dry-run
+        assert load_registry(registry_path).get("kodo").fork_commit == head[:7]
+
+    def test_disabled_flag_blocks(self, tmp_path, monkeypatch):
+        from operations_center.upstream.lifecycle import auto_sync_fork
+        monkeypatch.setenv("HOME", str(tmp_path / "fake-home"))
+        upstream, clone, head = self._setup_upstream_and_fork(tmp_path)
+        registry_path = _registry_with_kodo(tmp_path, clone, head[:7])
+        # Inject auto_sync: false
+        text = registry_path.read_text(encoding="utf-8")
+        registry_path.write_text(text + "    auto_sync: false\n", encoding="utf-8")
+
+        result = auto_sync_fork("kodo", registry_path=registry_path, dry_run=True)
+
+        assert not result.ok
+        assert result.final_state == "blocked"
+        assert any("auto_sync disabled" in b for b in result.actions_blocked)
+
+    def test_blocks_when_no_clone_resolvable(self, tmp_path, monkeypatch):
+        from operations_center.upstream.lifecycle import auto_sync_fork
+        monkeypatch.setenv("HOME", str(tmp_path / "fake-home"))
+        monkeypatch.delenv("OC_UPSTREAM_CLONES_ROOT", raising=False)
+        registry_path = _registry_with_kodo(tmp_path, tmp_path / "absent", "abc1234")
+
+        result = auto_sync_fork("kodo", registry_path=registry_path, dry_run=True)
+
+        assert not result.ok
+        assert result.final_state == "blocked"
