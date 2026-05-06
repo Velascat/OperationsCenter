@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from operations_center.contracts.execution import ExecutionRequest, RuntimeBindingSummary
+from operations_center.lifecycle import LifecycleMetadata
 from operations_center.planning.models import ProposalDecisionBundle
 from operations_center.policy.models import PolicyDecision
 
@@ -25,12 +26,17 @@ class ExecutionRuntimeContext:
     layer (not from SwitchBoard's LaneDecision — SB picks lane/backend,
     OC binds the runtime). When set, the coordinator's drift detection
     becomes active for this run.
+
+    ``lifecycle`` (ER-003) is optional. When set, the coordinator wraps
+    the dispatch in a plan/execute/verify cycle and attaches the outcome
+    to ``ExecutionResult.lifecycle_outcome``.
     """
 
     workspace_path: Path
     task_branch: str
     goal_file_path: Path | None = None
     runtime_binding: RuntimeBindingSummary | None = None
+    lifecycle: LifecycleMetadata | None = None
 
 
 class ExecutionRequestBuilder:
@@ -66,4 +72,5 @@ class ExecutionRequestBuilder:
             require_clean_validation=proposal.constraints.require_clean_validation,
             validation_commands=list(proposal.validation_profile.commands),
             runtime_binding=runtime.runtime_binding,
+            lifecycle=runtime.lifecycle,
         )

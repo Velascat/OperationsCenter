@@ -32,6 +32,27 @@ from .models import (
 )
 
 
+def default_config_path() -> Path:
+    """Path to the shipped ``config/repo_graph.yaml``.
+
+    Located via this file's location so callers don't need to know the
+    repo layout. Returns the path even if the file does not exist.
+    """
+    return Path(__file__).resolve().parents[3] / "config" / "repo_graph.yaml"
+
+
+_cached_default: RepoGraph | None = None
+
+
+def load_default_repo_graph() -> RepoGraph:
+    """Load + cache the shipped repo graph. Safe to call from coordinator
+    construction sites; subsequent calls reuse the parsed graph."""
+    global _cached_default
+    if _cached_default is None:
+        _cached_default = load_repo_graph(default_config_path())
+    return _cached_default
+
+
 def load_repo_graph(path: Path) -> RepoGraph:
     if not path.exists():
         raise RepoGraphConfigError(f"repo graph config not found: {path}")

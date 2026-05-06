@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+from pathlib import Path
 from typing import Any
 from typing import Protocol, runtime_checkable
 
@@ -83,6 +84,8 @@ class ExecutionCoordinator:
         workspace_manager: WorkspaceManager | None = None,
         recovery_engine: RecoveryEngine | None = None,
         recovery_policy: RecoveryPolicy | None = None,
+        run_memory_index_dir: Path | None = None,
+        repo_graph: object | None = None,
     ) -> None:
         self._registry = adapter_registry
         self._policy = policy_engine or PolicyEngine.from_defaults()
@@ -94,6 +97,10 @@ class ExecutionCoordinator:
         # preserved unless callers explicitly enable retry policy.
         self._recovery_policy = recovery_policy or RecoveryPolicy()
         self._recovery_engine = recovery_engine or build_default_engine(self._recovery_policy)
+        # ER-002 — opt-in run memory index. None preserves existing behavior.
+        self._run_memory_index_dir = run_memory_index_dir
+        # ER-001 — optional repo graph context handed to lifecycle plan stage.
+        self._repo_graph = repo_graph
 
     def execute(
         self,
@@ -106,6 +113,7 @@ class ExecutionCoordinator:
         if policy_decision.status in {PolicyStatus.BLOCK, PolicyStatus.REQUIRE_REVIEW}:
             result = _policy_blocked_result(request, policy_decision)
             record, trace = self._observe(bundle, result, policy_decision)
+            self._record_run_memory(request=request, result=result, bundle=bundle)
             return ExecutionRunOutcome(
                 request=request,
                 policy_decision=policy_decision,
@@ -129,6 +137,7 @@ class ExecutionCoordinator:
                 )
                 result = _workspace_prep_failed_result(request, exc)
                 record, trace = self._observe(bundle, result, policy_decision)
+                self._record_run_memory(request=request, result=result, bundle=bundle)
                 return ExecutionRunOutcome(
                     request=request,
                     policy_decision=policy_decision,
@@ -162,6 +171,16 @@ class ExecutionCoordinator:
                     "Workspace finalize failed for run %s: %s", request.run_id, exc,
                 )
 
+        # ER-003 — if the request carried lifecycle metadata, drive
+        # plan/verify around the dispatch we just ran. The dispatch result
+        # itself remains the canonical execution; lifecycle augments it.
+        if request.lifecycle is not None:
+            result = _attach_lifecycle_outcome(
+                request=request,
+                result=result,
+                repo_graph_context=self._repo_graph,
+            )
+
         record, trace = self._observe(
             bundle,
             result,
@@ -170,6 +189,9 @@ class ExecutionCoordinator:
             runtime_metadata=runtime_metadata,
             request=request,
         )
+        # ER-002 — index the finalized result. Single write site for
+        # OperationsCenter. Failures are swallowed: memory is advisory.
+        self._record_run_memory(request=request, result=result, bundle=bundle)
         return ExecutionRunOutcome(
             request=request,
             policy_decision=policy_decision,
@@ -178,6 +200,33 @@ class ExecutionCoordinator:
             trace=trace,
             executed=True,
         )
+
+    def _record_run_memory(
+        self,
+        *,
+        request: ExecutionRequest,
+        result: ExecutionResult,
+        bundle: ProposalDecisionBundle,
+    ) -> None:
+        if self._run_memory_index_dir is None:
+            return
+        try:
+            from operations_center.run_memory import record_execution_result
+
+            record_execution_result(
+                result,
+                self._run_memory_index_dir,
+                repo_id=request.repo_key,
+                tags=(
+                    bundle.proposal.task_type.value,
+                    bundle.decision.selected_lane.value,
+                    bundle.decision.selected_backend.value,
+                ),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Run memory indexing failed for run %s: %s", request.run_id, exc,
+            )
 
     def _observe(
         self,
@@ -455,6 +504,79 @@ def _runtime_metadata_from_capture(capture: object | None) -> dict[str, Any]:
         metadata["used_capabilities"] = sorted(str(c) for c in used_capabilities)
 
     return metadata
+
+
+def _attach_lifecycle_outcome(
+    *,
+    request: ExecutionRequest,
+    result: ExecutionResult,
+    repo_graph_context: object | None,
+) -> ExecutionResult:
+    """Run plan + verify around the already-dispatched execution.
+
+    The coordinator's dispatch IS the ``execute`` stage — we don't re-dispatch.
+    Plan and verify use built-in default handlers; callers wanting custom
+    behavior can subclass or override ``_DEFAULT_LIFECYCLE_HANDLERS`` later.
+    Failures in plan/verify do not corrupt the canonical result; they are
+    recorded on ``lifecycle_outcome`` only.
+    """
+    from operations_center.lifecycle import (
+        Check,
+        CheckResult,
+        ExecuteOutput,
+        LifecycleRunner,
+        PlanOutput,
+        StageHandlers,
+        TaskLifecycleStage,
+    )
+
+    def _default_plan(*, request, repo_graph_context):  # type: ignore[no-untyped-def]
+        targets = []
+        if repo_graph_context is not None and hasattr(repo_graph_context, "resolve"):
+            node = repo_graph_context.resolve(request.repo_key)
+            if node is not None:
+                targets = [node.canonical_name]
+        if not targets:
+            targets = [request.repo_key]
+        return PlanOutput(
+            plan_summary=f"dispatch {request.repo_key} via coordinator",
+            target_repos=targets,
+            steps=["coordinator dispatch"],
+            checks=[Check(check_id="execution_succeeded")],
+        )
+
+    def _default_execute(*, request, plan):  # type: ignore[no-untyped-def]
+        # The actual execution already ran; mirror its status.
+        return ExecuteOutput(
+            result_ref=result.run_id,
+            status=result.status.value if hasattr(result.status, "value") else str(result.status),
+        )
+
+    def _default_verify(*, request, plan, execution):  # type: ignore[no-untyped-def]
+        passed = result.success
+        return [
+            CheckResult(
+                check_id="execution_succeeded",
+                passed=passed,
+                reason=None if passed else (result.failure_reason or "execution did not succeed"),
+            )
+        ]
+
+    runner = LifecycleRunner(
+        StageHandlers(plan=_default_plan, execute=_default_execute, verify=_default_verify)
+    )
+    try:
+        lc_result = runner.run(
+            request=request,
+            metadata=request.lifecycle,
+            repo_graph_context=repo_graph_context,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Lifecycle runner raised for run %s: %s", request.run_id, exc,
+        )
+        return result
+    return result.model_copy(update={"lifecycle_outcome": lc_result.outcome})
 
 
 def _evaluate_runtime_drift(

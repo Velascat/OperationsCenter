@@ -1,163 +1,91 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
-"""Phase 14 — operations-center-upstream CLI.
+"""Deprecation shim: ``operations-center-upstream`` → ``source-registry``.
 
-Forks-as-default dependency management. See
-docs/architecture/backend_control_audit.md (Phase 14).
+The fork-manager engine moved out of OperationsCenter into the
+SourceRegistry library. This entrypoint stays one release for
+muscle-memory compatibility — it prints a deprecation notice and
+delegates to ``source-registry`` with OC's canonical paths
+(``registry/source_registry.yaml`` and ``registry/patches``)
+auto-injected so existing scripts keep working.
 
-Subcommands:
-  install   — install registered forks per --mode
-  verify    — CI gate: confirm installed SHAs match registry
-  status    — per-fork report
+Hard-cut planned for the next release.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
-import typer
-
-from operations_center.upstream.cli import (
-    cmd_auto_sync, cmd_bump, cmd_drop, cmd_install, cmd_poll, cmd_push,
-    cmd_rebase, cmd_status, cmd_sync, cmd_verify,
-)
-from operations_center.upstream.registry import InstallMode
-
-app = typer.Typer(
-    help="Fork-first dependency management (registry/install/verify/status).",
-    no_args_is_help=True,
-)
+# Canonical OC paths for the source registry + patches.
+# Resolved relative to the OperationsCenter repo root (the directory
+# containing ``registry/source_registry.yaml``). The shim walks up from
+# the CWD until it finds that file, falling back to the literal path.
+_REGISTRY_RELATIVE = Path("registry/source_registry.yaml")
+_PATCHES_RELATIVE = Path("registry/patches")
 
 
-def _resolve_registry(path: Path | None) -> Path | None:
-    if path is None:
-        return None
-    return path.expanduser().resolve()
+def _find_registry_root() -> Path:
+    """Walk up from CWD looking for ``registry/source_registry.yaml``."""
+    cwd = Path.cwd().resolve()
+    for parent in (cwd, *cwd.parents):
+        if (parent / _REGISTRY_RELATIVE).is_file():
+            return parent
+    return cwd
 
 
-@app.command("install")
-def install(
-    fork_id: str = typer.Argument(None, help="Fork id to install (omit if --all)"),
-    mode: str = typer.Option("dev", "--mode", "-m", help="Install mode: dev | ci | prod"),
-    all_forks: bool = typer.Option(False, "--all", help="Install every registered fork"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Print commands without running"),
-    registry: Path = typer.Option(None, "--registry", help="Override path to registry.yaml"),
-) -> None:
-    try:
-        install_mode = InstallMode(mode)
-    except ValueError:
-        typer.echo(f"ERROR: invalid mode {mode!r}; valid: {[m.value for m in InstallMode]}", err=True)
-        raise typer.Exit(2)
-    code = cmd_install(
-        fork_id=fork_id, mode=install_mode, all_forks=all_forks,
-        dry_run=dry_run, registry_path=_resolve_registry(registry),
+def _emit_deprecation() -> None:
+    sys.stderr.write(
+        "\033[33m[deprecated]\033[0m operations-center-upstream is now a thin "
+        "shim over `source-registry`.\n"
+        "  Switch to: source-registry <subcommand> --registry "
+        f"{_REGISTRY_RELATIVE} [--patches {_PATCHES_RELATIVE}]\n\n"
     )
-    raise typer.Exit(code)
 
 
-@app.command("verify")
-def verify(
-    registry: Path = typer.Option(None, "--registry", help="Override path to registry.yaml"),
-) -> None:
-    code = cmd_verify(registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
+# Subcommands that need ``--patches`` auto-injected on the SR side
+_PATCHES_SUBCOMMANDS = {"poll", "push", "drop"}
 
-
-@app.command("status")
-def status(
-    registry: Path = typer.Option(None, "--registry", help="Override path to registry.yaml"),
-) -> None:
-    code = cmd_status(registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
-
-
-@app.command("bump")
-def bump(
-    fork_id: str = typer.Argument(..., help="Fork id to bump"),
-    to_sha: str = typer.Option(None, "--to", help="SHA to pin (omit to use HEAD)"),
-    registry: Path = typer.Option(None, "--registry"),
-) -> None:
-    code = cmd_bump(fork_id=fork_id, to_sha=to_sha, registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
-
-
-@app.command("rebase")
-def rebase(
-    fork_id: str = typer.Argument(..., help="Fork id to rebase"),
-    upstream_remote: str = typer.Option("upstream", "--upstream-remote"),
-    registry: Path = typer.Option(None, "--registry"),
-) -> None:
-    code = cmd_rebase(fork_id=fork_id, upstream_remote=upstream_remote,
-                     registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
-
-
-@app.command("sync")
-def sync(
-    fork_id: str = typer.Argument(..., help="Fork id to rebase + bump + reinstall"),
-    mode: str = typer.Option("dev", "--mode", "-m"),
-    skip_install: bool = typer.Option(False, "--skip-install"),
-    registry: Path = typer.Option(None, "--registry"),
-) -> None:
-    code = cmd_sync(fork_id=fork_id, mode_str=mode, skip_install=skip_install,
-                   registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
-
-
-@app.command("poll")
-def poll(
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON instead of human text"),
-    registry: Path = typer.Option(None, "--registry"),
-) -> None:
-    """Poll upstream + emit reconcile suggestions. Exits non-zero on findings."""
-    code = cmd_poll(json_output=json_output, registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
-
-
-@app.command("push")
-def push(
-    patch_id: str = typer.Argument(..., help="Patch id (fork:PATCH-NNN)"),
-    dry_run: bool = typer.Option(False, "--dry-run"),
-    registry: Path = typer.Option(None, "--registry"),
-) -> None:
-    """Push a patch's branch as an upstream PR (auto_pr_push opt-in required)."""
-    code = cmd_push(patch_id=patch_id, dry_run=dry_run,
-                    registry_path=_resolve_registry(registry))
-    raise typer.Exit(code)
-
-
-@app.command("auto-sync")
-def auto_sync(
-    fork_id: str = typer.Argument(None, help="Fork id (omit if --all)"),
-    all_forks: bool = typer.Option(False, "--all", help="Auto-sync every registered fork"),
-    mode: str = typer.Option("dev", "--mode", "-m"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Plan without applying"),
-    registry: Path = typer.Option(None, "--registry"),
-) -> None:
-    """Cron-friendly: silently apply safe reconcile actions.
-
-    Pulls upstream into forks that have zero local patches; drops patches
-    after upstream merge; aborts on conflicts (manual intervention).
-    Never opens upstream PRs (auto_pr_push stays opt-in via `push`).
-    """
-    code = cmd_auto_sync(
-        fork_id=fork_id, all_forks=all_forks, mode_str=mode,
-        dry_run=dry_run, registry_path=_resolve_registry(registry),
-    )
-    raise typer.Exit(code)
-
-
-@app.command("drop")
-def drop(
-    patch_id: str = typer.Argument(..., help="Patch id (fork:PATCH-NNN)"),
-) -> None:
-    """Mark a patch as dropped (after upstream merge). Removes the yaml."""
-    code = cmd_drop(patch_id=patch_id)
-    raise typer.Exit(code)
+# Subcommands the old CLI supported but SR maps differently
+_LEGACY_INSTALL_NOTE = (
+    "\033[33m[deprecated]\033[0m `install` was removed; use "
+    "`sync` (rebase + bump + reinstall) or `auto-sync` instead.\n"
+)
 
 
 def main() -> None:
-    app()
+    _emit_deprecation()
+
+    argv = list(sys.argv[1:])
+    if not argv:
+        # No subcommand → show help via the SR CLI
+        from source_registry.cli import app
+        app(["--help"])
+        return
+
+    subcommand = argv[0]
+
+    if subcommand == "install":
+        sys.stderr.write(_LEGACY_INSTALL_NOTE)
+        sys.exit(2)
+
+    # Auto-inject --registry pointing at OC's canonical path
+    root = _find_registry_root()
+    registry_path = root / _REGISTRY_RELATIVE
+    patches_path = root / _PATCHES_RELATIVE
+
+    user_supplied_registry = "--registry" in argv
+    user_supplied_patches = "--patches" in argv
+
+    new_argv = argv[:]
+    if not user_supplied_registry:
+        new_argv += ["--registry", str(registry_path)]
+    if subcommand in _PATCHES_SUBCOMMANDS and not user_supplied_patches:
+        new_argv += ["--patches", str(patches_path)]
+
+    # Hand off to the SR CLI app
+    from source_registry.cli import app
+    app(new_argv)
 
 
 if __name__ == "__main__":

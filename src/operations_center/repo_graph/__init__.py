@@ -14,7 +14,11 @@ Public API:
   RepoGraph.affected_by_contract_change(repo_id) -> list[RepoNode]
 """
 
-from .loader import load_repo_graph
+from .loader import (
+    default_config_path,
+    load_default_repo_graph,
+    load_repo_graph,
+)
 from .models import (
     RepoEdge,
     RepoEdgeType,
@@ -29,5 +33,7 @@ __all__ = [
     "RepoGraph",
     "RepoGraphConfigError",
     "RepoNode",
+    "default_config_path",
+    "load_default_repo_graph",
     "load_repo_graph",
 ]

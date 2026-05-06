@@ -77,20 +77,50 @@ class _AlwaysAllowPolicy:
 # ── Provenance resolution (OC-only — never on the wire) ─────────────────
 
 
+_DEFAULT_REGISTRY_PATH = "registry/source_registry.yaml"
+_DEFAULT_PATCHES_ROOT = "registry/patches"
+
+
 def _provenance_from_registry(backend_id: str) -> Optional[BackendProvenance]:
+    """Resolve provenance for ``backend_id`` from the OC source registry.
+
+    Reads ``registry/source_registry.yaml`` (relative to CWD) via the
+    SourceRegistry library. Returns None when the entry doesn't exist
+    or the registry can't be loaded — callers fall back to ``unknown``.
+    """
     try:
-        from operations_center.upstream.registry import load_registry
-        from operations_center.upstream.patches import load_patches
+        from pathlib import Path
+        from source_registry import SourceRegistry, load_patches
     except ImportError:
         return None
-    registry = load_registry()
-    if backend_id not in registry.entries:
+
+    registry_path = Path(_DEFAULT_REGISTRY_PATH)
+    if not registry_path.exists():
         return None
-    entry = registry.entries[backend_id]
-    patches = load_patches().for_fork(backend_id)
+    try:
+        registry = SourceRegistry.from_yaml(registry_path)
+        entry = registry.resolve(backend_id)
+    except Exception:
+        return None
+
+    repo = entry.fork_url or entry.upstream_url
+    # Strip protocol/host to match old "owner/repo" provenance form
+    if "github.com/" in repo:
+        repo = repo.split("github.com/", 1)[1].rstrip("/")
+        if repo.endswith(".git"):
+            repo = repo[:-4]
+
+    patches_root = Path(_DEFAULT_PATCHES_ROOT)
+    patch_ids: list[str] = []
+    if patches_root.exists():
+        try:
+            patch_reg = load_patches(patches_root)
+            patch_ids = [p.patch_id for p in patch_reg.for_source(backend_id)]
+        except Exception:
+            patch_ids = []
+
     return BackendProvenance(
-        source="registry", repo=entry.fork.repo, ref=entry.fork_commit,
-        patches=[p.id for p in patches],
+        source="registry", repo=repo, ref=entry.expected_sha, patches=patch_ids,
     )
 
 
