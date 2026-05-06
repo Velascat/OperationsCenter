@@ -17,7 +17,7 @@ from cxrp.vocabulary.runtime import RuntimeKind, SelectionMode
 from operations_center.contracts.enums import BackendName, LaneName
 from operations_center.execution.binding import (
     InvalidRuntimeBindingError, MissingProvenanceError, PolicyViolationError,
-    UnknownBackendError, UnknownExecutorError, bind_execution_target,
+    UnknownBackendError, bind_execution_target,
 )
 from operations_center.execution.target import (
     BackendProvenance, BoundExecutionTarget,

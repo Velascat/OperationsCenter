@@ -3,19 +3,15 @@
 """bind_execution_target — convert CxRP envelope → OC bound target.
 
 Schema 0.3 (closed-system simplification): envelope.backend and
-envelope.executor are already typed CxRP enums. This binder is a thin
-shim that converts to OC's same-shape enums and resolves provenance
-from the upstream registry. The pre-0.3 typo-catching errors (Unknown
-Backend/Executor) are now impossible at this layer — the wire schema
-already rejected them.
+envelope.executor are already typed CxRP enums. This binder converts
+them to OC's same-valued enums and resolves provenance from the
+SourceRegistry.
 
-Errors retained for the cases that still apply:
+Errors:
+  - UnknownBackendError         : envelope.backend missing or not in catalog
   - InvalidRuntimeBindingError  : RuntimeBinding object malformed
   - PolicyViolationError        : bound target rejected by policy
   - MissingProvenanceError      : registry-strict mode and no entry
-
-UnknownBackendError / UnknownExecutorError remain importable for
-callers that catch them, but the binder no longer raises them.
 """
 from __future__ import annotations
 
@@ -40,12 +36,10 @@ class TargetBindError(ValueError):
 
 
 class UnknownBackendError(TargetBindError):
-    """Wire-validation rejected the backend name. Retained for catch-clauses;
-    schema 0.3 makes the binder not raise this — it dies at parse time."""
-
-
-class UnknownExecutorError(TargetBindError):
-    """Wire-validation rejected the executor name. Retained for catch-clauses."""
+    """envelope.backend is missing, or not present in the configured
+    executor catalog. Schema 0.3 already rejects unknown *names* at
+    parse time; this fires for missing values or catalog mismatches.
+    """
 
 
 class InvalidRuntimeBindingError(TargetBindError):

@@ -68,11 +68,10 @@ Forbidden in shared docs (informal notes are fine):
          envelope, catalog=executor_catalog, policy=execution_policy,
      )
      # target is a BoundExecutionTarget
-     # → unknown backend?  UnknownBackendError
-     # → unknown executor? UnknownExecutorError
+     # → backend missing or not in catalog? UnknownBackendError
      # → invalid runtime?  InvalidRuntimeBindingError
      # → policy reject?    PolicyViolationError
-     # → missing fork prov? MissingProvenanceError (when require_provenance=True)
+     # → missing source provenance? MissingProvenanceError (when require_provenance=True)
 
 4. Adapter dispatch:
      adapter.execute_and_capture(request)
@@ -91,7 +90,6 @@ from operations_center.execution.binding import (
     PolicyViolationError,
     TargetBindError,           # base class
     UnknownBackendError,
-    UnknownExecutorError,
 )
 ```
 
@@ -104,7 +102,7 @@ a "this is an admin/governance issue" failure).
 
 `bind_execution_target(..., require_provenance=True)` raises
 `MissingProvenanceError` if the bound backend has no entry in OC's
-`upstream/registry.yaml`. Use this:
+`registry/source_registry.yaml`. Use this:
 
 - In production CI dispatch flows where every backend MUST be a
   registered fork (Phase 14 strict mode)
