@@ -91,7 +91,7 @@ class TestOutputShapeDrift:
         out = detect_output_shape_drift(
             backend_id="x", request_id="r",
             result_payload={
-                "schema_version": "0.2", "contract_kind": "execution_result",
+                "schema_version": "0.3", "contract_kind": "execution_result",
                 "result_id": "r", "request_id": "rq", "ok": True,
                 "status": "succeeded", "evidence": {},
             },
@@ -102,7 +102,7 @@ class TestOutputShapeDrift:
         out = detect_output_shape_drift(
             backend_id="x", request_id="r",
             result_payload={
-                "schema_version": "0.2", "contract_kind": "execution_result",
+                "schema_version": "0.3", "contract_kind": "execution_result",
                 "result_id": "r", "request_id": "rq", "ok": True,
                 "status": "succeeded",
                 "vendor_specific_top_level": "leaked",

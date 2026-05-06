@@ -46,7 +46,7 @@ def _stub_decision(lane=LaneName.CLAUDE_CLI, backend=BackendName.KODO) -> LaneDe
 def _stub_cxrp_response(executor: str = "claude_cli", backend: str = "kodo") -> dict:
     """Minimal CxRP v0.2 LaneDecision payload for /route mock responses."""
     return {
-        "schema_version": "0.2",
+        "schema_version": "0.3",
         "contract_kind": "lane_decision",
         "decision_id": "dec-test-1",
         "proposal_id": "prop-test-1",
@@ -147,7 +147,7 @@ def test_http_client_decodes_cxrp_shape_response() -> None:
     """SwitchBoard emits CxRP v0.2 envelope; the client must deserialize it
     back into the OC LaneDecision."""
     cxrp_payload = {
-        "schema_version": "0.2",
+        "schema_version": "0.3",
         "contract_kind": "lane_decision",
         "decision_id": "dec-cxrp-1",
         "proposal_id": "prop-cxrp-1",

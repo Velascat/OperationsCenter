@@ -179,6 +179,8 @@ def to_cxrp_execution_request(oc: ExecutionRequest, *, executor: str, backend: s
         if oc.runtime_binding is not None
         else None
     )
+    # Schema 0.3 — backend/executor are typed CxRP enums
+    from cxrp.contracts import BackendName as CxrpBackendName, ExecutorName as CxrpExecutorName
     return CxrpExecutionRequest(
         request_id=oc.run_id,
         proposal_id=oc.proposal_id,
@@ -186,8 +188,8 @@ def to_cxrp_execution_request(oc: ExecutionRequest, *, executor: str, backend: s
         created_at=oc.requested_at,
         metadata={"executor": executor, "backend": backend},
         lane=_category_for(executor),
-        executor=executor,
-        backend=backend,
+        executor=CxrpExecutorName(executor),
+        backend=CxrpBackendName(backend),
         scope=oc.goal_text[:120],
         input_payload=input_payload,
         input_payload_schema=CODING_AGENT_INPUT_SCHEMA_ID,

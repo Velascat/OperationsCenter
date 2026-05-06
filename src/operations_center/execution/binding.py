@@ -2,12 +2,20 @@
 # Copyright (C) 2026 Velascat
 """bind_execution_target — convert CxRP envelope → OC bound target.
 
-This is the explicit narrowing step. Unknown backends/executors from
-the wire die here, not at the adapter layer. Provenance is resolved
-from OC's upstream registry, not from CxRP.
+Schema 0.3 (closed-system simplification): envelope.backend and
+envelope.executor are already typed CxRP enums. This binder is a thin
+shim that converts to OC's same-shape enums and resolves provenance
+from the upstream registry. The pre-0.3 typo-catching errors (Unknown
+Backend/Executor) are now impossible at this layer — the wire schema
+already rejected them.
 
-Errors are typed (UnknownBackendError, UnknownExecutorError, etc.) so
-callers can distinguish recoverable mismatches from policy violations.
+Errors retained for the cases that still apply:
+  - InvalidRuntimeBindingError  : RuntimeBinding object malformed
+  - PolicyViolationError        : bound target rejected by policy
+  - MissingProvenanceError      : registry-strict mode and no entry
+
+UnknownBackendError / UnknownExecutorError remain importable for
+callers that catch them, but the binder no longer raises them.
 """
 from __future__ import annotations
 
@@ -28,47 +36,36 @@ from operations_center.execution.target import (
 
 
 class TargetBindError(ValueError):
-    """Base class for all binding errors."""
+    """Base class for binding errors."""
 
 
 class UnknownBackendError(TargetBindError):
-    """CxRP envelope named a backend OC doesn't recognize."""
+    """Wire-validation rejected the backend name. Retained for catch-clauses;
+    schema 0.3 makes the binder not raise this — it dies at parse time."""
 
 
 class UnknownExecutorError(TargetBindError):
-    """CxRP envelope named an executor OC doesn't recognize."""
+    """Wire-validation rejected the executor name. Retained for catch-clauses."""
 
 
 class InvalidRuntimeBindingError(TargetBindError):
-    """RuntimeBinding violates the validity table or optional-field allow-list."""
+    """RuntimeBinding object is malformed (missing required attrs)."""
 
 
 class PolicyViolationError(TargetBindError):
-    """The bound target would violate execution policy."""
+    """Policy rejected the bound target."""
 
 
 class MissingProvenanceError(TargetBindError):
-    """The catalog requires a backend's provenance but none was resolved."""
-
-
-# ── Catalog + policy protocols (avoid hard imports — keep test surface lean) ──
+    """``require_provenance=True`` and registry has no entry for the backend."""
 
 
 class CatalogLike(Protocol):
-    """The subset of ExecutorCatalog ``bind`` needs.
-
-    A real ExecutorCatalog from ``operations_center.executors.catalog``
-    satisfies this Protocol implicitly.
-    """
-
     @property
     def entries(self) -> dict: ...
 
 
 class PolicyLike(Protocol):
-    """A no-op default policy is fine; production OC plugs its real
-    ExecutionPolicy in here."""
-
     def allows(self, target: BoundExecutionTarget) -> tuple[bool, str]: ...
 
 
@@ -77,30 +74,22 @@ class _AlwaysAllowPolicy:
         return True, ""
 
 
-# ── Provenance resolution ────────────────────────────────────────────────
+# ── Provenance resolution (OC-only — never on the wire) ─────────────────
 
 
 def _provenance_from_registry(backend_id: str) -> Optional[BackendProvenance]:
-    """Look up the backend in OC's upstream fork registry.
-
-    Returns None when the backend isn't in the registry (e.g. direct_local
-    is not forked). Returns a fully-populated BackendProvenance otherwise.
-    """
     try:
         from operations_center.upstream.registry import load_registry
         from operations_center.upstream.patches import load_patches
     except ImportError:
         return None
-
     registry = load_registry()
     if backend_id not in registry.entries:
         return None
     entry = registry.entries[backend_id]
     patches = load_patches().for_fork(backend_id)
     return BackendProvenance(
-        source="registry",
-        repo=entry.fork.repo,
-        ref=entry.fork_commit,
+        source="registry", repo=entry.fork.repo, ref=entry.fork_commit,
         patches=[p.id for p in patches],
     )
 
@@ -119,49 +108,12 @@ def _runtime_binding_to_summary(rb) -> Optional[RuntimeBindingSummary]:
                 if isinstance(rb.selection_mode, SelectionMode)
                 else str(rb.selection_mode)
             ),
-            model=rb.model,
-            provider=rb.provider,
-            endpoint=rb.endpoint,
-            config_ref=rb.config_ref,
+            model=rb.model, provider=rb.provider,
+            endpoint=rb.endpoint, config_ref=rb.config_ref,
         )
     except (AttributeError, TypeError) as exc:
         raise InvalidRuntimeBindingError(
             f"runtime_binding object missing required field: {exc}"
-        ) from exc
-
-
-def _narrow_lane(value: str | None) -> str:
-    """Lane is the CxRP abstract category — kept as string in OC.
-
-    OC's strict enum is ``LaneName`` (executor-shaped), which is a
-    different concept; that goes through ``_narrow_executor``.
-    """
-    if value is None:
-        raise UnknownExecutorError("envelope.lane is required")
-    return str(value)
-
-
-def _narrow_backend(value: str | None) -> BackendName:
-    if value is None:
-        raise UnknownBackendError("envelope.backend is required for binding")
-    try:
-        return BackendName(value)
-    except ValueError as exc:
-        valid = sorted(b.value for b in BackendName)
-        raise UnknownBackendError(
-            f"unknown backend {value!r}; OC recognizes: {valid}"
-        ) from exc
-
-
-def _narrow_executor(value: str | None) -> Optional[LaneName]:
-    if value is None:
-        return None
-    try:
-        return LaneName(value)
-    except ValueError as exc:
-        valid = sorted(l.value for l in LaneName)
-        raise UnknownExecutorError(
-            f"unknown executor {value!r}; OC recognizes: {valid}"
         ) from exc
 
 
@@ -175,26 +127,27 @@ def bind_execution_target(
     policy: Optional[PolicyLike] = None,
     require_provenance: bool = False,
 ) -> BoundExecutionTarget:
-    """Validate a CxRP envelope and produce a BoundExecutionTarget.
+    """Convert a wire-shape envelope to a dispatch-ready BoundExecutionTarget.
 
-    Raises typed errors (UnknownBackendError / UnknownExecutorError /
-    InvalidRuntimeBindingError / PolicyViolationError /
-    MissingProvenanceError) for structured handling.
+    Schema 0.3: envelope.backend and envelope.executor are already typed
+    CxRP enums (BackendName, ExecutorName). This binder converts them to
+    OC's same-valued enums (BackendName, LaneName) — infallible, since
+    the wire already validated.
 
-    Args:
-        envelope: The wire-shape execution target intent.
-        catalog: Optional ExecutorCatalog. If supplied, the bound
-            backend must be present (else UnknownBackendError).
-        policy: Optional ExecutionPolicy. If supplied, the bound target
-            is validated against it.
-        require_provenance: When True, MissingProvenanceError is raised
-            if the registered backend has no upstream registry entry.
-            Production callers (Phase 14 catalog-strict mode) set True;
-            tests / dev typically leave False.
+    What this still does:
+      - Resolves provenance from the upstream registry
+      - Optionally checks catalog membership
+      - Optionally runs policy
+      - Validates RuntimeBinding shape (already CxRP-validated, but the
+        adapter mirror needs the field-pluck)
     """
-    lane = _narrow_lane(envelope.lane.value if hasattr(envelope.lane, "value") else envelope.lane)
-    backend = _narrow_backend(envelope.backend)
-    executor = _narrow_executor(envelope.executor)
+    if envelope.backend is None:
+        raise UnknownBackendError("envelope.backend is required for binding")
+
+    # Both enums share the same string values; conversion is by-value.
+    backend = BackendName(envelope.backend.value)
+    executor = LaneName(envelope.executor.value) if envelope.executor is not None else None
+    lane = envelope.lane.value if hasattr(envelope.lane, "value") else str(envelope.lane)
 
     if catalog is not None and backend.value not in catalog.entries:
         raise UnknownBackendError(
@@ -202,7 +155,6 @@ def bind_execution_target(
         )
 
     runtime_summary = _runtime_binding_to_summary(envelope.runtime_binding)
-
     provenance = _provenance_from_registry(backend.value)
     if require_provenance and provenance is None:
         raise MissingProvenanceError(
@@ -210,11 +162,8 @@ def bind_execution_target(
         )
 
     target = BoundExecutionTarget(
-        lane=lane,
-        backend=backend,
-        executor=executor,
-        runtime_binding=runtime_summary,
-        provenance=provenance,
+        lane=lane, backend=backend, executor=executor,
+        runtime_binding=runtime_summary, provenance=provenance,
     )
 
     pol = policy or _AlwaysAllowPolicy()

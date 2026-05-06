@@ -175,7 +175,7 @@ def test_to_cxrp_task_proposal_returns_ecp_envelope():
     cxrp = to_cxrp_task_proposal(_make_proposal())
     assert isinstance(cxrp, CxrpTaskProposal)
     assert cxrp.contract_kind == "task_proposal"
-    assert cxrp.schema_version == "0.2"
+    assert cxrp.schema_version == "0.3"
 
 
 def test_ecp_task_proposal_validates_against_schema():

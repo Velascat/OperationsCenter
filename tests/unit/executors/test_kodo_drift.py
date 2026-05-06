@@ -34,7 +34,7 @@ def test_kodo_capability_drift_fires():
 def test_kodo_output_shape_drift_fires():
     f = _fix().inject_output_shape(
         result_payload={
-            "schema_version": "0.2", "contract_kind": "execution_result",
+            "schema_version": "0.3", "contract_kind": "execution_result",
             "result_id": "r", "request_id": "q", "ok": True, "status": "succeeded",
             "kodo_team_used": "leaked",
         },

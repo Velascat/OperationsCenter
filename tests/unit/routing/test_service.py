@@ -175,7 +175,7 @@ def test_default_service_uses_real_routing():
 
 def test_http_backed_service_routes_over_switchboard_boundary():
     cxrp_payload = {
-        "schema_version": "0.2",
+        "schema_version": "0.3",
         "contract_kind": "lane_decision",
         "decision_id": "dec-http-1",
         "proposal_id": "prop-http-1",

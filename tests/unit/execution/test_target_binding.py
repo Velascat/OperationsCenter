@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from cxrp.contracts import ExecutionTargetEnvelope, RuntimeBinding
+from cxrp.contracts import (
+    BackendName as CxrpBackendName, ExecutionTargetEnvelope,
+    ExecutorName as CxrpExecutorName, RuntimeBinding,
+)
 from cxrp.vocabulary.lane import LaneType
 from cxrp.vocabulary.runtime import RuntimeKind, SelectionMode
 
@@ -22,6 +25,8 @@ from operations_center.execution.target import (
 
 
 def _envelope(**overrides) -> ExecutionTargetEnvelope:
+    """Helper — accepts string backend/executor and converts to typed enums.
+    Schema 0.3 narrowed these on the wire; this preserves test ergonomics."""
     base = {
         "lane": LaneType.CODING_AGENT,
         "backend": "kodo",
@@ -29,6 +34,10 @@ def _envelope(**overrides) -> ExecutionTargetEnvelope:
         "runtime_binding": None,
     }
     base.update(overrides)
+    if isinstance(base["backend"], str):
+        base["backend"] = CxrpBackendName(base["backend"])
+    if isinstance(base["executor"], str):
+        base["executor"] = CxrpExecutorName(base["executor"])
     return ExecutionTargetEnvelope(**base)
 
 
@@ -64,24 +73,26 @@ class TestNarrowing:
         assert target.runtime_binding.model == "opus"
 
 
-# ── Unknown values rejected with typed errors ───────────────────────────
+# ── Unknown values rejected at wire layer (schema 0.3) ──────────────────
 
 
 class TestRejection:
-    def test_unknown_backend_raises_typed_error(self):
-        with pytest.raises(UnknownBackendError, match="some_future"):
-            bind_execution_target(_envelope(backend="some_future_backend"))
+    def test_unknown_backend_rejected_at_wire(self):
+        """Schema 0.3 — typed enum at the wire rejects unknown backend names
+        before they reach the binder. The CxRP enum raises ValueError."""
+        with pytest.raises(ValueError):
+            CxrpBackendName("some_future_backend")
 
-    def test_unknown_executor_raises_typed_error(self):
-        with pytest.raises(UnknownExecutorError, match="vibes"):
-            bind_execution_target(_envelope(executor="vibes"))
+    def test_unknown_executor_rejected_at_wire(self):
+        with pytest.raises(ValueError):
+            CxrpExecutorName("vibes")
 
-    def test_missing_backend_raises(self):
+    def test_missing_backend_raises_at_binder(self):
+        # Backend is still required at bind time
         with pytest.raises(UnknownBackendError, match="required"):
             bind_execution_target(_envelope(backend=None))
 
     def test_invalid_runtime_binding_raises(self):
-        # Pass a non-RuntimeBinding object that's missing fields
         class FakeBinding:
             pass
         with pytest.raises(InvalidRuntimeBindingError):
