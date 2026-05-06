@@ -1,0 +1,34 @@
+sources:
+  - name: kodo
+    upstream_url: https://github.com/ikamensh/kodo
+    fork_url: https://github.com/Velascat/kodo
+    local_path: /home/dev/Documents/GitHub/kodo
+    branch: dev
+    expected_sha: 9758a0a
+    install_kind: cli_tool
+    base_commit: 90bdf8a
+    install_modes:
+      prod: uv tool install --reinstall --force git+ssh://git@github.com/Velascat/kodo.git@{expected_sha}
+      ci: uv tool install --reinstall --force git+https://github.com/Velascat/kodo.git@{expected_sha}
+      dev: uv tool install --reinstall --force {local_path}
+    local_clone_hint: ~/Documents/GitHub/kodo
+    poll_cadence_hours: 24
+    auto_pr_push: true
+    auto_sync: true
+
+  - name: archon
+    upstream_url: https://github.com/coleam00/Archon
+    fork_url: https://github.com/Velascat/Archon
+    local_path: /home/dev/Documents/GitHub/Archon
+    branch: main
+    expected_sha: fd6d75e
+    install_kind: external
+    base_commit: 6be5c61
+    install_modes:
+      dev: 'true'
+      ci: 'true'
+      prod: 'true'
+    local_clone_hint: ~/Documents/GitHub/Archon
+    poll_cadence_hours: 24
+    auto_pr_push: false
+    auto_sync: true

@@ -23,9 +23,10 @@ from operations_center.contracts.execution import RuntimeBindingSummary
 class BackendProvenance(BaseModel):
     """OC-owned source-of-truth for which fork/ref/patches power a backend.
 
-    Filled from ``operations_center.upstream`` registry + patch records,
-    not from CxRP. Two OC deployments routing to the same backend may
-    have different provenance; that's a runtime fact OC owns.
+    Filled from the SourceRegistry (``registry/source_registry.yaml`` +
+    ``registry/patches/``), not from CxRP. Two OC deployments routing to
+    the same backend may have different provenance; that's a runtime
+    fact OC owns.
     """
 
     source: Literal["registry", "local", "upstream", "unknown"] = "unknown"
