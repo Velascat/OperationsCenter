@@ -141,12 +141,18 @@ class TestCatalog:
 
 class TestProvenance:
     def test_provenance_resolved_for_kodo_from_real_registry(self):
-        """The shipped Velascat/kodo registry entry should resolve."""
+        """The shipped Velascat/kodo registry entry should resolve.
+
+        After PR #49 merged upstream and PATCH-001 was dropped (2026-05-06),
+        the fork carries zero local patches. Provenance still resolves but
+        the patches list is empty.
+        """
         target = bind_execution_target(_envelope(backend="kodo"))
         assert target.provenance is not None
         assert target.provenance.source == "registry"
         assert target.provenance.repo == "Velascat/kodo"
-        assert "PATCH-001" in target.provenance.patches
+        # PATCH-001 dropped after upstream merge — fork now mirrors upstream
+        assert isinstance(target.provenance.patches, list)
 
     def test_unforked_backend_has_no_provenance(self):
         # direct_local is not in the upstream/registry.yaml

@@ -48,6 +48,7 @@ class GapStatus(str, Enum):
     MITIGATED        = "mitigated"
     PATCHED_UPSTREAM = "patched_upstream"
     FORKED           = "forked"
+    UPSTREAM_MERGED  = "upstream_merged"  # spec lifecycle: forked → upstream_merged → mitigated
 
 
 _GAP_REQUIRED = {"id", "gap", "discovered_at", "impact", "workaround", "fork_threshold", "status"}

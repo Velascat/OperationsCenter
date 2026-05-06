@@ -45,19 +45,16 @@ def _seed(tmp_path: Path, content: str = _VALID, fork: str = "kodo", name: str =
 
 
 class TestShippedPatch:
-    def test_loads_real_kodo_patch_001(self):
-        # Loads the actual shipped registry — not a test fixture
+    def test_kodo_has_no_local_patches_after_upstream_merge(self):
+        """PATCH-001 was dropped 2026-05-06 after upstream PR #49 merged.
+
+        Velascat/kodo dev now mirrors upstream/dev — zero local patches.
+        Kodo G-004 transitioned forked → upstream_merged in
+        contract_gaps.yaml.
+        """
         reg = load_patches()
         kodo_patches = reg.for_fork("kodo")
-        assert len(kodo_patches) == 1
-        p = kodo_patches[0]
-        assert p.id == "PATCH-001"
-        assert p.contract_gap_ref == "kodo:G-004"
-        assert p.upstream.upstream_status == UpstreamStatus.PENDING_REVIEW
-        assert p.upstream.related_pr.endswith("/pull/49")
-        assert p.push_to_upstream.enabled is True
-        assert p.push_to_upstream.pushed is False
-        assert "kodo/orchestrators/claude_code.py" in p.touched_files
+        assert kodo_patches == []
 
 
 class TestLoad:
