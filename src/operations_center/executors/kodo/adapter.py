@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Kodo discovery adapter — Phase 1.
 
-Wraps the existing operations_center.adapters.kodo invocation logic
+Wraps the existing operations_center.backends.kodo invocation logic
 with sample capture. NO normalization (Phase 2). NO policy enforcement.
 
 Capture lives at:

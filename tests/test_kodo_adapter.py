@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from operations_center.adapters.kodo import KodoAdapter
+from operations_center.backends.kodo.runner import KodoAdapter
 from operations_center.config.settings import KodoSettings
 
 

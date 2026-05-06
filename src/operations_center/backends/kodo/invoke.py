@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from operations_center.adapters.kodo.adapter import KodoAdapter
+from operations_center.backends.kodo.runner import KodoAdapter
 
 from .models import KodoArtifactCapture, KodoPreparedRun, KodoRunCapture
 
