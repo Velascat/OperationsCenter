@@ -170,11 +170,15 @@ def verify_install(entry: ForkEntry) -> VerifyResult:
     """Read installed state and compare against registry's pinned SHA.
 
     For ``cli_tool`` kind: reads ``direct_url.json`` from the uv-tool
-    install. ``library`` and ``binary`` kinds return UNKNOWN until that
-    integration is added.
+    install. For ``external`` kind: reads ``git rev-parse HEAD`` from
+    the local clone. ``library`` and ``binary`` kinds return UNKNOWN
+    until that integration is added.
     """
     expected_repo = entry.fork.repo
     expected_sha = entry.fork_commit
+
+    if entry.install.kind == InstallKind.EXTERNAL:
+        return _verify_external(entry)
 
     if entry.install.kind != InstallKind.CLI_TOOL:
         return VerifyResult(
@@ -236,6 +240,48 @@ def verify_install(entry: ForkEntry) -> VerifyResult:
         expected_repo=expected_repo, expected_sha=expected_sha,
         observed_repo=observed_repo or "<unknown>",
         observed_sha=observed_sha or "<unknown>",
+    )
+
+
+def _verify_external(entry: ForkEntry) -> VerifyResult:
+    """Verify an external fork by reading the local clone's git HEAD."""
+    expected_repo = entry.fork.repo
+    expected_sha = entry.fork_commit
+
+    clone = resolve_local_clone(entry)
+    if clone is None:
+        return VerifyResult(
+            fork_id=entry.fork_id, status=VerifyStatus.NOT_INSTALLED,
+            expected_repo=expected_repo, expected_sha=expected_sha,
+            observed_repo=None, observed_sha=None,
+            detail=f"no local clone resolvable for external fork {entry.fork_id}",
+        )
+
+    proc = subprocess.run(
+        ["git", "-C", str(clone), "rev-parse", "HEAD"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        return VerifyResult(
+            fork_id=entry.fork_id, status=VerifyStatus.UNKNOWN,
+            expected_repo=expected_repo, expected_sha=expected_sha,
+            observed_repo=str(clone), observed_sha=None,
+            detail=f"git rev-parse failed: {proc.stderr.strip()[:120]}",
+        )
+    observed_sha = proc.stdout.strip()
+
+    if not observed_sha.startswith(expected_sha) and not expected_sha.startswith(observed_sha):
+        return VerifyResult(
+            fork_id=entry.fork_id, status=VerifyStatus.WRONG_SHA,
+            expected_repo=expected_repo, expected_sha=expected_sha,
+            observed_repo=str(clone), observed_sha=observed_sha,
+            detail=f"clone HEAD {observed_sha[:8]} != registry pin {expected_sha}",
+        )
+
+    return VerifyResult(
+        fork_id=entry.fork_id, status=VerifyStatus.OK,
+        expected_repo=expected_repo, expected_sha=expected_sha,
+        observed_repo=str(clone), observed_sha=observed_sha,
     )
 
 

@@ -18,3 +18,21 @@ forks:
       local_clone_hint: ~/Documents/GitHub/kodo
     poll_cadence_hours: 24
     auto_pr_push: true
+  archon:
+    upstream:
+      repo: coleam00/Archon
+    fork:
+      repo: Velascat/Archon
+      branch: main
+    base_commit: 6be5c61
+    fork_commit: fd6d75e
+    install:
+      kind: external
+      modes:
+        dev: 'true'
+        ci: 'true'
+        prod: 'true'
+      local_clone_hint: ~/Documents/GitHub/Archon
+    poll_cadence_hours: 24
+    auto_pr_push: false
+    auto_sync: true

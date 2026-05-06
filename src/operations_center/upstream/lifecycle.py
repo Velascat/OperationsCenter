@@ -380,7 +380,14 @@ def auto_sync_fork(
             capture_output=True, text=True,
         )
         if push_res.returncode == 0:
-            result.actions_taken.append("pushed dev to origin")
+            result.actions_taken.append(f"pushed {entry.fork.branch} to origin")
+        else:
+            result.actions_blocked.append(
+                f"{fork_id}: push to origin failed: "
+                f"{push_res.stderr.strip()[:160]}"
+            )
+            result.final_state = "blocked"
+            return result
 
         # Bump registry
         bump = bump_fork(fork_id, registry_path=registry_path)

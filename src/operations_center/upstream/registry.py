@@ -55,9 +55,10 @@ class RegistryError(ValueError):
 
 
 class InstallKind(str, Enum):
-    CLI_TOOL = "cli_tool"
-    LIBRARY  = "library"
-    BINARY   = "binary"
+    CLI_TOOL = "cli_tool"     # internal: uv tool install (Python)
+    LIBRARY  = "library"      # internal: pip install (Python)
+    BINARY   = "binary"       # internal: prebuilt binary
+    EXTERNAL = "external"     # out-of-process service; verify via git rev-parse
 
 
 class InstallMode(str, Enum):
