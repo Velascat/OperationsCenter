@@ -2,7 +2,7 @@
 
 **Phase:** 4  
 **Module:** `operations_center.run_identity`  
-**Related:** [Managed Repo Contract (Phase 1)](videofoundry_managed_repo_contract.md) · [Audit Toolset Contract (Phase 3)](managed_repo_audit_toolset_contract.md)
+**Related:** [Managed Repo Contract (Phase 1)](../../architecture/videofoundry_managed_repo_contract.md) · [Audit Toolset Contract (Phase 3)](managed_repo_audit_toolset_contract.md)
 
 ---
 

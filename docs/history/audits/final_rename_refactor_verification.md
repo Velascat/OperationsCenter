@@ -83,10 +83,10 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `.gitignore:126` | `# FOB operator state` comment | Fixed → `# OperatorConsole state` |
 | `docker/Dockerfile.switchboard:13` | "fetch the control-plane git dependency" | Fixed → "operations-center git dependency" |
 | `docs/providers.md:16` | `fob providers` | Fixed → `console providers` |
-| `docs/architecture/ownership.md:108,111` | `fob brief`, `fob demo`, `fob status` | Fixed → `console open`, `console demo`, `console status` |
-| `docs/architecture/ownership.md:171` | `fob demo` (section heading) | Fixed → `console demo` |
-| `docs/architecture/ownership.md:218` | `fob demo` (checklist item) | Fixed → `console demo` |
-| `docs/architecture/execution-observability.md:253` | `controlplane-routing.md` link | Fixed → `operations-center-routing.md` |
+| `docs/architecture/system/ownership.md:108,111` | `fob brief`, `fob demo`, `fob status` | Fixed → `console open`, `console demo`, `console status` |
+| `docs/architecture/system/ownership.md:171` | `fob demo` (section heading) | Fixed → `console demo` |
+| `docs/architecture/system/ownership.md:218` | `fob demo` (checklist item) | Fixed → `console demo` |
+| `docs/architecture/execution/execution-observability.md:253` | `controlplane-routing.md` link | Fixed → `operations-center-routing.md` |
 | docs/architecture/controlplane-routing.md (WorkStation) | Filename | Renamed → `operations-center-routing.md` (content was already updated) |
 | docs/architecture/controlplane-routing-examples.md (WorkStation) | Filename | Renamed → `operations-center-routing-examples.md` (content was already updated) |
 | docs/migration/workstation-9router-removal.md (WorkStation) | `9router` throughout | **Left** — explicitly archival migration doc |

@@ -104,8 +104,8 @@ bundle = service.plan(PlanningContext(
 ```
 
 For full architecture and examples see:
-- `WorkStation/docs/architecture/operations-center-routing.md`
-- `WorkStation/docs/architecture/operations-center-routing-examples.md`
+- `WorkStation/docs/architecture/routing/operations-center-routing.md`
+- `WorkStation/docs/architecture/routing/operations-center-routing-examples.md`
 
 ### Canonical contract types
 
@@ -119,7 +119,7 @@ OperationsCenter consumes canonical contracts from [CxRP](https://github.com/Vel
 | `execution.py` | `ExecutionRequest`, `ExecutionResult`, `ExecutionArtifact`, `RunTelemetry` |
 | `common.py` | `TaskTarget`, `ExecutionConstraints`, `ValidationProfile`, `BranchPolicy` |
 
-See `WorkStation/docs/architecture/contracts.md` for full documentation.
+See `WorkStation/docs/architecture/contracts/contracts.md` for full documentation.
 
 ### Backend adapters (inside OperationsCenter's execution boundary)
 
@@ -195,7 +195,7 @@ Key design constraints:
 - `execute_and_capture()` exposes raw workflow events for `BackendDetailRef` retention without inlining them into canonical contracts
 - Unsupported requests return `UNSUPPORTED_REQUEST` before invocation; the capture is `None`
 
-See `WorkStation/docs/architecture/archon-adapter.md` for architecture and usage.
+See `WorkStation/docs/architecture/adapters/archon-adapter.md` for architecture and usage.
 
 ### OpenClaw Backend Adapter (Phase 11, optional)
 
@@ -220,7 +220,7 @@ The adapter never presents inferred or unknown changed files as authoritative.
 
 Subclass `OpenClawRunner` to provide a real implementation; `StubOpenClawRunner` and `OpenClawBackendAdapter.with_stub()` are available for tests and local dev.
 
-See `WorkStation/docs/architecture/openclaw-backend-adapter.md` for architecture and examples.
+See `WorkStation/docs/architecture/adapters/openclaw-backend-adapter.md` for architecture and examples.
 
 ### OpenClaw Outer Shell (Phase 10, optional)
 
@@ -250,7 +250,7 @@ Key design rules:
 - Shell output types (`ShellRunHandle`, `ShellStatusSummary`, `ShellInspectionResult`) are derived from canonical internal data only — never from OpenClaw-native event streams
 - `wrap_action()` catches exceptions at the shell boundary so failures don't propagate outward
 
-See `WorkStation/docs/architecture/openclaw-outer-shell.md` for architecture and examples.
+See `WorkStation/docs/architecture/adapters/openclaw-outer-shell.md` for architecture and examples.
 
 ### Execution Observability (Phase 7)
 
@@ -275,7 +275,7 @@ Key model distinctions:
 | `BackendDetailRef` | Reference to raw backend output; kept separate from canonical data |
 | `ChangedFilesEvidence` | Changed-file knowledge with honest uncertainty (KNOWN/NONE/UNKNOWN/NOT_APPLICABLE) |
 
-See `WorkStation/docs/architecture/execution-observability.md` for architecture and examples.
+See `WorkStation/docs/architecture/execution/execution-observability.md` for architecture and examples.
 
 ### Policy and Guardrails (Phase 12)
 
@@ -319,7 +319,7 @@ execution and are retained as inspectable blocked-execution records.
 
 Config validation: `validate_config(config)` returns a list of error strings for contradictory configs before evaluation.
 
-See `WorkStation/docs/architecture/policy-guardrails.md` for full architecture and `policy-guardrails-examples.md` for usage examples.
+See `WorkStation/docs/architecture/policy/policy-guardrails.md` for full architecture and `policy-guardrails-examples.md` for usage examples.
 
 ### Evidence-Driven Routing Strategy Tuning (Phase 13)
 
@@ -350,7 +350,7 @@ report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisR
 2. Observed historical evidence (retained ExecutionRecords)
 3. Proposed strategy changes (tuning proposals, subject to review)
 
-See [WorkStation/docs/architecture/routing-tuning.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing-tuning-examples.md) for examples.
+See [WorkStation/docs/architecture/routing/routing-tuning.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing/routing-tuning-examples.md) for examples.
 
 ### Upstream Patch Evaluation (Phase 14)
 
@@ -374,7 +374,7 @@ Design rules:
 - Patch proposals are reviewable recommendations, not silent commitments
 - Maintenance burden and divergence risk are part of every serious recommendation
 
-See [WorkStation/docs/architecture/upstream-patch-evaluation.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/upstream-patch-evaluation-examples.md).
+See [WorkStation/docs/architecture/contracts/upstream-patch-evaluation.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation-examples.md).
 
 ---
 
@@ -943,7 +943,7 @@ OperationsCenter does **not** own the infrastructure required to run Plane or Sw
 
 **Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `WorkStation/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. WorkStation must be cloned as a sibling directory (or `OPERATIONS_CENTER_WORKSTATION_DIR` must be set).
 
-For the full platform ownership model see `WorkStation/docs/architecture/ownership.md`.
+For the full platform ownership model see `WorkStation/docs/architecture/system/ownership.md`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Phase:** 3  
 **Module:** `operations_center.audit_toolset`  
-**Related:** [Managed Repo Contract (Phase 1)](videofoundry_managed_repo_contract.md) · [Artifact Contract (Phase 2)](videofoundry_audit_artifact_contract.md)
+**Related:** [Managed Repo Contract (Phase 1)](../../architecture/videofoundry_managed_repo_contract.md) · [Artifact Contract (Phase 2)](../../architecture/videofoundry_audit_artifact_contract.md)
 
 ---
 
