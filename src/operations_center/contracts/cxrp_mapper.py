@@ -98,6 +98,8 @@ def to_cxrp_lane_decision(
     Mirrors switchboard.adapters.cxrp_mapper but lives here so OC's own
     audit/observability code can emit the same wire shape.
     """
+    from cxrp.contracts import BackendName as CxrpBackendName, ExecutorName as CxrpExecutorName
+
     metadata: dict[str, Any] = {
         "policy_rule_matched": oc.policy_rule_matched,
     }
@@ -110,12 +112,15 @@ def to_cxrp_lane_decision(
         created_at=oc.decided_at,
         metadata=metadata,
         lane=_category_for(oc.selected_lane.value),
-        executor=oc.selected_lane.value,
-        backend=oc.selected_backend.value,
+        executor=CxrpExecutorName(oc.selected_lane.value),
+        backend=CxrpBackendName(oc.selected_backend.value),
         rationale=oc.rationale or "",
         confidence=oc.confidence,
         alternatives=[
-            CxrpLaneAlternative(lane=_category_for(alt.value), executor=alt.value)
+            CxrpLaneAlternative(
+                lane=_category_for(alt.value),
+                executor=CxrpExecutorName(alt.value),
+            )
             for alt in oc.alternatives_considered
         ],
     )

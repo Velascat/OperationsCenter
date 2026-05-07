@@ -158,7 +158,7 @@ def create_revert_branch(
     except subprocess.CalledProcessError as exc:
         logger.warning(
             "create_revert_branch: failed for %s — %s",
-            commit_sha, (exc.stderr.decode() if exc.stderr else exc).strip()[:200],
+            commit_sha, (exc.stderr.decode() if exc.stderr else str(exc)).strip()[:200],
         )
         return None
     except subprocess.TimeoutExpired:

@@ -113,7 +113,7 @@ def _detect_f11_retry_overflow(ctx: FlowContext) -> tuple[int, list[str]]:
 # which state directories hold per-task records, keeping flow_audit and
 # cleanup_state from drifting if a new state store is added later.
 try:
-    from _custodian.state_scanner import OCStateScanner
+    from _custodian.state_scanner import OCStateScanner  # ty:ignore[unresolved-import]
     _STATE_SCANNER = OCStateScanner()
     _PER_TASK_SUBDIRS = _STATE_SCANNER.per_task_subdirs
 except ImportError:

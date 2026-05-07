@@ -21,12 +21,10 @@ jobs:
         run: ruff check .
 
   typecheck:
-    name: Type check (ty, advisory)
+    name: Type check (ty)
     runs-on: ubuntu-latest
-    # Advisory only: 21 pre-existing diagnostics tracked in
-    # .console/log.md backlog. Don't block PRs on them yet —
-    # incremental cleanup, not a blocker.
-    continue-on-error: true
+    # Was advisory (continue-on-error) while 21 pre-existing diagnostics
+    # were unresolved. Cleared on 2026-05-07 — now blocking.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

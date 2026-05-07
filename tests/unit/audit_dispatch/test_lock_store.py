@@ -82,7 +82,9 @@ class TestAcquireRelease:
         with pytest.raises(RepoLockAlreadyHeldError) as ei:
             store.try_acquire(_payload())
         # Held payload is attached for diagnostics.
-        assert ei.value.held_payload.repo_id == "videofoundry"  # type: ignore[attr-defined]
+        held = ei.value.held_payload
+        assert held is not None
+        assert held.repo_id == "videofoundry"
 
     def test_acquire_succeeds_when_held_lock_is_dead(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)

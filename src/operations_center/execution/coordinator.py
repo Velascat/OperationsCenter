@@ -626,13 +626,20 @@ def _attach_lifecycle_outcome(
             )
         ]
 
+    metadata = request.lifecycle
+    if metadata is None:
+        # Caller is responsible for checking; this branch keeps the helper
+        # safe to call defensively and satisfies the LifecycleRunner.run
+        # signature (which requires non-None metadata).
+        return result
+
     runner = LifecycleRunner(
         StageHandlers(plan=_default_plan, execute=_default_execute, verify=_default_verify)
     )
     try:
         lc_result = runner.run(
             request=request,
-            metadata=request.lifecycle,
+            metadata=metadata,
             repo_graph_context=repo_graph_context,
         )
     except Exception as exc:
