@@ -350,7 +350,7 @@ report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisR
 2. Observed historical evidence (retained ExecutionRecords)
 3. Proposed strategy changes (tuning proposals, subject to review)
 
-See [docs/architecture/routing-tuning.md](docs/architecture/routing-tuning.md) for architecture and [docs/architecture/routing-tuning-examples.md](docs/architecture/routing-tuning-examples.md) for examples.
+See [WorkStation/docs/architecture/routing-tuning.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing-tuning-examples.md) for examples.
 
 ### Upstream Patch Evaluation (Phase 14)
 
@@ -374,7 +374,7 @@ Design rules:
 - Patch proposals are reviewable recommendations, not silent commitments
 - Maintenance burden and divergence risk are part of every serious recommendation
 
-See [docs/architecture/upstream-patch-evaluation.md](docs/architecture/upstream-patch-evaluation.md) and [docs/architecture/upstream-patch-evaluation-examples.md](docs/architecture/upstream-patch-evaluation-examples.md).
+See [WorkStation/docs/architecture/upstream-patch-evaluation.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/upstream-patch-evaluation-examples.md).
 
 ---
 

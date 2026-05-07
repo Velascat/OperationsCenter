@@ -53,8 +53,8 @@ After running, triage in this order:
 | OC code-health (OC1–OC9) | `_custodian/detectors.py` + `docs/architecture/code_health_audit.md` |
 | Architecture invariants (AI1–AI4) | `_custodian/architecture.py` + `tools/audit/architecture_invariants/` |
 | Doc conventions (DC1–DC5) | `_custodian/doc_conventions.py` |
-| Ghost work (G1–GN) | `docs/architecture/ghost_work_audit.md` |
-| Flow gaps (F1–FN) | `docs/architecture/flow_audit.md` |
+| Ghost work (G1–GN) | `docs/history/audits/ghost_work_audit.md` |
+| Flow gaps (F1–FN) | `docs/history/audits/flow_audit.md` |
 
 ## How the cadence is enforced
 

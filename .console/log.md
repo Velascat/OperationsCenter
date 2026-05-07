@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- docs reorganization round (2026-05-07, on `main`): Moved historical content into `docs/history/`: audits/ (rename-refactor verifications, dod_verification, integration-invariants, flow_audit, ghost_work_audit), migration/ (controlplane-execution-extraction), managed-repo/ (10 phase docs from the managed-repo audit subsystem). Updated `docs/operator/weekly_audits.md` to point at new ghost/flow audit paths. Replaced 4 OC↔WS duplicate docs (upstream-patch-evaluation + examples, routing-tuning + examples) with redirect stubs and updated repo README to link directly at WS canonical versions. Refreshed `docs/README.md` and `docs/history/README.md` indexes.
+
 - docs/README.md index added (2026-05-07, on `main`): Required by Custodian R6 (newly landed). OC's docs/ tree has 80+ files across architecture/, design/, operator/, specs/, audits/, backends/, history/, and migration/ — newcomers had no entry point. Index organizes them by audience: operator how-tos, OC-specific architecture, managed-repo audit subsystem, design notes, specs, audits. Cross-repo platform architecture (ownership/contracts/routing/adapters) is referenced out to WorkStation/docs/architecture/.
 
 - README opening standardized (2026-05-06, on `main`): Added `## What this repo is` and `## What this repo is not` sections per the new platform-wide convention enforced by Custodian R3/R4 detectors. Lists OC's primary capabilities (planning, routing, execution, policy, evidence) and explicit anti-scope (SwitchBoard, ExecutorRuntime, CxRP/RxP, WorkStation).

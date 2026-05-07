@@ -38,37 +38,22 @@ This directory holds OC-specific material.
 - [architecture/contract-map.md](architecture/contract-map.md)
 - [architecture/execution-handoff-cutover.md](architecture/execution-handoff-cutover.md)
 - [architecture/execution_target.md](architecture/execution_target.md)
-- [architecture/flow_audit.md](architecture/flow_audit.md)
-- [architecture/ghost_work_audit.md](architecture/ghost_work_audit.md)
 - [architecture/lifecycle_labels.md](architecture/lifecycle_labels.md)
 - [architecture/phantom_helper_waves.md](architecture/phantom_helper_waves.md)
 - [architecture/policy-pre-execution-gate.md](architecture/policy-pre-execution-gate.md)
 - [architecture/recovery_loop_design.md](architecture/recovery_loop_design.md)
 - [architecture/routing-contract-fidelity.md](architecture/routing-contract-fidelity.md)
-- [architecture/routing-tuning.md](architecture/routing-tuning.md) ·
-  [examples](architecture/routing-tuning-examples.md)
-- [architecture/upstream-patch-evaluation.md](architecture/upstream-patch-evaluation.md) ·
-  [examples](architecture/upstream-patch-evaluation-examples.md)
 - [architecture/adr/](architecture/adr/) — OC architecture decision records.
-
-### Managed-repo audit subsystem
-
-- [architecture/managed_repo_audit_dispatch.md](architecture/managed_repo_audit_dispatch.md)
-- [architecture/managed_repo_audit_toolset_contract.md](architecture/managed_repo_audit_toolset_contract.md)
-- [architecture/managed_repo_artifact_index.md](architecture/managed_repo_artifact_index.md)
-- [architecture/managed_repo_run_identity.md](architecture/managed_repo_run_identity.md)
-- [architecture/managed_repo_behavior_calibration.md](architecture/managed_repo_behavior_calibration.md)
-- [architecture/managed_repo_full_audit_governance.md](architecture/managed_repo_full_audit_governance.md)
-- [architecture/managed_repo_fixture_harvesting.md](architecture/managed_repo_fixture_harvesting.md)
-- [architecture/managed_repo_mini_regression_suite.md](architecture/managed_repo_mini_regression_suite.md)
-- [architecture/managed_repo_slice_replay.md](architecture/managed_repo_slice_replay.md)
-- [architecture/managed_repo_audit_system_final_verification.md](architecture/managed_repo_audit_system_final_verification.md)
 
 ### VideoFoundry-specific
 
 - [architecture/videofoundry_managed_repo_contract.md](architecture/videofoundry_managed_repo_contract.md)
 - [architecture/videofoundry_audit_artifact_contract.md](architecture/videofoundry_audit_artifact_contract.md)
 - [architecture/videofoundry_audit_ground_truth.md](architecture/videofoundry_audit_ground_truth.md)
+
+> **Tuning and upstream-patch evaluation** (`routing-tuning.md`,
+> `upstream-patch-evaluation.md` and their examples) are now sourced from
+> WorkStation: see [WorkStation/docs/architecture/](https://github.com/Velascat/WorkStation/tree/main/docs/architecture).
 
 ## Design
 
@@ -91,16 +76,23 @@ This directory holds OC-specific material.
 - [specs/reviewer-pr-state-machine.md](specs/reviewer-pr-state-machine.md)
 - [specs/watcher-entrypoint-test-coverage.md](specs/watcher-entrypoint-test-coverage.md)
 
-## Audits
-
-- [audits/dod_verification_final.md](audits/dod_verification_final.md)
-- [audits/integration_invariants_verification.md](audits/integration_invariants_verification.md)
-- [audits/final_rename_refactor_verification.md](audits/final_rename_refactor_verification.md)
-- [audits/final_rename_refactor_verification_3.md](audits/final_rename_refactor_verification_3.md)
-
-## Other
+## Demo & Backlog
 
 - [demo.md](demo.md) — End-to-end planning → routing → execution walkthrough.
 - [backlog.md](backlog.md) — Backlog of in-flight work (see also `.console/backlog.md`).
-- [history/](history/) — Development log + historical remediation summaries.
-- [migration/controlplane-execution-extraction.md](migration/controlplane-execution-extraction.md)
+
+## History
+
+One-shot audit reports, completed migrations, and the managed-repo audit
+subsystem phase docs (now stable). Retained for context; not authoritative
+guidance.
+
+- [history/audits/](history/audits/) — `dod_verification_final`, the rename-refactor
+  verifications, integration-invariants verification, `flow_audit`, `ghost_work_audit`.
+- [history/migration/](history/migration/) — `controlplane-execution-extraction`.
+- [history/managed-repo/](history/managed-repo/) — Managed-repo audit subsystem
+  phase docs: dispatch, toolset contract, artifact index, run identity, behavior
+  calibration, full-audit governance, fixture harvesting, mini-regression suite,
+  slice replay, final verification.
+- [history/development-log/](history/development-log/) (under previous `history/`) —
+  development log and remediation summaries.
