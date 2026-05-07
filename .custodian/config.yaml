@@ -438,6 +438,32 @@ architecture:
       glob: "src/operations_center/**"
       forbidden_import_prefix: "managed_repo"
 
+    # AI5: boundary discipline for extracted-library platform deps.
+    # OC consumes ExecutorRuntime, RxP, SourceRegistry as independent
+    # libraries — imports must go through each library's public API
+    # only. Deep imports bypass the contract.
+    - name: "AI5 ExecutorRuntime public API only"
+      glob: "src/operations_center/**"
+      public_api_only:
+        package: "executor_runtime"
+        allowed_paths:
+          - "executor_runtime"
+          - "executor_runtime.runners"
+          - "executor_runtime.contracts"
+    - name: "AI5 RxP public API only"
+      glob: "src/operations_center/**"
+      public_api_only:
+        package: "rxp"
+        allowed_paths:
+          - "rxp.contracts"
+          - "rxp.vocabulary"
+    - name: "AI5 SourceRegistry public API only"
+      glob: "src/operations_center/**"
+      public_api_only:
+        package: "source_registry"
+        allowed_paths:
+          - "source_registry"
+
 plugins:
   - module: ".custodian/log_scanner.py:OCLogScanner"
   - module: ".custodian/state_scanner.py:OCStateScanner"
