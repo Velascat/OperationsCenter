@@ -1,0 +1,56 @@
+# Runtime binding policy — task-shape → model selection.
+#
+# SwitchBoard picks the lane (claude_cli / codex_cli / aider_local). This
+# file picks what powers it (opus / sonnet / haiku, etc.). The first rule
+# whose `when:` matches wins; the `default:` block applies when no rule
+# matches.
+#
+# The `bind:` block is translated into a CxRP RuntimeBinding. Validity is
+# checked against CxRP's kind × selection_mode table on construction —
+# invalid combos raise at config load time, not at runtime.
+#
+# This file is loaded by ExecutionCoordinator. Its absence is non-fatal:
+# the bundled DEFAULT_POLICY in runtime_binding_policy.py is used instead.
+
+rules:
+  - name: refactor_premium
+    when:
+      task_type: refactor
+      lane: claude_cli
+    bind:
+      kind: cli_subscription
+      provider: anthropic
+      model: opus
+
+  - name: feature_premium
+    when:
+      task_type: feature
+      lane: claude_cli
+    bind:
+      kind: cli_subscription
+      provider: anthropic
+      model: opus
+
+  - name: test_balanced
+    when:
+      task_type: test_fix
+      lane: claude_cli
+    bind:
+      kind: cli_subscription
+      provider: anthropic
+      model: sonnet
+
+  - name: lint_cheap
+    when:
+      task_type: lint_fix
+      lane: claude_cli
+    bind:
+      kind: cli_subscription
+      provider: anthropic
+      model: haiku
+
+default:
+  bind:
+    kind: cli_subscription
+    provider: anthropic
+    model: sonnet

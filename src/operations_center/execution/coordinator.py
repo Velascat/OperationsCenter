@@ -18,8 +18,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from typing import Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from operations_center.policy.runtime_binding_policy import RuntimeBindingPolicy
 
 from operations_center.backends.factory import CanonicalBackendRegistry
 from operations_center.contracts.common import ValidationSummary
@@ -84,6 +87,7 @@ class ExecutionCoordinator:
         workspace_manager: WorkspaceManager | None = None,
         recovery_engine: RecoveryEngine | None = None,
         recovery_policy: RecoveryPolicy | None = None,
+        runtime_binding_policy: "RuntimeBindingPolicy | None" = None,
         run_memory_index_dir: Path | None = None,
         repo_graph: object | None = None,
     ) -> None:
@@ -92,6 +96,11 @@ class ExecutionCoordinator:
         self._builder = request_builder or ExecutionRequestBuilder()
         self._observability = observability_service or ExecutionObservabilityService.default()
         self._workspace = workspace_manager
+        # Option B — task-shape → model selection at request build time.
+        # When the caller doesn't supply a policy, we leave runtime_binding
+        # selection off (passthrough — adapters use their built-in defaults).
+        # The bundled DEFAULT_POLICY is opt-in via from_defaults_with_runtime_policy().
+        self._runtime_binding_policy = runtime_binding_policy
         # Recovery loop wiring. Defaults are conservative — max_attempts=1
         # means "no retry beyond the first attempt" so existing behavior is
         # preserved unless callers explicitly enable retry policy.
@@ -107,6 +116,7 @@ class ExecutionCoordinator:
         bundle: ProposalDecisionBundle,
         runtime: ExecutionRuntimeContext,
     ) -> ExecutionRunOutcome:
+        runtime = self._apply_runtime_binding_policy(bundle, runtime)
         request = self._builder.build(bundle, runtime)
         policy_decision = self._policy.evaluate(bundle.proposal, bundle.decision, request)
 
@@ -200,6 +210,61 @@ class ExecutionCoordinator:
             trace=trace,
             executed=True,
         )
+
+    def _apply_runtime_binding_policy(
+        self,
+        bundle: ProposalDecisionBundle,
+        runtime: ExecutionRuntimeContext,
+    ) -> ExecutionRuntimeContext:
+        """Apply the configured RuntimeBindingPolicy to the runtime context.
+
+        Returns the original runtime unchanged when:
+          - no policy is configured (passthrough — adapters use defaults), OR
+          - the runtime context already carries a binding (caller-supplied
+            override wins; explicit > policy).
+
+        Otherwise selects a binding via the policy and returns a new
+        ExecutionRuntimeContext with ``runtime_binding`` populated.
+        """
+        if self._runtime_binding_policy is None:
+            return runtime
+        if runtime.runtime_binding is not None:
+            # Caller already pinned a binding — respect it.
+            return runtime
+
+        try:
+            cxrp_binding = self._runtime_binding_policy.select(
+                bundle.proposal, bundle.decision,
+            )
+        except Exception as exc:
+            logger.warning(
+                "RuntimeBindingPolicy.select failed for proposal=%s — falling back to backend default: %s",
+                bundle.proposal.proposal_id, exc,
+            )
+            return runtime
+
+        if cxrp_binding is None:
+            return runtime
+
+        # Mirror the canonical CxRP RuntimeBinding into the OC summary type
+        # carried on ExecutionRequest.
+        from dataclasses import replace
+        from operations_center.contracts.execution import RuntimeBindingSummary
+
+        summary = RuntimeBindingSummary(
+            kind=cxrp_binding.kind.value,
+            selection_mode=cxrp_binding.selection_mode.value,
+            model=cxrp_binding.model,
+            provider=cxrp_binding.provider,
+            endpoint=cxrp_binding.endpoint,
+            config_ref=cxrp_binding.config_ref,
+        )
+        logger.info(
+            "RuntimeBindingPolicy: bound runtime for proposal=%s to kind=%s model=%s provider=%s",
+            bundle.proposal.proposal_id,
+            summary.kind, summary.model, summary.provider,
+        )
+        return replace(runtime, runtime_binding=summary)
 
     def _record_run_memory(
         self,

@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- RuntimeBindingPolicy landed (2026-05-07, on `feat/runtime-binding-policy`): Closes the request-time model-selection gap. New `operations_center/policy/runtime_binding_policy.py` + bundled `config/runtime_binding_policy.yaml` map (task_type, lane) → opus/sonnet/haiku. ExecutionCoordinator applies the policy before `_builder.build()`; caller-supplied bindings take precedence (explicit_request > policy_selected). Policy exceptions are non-fatal — fall back to passthrough. Rules emit canonical `cxrp.contracts.RuntimeBinding` so kind × selection_mode validity is checked at config-load time, not adapter-time. 20 new tests; 2471 unit tests pass (was 2451). The kodo binder stays unchanged — it now sees a populated RuntimeBinding instead of None and produces the right team config without further work. PR #TBD.
+
 - audit/ docs refreshed for .custodian/config.yaml layout (2026-05-07, on `main`): audit_architecture.md and code_health_audit.md still referenced legacy `.custodian.yaml` path. Updated to current `.custodian/config.yaml`.
 
 - OC design/autonomy/ subgrouped (2026-05-07, on `main`): The 6 `autonomy_*.md` files plus `repo_aware_autonomy.md` moved into `docs/design/autonomy/`. Inbound refs (docs/README.md and any internal cross-links) rewritten via batch sed.
