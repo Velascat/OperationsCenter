@@ -293,7 +293,7 @@ class ExecutionCoordinator:
     ]:
         """Bounded recovery loop wrapping ``_execute_adapter``.
 
-        See ``docs/architecture/recovery_loop_design.md`` for the design.
+        See ``docs/architecture/recovery/recovery_loop_design.md`` for the design.
         Per-call state is local to this method; the coordinator instance
         holds no mutable retry state, so concurrent ``execute()`` calls are
         safe.

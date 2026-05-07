@@ -11,7 +11,7 @@ wave bundles 5–10 related helpers, gets implemented + tested + committed,
 and the catalog is updated. Order is by *cost-to-implement × value*, with
 small high-value first.
 
-**Invariants every helper must respect** (see `docs/architecture/anti_collapse_invariant.md`):
+**Invariants every helper must respect** (see `docs/architecture/policy/anti_collapse_invariant.md`):
 - No new imports of `behavior_calibration` from runtime packages
 - No mutation of frozen Pydantic contracts (`ExecutionRequest`, `ExecutionResult`, `TaskProposal`, `LaneDecision`)
 - No new code making routing decisions outside SwitchBoard

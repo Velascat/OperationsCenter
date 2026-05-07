@@ -12,7 +12,7 @@ Another managed repo would create its own profile module without touching
 the generic contract.
 
 Phase 0 ground truth drives all values here. See:
-  docs/architecture/videofoundry_audit_ground_truth.md
+  docs/architecture/videofoundry/videofoundry_audit_ground_truth.md
 """
 
 from __future__ import annotations

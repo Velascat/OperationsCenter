@@ -60,7 +60,7 @@ None.
 
 1. **First live VideoFoundry audit run** — Phase 5 code is wired but has never been executed against a live VF audit. Run `operations-center-governance run` against a live VF instance to validate Phase 5 outputs conform to the contract.
 
-2. ~~**CI integration guide**~~ — **Done (Rev 12).** `docs/architecture/ci_integration_guide.md` covers the full governance flow, exit codes, urgency/approval matrix, cooldown/budget configuration, and the state directory persistence requirement for ephemeral CI environments.
+2. ~~**CI integration guide**~~ — **Done (Rev 12).** `docs/architecture/ci/ci_integration_guide.md` covers the full governance flow, exit codes, urgency/approval matrix, cooldown/budget configuration, and the state directory persistence requirement for ephemeral CI environments.
 
 3. ~~**Consider top-level `repo_id`/`audit_type` in `MiniRegressionSuiteReport`**~~ — **Done (Rev 12).** `repo_id` and `audit_type` added to both `MiniRegressionSuiteDefinition` (v1.1) and `MiniRegressionSuiteReport` (v1.1); propagated by the runner; schema regenerated; 6 new tests added.
 
@@ -498,7 +498,7 @@ The managed repo audit system across Phases 0–12 is declared **locked** as of 
 - All persisted artifacts have JSON schemas (7 schema files across 6 subdirectories)
 - `MiniRegressionSuiteDefinition` and `MiniRegressionSuiteReport` bumped to schema v1.1 with `repo_id`/`audit_type` fields
 - `suite_report.schema.json` regenerated; 0-delta against model
-- CI integration guide published at `docs/architecture/ci_integration_guide.md`
+- CI integration guide published at `docs/architecture/ci/ci_integration_guide.md`
 - Follow-up tasks 2 and 3 completed; only first live VF run remains open
 
 **The system is architecturally complete and gap-free.** Twelve verification passes across this codebase have found and closed 23 gaps; Rev 7 through Rev 12 all found zero new gaps (six consecutive clean passes). The two non-correctness follow-up enhancements are now complete. The one remaining open item (first live VideoFoundry run) is operational, not architectural.

@@ -235,7 +235,7 @@ class ExecutionResult(BaseModel):
     # run. Recorded for audit/replay so any past run can answer:
     # which lane was requested? which backend executed? which runtime
     # powered it? which fork/ref/patches were actually used?
-    # See docs/architecture/execution_target.md.
+    # See docs/architecture/contracts/execution_target.md.
     bound_target: Optional["BoundExecutionTargetMirror"] = None
 
     # ER-003 — lifecycle outcome attached when the request carried lifecycle

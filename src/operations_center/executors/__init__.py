@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Executor framework — backend discovery, normalization, gaps, cards, verdicts.
 
-Per-backend layout (see docs/architecture/backend_control_audit.md):
+Per-backend layout (see docs/architecture/audit/backend_control_audit.md):
 
     operations_center/executors/<backend>/
       adapter.py             # discovery harness — invoke + capture

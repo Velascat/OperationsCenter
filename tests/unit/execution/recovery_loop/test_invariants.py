@@ -3,7 +3,7 @@
 """Invariant lockdown tests for the recovery loop.
 
 These tests prevent recovery-policy logic from leaking across architectural
-boundaries (R1-R12 + I1-I5 from docs/architecture/recovery_loop_design.md).
+boundaries (R1-R12 + I1-I5 from docs/architecture/recovery/recovery_loop_design.md).
 """
 
 from __future__ import annotations

@@ -50,7 +50,7 @@ After running, triage in this order:
 | Audit | Catalog |
 |---|---|
 | Custodian generic (C1–C8) | Custodian repo `audit_kit/` |
-| OC code-health (OC1–OC9) | `_custodian/detectors.py` + `docs/architecture/code_health_audit.md` |
+| OC code-health (OC1–OC9) | `_custodian/detectors.py` + `docs/architecture/audit/code_health_audit.md` |
 | Architecture invariants (AI1–AI4) | `_custodian/architecture.py` + `tools/audit/architecture_invariants/` |
 | Doc conventions (DC1–DC5) | `_custodian/doc_conventions.py` |
 | Ghost work (G1–GN) | `docs/history/audits/ghost_work_audit.md` |
@@ -80,6 +80,6 @@ don't fire-storm on resume.
 
 ## Related
 
-- `docs/architecture/audit_architecture.md` — the Custodian / OC split
+- `docs/architecture/audit/audit_architecture.md` — the Custodian / OC split
 - `docs/specs/proposer-consumes-custodian-sweep.md` — future automation
   that turns sweep findings directly into goal tasks

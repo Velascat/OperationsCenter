@@ -14,7 +14,7 @@ three hardcoded queries:
 NOT in v1: ranking, scoring, free-form query language, persistence,
 subjective recommendations as routing input.
 
-See docs/architecture/backend_control_audit.md (Phase 10).
+See docs/architecture/audit/backend_control_audit.md (Phase 10).
 """
 from operations_center.executors.catalog.loader import (
     BackendEntry,

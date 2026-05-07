@@ -12,7 +12,7 @@ OC bound or allowed. Four kinds:
   - internal_routing — multi-agent backend's internal orchestration
                        bypassed OC constraints
 
-See OperationsCenter/docs/architecture/backend_control_audit.md
+See OperationsCenter/docs/architecture/audit/backend_control_audit.md
 (System Phase — Drift Detection).
 """
 from operations_center.drift.engine import (

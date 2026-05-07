@@ -7,7 +7,7 @@ post-validation, post-binding shape that the coordinator hands to
 adapters. Unknown executors/backends from CxRP are rejected at the
 binding step and never reach this type.
 
-See docs/architecture/execution_target.md (this repo) and
+See docs/architecture/contracts/execution_target.md (this repo) and
 CxRP docs/spec/execution_target.md for the asymmetry rationale.
 """
 from __future__ import annotations

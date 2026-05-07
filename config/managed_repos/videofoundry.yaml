@@ -10,7 +10,7 @@
 #   OperationsCenter must NEVER depend on VideoFoundry Python internals.
 #
 # Phase: 1 — Managed Repo Contract
-# Phase 0 ground truth: docs/architecture/videofoundry_audit_ground_truth.md
+# Phase 0 ground truth: docs/architecture/videofoundry/videofoundry_audit_ground_truth.md
 
 repo_id: videofoundry
 repo_name: VideoFoundry

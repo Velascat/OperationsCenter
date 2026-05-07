@@ -23,7 +23,7 @@ class DriftKind(str, Enum):
 class BackendDriftFinding:
     """The single canonical BACKEND_DRIFT finding shape.
 
-    Matches the schema in docs/architecture/backend_control_audit.md
+    Matches the schema in docs/architecture/audit/backend_control_audit.md
     (System Phase — Drift Detection).
     """
 

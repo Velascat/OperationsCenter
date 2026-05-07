@@ -4,7 +4,7 @@
 **Config**: `config/managed_repos/videofoundry.yaml`
 **Models**: `src/operations_center/managed_repos/`
 **Tests**: `tests/unit/managed_repos/test_videofoundry_config.py`
-**Ground truth**: `docs/architecture/videofoundry_audit_ground_truth.md`
+**Ground truth**: `docs/architecture/videofoundry/videofoundry_audit_ground_truth.md`
 
 ---
 

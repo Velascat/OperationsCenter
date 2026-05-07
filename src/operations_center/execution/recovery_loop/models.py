@@ -4,7 +4,7 @@
 
 Backend-neutral types used by the recovery loop layer that wraps adapter
 execution inside ``ExecutionCoordinator``. See
-``docs/architecture/recovery_loop_design.md`` for the full design.
+``docs/architecture/recovery/recovery_loop_design.md`` for the full design.
 """
 
 from __future__ import annotations

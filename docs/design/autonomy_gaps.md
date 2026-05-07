@@ -6,7 +6,7 @@ status: deferred
 > **Audit note (2026-04-28):** Headings tagged `*[deferred, reviewed YYYY-MM-DD]*`
 > describe features where no cited symbol exists in `src/`. They were
 > mechanically tagged based on the C8 phantom-symbol detector
-> (`docs/architecture/code_health_audit.md`); the tag suppresses the
+> (`docs/architecture/audit/code_health_audit.md`); the tag suppresses the
 > detector and signals this section is design-only, not status-of-shipped.
 > Sections without the tag have at least one cited symbol present in `src/`,
 > meaning the feature is partially or fully implemented — those need

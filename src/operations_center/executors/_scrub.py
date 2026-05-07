@@ -8,7 +8,7 @@ tokens, absolute home paths with usernames, customer data, etc.
 pass through. CI scans committed samples for high-entropy strings and
 common token prefixes as a second line of defence.
 
-See docs/architecture/backend_control_audit.md (Phase 1 — Sample Safety).
+See docs/architecture/audit/backend_control_audit.md (Phase 1 — Sample Safety).
 """
 from __future__ import annotations
 

@@ -123,7 +123,7 @@ piling up duplicate proposals for the same long-standing finding.
 
 ## Related
 
-- `docs/architecture/audit_architecture.md` — the broader
+- `docs/architecture/audit/audit_architecture.md` — the broader
   Custodian/OC split this spec sits inside
 - `src/operations_center/entrypoints/custodian_sweep/main.py` —
   the producer side; its `_render_body` is the contract this

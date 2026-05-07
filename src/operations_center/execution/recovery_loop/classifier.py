@@ -7,7 +7,7 @@ The default classifier uses structured fields on ``ExecutionResult``
 ``AdapterErrorCode`` hint that adapters may attach via the ``artifacts``
 list. It does not parse free-form log text.
 
-See ``docs/architecture/recovery_loop_design.md`` for the full design.
+See ``docs/architecture/recovery/recovery_loop_design.md`` for the full design.
 """
 
 from __future__ import annotations

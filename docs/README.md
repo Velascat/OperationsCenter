@@ -28,28 +28,28 @@ This directory holds OC-specific material.
 
 ## Architecture (OC-specific)
 
-- [architecture/audit_architecture.md](architecture/audit_architecture.md) —
+- [architecture/audit/audit_architecture.md](architecture/audit/audit_architecture.md) —
   Audit-dispatch architecture inside OC.
-- [architecture/audit_triage_plan.md](architecture/audit_triage_plan.md)
-- [architecture/anti_collapse_invariant.md](architecture/anti_collapse_invariant.md)
-- [architecture/backend_control_audit.md](architecture/backend_control_audit.md)
-- [architecture/ci_integration_guide.md](architecture/ci_integration_guide.md)
-- [architecture/code_health_audit.md](architecture/code_health_audit.md)
-- [architecture/contract-map.md](architecture/contract-map.md)
-- [architecture/execution-handoff-cutover.md](architecture/execution-handoff-cutover.md)
-- [architecture/execution_target.md](architecture/execution_target.md)
-- [architecture/lifecycle_labels.md](architecture/lifecycle_labels.md)
-- [architecture/phantom_helper_waves.md](architecture/phantom_helper_waves.md)
-- [architecture/policy-pre-execution-gate.md](architecture/policy-pre-execution-gate.md)
-- [architecture/recovery_loop_design.md](architecture/recovery_loop_design.md)
-- [architecture/routing-contract-fidelity.md](architecture/routing-contract-fidelity.md)
+- [architecture/audit/audit_triage_plan.md](architecture/audit/audit_triage_plan.md)
+- [architecture/policy/anti_collapse_invariant.md](architecture/policy/anti_collapse_invariant.md)
+- [architecture/audit/backend_control_audit.md](architecture/audit/backend_control_audit.md)
+- [architecture/ci/ci_integration_guide.md](architecture/ci/ci_integration_guide.md)
+- [architecture/audit/code_health_audit.md](architecture/audit/code_health_audit.md)
+- [architecture/contracts/contract-map.md](architecture/contracts/contract-map.md)
+- [architecture/contracts/execution-handoff-cutover.md](architecture/contracts/execution-handoff-cutover.md)
+- [architecture/contracts/execution_target.md](architecture/contracts/execution_target.md)
+- [architecture/contracts/lifecycle_labels.md](architecture/contracts/lifecycle_labels.md)
+- [architecture/recovery/phantom_helper_waves.md](architecture/recovery/phantom_helper_waves.md)
+- [architecture/policy/policy-pre-execution-gate.md](architecture/policy/policy-pre-execution-gate.md)
+- [architecture/recovery/recovery_loop_design.md](architecture/recovery/recovery_loop_design.md)
+- [architecture/routing/routing-contract-fidelity.md](architecture/routing/routing-contract-fidelity.md)
 - [architecture/adr/](architecture/adr/) — OC architecture decision records.
 
 ### VideoFoundry-specific
 
-- [architecture/videofoundry_managed_repo_contract.md](architecture/videofoundry_managed_repo_contract.md)
-- [architecture/videofoundry_audit_artifact_contract.md](architecture/videofoundry_audit_artifact_contract.md)
-- [architecture/videofoundry_audit_ground_truth.md](architecture/videofoundry_audit_ground_truth.md)
+- [architecture/videofoundry/videofoundry_managed_repo_contract.md](architecture/videofoundry/videofoundry_managed_repo_contract.md)
+- [architecture/videofoundry/videofoundry_audit_artifact_contract.md](architecture/videofoundry/videofoundry_audit_artifact_contract.md)
+- [architecture/videofoundry/videofoundry_audit_ground_truth.md](architecture/videofoundry/videofoundry_audit_ground_truth.md)
 
 > **Tuning and upstream-patch evaluation** (`routing-tuning.md`,
 > `upstream-patch-evaluation.md` and their examples) are now sourced from

@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Bounded recovery loop wrapping ``ExecutionCoordinator``'s adapter call.
 
-See ``docs/architecture/recovery_loop_design.md``.
+See ``docs/architecture/recovery/recovery_loop_design.md``.
 """
 
 from .classifier import DefaultFailureClassifier, FailureClassifier
