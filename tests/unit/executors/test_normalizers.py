@@ -15,7 +15,6 @@ from operations_center.executors.kodo.normalizer import (
     normalize as normalize_kodo,
 )
 from operations_center.executors.archon.normalizer import (
-    NormalizationError as ArchonNormErr,
     normalize as normalize_archon,
 )
 

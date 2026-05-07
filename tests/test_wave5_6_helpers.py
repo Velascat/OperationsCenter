@@ -7,7 +7,6 @@ import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
-import pytest
 
 
 # ── Wave 5 ────────────────────────────────────────────────────────────────────

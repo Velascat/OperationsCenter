@@ -559,10 +559,11 @@ def test_cli_accepts_all_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     with patch.object(watcher, "_load_settings") as mock_settings, \
          patch.object(watcher, "_poll_once"):
         mock_settings.return_value = SETTINGS
-        result = watcher.main.__wrapped__() if hasattr(watcher.main, "__wrapped__") else None
+        _result = watcher.main.__wrapped__() if hasattr(watcher.main, "__wrapped__") else None
 
     # Just verify --help doesn't crash and flags are accepted
-    import subprocess, sys
+    import subprocess
+    import sys
     proc = subprocess.run(
         [sys.executable, "-m", "operations_center.entrypoints.pr_review_watcher.main", "--help"],
         capture_output=True, text=True,

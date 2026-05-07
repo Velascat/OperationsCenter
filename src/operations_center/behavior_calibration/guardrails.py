@@ -16,7 +16,7 @@ from .errors import BehaviorCalibrationError
 from .models import CalibrationRecommendation
 
 
-class GuardrailViolation(BehaviorCalibrationError):
+class GuardrailViolation(BehaviorCalibrationError):  # noqa: N818
     """Raised when a guardrail constraint is violated."""
 
 

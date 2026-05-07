@@ -3,7 +3,6 @@
 """Catalog v1 tests — load + the three queries + enforcement rules."""
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest

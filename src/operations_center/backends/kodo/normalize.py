@@ -121,7 +121,7 @@ def normalize(
 # G-003 (2026-05-05): patterns that indicate Kodo's internal stage
 # execution failed even when exit_code=0. Discovered during the real
 # R6 run where ClaudeCodeOrchestrator crashed mid-stage.
-import re as _re
+import re as _re  # noqa: E402  -- intentional late import after module docstring
 
 _INTERNAL_FAILURE_PATTERNS = (
     _re.compile(r"Done:\s*0/\d+\s+stage(?:s)?\s+completed", _re.IGNORECASE),

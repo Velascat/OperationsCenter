@@ -3,10 +3,8 @@
 """Wave 2 — pre-execution validation helpers."""
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 
 # ── _check_execution_environment ─────────────────────────────────────────────
@@ -66,7 +64,8 @@ def test_collect_open_pr_files_silently_skips_failed_per_pr():
     gh = MagicMock()
     gh.list_open_prs.return_value = [{"number": 1}, {"number": 2}]
     def _files(o, r, n):
-        if n == 1: raise RuntimeError("rate limit")
+        if n == 1:
+                raise RuntimeError("rate limit")
         return ["b.py"]
     gh.list_pr_files.side_effect = _files
     out = _collect_open_pr_files(gh, "o", "r")

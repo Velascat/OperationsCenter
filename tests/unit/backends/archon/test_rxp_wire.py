@@ -13,10 +13,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+from executor_runtime import ExecutorRuntime
+from executor_runtime.runners import ManualRunner
 from rxp.contracts import RuntimeInvocation, RuntimeResult
 
 from operations_center.backends.archon.invoke import (
+    ArchonBackendInvoker,
     ArchonRunResult,
+    StubArchonAdapter,
     _build_invocation,
     _build_runtime_result,
 )
@@ -136,15 +140,6 @@ class TestBuildRuntimeResult:
 # ---------------------------------------------------------------------------
 # Phase 3 — ExecutorRuntime delegation through ManualRunner
 # ---------------------------------------------------------------------------
-
-
-from executor_runtime import ExecutorRuntime
-from executor_runtime.runners import ManualRunner
-
-from operations_center.backends.archon.invoke import (
-    ArchonBackendInvoker,
-    StubArchonAdapter,
-)
 
 
 class TestExecutorRuntimeDelegation:

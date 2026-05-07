@@ -7,7 +7,6 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
-import pytest
 
 
 def test_detect_no_regression_when_base_green():

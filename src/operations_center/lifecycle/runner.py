@@ -9,7 +9,7 @@ are passed in via ``StageHandlers`` so tests run with simple callables.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 from .models import (
     Check,
@@ -141,7 +141,7 @@ class LifecycleRunner:
         )
 
 
-class _StageFailure(Exception):
+class _StageFailure(Exception):  # noqa: N818
     """Internal signal — a stage's typed failure (vs. unexpected exception)."""
 
 

@@ -10,7 +10,7 @@ from operations_center.decision.rules.observation_coverage import ObservationCov
 from operations_center.insights.derivers.observation_coverage import ObservationCoverageDeriver
 from operations_center.insights.normalizer import InsightNormalizer
 
-from test_insights import make_snapshot
+from test_insights import _make_snapshot as make_snapshot
 
 
 def _normalizer() -> InsightNormalizer:

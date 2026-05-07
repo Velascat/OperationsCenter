@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from executor_runtime import ExecutorRuntime
-from rxp.contracts import RuntimeInvocation, RuntimeResult
+from rxp.contracts import RuntimeInvocation
 
 from operations_center.backends.kodo.runner import KodoAdapter
 

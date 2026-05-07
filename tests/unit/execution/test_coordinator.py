@@ -293,8 +293,10 @@ def test_kodo_adapter_retains_backend_detail_refs_and_duration_metadata(tmp_path
         def run(self, invocation):
             ar = Path(invocation.artifact_directory) if invocation.artifact_directory else Path("/tmp")
             ar.mkdir(parents=True, exist_ok=True)
-            sout = ar / "stdout.txt"; sout.write_text("kodo stdout", encoding="utf-8")
-            serr = ar / "stderr.txt"; serr.write_text("", encoding="utf-8")
+            sout = ar / "stdout.txt"
+            sout.write_text("kodo stdout", encoding="utf-8")
+            serr = ar / "stderr.txt"
+            serr.write_text("", encoding="utf-8")
             now = datetime.now(timezone.utc).isoformat()
             return RuntimeResult(
                 invocation_id=invocation.invocation_id,

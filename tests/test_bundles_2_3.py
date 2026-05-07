@@ -4,11 +4,8 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
-import pytest
 
 from operations_center.contracts.enums import ValidationStatus
 

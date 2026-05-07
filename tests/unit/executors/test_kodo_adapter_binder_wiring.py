@@ -28,7 +28,7 @@ def _request(workspace: Path, *, binding: RuntimeBindingSummary | None = None) -
 
 def _build_adapter(*, capture_to_return: KodoRunCapture) -> KodoBackendAdapter:
     """Build a KodoBackendAdapter whose invoker returns a stubbed capture."""
-    kodo_raw = MagicMock()
+    _kodo_raw = MagicMock()
     adapter = KodoBackendAdapter.__new__(KodoBackendAdapter)
     adapter._invoker = MagicMock()
     adapter._invoker.invoke.return_value = capture_to_return

@@ -26,7 +26,6 @@ from operations_center.lifecycle import (
     StageHandlers,
     StageStatus,
     TaskLifecycleStage,
-    VerifyOutput,
 )
 
 

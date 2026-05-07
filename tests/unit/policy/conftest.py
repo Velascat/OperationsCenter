@@ -10,7 +10,6 @@ so test bodies stay focused on the policy dimension being tested.
 
 from __future__ import annotations
 
-import pytest
 
 from operations_center.contracts.common import BranchPolicy, TaskTarget, ValidationProfile
 from operations_center.contracts.enums import (

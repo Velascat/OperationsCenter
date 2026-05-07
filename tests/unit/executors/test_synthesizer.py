@@ -10,7 +10,6 @@ import yaml
 
 from operations_center.executors.synthesizer import (
     OngoingSynthesizer,
-    SynthesizedFacts,
     synthesize_from_samples,
     write_synthesized_diffs,
 )
