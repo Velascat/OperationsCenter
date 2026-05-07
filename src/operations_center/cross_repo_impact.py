@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Detect cross-repo impact when a goal touches a shared-interface path.
 
-Cited by `docs/design/autonomy_gaps.md` S7-6 (Cross-Repo Impact Analysis).
+Cited by `docs/design/autonomy/autonomy_gaps.md` S7-6 (Cross-Repo Impact Analysis).
 
 Each repo's settings carry an `impact_report_paths` list (already exists
 on `RepoSettings` as a deferred field). When a goal task in repo A

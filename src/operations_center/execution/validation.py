@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Pre-execution validation helpers.
 
-Cited by `docs/design/autonomy_gaps.md` Wave 2 entries (S3-2, S7-7, etc.).
+Cited by `docs/design/autonomy/autonomy_gaps.md` Wave 2 entries (S3-2, S7-7, etc.).
 Each function is a small read-only check; together they form a
 pre-flight stage that the coordinator (or a dedicated validator) can
 run before invoking kodo.

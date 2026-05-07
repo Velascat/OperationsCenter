@@ -103,7 +103,7 @@ where the implementation cost is small AND the value is concrete.
 ## Group F — Documentation reconciliation (NEW — from C8)
 
 The phantom-symbol detector flagged **151 references in design docs to
-functions that don't exist**. Almost all in `docs/design/autonomy_gaps.md`,
+functions that don't exist**. Almost all in `docs/design/autonomy/autonomy_gaps.md`,
 which turns out to be aspirational rather than status. Per-section triage:
 
 | ID | Action | Cost | Status |

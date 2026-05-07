@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Priority + scheduling scan helpers.
 
-Cited by `docs/design/autonomy_gaps.md` Wave 6 (S10-10 Task Priority
+Cited by `docs/design/autonomy/autonomy_gaps.md` Wave 6 (S10-10 Task Priority
 Re-Evaluation Scan, S10-2 awaiting_input handling, S5-9 stale signal
 handling).
 

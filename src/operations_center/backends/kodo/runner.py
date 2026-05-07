@@ -111,7 +111,7 @@ def _get_kodo_version(binary: str | None = None) -> str | None:
     an adapter instance (e.g. capture writers, observability collectors) can
     record the version that produced an execution. No side effects.
 
-    See `docs/design/autonomy_gaps.md` S6-8 (Kodo Version Attribution).
+    See `docs/design/autonomy/autonomy_gaps.md` S6-8 (Kodo Version Attribution).
     """
     if binary is None:
         binary = "kodo"

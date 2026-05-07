@@ -870,13 +870,13 @@ The repo-aware autonomy loop is behaving well when:
 
 - [Lifecycle Contract](docs/design/lifecycle.md)
 - [Improve Worker](docs/design/improve_worker.md)
-- [Autonomy Hardening](docs/design/autonomy_gaps.md) — 26 full-autonomy improvements across 3 sessions: rate-limit handling, pre-execution validation, feedback loop automation, workspace health, config drift detection, spend telemetry, parallel execution, multi-step planning, and more
-- [Repo Observer](docs/design/autonomy_repo_observer.md)
-- [Insight Engine](docs/design/autonomy_insight_engine.md)
-- [Decision Engine](docs/design/autonomy_decision_engine.md)
-- [Proposer Integration](docs/design/autonomy_proposer_integration.md)
-- [Repo-Aware Autonomy Layer](docs/design/repo_aware_autonomy.md)
-- [Self-Tuning Regulator](docs/design/autonomy_self_tuning_regulator.md)
+- [Autonomy Hardening](docs/design/autonomy/autonomy_gaps.md) — 26 full-autonomy improvements across 3 sessions: rate-limit handling, pre-execution validation, feedback loop automation, workspace health, config drift detection, spend telemetry, parallel execution, multi-step planning, and more
+- [Repo Observer](docs/design/autonomy/autonomy_repo_observer.md)
+- [Insight Engine](docs/design/autonomy/autonomy_insight_engine.md)
+- [Decision Engine](docs/design/autonomy/autonomy_decision_engine.md)
+- [Proposer Integration](docs/design/autonomy/autonomy_proposer_integration.md)
+- [Repo-Aware Autonomy Layer](docs/design/autonomy/repo_aware_autonomy.md)
+- [Self-Tuning Regulator](docs/design/autonomy/autonomy_self_tuning_regulator.md)
 - [Execution Budget And Safety Controls](docs/design/execution_budget_and_safety_controls.md)
 - [Plane + Kodo Wrapper Design](docs/design/plane_kodo_wrapper.md)
 - [Roadmap](docs/design/roadmap.md)

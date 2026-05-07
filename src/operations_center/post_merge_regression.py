@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Post-merge regression detection + revert helpers.
 
-Cited by `docs/design/autonomy_gaps.md` Wave 3 entries (4+6 Post-Merge
+Cited by `docs/design/autonomy/autonomy_gaps.md` Wave 3 entries (4+6 Post-Merge
 CI Feedback, S8-5 Automatic Revert Branch).
 
 What this *does*: provides callable helpers a maintenance CLI or

@@ -61,14 +61,14 @@ This directory holds OC-specific material.
 - [design/lifecycle.md](design/lifecycle.md)
 - [design/improve_worker.md](design/improve_worker.md)
 - [design/plane_kodo_wrapper.md](design/plane_kodo_wrapper.md)
-- [design/repo_aware_autonomy.md](design/repo_aware_autonomy.md)
+- [design/autonomy/repo_aware_autonomy.md](design/autonomy/repo_aware_autonomy.md)
 - [design/execution_budget_and_safety_controls.md](design/execution_budget_and_safety_controls.md)
-- [design/autonomy_decision_engine.md](design/autonomy_decision_engine.md)
-- [design/autonomy_gaps.md](design/autonomy_gaps.md)
-- [design/autonomy_insight_engine.md](design/autonomy_insight_engine.md)
-- [design/autonomy_proposer_integration.md](design/autonomy_proposer_integration.md)
-- [design/autonomy_repo_observer.md](design/autonomy_repo_observer.md)
-- [design/autonomy_self_tuning_regulator.md](design/autonomy_self_tuning_regulator.md)
+- [design/autonomy/autonomy_decision_engine.md](design/autonomy/autonomy_decision_engine.md)
+- [design/autonomy/autonomy_gaps.md](design/autonomy/autonomy_gaps.md)
+- [design/autonomy/autonomy_insight_engine.md](design/autonomy/autonomy_insight_engine.md)
+- [design/autonomy/autonomy_proposer_integration.md](design/autonomy/autonomy_proposer_integration.md)
+- [design/autonomy/autonomy_repo_observer.md](design/autonomy/autonomy_repo_observer.md)
+- [design/autonomy/autonomy_self_tuning_regulator.md](design/autonomy/autonomy_self_tuning_regulator.md)
 
 ## Specs
 

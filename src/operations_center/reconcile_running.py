@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Per-task-kind reconciliation for stale Running tasks.
 
-Cited by `docs/design/autonomy_gaps.md` S5-3 (Per-Task-Kind Running TTL
+Cited by `docs/design/autonomy/autonomy_gaps.md` S5-3 (Per-Task-Kind Running TTL
 in Reconcile). The existing `entrypoints/maintenance/recover_stale.py`
 uses a single TTL for every Running task; in practice a long refactor
 goal can legitimately run 2+ hours while a verification test stuck for

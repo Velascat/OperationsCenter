@@ -1,7 +1,7 @@
 # Phantom-Helper Implementation Waves
 
 Catalog of the genuine phantom helpers cited in
-`docs/design/autonomy_gaps.md` (and surfaced by C8 in
+`docs/design/autonomy/autonomy_gaps.md` (and surfaced by C8 in
 `code_health_audit.md`). Each is a small Python helper that the design
 doc references in an implementation context but no `def`/`class` exists
 in `src/`.

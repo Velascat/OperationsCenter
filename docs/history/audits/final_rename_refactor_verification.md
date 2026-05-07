@@ -61,7 +61,7 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `docs/design/lifecycle.md:78` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
 | `docs/operator/pr_review.md` (7 occurrences) | `<!-- controlplane:bot -->`, `controlplane-bot` | Fixed throughout |
 | `docs/operator/runtime.md:65` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
-| `docs/design/autonomy_gaps.md:1189` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
+| `docs/design/autonomy/autonomy_gaps.md:1189` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
 | docs/superpowers/plans/2026-04-15-autonomous-spec-driven-chain.md (removed) (2 occurrences) | `<!-- controlplane:bot -->` in code strings | Fixed → `<!-- operations-center:bot -->` |
 | `README.md:90-91` | `controlplane-routing.md`, `controlplane-routing-examples.md` file paths | Fixed → `operations-center-routing{,-examples}.md` |
 | `README.md:469` | `<!-- controlplane:bot -->` | Fixed → `<!-- operations-center:bot -->` |
@@ -82,7 +82,7 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `.env.example:17` | "Plane is a task board used by ControlPlane" | Fixed → "OperationsCenter" |
 | `.gitignore:126` | `# FOB operator state` comment | Fixed → `# OperatorConsole state` |
 | `docker/Dockerfile.switchboard:13` | "fetch the control-plane git dependency" | Fixed → "operations-center git dependency" |
-| `docs/providers.md:16` | `fob providers` | Fixed → `console providers` |
+| `docs/reference/providers.md:16` | `fob providers` | Fixed → `console providers` |
 | `docs/architecture/system/ownership.md:108,111` | `fob brief`, `fob demo`, `fob status` | Fixed → `console open`, `console demo`, `console status` |
 | `docs/architecture/system/ownership.md:171` | `fob demo` (section heading) | Fixed → `console demo` |
 | `docs/architecture/system/ownership.md:218` | `fob demo` (checklist item) | Fixed → `console demo` |

@@ -13,7 +13,7 @@
 #   deployment/plane/manage.sh down
 #   deployment/plane/manage.sh status
 #
-# See WorkStation/docs/service-map.md and WorkStation/docs/operations.md
+# See WorkStation/docs/operations/service-map.md and WorkStation/docs/operations/runbook.md
 # for canonical Plane lifecycle documentation.
 # =============================================================================
 set -euo pipefail

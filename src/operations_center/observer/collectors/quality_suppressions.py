@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Count code-quality suppression markers added in a kodo diff.
 
-Cited by `docs/design/autonomy_gaps.md` S5-10 (Kodo Quality Erosion
+Cited by `docs/design/autonomy/autonomy_gaps.md` S5-10 (Kodo Quality Erosion
 Detection). The intent: if kodo's output keeps reaching for `# noqa` /
 `# type: ignore` to silence linters and type checkers instead of fixing
 the underlying issue, that's a signal that the team config is degrading

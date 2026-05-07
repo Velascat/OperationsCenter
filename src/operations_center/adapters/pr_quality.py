@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Heuristic quality check for PR description bodies.
 
-Cited by `docs/design/autonomy_gaps.md` S9-8 (PR Description Quality Check).
+Cited by `docs/design/autonomy/autonomy_gaps.md` S9-8 (PR Description Quality Check).
 A bot-written PR with an empty or one-line body makes review harder; this
 gate gives a small signal when the body is missing, too short, or skips
 the conventional sections (## Goal, ## Changes, etc.).

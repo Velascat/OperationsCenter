@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- OC design/autonomy/ subgrouped (2026-05-07, on `main`): The 6 `autonomy_*.md` files plus `repo_aware_autonomy.md` moved into `docs/design/autonomy/`. Inbound refs (docs/README.md and any internal cross-links) rewritten via batch sed.
+
 - OC architecture/ subgrouped (2026-05-07, on `main`): 21 loose files split into audit/, contracts/, routing/, policy/, recovery/, ci/, videofoundry/ subdirs. All inbound refs rewritten via batch sed pass; docs/README.md and operator/weekly_audits.md auto-updated to match. Redirect stubs (upstream-patch-evaluation, routing-tuning + examples) moved into contracts/ and routing/ alongside their topic-mates.
 
 - WS architecture refs updated after subgrouping (2026-05-07, on `main`): WorkStation moved its architecture/ docs into adapters/, routing/, contracts/, execution/, policy/, system/ subdirs. Updated all inbound refs in OC: README.md, redirect stubs (upstream-patch-evaluation*, routing-tuning*), historical audit/managed-repo cross-refs.

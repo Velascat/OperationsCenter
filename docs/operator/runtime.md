@@ -307,7 +307,7 @@ The bounded self-tuning regulation loop. Run this as a periodic maintenance step
 OPERATIONS_CENTER_TUNING_AUTO_APPLY_ENABLED=1 ./scripts/operations-center.sh tune-autonomy --apply
 ```
 
-Reads retained decision, proposer, and feedback artifacts. Produces per-family metrics including acceptance rates and emits conservative recommendations. See `docs/operator/tuning.md` and `docs/design/autonomy_self_tuning_regulator.md` for full details.
+Reads retained decision, proposer, and feedback artifacts. Produces per-family metrics including acceptance rates and emits conservative recommendations. See `docs/operator/tuning.md` and `docs/design/autonomy/autonomy_self_tuning_regulator.md` for full details.
 
 ## Autonomy-Tiers
 

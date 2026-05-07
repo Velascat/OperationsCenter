@@ -6,7 +6,7 @@ A maintenance window is a recurring time-of-day + weekday range during
 which autonomous execution should be paused. The schema lives in
 ``Settings.maintenance_windows`` (a list of MaintenanceWindow objects).
 
-Cited by `docs/design/autonomy_gaps.md` S6-1 / S7-7. The check itself
+Cited by `docs/design/autonomy/autonomy_gaps.md` S6-1 / S7-7. The check itself
 was inline in ``autonomy_cycle/main.py``; this module extracts it so
 other components (escalation logic, status pane, future schedulers)
 can ask the same question without duplicating logic.

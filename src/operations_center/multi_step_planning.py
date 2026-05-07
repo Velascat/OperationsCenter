@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Multi-step planning helpers — split complex goals into a chain of subtasks.
 
-Cited by `docs/design/autonomy_gaps.md` §8 (Multi-Step Dependency Planning)
+Cited by `docs/design/autonomy/autonomy_gaps.md` §8 (Multi-Step Dependency Planning)
 and Wave 4 entries.
 
 What this *does*: classifies a goal as multi-step (by title keywords or
