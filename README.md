@@ -92,7 +92,7 @@ For full architecture and examples see:
 
 ### Canonical contract types
 
-All cross-repo contracts live in `src/operations_center/contracts/`:
+OperationsCenter consumes canonical contracts from [CxRP](https://github.com/Velascat/CxRP) (orchestration) and [RxP](https://github.com/Velascat/RxP) (runtime), and maps them to/from internal Pydantic models defined in `src/operations_center/contracts/` (mapper: `contracts/cxrp_mapper.py`):
 
 | Module | Types |
 |---|---|
