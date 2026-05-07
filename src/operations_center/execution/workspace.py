@@ -478,6 +478,10 @@ class WorkspaceManager:
                 request.repo_key, exc,
             )
             return
+        # install_cmd is non-None at this point (early-returned above when both
+        # custom and install_cmd were empty); narrow for ty.
+        if install_cmd is None:  # pragma: no cover — guarded by early return above
+            return
         proc = subprocess.run(
             install_cmd, shell=True, cwd=ws,
             capture_output=True, text=True, timeout=900,

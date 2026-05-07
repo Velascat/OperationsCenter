@@ -28,7 +28,12 @@ from collections.abc import Callable
 from operations_center.observability.models import ExecutionRecord
 
 from .compare import compare_backends
-from .routing_models import BackendComparisonSummary, RoutingTuningProposal, StrategyAnalysisReport
+from .routing_models import (
+    BackendComparisonSummary,
+    RoutingTuningProposal,
+    StrategyAnalysisReport,
+    StrategyFinding,
+)
 from .routing_recommend import derive_findings, generate_recommendations
 
 
@@ -58,7 +63,7 @@ class StrategyTuningService:
     def __init__(
         self,
         compare_fn: Callable[..., list[BackendComparisonSummary]] | None = None,
-        findings_fn: Callable[..., object] | None = None,
+        findings_fn: Callable[..., list[StrategyFinding]] | None = None,
         recommendations_fn: Callable[..., list[RoutingTuningProposal]] | None = None,
     ) -> None:
         self._compare = compare_fn or compare_backends

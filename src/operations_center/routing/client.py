@@ -97,7 +97,7 @@ class StubLaneRoutingClient:
     def __init__(self, decision: LaneDecision) -> None:
         self._decision = decision
 
-    def select_lane(self, _proposal: TaskProposal) -> LaneDecision:
+    def select_lane(self, proposal: TaskProposal) -> LaneDecision:  # noqa: ARG002 - stub ignores arg
         return self._decision
 
 

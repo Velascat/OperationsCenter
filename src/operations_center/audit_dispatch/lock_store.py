@@ -237,14 +237,12 @@ class PersistentLockStore:
         with _locked_state_file(path):
             existing = self.read(payload.repo_id)
             if existing is not None and existing.is_alive():
-                err = RepoLockAlreadyHeldError(
+                raise RepoLockAlreadyHeldError(
                     f"managed audit lock for repo {payload.repo_id!r} is held by "
                     f"run {existing.run_id} (oc_pid={existing.oc_pid}, "
-                    f"audit_pid={existing.audit_pid})"
+                    f"audit_pid={existing.audit_pid})",
+                    held_payload=existing,
                 )
-                # Stash for diagnostics — CLI surfaces this.
-                err.held_payload = existing  # type: ignore[attr-defined]
-                raise err
             self._write_atomic(path, payload)
         return payload
 

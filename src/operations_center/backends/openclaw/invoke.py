@@ -58,7 +58,7 @@ class StubOpenClawRunner(OpenClawRunner):
     def __init__(self, result: OpenClawRunResult) -> None:
         self._result = result
 
-    def run(self, _prepared: OpenClawPreparedRun) -> OpenClawRunResult:
+    def run(self, prepared: OpenClawPreparedRun) -> OpenClawRunResult:  # noqa: ARG002 - stub ignores arg
         return self._result
 
 

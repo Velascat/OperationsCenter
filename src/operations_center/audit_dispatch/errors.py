@@ -29,7 +29,16 @@ class RepoLockAlreadyHeldError(AuditDispatchError):
     Raised by acquire_audit_lock() when the per-repo lock is held.
     Callers must wait for the in-progress audit to complete before dispatching
     another for the same repo.
+
+    ``held_payload`` carries the live lock payload for diagnostics — CLIs and
+    operators surface it to show *which* run holds the lock.
     """
+
+    held_payload: "object | None" = None
+
+    def __init__(self, message: str, held_payload: "object | None" = None) -> None:
+        super().__init__(message)
+        self.held_payload = held_payload
 
 
 class AuditDispatchConfigError(AuditDispatchError):

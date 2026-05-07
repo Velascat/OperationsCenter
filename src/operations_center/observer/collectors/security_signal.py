@@ -109,7 +109,7 @@ class SecuritySignalCollector:
         critical = 0
         high = 0
         for entry in data:
-            vulns = entry.get("vulns", []) if isinstance(entry, dict) else []  # type: ignore[union-attr]
+            vulns = entry.get("vulns", []) if isinstance(entry, dict) else []  # type: ignore[union-attr]  # ty:ignore[no-matching-overload]
             advisory_count += len(vulns)
             for vuln in vulns:
                 severity = (vuln.get("fix_versions") and "high") or "unknown"
@@ -124,7 +124,7 @@ class SecuritySignalCollector:
         if not isinstance(data, dict):
             return 0, 0, 0
 
-        vulns = data.get("vulnerabilities", {})  # type: ignore[union-attr]
+        vulns = data.get("vulnerabilities", {})  # type: ignore[union-attr]  # ty:ignore[no-matching-overload]
         if not isinstance(vulns, dict):
             return 0, 0, 0
 
@@ -149,7 +149,7 @@ class SecuritySignalCollector:
         if not isinstance(data, dict):
             return 0, 0, 0
 
-        results = data.get("Results", [])  # type: ignore[union-attr]
+        results = data.get("Results", [])  # type: ignore[union-attr]  # ty:ignore[no-matching-overload]
         if not isinstance(results, list):
             return 0, 0, 0
 

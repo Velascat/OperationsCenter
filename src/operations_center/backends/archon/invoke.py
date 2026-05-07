@@ -77,7 +77,7 @@ class StubArchonAdapter(ArchonAdapter):
     def __init__(self, result: ArchonRunResult) -> None:
         self._result = result
 
-    def run(self, _config: ArchonWorkflowConfig) -> ArchonRunResult:
+    def run(self, config: ArchonWorkflowConfig) -> ArchonRunResult:  # noqa: ARG002 - stub ignores arg
         return self._result
 
 

@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Mapping, Protocol
 
 if TYPE_CHECKING:
-    from operations_center.backends.archon.adapter import ArchonBackendAdapter
-    from operations_center.backends.openclaw.adapter import OpenClawBackendAdapter
+    from operations_center.backends.archon.invoke import ArchonAdapter
+    from operations_center.backends.openclaw.invoke import OpenClawRunner
 
 from operations_center.config.settings import Settings
 from operations_center.contracts.enums import BackendName
@@ -53,8 +53,8 @@ class CanonicalBackendRegistry:
         cls,
         settings: Settings,
         *,
-        archon_adapter: ArchonBackendAdapter | None = None,
-        openclaw_runner: OpenClawBackendAdapter | None = None,
+        archon_adapter: "ArchonAdapter | None" = None,
+        openclaw_runner: "OpenClawRunner | None" = None,
     ) -> "CanonicalBackendRegistry":
         adapters: dict[BackendName, CanonicalBackendAdapter] = {
             BackendName.KODO: KodoBackendAdapter.from_settings(

@@ -71,8 +71,9 @@ def main() -> int:
                 "failed_checks":  list(sig.failed_checks),
             }
             # Optional revert step — only LOCAL git ops, never push/open
-            if args.revert and not args.dry_run and getattr(repo_cfg, "local_path", None):
-                ws = Path(repo_cfg.local_path)
+            local_path = getattr(repo_cfg, "local_path", None)
+            if args.revert and not args.dry_run and local_path:
+                ws = Path(local_path)
                 branch = create_revert_branch(
                     ws, commit_sha=sig.merge_commit_sha,
                     base_branch=sig.base_branch,

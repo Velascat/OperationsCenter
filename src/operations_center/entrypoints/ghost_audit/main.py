@@ -52,7 +52,7 @@ class AuditContext:
 # in _custodian/ means the parsing rules are reused by Custodian's detectors
 # too (no drift between OC's own ghost_audit and what Custodian sees).
 try:
-    from _custodian.log_scanner import OCLogScanner
+    from _custodian.log_scanner import OCLogScanner  # ty:ignore[unresolved-import]
     _LOG_SCANNER = OCLogScanner()
 except ImportError:
     _LOG_SCANNER = None
