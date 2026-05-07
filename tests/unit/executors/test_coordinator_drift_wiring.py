@@ -42,7 +42,6 @@ def _request_builder_with_binding(binding: RuntimeBindingSummary):
     class _Builder:
         def build(self, bundle, runtime, policy_decision=None):
             from operations_center.contracts.execution import ExecutionRequest
-            from datetime import datetime, timezone
             return ExecutionRequest(
                 proposal_id=bundle.proposal.proposal_id,
                 decision_id=bundle.decision.decision_id,

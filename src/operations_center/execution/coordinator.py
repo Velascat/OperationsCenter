@@ -527,7 +527,6 @@ def _attach_lifecycle_outcome(
         LifecycleRunner,
         PlanOutput,
         StageHandlers,
-        TaskLifecycleStage,
     )
 
     def _default_plan(*, request, repo_graph_context):  # type: ignore[no-untyped-def]

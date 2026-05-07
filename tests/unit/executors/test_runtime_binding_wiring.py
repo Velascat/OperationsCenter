@@ -3,7 +3,6 @@
 """R1 — RuntimeBinding wired through OC's ExecutionRequest + CxRP mapper."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest

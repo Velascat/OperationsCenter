@@ -4,10 +4,8 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-import pytest
 
 from operations_center.contracts.common import ValidationSummary
 from operations_center.contracts.enums import (
@@ -25,8 +23,6 @@ from operations_center.planning.models import PlanningContext, ProposalDecisionB
 from operations_center.planning.proposal_builder import build_proposal
 from operations_center.policy.models import PolicyDecision, PolicyStatus
 from operations_center.repo_graph import (
-    RepoEdge,
-    RepoEdgeType,
     RepoGraph,
     RepoNode,
     load_default_repo_graph,

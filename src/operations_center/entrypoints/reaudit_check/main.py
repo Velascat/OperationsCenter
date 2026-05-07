@@ -24,7 +24,6 @@ from pathlib import Path
 from operations_center.executors.catalog import load_catalog
 from operations_center.executors.reaudit import (
     ReauditDecision,
-    ReauditReason,
     needs_reaudit,
 )
 

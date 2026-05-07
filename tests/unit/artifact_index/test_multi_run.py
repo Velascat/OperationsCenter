@@ -15,7 +15,6 @@ from operations_center.artifact_index.errors import (
 )
 from operations_center.artifact_index.models import ArtifactQuery
 from operations_center.artifact_index.multi_run import (
-    IndexedRun,
     MultiRunArtifactIndex,
     build_multi_run_index,
     discover_manifest_files,
@@ -189,7 +188,7 @@ class TestResolve:
     def test_resolve_returns_path_for_existing_artifact(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload, _BASE_ENTRY  # type: ignore
 
-        bucket = _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=_make_manifest_payload)
+        _bucket = _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=_make_manifest_payload)
         # Materialize the artifact file so existence check passes.
         (tmp_path / _BASE_ENTRY["path"]).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / _BASE_ENTRY["path"]).write_text("{}")

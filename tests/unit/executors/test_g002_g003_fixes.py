@@ -3,12 +3,11 @@
 """Regression tests for the G-002 and G-003 fixes from the real R6 run."""
 from __future__ import annotations
 
-import pytest
 
 from cxrp.vocabulary.status import ExecutionStatus
 
 from operations_center.contracts.execution import RuntimeBindingSummary
-from operations_center.executors.kodo.binder import bind, BindError
+from operations_center.executors.kodo.binder import bind
 from operations_center.executors.kodo.normalizer import normalize
 
 

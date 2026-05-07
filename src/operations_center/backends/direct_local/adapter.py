@@ -219,7 +219,6 @@ def _failure_category(result) -> Optional[FailureReasonCategory]:
 
 
 def _discover_changed_files(workspace_path: Path) -> tuple[list[ChangedFileRef], str, float]:
-    import subprocess
 
     try:
         proc = subprocess.run(

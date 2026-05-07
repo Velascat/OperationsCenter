@@ -19,7 +19,6 @@ from __future__ import annotations
 from operations_center.executors.kodo.adapter import (
     DiscoveryRunCapture,
     discover as _discover,
-    write_capture,
 )
 from pathlib import Path
 from typing import Any, Optional

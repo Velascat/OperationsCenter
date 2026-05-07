@@ -3,7 +3,6 @@
 """Phase 4 + 7 — bind_execution_target tests."""
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -20,7 +19,7 @@ from operations_center.execution.binding import (
     UnknownBackendError, bind_execution_target,
 )
 from operations_center.execution.target import (
-    BackendProvenance, BoundExecutionTarget,
+    BoundExecutionTarget,
 )
 
 
@@ -174,7 +173,6 @@ class TestContractMirror:
     def test_bound_target_round_trips_through_mirror(self):
         from operations_center.contracts.execution import (
             BackendProvenanceMirror, BoundExecutionTargetMirror,
-            RuntimeBindingSummary,
         )
         bound = bind_execution_target(_envelope(backend="kodo"))
         mirror = BoundExecutionTargetMirror(

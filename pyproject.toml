@@ -93,10 +93,7 @@ target-version = "py311"
 extend-select = [
     "T201",                                              # C2  — print()
     "S101",                                              # C40 — assert in prod
-    "S110",                                              # C4  — try/except/pass
     "S324",                                              # C31 — weak hash
-    "S602", "S603",                                      # C23 — subprocess shell=True
-    "BLE001",                                            # C9  — blind Exception
     "DTZ001", "DTZ003", "DTZ005", "DTZ006", "DTZ007",   # C10 — naive datetime
     "G004",                                              # C15 — f-string in logger
     "B006",                                              # C38 — mutable default arg
@@ -108,6 +105,34 @@ extend-select = [
     "RET503",                                            # D8  — implicit return
     "N818",                                              # N1  — exception class naming
 ]
+# Dropped (too noisy across codebase, real legitimate uses):
+#   S110  — try/except/pass — used in cleanup paths and maintenance code
+#   S602/S603 — subprocess invocations — heavily used in adapters / CLI / setup
+#   BLE001 — blind except — codebase uses defensive top-level handlers
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use `assert`, may patch subprocess, can have broad excepts in
+# fixtures, intentionally use vanilla Exception, and may print for
+# debug visibility — none of these are real violations there.
+"tests/**/*.py" = [
+    "S101",
+    "S110",
+    "S602", "S603",
+    "BLE001",
+    "DTZ001", "DTZ003", "DTZ005", "DTZ006", "DTZ007",
+    "B006", "B028",
+    "PLC1802",
+    "TRY002", "TRY203",
+    "PGH003",
+    "RET503",
+    "G004",
+    "T201",
+]
+# CLI scripts and entrypoints are allowed to print() and broad-except.
+"scripts/**/*.py" = ["T201", "BLE001", "S110"]
+"src/operations_center/entrypoints/**/*.py" = ["T201"]
+# Tools / one-shots
+"tools/**/*.py" = ["T201", "BLE001"]
 
 [tool.ty.environment]
 python-version = "3.11"

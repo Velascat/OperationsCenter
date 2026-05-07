@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-from operations_center.executors.catalog.loader import CatalogValidationError
 from operations_center.executors.startup import initialize_catalog
 
 

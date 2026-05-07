@@ -30,18 +30,12 @@ from __future__ import annotations
 
 import json
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 import yaml
 
-from operations_center.executors._artifacts import (
-    AuditArtifactError,
-    load_capability_card,
-    load_runtime_support,
-)
 
 
 _DEFAULT_FLUSH_EVERY_OBSERVATIONS = 10

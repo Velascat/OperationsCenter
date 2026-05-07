@@ -14,7 +14,7 @@ from pathlib import Path
 
 from executor_runtime import ExecutorRuntime
 from executor_runtime.runners import ManualRunner
-from rxp.contracts import RuntimeInvocation, RuntimeResult
+from rxp.contracts import RuntimeInvocation
 
 from operations_center.backends.openclaw.invoke import (
     OpenClawBackendInvoker,

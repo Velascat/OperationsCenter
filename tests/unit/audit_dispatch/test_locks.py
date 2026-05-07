@@ -124,7 +124,6 @@ class TestLazyStaleSweep:
     """Slice C: registry reclaims stale locks on first use (post-OC-restart safety)."""
 
     def test_sweep_clears_dead_lock_before_first_acquire(self, tmp_path) -> None:
-        import os
         import subprocess
         import sys
 
@@ -163,7 +162,6 @@ class TestLazyStaleSweep:
         lock1 = reg.acquire("repo_a")
         lock1.release()
         # Plant a stale lock after the registry has already swept once
-        import os
         import subprocess
         import sys
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from operations_center.executors.kodo.adapter import discover, write_capture, DiscoveryRunCapture
+from operations_center.executors.kodo.adapter import discover
 from operations_center.executors._scrub import REDACTED
 
 

@@ -8,14 +8,12 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from operations_center.audit_governance.coverage_analysis import (
     _find_coverage_json,
     _summarize,
     run_post_dispatch_coverage_audit,
 )
-from operations_center.audit_governance.models import CoverageAuditSummary
 
 
 def _write_manifest_with_coverage(tmp_path: Path) -> Path:

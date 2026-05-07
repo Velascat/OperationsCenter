@@ -8,7 +8,6 @@ import pytest
 from operations_center.contracts.execution import RuntimeBindingSummary
 from operations_center.executors.kodo.binder import (
     BindError,
-    KodoTeamSelection,
     _CLAUDE_FALLBACK_TEAM,
     _OPUS_HAIKU_FALLBACK_TEAM,
     bind,

@@ -17,7 +17,7 @@ from operations_center.insights.derivers.test_continuity import TestContinuityDe
 from operations_center.insights.normalizer import InsightNormalizer
 
 # Re-use the helper from the existing test module.
-from test_insights import make_snapshot
+from test_insights import _make_snapshot as make_snapshot
 
 
 def _normalizer() -> InsightNormalizer:

@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-import pytest
 
 
 # ── _count_quality_suppressions ──────────────────────────────────────────────
