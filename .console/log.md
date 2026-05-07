@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- docs/README.md index added (2026-05-07, on `main`): Required by Custodian R6 (newly landed). OC's docs/ tree has 80+ files across architecture/, design/, operator/, specs/, audits/, backends/, history/, and migration/ — newcomers had no entry point. Index organizes them by audience: operator how-tos, OC-specific architecture, managed-repo audit subsystem, design notes, specs, audits. Cross-repo platform architecture (ownership/contracts/routing/adapters) is referenced out to WorkStation/docs/architecture/.
+
 - README opening standardized (2026-05-06, on `main`): Added `## What this repo is` and `## What this repo is not` sections per the new platform-wide convention enforced by Custodian R3/R4 detectors. Lists OC's primary capabilities (planning, routing, execution, policy, evidence) and explicit anti-scope (SwitchBoard, ExecutorRuntime, CxRP/RxP, WorkStation).
 
 - pyproject description aligned with README (2026-05-06, on `main`): pyproject.toml had "Planning, policy, and evidence layer for canonical task proposals" — missing "routing" and "execution" which are part of OC's actual scope. Updated to match the GitHub repo description and README intro.
