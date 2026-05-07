@@ -22,7 +22,6 @@ from operations_center.policy.models import PolicyDecision, PolicyStatus
 from operations_center.policy.runtime_binding_policy import (
     DEFAULT_POLICY,
     RuntimeBindingPolicy,
-    RuntimeBindingRule,
 )
 
 
