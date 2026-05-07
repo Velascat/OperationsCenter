@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- README opening standardized (2026-05-06, on `main`): Added `## What this repo is` and `## What this repo is not` sections per the new platform-wide convention enforced by Custodian R3/R4 detectors. Lists OC's primary capabilities (planning, routing, execution, policy, evidence) and explicit anti-scope (SwitchBoard, ExecutorRuntime, CxRP/RxP, WorkStation).
+
 - pyproject description aligned with README (2026-05-06, on `main`): pyproject.toml had "Planning, policy, and evidence layer for canonical task proposals" — missing "routing" and "execution" which are part of OC's actual scope. Updated to match the GitHub repo description and README intro.
 
 - README contracts attribution (2026-05-06, on `main`): "Canonical contract types" section claimed all cross-repo contracts live in `src/operations_center/contracts/`. After CxRP/RxP extraction that's misleading — canonical contracts live in CxRP (orchestration) and RxP (runtime); OC's `contracts/` holds internal Pydantic models mapped via `cxrp_mapper.py`. Fixed wording.

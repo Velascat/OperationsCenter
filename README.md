@@ -2,6 +2,23 @@
 
 Local planning, execution, policy, and evidence service for the coding platform. OperationsCenter turns work context into canonical proposals, routes them through SwitchBoard, executes routed work through bounded adapters, and retains evidence around what happened later.
 
+## What this repo is
+
+- Canonical task-proposal authoring and validation
+- Routing-aware planning (SwitchBoard lane decisions consumed as input)
+- Bounded execution boundary (`ExecutionCoordinator` + per-backend adapters: kodo, archon, openclaw, direct_local, aider_local)
+- Mandatory policy gate before execution
+- Run-artifact persistence and observability (proposal, decision, request, result, trace)
+- Worker lanes for the autonomous loop: goal, test, improve, propose, review
+
+## What this repo is not
+
+- SwitchBoard — lane/backend selection lives there
+- ExecutorRuntime — runtime mechanics (subprocess/manual/HTTP) live there
+- CxRP / RxP — canonical contracts live there; OC consumes them via `cxrp_mapper.py`
+- WorkStation — service compose, Dockerfiles, lifecycle scripts live there
+- A scheduler, queue system, or model host
+
 ## Primary Operator Model
 
 OperationsCenter is operated through a **planning -> routing -> execution** flow:
@@ -173,7 +190,7 @@ result, capture = adapter.execute_and_capture(request)
 ```
 
 Key design constraints:
-- Archon is **not** a universal backend — `aider_local` lane runs stay on kodo
+- Archon is **not** a universal backend — `aider_local` runs use the dedicated `AiderLocalBackendAdapter`, not Archon
 - Archon-native types (`ArchonWorkflowConfig`, `ArchonRunCapture`, `workflow_events`) are confined to `backends/archon/`
 - `execute_and_capture()` exposes raw workflow events for `BackendDetailRef` retention without inlining them into canonical contracts
 - Unsupported requests return `UNSUPPORTED_REQUEST` before invocation; the capture is `None`
