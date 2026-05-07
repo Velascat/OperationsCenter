@@ -5,6 +5,8 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 ## Stop Points
 
+- pyproject description aligned with README (2026-05-06, on `main`): pyproject.toml had "Planning, policy, and evidence layer for canonical task proposals" — missing "routing" and "execution" which are part of OC's actual scope. Updated to match the GitHub repo description and README intro.
+
 - README contracts attribution (2026-05-06, on `main`): "Canonical contract types" section claimed all cross-repo contracts live in `src/operations_center/contracts/`. After CxRP/RxP extraction that's misleading — canonical contracts live in CxRP (orchestration) and RxP (runtime); OC's `contracts/` holds internal Pydantic models mapped via `cxrp_mapper.py`. Fixed wording.
 
 - CI follow-up: SPDX headers on 9 __init__.py files (2026-05-06, on `main`): License-header CI check flagged 9 freshly-created package init files missing SPDX headers (most are empty package markers — entrypoints/, tests/unit/* parent dirs). Bulk-fix.

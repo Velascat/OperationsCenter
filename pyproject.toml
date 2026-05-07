@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "operations-center"
 version = "0.1.0"
-description = "Planning, policy, and evidence layer for canonical task proposals"
+description = "Planning, routing, execution, policy, and evidence service for canonical task proposals"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
