@@ -25,7 +25,7 @@ responsibility for audits, runtime checks, and maintenance.
 │  OperationsCenter (this repo)                                  │
 │  ────────────────                                              │
 │                                                                │
-│  .custodian.yaml         Declares repo_key + paths +           │
+│  .custodian/config.yaml         Declares repo_key + paths +           │
 │                          which plugins / detectors to load     │
 │                                                                │
 │  _custodian/             Consumer plugin layer (OC's OWN code) │
@@ -56,7 +56,7 @@ responsibility for audits, runtime checks, and maintenance.
 
 **`custodian-audit`** (entry point, lives in Custodian):
 
-1. Reads `.custodian.yaml`
+1. Reads `.custodian/config.yaml`
 2. Always runs Custodian's built-in detectors (C, D, F, K, S, A, H, T, G, N, U, P classes)
 3. Loads plugins (OCLogScanner, OCStateScanner) → puts them in
    `AuditContext.plugin_modules`
@@ -97,7 +97,7 @@ The crisp rule:
 
 **Each managed repo owns** (its specifics):
 
-- `.custodian.yaml` — what to load, what stale handlers / common words to skip
+- `.custodian/config.yaml` — what to load, what stale handlers / common words to skip
 - `_custodian/` — repo-specific detectors and protocol implementations
 - Its own state shape, log shape, architecture invariants — Custodian doesn't know these and shouldn't
 
@@ -162,7 +162,7 @@ decision, not a v0.1 task. Until then, runtime audits stay in OC.
 
 | File | What it does |
 |---|---|
-| `.custodian.yaml` | Tells Custodian what plugins / detectors to load |
+| `.custodian/config.yaml` | Tells Custodian what plugins / detectors to load |
 | `_custodian/__init__.py` | Empty — just makes it a package |
 | `_custodian/detectors.py` | OC1–OC9 (code-health) |
 | `_custodian/architecture.py` | AI1–AI4 (wraps `tools/audit/architecture_invariants/`) |
