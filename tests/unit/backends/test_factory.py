@@ -34,6 +34,7 @@ def test_canonical_registry_does_not_thread_switchboard_proxy_transport(monkeypa
         kodo=object(),
         aider=object(),
         aider_local=object(),
+        archon=SimpleNamespace(enabled=False),
         spec_director=SimpleNamespace(switchboard_url="http://sb:20401"),
     )
 

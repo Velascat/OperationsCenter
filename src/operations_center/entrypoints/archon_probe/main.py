@@ -3,15 +3,16 @@
 """``operations-center-archon-probe`` — health-probe a running Archon.
 
 Standalone CLI for ops/monitoring. Wraps
-``operations_center.backends.archon.archon_health_probe``.
+``operations_center.backends.archon.archon_health_probe`` and the
+workflow-listing helper for cross-checking configured workflow names
+before running.
 
 Exit codes:
-    0   Archon healthy
+    0   Archon healthy (or workflows listed)
     1   Archon unreachable or unhealthy
     2   Bad usage
 """
 from __future__ import annotations
-
 
 import typer
 
@@ -30,9 +31,28 @@ def probe(
         5.0, "--timeout", "-t",
         help="HTTP request timeout in seconds",
     ),
+    list_workflows: bool = typer.Option(
+        False, "--list-workflows",
+        help="Skip the health probe and list registered Archon workflows.",
+    ),
 ) -> None:
-    """Probe Archon's /api/health endpoint and print the verdict."""
+    """Probe Archon's /api/health endpoint, or list registered workflows."""
     from operations_center.backends.archon import archon_health_probe
+
+    if list_workflows:
+        from operations_center.backends.archon.http_client import archon_list_workflows
+
+        workflows = archon_list_workflows(base_url, timeout_seconds=timeout)
+        if not workflows:
+            typer.echo(
+                "[FAIL] no workflows returned (archon unreachable or empty list)",
+                err=True,
+            )
+            raise typer.Exit(1)
+        for wf in workflows:
+            description = wf.description or "(no description)"
+            typer.echo(f"{wf.name}\t{description}")
+        raise typer.Exit(0)
 
     result = archon_health_probe(base_url, timeout_seconds=timeout)
 

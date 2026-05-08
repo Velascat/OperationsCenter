@@ -28,6 +28,28 @@ class GitSettings(BaseModel):
     signing_key: str | None = None
 
 
+class ArchonSettings(BaseModel):
+    """Settings for the Archon HTTP workflow backend.
+
+    Archon is deployed by WorkStation (``compose/profiles/archon.yml``)
+    at ``http://localhost:3000`` by default. ``workflow_names`` maps OC
+    workflow_type values to actual Archon workflow names operators have
+    shipped under ``.archon/workflows/``.
+    """
+
+    enabled: bool = False
+    base_url: str = "http://localhost:3000"
+    poll_interval_seconds: float = 2.0
+    workflow_names: dict[str, str] = Field(
+        default_factory=lambda: {
+            "goal":    "archon-goal-default",
+            "fix_pr":  "archon-fix-github-issue-dag",
+            "test":    "archon-test-default",
+            "improve": "archon-improve-default",
+        },
+    )
+
+
 class KodoSettings(BaseModel):
     binary: str = "kodo"
     team: str = "full"
@@ -210,6 +232,7 @@ class Settings(BaseModel):
     plane: PlaneSettings
     git: GitSettings
     kodo: KodoSettings
+    archon: ArchonSettings = Field(default_factory=ArchonSettings)
     aider: AiderSettings = Field(default_factory=AiderSettings)
     aider_local: AiderLocalSettings = Field(default_factory=AiderLocalSettings)
     repos: dict[str, RepoSettings]
