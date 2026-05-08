@@ -281,3 +281,16 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 - Phase 2 test suite: `pytest tests/unit/audit_contracts/ -v` → 119 passed in 0.50s
 - Phase 1 test suite: `pytest tests/unit/managed_repos/ -v` → 26 passed
 - stack_authoring output_dir is `tools/audit/report/authoring` not `stack_authoring` (Phase 0 quirk, documented)
+
+## 2026-05-08 — Custodian round: T6/T7/T8 exclusions + DC8/M1/C41 cleanup
+
+OC findings: 364 → 73.
+
+- T6/T7/T8 exclude_paths added per integration-tested layer (adapters,
+  entrypoints, backends, executors, observer, scheduled_tasks, etc.) plus
+  artifact_index/audit_contracts and the top-level scheduled-task entry
+  modules. These are exercised via integration tests, not direct imports.
+- M1: added CHANGELOG.md (Keep-a-Changelog format).
+- DC8: moved Quick Start before Overview in README.
+- C41: added ensure_ascii=False to json.dumps in run_memory/{cli,index}
+  and entrypoints/{graph_doctor,reaudit_check} mains.

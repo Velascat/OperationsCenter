@@ -46,7 +46,7 @@ def query_cmd(
     )
     records = svc.query(q)
     if json_out:
-        typer.echo(json.dumps([r.to_jsonl() for r in records], sort_keys=True, indent=2))
+        typer.echo(json.dumps([r.to_jsonl() for r in records], sort_keys=True, indent=2, ensure_ascii=False))
         return
     table = Table(title=f"Run Memory ({len(records)} matches)")
     table.add_column("created_at")

@@ -58,7 +58,7 @@ class RunMemoryIndexWriter:
 
     def append(self, record: RunMemoryRecord) -> None:
         with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record.to_jsonl(), sort_keys=True) + "\n")
+            fh.write(json.dumps(record.to_jsonl(), sort_keys=True, ensure_ascii=False) + "\n")
 
     def truncate(self) -> None:
         """Clear the index. Used by rebuild only."""
