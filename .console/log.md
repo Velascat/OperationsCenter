@@ -3,6 +3,11 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — Watchdog heartbeat every 5 min; propose heartbeat after child exits
+
+Watchdog slept 3600s between heartbeats — replaced single sleep with 12×300s loop, writing each iteration.
+Propose only wrote heartbeat at loop-top; added second write after wait returns so it updates after each pipeline_trigger run.
+
 ## 2026-05-08 — Fix bash syntax error in heartbeat printf (propose + watchdog)
 
 Quoted `"\$(date ...)"` inside a `-lc "..."` string closed the outer double-quote.

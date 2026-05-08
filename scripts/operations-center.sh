@@ -353,6 +353,9 @@ start_watch_role() {
         _child_pid=\$!
         wait \$_child_pid
         _exit=\$?
+        printf '{\"role\":\"propose\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
+          \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
+          > '${WATCH_DIR}/heartbeat_propose.json'
         [[ ! -f '${pid_file}' ]] && exit 0
         echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"propose\\\",\\\"exit_code\\\":\$_exit}\"
         sleep 30
@@ -435,7 +438,14 @@ start_watchdog() {
       printf '{\"role\":\"watchdog\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
         \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
         > '${WATCH_DIR}/heartbeat_watchdog.json'
-      sleep 3600
+      _slept=0
+      while [[ \$_slept -lt 3600 && -f '${pid_file}' ]]; do
+        sleep 300
+        _slept=\$((_slept + 300))
+        printf '{\"role\":\"watchdog\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
+          \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
+          > '${WATCH_DIR}/heartbeat_watchdog.json'
+      done
       [[ ! -f '${pid_file}' ]] && break
       for _r in \$_ROLES; do
         _pf='${WATCH_DIR}'/\"\$_r\".pid
