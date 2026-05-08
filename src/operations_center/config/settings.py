@@ -29,24 +29,56 @@ class GitSettings(BaseModel):
 
 
 class BackendCapSettings(BaseModel):
-    """Per-backend execution cap (Option A — per-backend caps).
+    """Per-backend execution cap and resource thresholds.
 
-    Mirror of ``RepoSettings.max_daily_executions`` but keyed on the
-    backend that powers the dispatch (``kodo``, ``archon``, ``aider``,
-    ``openclaw``, ...). Either field may be ``None`` to skip that
-    window — typical use is daily-only for a young backend you're
-    trust-building (``max_per_day: 5``) and unset hourly until you see
-    the actual rate.
+    Keyed on the backend that powers the dispatch (``kodo``, ``archon``,
+    ``aider``, ``openclaw``, ``pi``, ...). All fields are optional;
+    backends with no entry in ``Settings.backend_caps`` are
+    unconstrained at this layer — the global cap still applies.
 
-    Checked via ``UsageStore.budget_decision_for_backend()`` *after*
-    the global hourly/daily and per-repo caps pass. Backends with no
-    entry in ``Settings.backend_caps`` are unconstrained at this layer
-    — the global cap still applies. Backward-compatible: existing
-    kodo-only deployments behave identically until they opt in.
+    **Rate caps**:
+      - ``max_per_hour`` / ``max_per_day`` — checked via
+        ``UsageStore.budget_decision_for_backend()`` *after* the global
+        and per-repo caps pass.
+
+    **Resource thresholds** (all backends share the host's RAM and
+    process pool — calibrate to *aggregate footprint when dispatched
+    on this host*, not protocol overhead. An Archon HTTP dispatch is
+    cheap to send but the Archon container is on the same machine and
+    its child processes consume the same RAM that kodo subprocess
+    teams need):
+      - ``min_available_memory_mb`` — pre-dispatch check that free RAM
+        is at least this much (read from ``/proc/meminfo``). Refuses
+        the dispatch when below.
+      - ``max_concurrent`` — how many in-flight executions of this
+        backend OC will allow at once. Counted as
+        ``execution_started`` minus ``execution_finished`` events.
+
+    Typical config::
+
+        backend_caps:
+          kodo:
+            max_per_day: 50
+            min_available_memory_mb: 6144   # subprocess team config
+            max_concurrent: 1               # teams hate sharing
+          archon:
+            max_per_day: 5                  # trust-building rate cap
+            min_available_memory_mb: 8192   # container baseline + SDK call
+            max_concurrent: 4
+          aider:
+            min_available_memory_mb: 1024
+            max_concurrent: 2
+          pi:
+            min_available_memory_mb: 16384  # local LLM weights
+            max_concurrent: 1
     """
 
+    # Rate caps (Option A)
     max_per_hour: int | None = None
     max_per_day: int | None = None
+    # Resource thresholds (Option A follow-up)
+    min_available_memory_mb: int | None = None
+    max_concurrent: int | None = None
 
 
 class ArchonSettings(BaseModel):
