@@ -393,6 +393,13 @@ doc (DC7).
 
 ## 2026-05-08 — Link ADR 0002+0003; common_words for ADR 0002 vocabulary
 
+## 2026-05-08 — Fix phantom entrypoints/watchdog reference in audit docs
+
+G8 (ghost_work_audit.md) and F1 (flow_audit.md) both referenced
+`entrypoints/watchdog/main.py` which does not exist. Real implementation
+is `entrypoints/maintenance/recover_stale.py`. Updated both docs to point
+at the correct path and reflect the `--per-kind` flag that also exists.
+
 ## OC Platform Watchdog Cycle — 2026-05-08 20:30
 
 - Lock owner: pid=3165098 hostname=dev-virtual-machine
