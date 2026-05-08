@@ -193,6 +193,10 @@ audit:
       # Campaign + usage stores share record_* event-emit pattern (event-
       # log typology). Real refactor would centralise the writer.
       - "src/operations_center/execution/**"
+      # mini_regression + slice_replay are sibling audit subsystems with
+      # parallel report-loading and check-functions. Typology by class.
+      - "src/operations_center/mini_regression/**"
+      - "src/operations_center/slice_replay/**"
     T8:
       # Architecture-guard + lock-store-concurrency tests don't import the
       # code under audit — they probe via subprocess + filesystem.
@@ -503,6 +507,9 @@ audit:
     - _run_with_claude_fallback
     - is_quota_exhausted
     - visibility
+    # ADR 0002 backend card axis vocabulary (orchestration / mechanism labels).
+    - local_subprocess
+    - single_agent
 
   # F3-exempt field names: schema/documentation fields never accessed by dot
   # notation because they're serialized to JSON and consumed by external readers,

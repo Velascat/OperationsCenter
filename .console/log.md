@@ -345,3 +345,9 @@ run_show/main.py: split semicolon statements (E702), ensure_ascii=False on
 the JSON dump (C41). docs/README.md: linked the archon_workflow_registration
 doc (DC7).
 
+
+## 2026-05-08 — D11 exclusions for backend + entrypoint typologies
+
+
+## 2026-05-08 — Link ADR 0002+0003; common_words for ADR 0002 vocabulary
+
