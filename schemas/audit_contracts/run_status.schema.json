@@ -1,7 +1,7 @@
 {
   "$defs": {
     "RunStatus": {
-      "description": "Lifecycle status of a managed audit run.\n\nCanonical values for run_status.json and artifact manifests.\n\nDecision: VideoFoundry currently emits \"in_progress\" (legacy).\nThe contract canonicalises this to RUNNING. Phase 5 must switch\nVideoFoundry to emit \"running\". IN_PROGRESS_LEGACY is accepted\nduring the transition period by readers but must not be emitted\nby compliant producers.",
+      "description": "Lifecycle status of a managed audit run.\n\nCanonical values for run_status.json and artifact manifests.\n\nDecision: Pre-Phase-5 producers emit \"in_progress\" (legacy).\nThe contract canonicalises this to RUNNING. Phase 5 must switch\nproducers to emit \"running\". IN_PROGRESS_LEGACY is accepted\nduring the transition period by readers but must not be emitted\nby compliant producers.",
       "enum": [
         "pending",
         "running",
@@ -30,7 +30,7 @@
       "type": "string"
     },
     "producer": {
-      "description": "Managed repo identifier (e.g. 'videofoundry').",
+      "description": "Managed repo identifier as configured in the operator's binding.",
       "title": "Producer",
       "type": "string"
     },
@@ -51,7 +51,7 @@
     },
     "status": {
       "$ref": "#/$defs/RunStatus",
-      "description": "Run lifecycle status. Canonical values: pending, running, completed, failed, interrupted, unknown. Legacy: 'in_progress' (VideoFoundry pre-Phase-5)."
+      "description": "Run lifecycle status. Canonical values: pending, running, completed, failed, interrupted, unknown. Legacy: 'in_progress' (pre-Phase-5 producers)."
     },
     "current_phase": {
       "anyOf": [

@@ -96,7 +96,7 @@
           "type": "string"
         },
         "artifact_kind": {
-          "description": "Producer-vocabulary artifact kind (e.g. VideoFoundryArtifactKind values). Use 'unknown' when the kind cannot be determined.",
+          "description": "Producer-vocabulary artifact kind (e.g. ExampleManagedRepoArtifactKind values). Use 'unknown' when the kind cannot be determined.",
           "title": "Artifact Kind",
           "type": "string"
         },
@@ -137,7 +137,7 @@
             }
           ],
           "default": null,
-          "description": "Producer stage that created this artifact. Use producer profile vocabulary (e.g. VideoFoundrySourceStage). None for lifecycle or unknown sources.",
+          "description": "Producer stage that created this artifact. Use producer profile vocabulary (e.g. ExampleManagedRepoSourceStage). None for lifecycle or unknown sources.",
           "title": "Source Stage"
         },
         "status": {
@@ -280,7 +280,7 @@
       "type": "string"
     },
     "RunStatus": {
-      "description": "Lifecycle status of a managed audit run.\n\nCanonical values for run_status.json and artifact manifests.\n\nDecision: VideoFoundry currently emits \"in_progress\" (legacy).\nThe contract canonicalises this to RUNNING. Phase 5 must switch\nVideoFoundry to emit \"running\". IN_PROGRESS_LEGACY is accepted\nduring the transition period by readers but must not be emitted\nby compliant producers.",
+      "description": "Lifecycle status of a managed audit run.\n\nCanonical values for run_status.json and artifact manifests.\n\nDecision: Pre-Phase-5 producers emit \"in_progress\" (legacy).\nThe contract canonicalises this to RUNNING. Phase 5 must switch\nproducers to emit \"running\". IN_PROGRESS_LEGACY is accepted\nduring the transition period by readers but must not be emitted\nby compliant producers.",
       "enum": [
         "pending",
         "running",
@@ -307,7 +307,7 @@
       "type": "string"
     }
   },
-  "description": "Schema for artifact_manifest.json as defined by the managed-repo audit contract.\n\nProduced by VideoFoundry (Phase 5), defined by OperationsCenter (Phase 2),\nread by OpsCenter indexing (Phase 7).\n\nThe manifest is written incrementally. It is valid during initializing\nand running states. OpsCenter must tolerate a partial manifest.\n\nRepo-singleton rule:\n    Artifacts with location=REPO_SINGLETON have run_id=None in their\n    metadata and valid_for=[latest_snapshot]. The manifest run_id still\n    identifies the run that last updated the singleton reference.",
+  "description": "Schema for artifact_manifest.json as defined by the managed-repo audit contract.\n\nProduced by the bound managed repo (Phase 5), defined by OperationsCenter (Phase 2),\nread by OpsCenter indexing (Phase 7).\n\nThe manifest is written incrementally. It is valid during initializing\nand running states. OpsCenter must tolerate a partial manifest.\n\nRepo-singleton rule:\n    Artifacts with location=REPO_SINGLETON have run_id=None in their\n    metadata and valid_for=[latest_snapshot]. The manifest run_id still\n    identifies the run that last updated the singleton reference.",
   "properties": {
     "schema_version": {
       "default": "1.0",
@@ -322,7 +322,7 @@
       "type": "string"
     },
     "producer": {
-      "description": "Managed repo identifier (e.g. 'videofoundry').",
+      "description": "Managed repo identifier as configured in the operator's binding.",
       "title": "Producer",
       "type": "string"
     },
@@ -385,7 +385,7 @@
         }
       ],
       "default": null,
-      "description": "Root directory for resolving artifact paths in this manifest. Typically the VideoFoundry repo root. relative_path in each entry is relative to this root where applicable.",
+      "description": "Root directory for resolving artifact paths in this manifest. Typically the managed repo's filesystem root. relative_path in each entry is relative to this root where applicable.",
       "title": "Artifact Root"
     },
     "run_root": {

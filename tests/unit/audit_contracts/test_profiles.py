@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
-"""Tests for the VideoFoundry producer profile.
+"""Tests for the example managed-repo producer profile.
 
 Verifies the profile:
 - Is clearly separated from the generic contract.
@@ -19,9 +19,9 @@ from operations_center.audit_contracts.vocabulary import (
 )
 
 
-class TestVideoFoundryProfileSeparation:
-    def test_producer_id_is_videofoundry(self) -> None:
-        assert EXAMPLE_MANAGED_REPO_PROFILE.producer_id == "videofoundry"
+class TestExampleManagedRepoProfileSeparation:
+    def test_producer_id_is_example_managed_repo(self) -> None:
+        assert EXAMPLE_MANAGED_REPO_PROFILE.producer_id == "example_managed_repo"
 
     def test_profile_does_not_import_generic_enums(self) -> None:
         # The profile must not BE a generic enum; it is a producer extension.
@@ -42,7 +42,7 @@ class TestVideoFoundryProfileSeparation:
         assert ManagedRunStatus is not None
 
 
-class TestVideoFoundryAllSixAuditTypes:
+class TestExampleManagedRepoAllSixAuditTypes:
     def test_all_six_audit_types_have_specs(self) -> None:
         spec_types = {s.audit_type for s in EXAMPLE_MANAGED_REPO_PROFILE.audit_type_specs}
         expected = {at.value for at in ExampleManagedRepoAuditType}
@@ -65,7 +65,7 @@ class TestVideoFoundryAllSixAuditTypes:
         assert "stack_authoring" not in spec.output_dir
 
 
-class TestVideoFoundryPhase0Evidence:
+class TestExampleManagedRepoPhase0Evidence:
     def test_representative_evidence_is_real_run(self) -> None:
         spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("representative")
         assert spec is not None
@@ -85,7 +85,7 @@ class TestVideoFoundryPhase0Evidence:
         assert "in_progress" in EXAMPLE_MANAGED_REPO_PROFILE.legacy_status_value
 
 
-class TestVideoFoundryArchitectureInvariants:
+class TestExampleManagedRepoArchitectureInvariants:
     def test_singleton_path_set(self) -> None:
         assert "latest.json" in EXAMPLE_MANAGED_REPO_PROFILE.architecture_invariants_singleton_path
 
@@ -93,7 +93,7 @@ class TestVideoFoundryArchitectureInvariants:
         assert "repo_singleton" in EXAMPLE_MANAGED_REPO_PROFILE.architecture_invariants_note
 
 
-class TestVideoFoundryExcludedPathPatterns:
+class TestExampleManagedRepoExcludedPathPatterns:
     def test_coverage_ini_excluded(self) -> None:
         patterns = EXAMPLE_MANAGED_REPO_PROFILE.excluded_path_patterns
         assert "coverage.ini" in patterns
@@ -117,7 +117,7 @@ class TestManagedRepoPathQuirks:
 
 
 class TestBoundaryEnforcement:
-    def test_no_videofoundry_imports_in_contract_code(self) -> None:
+    def test_no_managed_repo_imports_in_contract_code(self) -> None:
         import ast
         from pathlib import Path
         contract_dir = Path(__file__).parent.parent.parent.parent / "src" / "operations_center" / "audit_contracts"
@@ -128,13 +128,13 @@ class TestBoundaryEnforcement:
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
                     if isinstance(node, ast.ImportFrom) and node.module:
                         assert not node.module.startswith("tools.audit"), (
-                            f"{py_file}: imports VideoFoundry code: {node.module}"
+                            f"{py_file}: imports managed-repo code: {node.module}"
                         )
                         assert not node.module.startswith("workflow."), (
-                            f"{py_file}: imports VideoFoundry workflow code: {node.module}"
+                            f"{py_file}: imports managed-repo workflow code: {node.module}"
                         )
                     if isinstance(node, ast.Import):
                         for alias in node.names:
                             assert not alias.name.startswith("tools.audit"), (
-                                f"{py_file}: imports VideoFoundry code: {alias.name}"
+                                f"{py_file}: imports managed-repo code: {alias.name}"
                             )

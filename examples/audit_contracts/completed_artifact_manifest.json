@@ -2,8 +2,8 @@
   "_example_note": "Synthetic contract example — not a real run. Shows all five location types and an excluded infrastructure path.",
   "schema_version": "1.0",
   "contract_name": "managed-repo-audit",
-  "producer": "videofoundry",
-  "repo_id": "videofoundry",
+  "producer": "example_managed_repo",
+  "repo_id": "example_managed_repo",
   "run_id": "3dead998d4c44e1cb296bef061de50f3",
   "audit_type": "representative",
   "manifest_status": "completed",
@@ -11,11 +11,11 @@
   "created_at": "2026-04-26T15:34:55Z",
   "updated_at": "2026-04-26T17:22:08Z",
   "finalized_at": "2026-04-26T17:22:08Z",
-  "artifact_root": "../VideoFoundry",
+  "artifact_root": "../ExampleManagedRepo",
   "run_root": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3",
   "artifacts": [
     {
-      "artifact_id": "videofoundry:representative:TopicSelectionStage:topic_selection",
+      "artifact_id": "example_managed_repo:representative:TopicSelectionStage:topic_selection",
       "artifact_kind": "stage_report",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/Connective_Contours_Connective_Contours_topic_selection.json",
       "relative_path": "Connective_Contours_Connective_Contours_topic_selection.json",
@@ -35,7 +35,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:AuthorProsodyStage:prosody_plan",
+      "artifact_id": "example_managed_repo:representative:AuthorProsodyStage:prosody_plan",
       "artifact_kind": "timing_artifact",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/Connective_Contours_AuthorProsodyStage.json",
       "relative_path": "Connective_Contours_AuthorProsodyStage.json",
@@ -55,7 +55,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:VoiceOverStage:asr_observations",
+      "artifact_id": "example_managed_repo:representative:VoiceOverStage:asr_observations",
       "artifact_kind": "alignment_artifact",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/Connective_Contours_voice_over_asr_observations.jsonl",
       "relative_path": "Connective_Contours_voice_over_asr_observations.jsonl",
@@ -75,7 +75,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:authoring:evidence_pack",
+      "artifact_id": "example_managed_repo:representative:authoring:evidence_pack",
       "artifact_kind": "authoring_artifact",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/artifacts/authoring/Connective_Contours_evidence_pack.json",
       "relative_path": "artifacts/authoring/Connective_Contours_evidence_pack.json",
@@ -95,7 +95,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:ScriptWritingStage:script_draft",
+      "artifact_id": "example_managed_repo:representative:ScriptWritingStage:script_draft",
       "artifact_kind": "script_contract",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/artifacts/script_contract/ScriptWriting/Connective_Contours_script_draft.json",
       "relative_path": "artifacts/script_contract/ScriptWriting/Connective_Contours_script_draft.json",
@@ -115,7 +115,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:VoiceSampleCleanStage:deadcode_report",
+      "artifact_id": "example_managed_repo:representative:VoiceSampleCleanStage:deadcode_report",
       "artifact_kind": "audit_report",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/audit/Connective_Contours_audit__voicesamplecleanstage__deadcode_report.txt",
       "relative_path": "audit/Connective_Contours_audit__voicesamplecleanstage__deadcode_report.txt",
@@ -135,7 +135,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:text_renderer:text_overlay_scene_001",
+      "artifact_id": "example_managed_repo:representative:text_renderer:text_overlay_scene_001",
       "artifact_kind": "rendering_artifact",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/text_overlay/Connective_Contours_text_overlay_scene_001.json",
       "relative_path": "text_overlay/Connective_Contours_text_overlay_scene_001.json",
@@ -155,7 +155,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:repo_singleton:architecture_invariants:latest",
+      "artifact_id": "example_managed_repo:repo_singleton:architecture_invariants:latest",
       "artifact_kind": "architecture_invariant",
       "path": "tools/audit/report/architecture_invariants/latest.json",
       "relative_path": null,
@@ -177,7 +177,7 @@
       }
     },
     {
-      "artifact_id": "videofoundry:representative:post_run:voice_over_regression_gate",
+      "artifact_id": "example_managed_repo:representative:post_run:voice_over_regression_gate",
       "artifact_kind": "json_report",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/voice_over_regression_gate.json",
       "relative_path": "voice_over_regression_gate.json",
@@ -197,7 +197,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:post_run:final_delivery_quality_summary",
+      "artifact_id": "example_managed_repo:representative:post_run:final_delivery_quality_summary",
       "artifact_kind": "json_report",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_153453_3dead998d4c44e1cb296bef061de50f3/final_delivery_quality_summary.json",
       "relative_path": "final_delivery_quality_summary.json",

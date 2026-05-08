@@ -12,10 +12,10 @@ Discovery chain:
 
 Design rules:
 - artifact_manifest_path is required for all Phase 5+ managed runs.
-- During transition, legacy VF run_status.json lacks this field.
-  The model accepts it as Optional only to allow reading legacy files.
-  Compliant producers MUST populate it.
-- status uses RunStatus vocabulary. VideoFoundry currently emits
+- During transition, pre-Phase-5 producers emit run_status.json without
+  this field. The model accepts it as Optional only to allow reading
+  legacy files. Compliant producers MUST populate it.
+- status uses RunStatus vocabulary. Pre-Phase-5 producers emit
   "in_progress" (legacy); Phase 5 must switch to "running".
 """
 
@@ -52,7 +52,7 @@ class ManagedRunStatus(BaseModel):
         description="Identifies this as a managed-repo-audit contract file.",
     )
     producer: str = Field(
-        description="Managed repo identifier (e.g. 'videofoundry').",
+        description="Managed repo identifier as configured in the operator's binding.",
     )
     repo_id: str = Field(
         description="Stable repo identifier matching the managed repo config.",
@@ -66,7 +66,7 @@ class ManagedRunStatus(BaseModel):
     status: RunStatus = Field(
         description=(
             "Run lifecycle status. Canonical values: pending, running, completed, "
-            "failed, interrupted, unknown. Legacy: 'in_progress' (VideoFoundry pre-Phase-5)."
+            "failed, interrupted, unknown. Legacy: 'in_progress' (pre-Phase-5 producers)."
         ),
     )
     current_phase: str | None = Field(
@@ -111,7 +111,7 @@ class ManagedRunStatus(BaseModel):
     @field_validator("status", mode="before")
     @classmethod
     def _accept_legacy_in_progress(cls, v: object) -> object:
-        # VideoFoundry pre-Phase-5 emits "in_progress"; map to the enum value.
+        # Pre-Phase-5 producers emit "in_progress"; map to the enum value.
         # The enum has IN_PROGRESS_LEGACY = "in_progress" so this is a no-op
         # at the value level, but it's explicit about the intent.
         return v

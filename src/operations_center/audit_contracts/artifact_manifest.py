@@ -3,7 +3,7 @@
 """
 artifact_manifest.py — generic managed-repo artifact manifest contract model.
 
-artifact_manifest.json is produced by the managed repo (VideoFoundry),
+artifact_manifest.json is produced by the bound managed repo,
 defined by OperationsCenter, and later read by OpsCenter indexing.
 
 Design rules:
@@ -13,8 +13,9 @@ Design rules:
 - Infrastructure noise (coverage.ini, .coverage.*, sitecustomize.py) is
   recorded in excluded_paths, NOT in artifacts.
 - artifact_kind, source_stage, consumer_types, valid_for, and limitations
-  use producer profile vocabulary (e.g. VideoFoundryArtifactKind).
-  The generic model accepts str for these to avoid baking in VF values.
+  use producer profile vocabulary (e.g. ExampleManagedRepoArtifactKind).
+  The generic model accepts str for these to avoid baking in
+  managed-repo-specific values.
 
 Lifecycle transitions:
     initializing → running → completed
@@ -83,7 +84,7 @@ class ManagedArtifactEntry(BaseModel):
     )
     artifact_kind: str = Field(
         description=(
-            "Producer-vocabulary artifact kind (e.g. VideoFoundryArtifactKind values). "
+            "Producer-vocabulary artifact kind (e.g. ExampleManagedRepoArtifactKind values). "
             "Use 'unknown' when the kind cannot be determined."
         ),
     )
@@ -108,7 +109,7 @@ class ManagedArtifactEntry(BaseModel):
         default=None,
         description=(
             "Producer stage that created this artifact. "
-            "Use producer profile vocabulary (e.g. VideoFoundrySourceStage). "
+            "Use producer profile vocabulary (e.g. ExampleManagedRepoSourceStage). "
             "None for lifecycle or unknown sources."
         ),
     )
@@ -171,8 +172,8 @@ class ManagedArtifactEntry(BaseModel):
 class ManagedArtifactManifest(BaseModel):
     """Schema for artifact_manifest.json as defined by the managed-repo audit contract.
 
-    Produced by VideoFoundry (Phase 5), defined by OperationsCenter (Phase 2),
-    read by OpsCenter indexing (Phase 7).
+    Produced by the bound managed repo (Phase 5), defined by
+    OperationsCenter (Phase 2), read by OpsCenter indexing (Phase 7).
 
     The manifest is written incrementally. It is valid during initializing
     and running states. OpsCenter must tolerate a partial manifest.
@@ -192,7 +193,7 @@ class ManagedArtifactManifest(BaseModel):
         description="Identifies this as a managed-repo-audit contract file.",
     )
     producer: str = Field(
-        description="Managed repo identifier (e.g. 'videofoundry').",
+        description="Managed repo identifier as configured in the operator's binding.",
     )
     repo_id: str = Field(
         description="Stable repo identifier matching the managed repo config.",
@@ -226,7 +227,7 @@ class ManagedArtifactManifest(BaseModel):
         default=None,
         description=(
             "Root directory for resolving artifact paths in this manifest. "
-            "Typically the VideoFoundry repo root. "
+            "Typically the managed repo's filesystem root. "
             "relative_path in each entry is relative to this root where applicable."
         ),
     )
