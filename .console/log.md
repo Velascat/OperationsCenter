@@ -393,6 +393,23 @@ doc (DC7).
 
 ## 2026-05-08 — Link ADR 0002+0003; common_words for ADR 0002 vocabulary
 
+## 2026-05-08 — Fix circuit breaker tripped by quota exhaustion events
+
+Root cause: API capacity exhaustion (kodo hit Claude quota ~19:40-20:00 UTC) was
+being recorded as execution_outcome(succeeded=False), feeding the circuit breaker.
+The CB design explicitly states quota events should NOT feed it — they are
+infrastructure problems, not task-quality signals. record_quota_event existed
+but was never called from coordinator.py.
+
+Fix:
+- coordinator.py: detect capacity_exhausted failure_category + reason keywords
+  → call record_quota_event instead of failed execution_outcome
+- .env.operations-center.local: CIRCUIT_BREAKER_STALENESS_HOURS=1 (was default 4h)
+  so past quota incidents age out within the same session after quota resets
+- Restarted goal/test/improve board workers to pick up new env
+
+Unblocked: 8/8 watchers running; CB closed with 1h staleness window.
+
 ## 2026-05-08 — Harden watchdog loop: adaptive cadence, blocked work investigation, anti-stagnation
 
 Rewrote docs/operator/watchdog_loop.md per canvas task (strengthen OC Platform

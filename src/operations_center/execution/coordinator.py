@@ -265,13 +265,35 @@ class ExecutionCoordinator:
                 repo_key=request.repo_key,
                 backend=backend_name,
             )
-            self._usage_store.record_execution_outcome(
-                task_id=request.run_id,
-                role=role,
-                succeeded=result.success,
-                now=now,
-                backend=backend_name,
+            # Capacity exhaustion is an external infrastructure event (rate-limited
+            # API key, billing cap). Record it as a quota_event so it does NOT feed
+            # the circuit breaker — the CB is a code/task-quality signal, not an
+            # API-quota signal. See usage_store.record_quota_event docstring.
+            _is_capacity_exhaustion = (
+                not result.success
+                and result.failure_category == FailureReasonCategory.BACKEND_ERROR
+                and result.failure_reason is not None
+                and any(
+                    kw in result.failure_reason.lower()
+                    for kw in ("capacity exhaustion", "you've hit your limit", "hit your limit",
+                               "quota exceeded", "rate limit", "billing")
+                )
             )
+            if _is_capacity_exhaustion:
+                self._usage_store.record_quota_event(
+                    task_id=request.run_id,
+                    role=role,
+                    backend=backend_name,
+                    now=now,
+                )
+            else:
+                self._usage_store.record_execution_outcome(
+                    task_id=request.run_id,
+                    role=role,
+                    succeeded=result.success,
+                    now=now,
+                    backend=backend_name,
+                )
 
         # Post-execution: commit any pending changes, push the task branch,
         # optionally open a PR. Failures are logged but non-fatal — the
