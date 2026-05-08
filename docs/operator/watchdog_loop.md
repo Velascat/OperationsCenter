@@ -1,11 +1,16 @@
 # OperationsCenter Platform Watchdog Loop Runbook
 
-This runbook describes the **OC/Platform watchdog loop** — a self-paced hourly
-audit-and-fix cycle driven by Claude Code's `/loop` skill and `ScheduleWakeup`.
-It is **not** the internal `watchdog` role that revives watcher processes; that
-is `scripts/operations-center.sh watchdog`. This loop is a higher-level operator
-loop that runs audits, triages findings, dispatches fixes, and enforces invariants
+This runbook describes the **OC/Platform watchdog loop** — a self-paced
+audit-and-stabilization cycle driven by Claude Code's `/loop` skill and
+`ScheduleWakeup`. It is **not** the internal `watchdog` role that revives
+watcher processes; that is `scripts/operations-center.sh watchdog`. This loop
+is a higher-level operator loop that actively investigates blocked work,
+unblocks stalled queues, escalates repeated failures, and enforces invariants
 across the whole OC/Platform stack.
+
+The loop is **not merely an hourly audit runner**. When the platform is
+unhealthy it shortens its cadence and actively works to restore forward
+progress. When healthy it backs off to maintenance frequency.
 
 The loop is session-bound: it runs as long as the Claude Code session is open.
 It uses `ScheduleWakeup`, not cron/systemd/daemon behavior. Do not replace it
@@ -118,7 +123,7 @@ must only run when this loop owns the lock.
 Invoke in the Claude Code session:
 
 ```
-/loop Every hour: run the OC/Platform audit-and-fix cycle from /home/dev/Documents/GitHub/OperationsCenter. Source .env.operations-center.local first. Use .venv/bin/ for all CLIs. This loop is session-bound and uses ScheduleWakeup, not cron/systemd.
+/loop Run the OC/Platform stabilization and audit cycle from /home/dev/Documents/GitHub/OperationsCenter. Source .env.operations-center.local first. Use .venv/bin/ for all CLIs. This loop is session-bound and uses ScheduleWakeup, not cron/systemd.
 
 STEP 0 — OWNERSHIP + PREFLIGHT:
 Acquire/verify logs/local/watchdog_loop.lock via:
@@ -138,7 +143,30 @@ Collect exit codes and finding counts. Determine affected repos only from tool o
 STEP 2 — TRIAGE:
   .venv/bin/operations-center-triage-scan --config config/operations_center.local.yaml --apply
 
-STEP 3 — EXECUTION GATE:
+STEP 3 — BLOCKED/STALLED WORK INVESTIGATION:
+Read the last 3 cycle summaries from .console/log.md to identify repeated patterns.
+Then actively investigate:
+  (a) Plane tasks stuck in Ready-for-AI for >2 cycles without being claimed
+  (b) Tasks repeatedly reopened (same title or label appearing across cycles)
+  (c) Same findings repeating from STEP 1 across consecutive cycles
+  (d) Repos skipped repeatedly by the execution gate
+  (e) Same regressions recurring across cycles
+  (f) Autonomy-cycle failures in recent cycles
+  (g) Flow-audit gaps open across multiple cycles
+  (h) Graph invariants remaining broken
+Classify each blocked item:
+  - temporarily-blocked: retry next cycle
+  - infra-blocked: platform instability preventing execution
+  - ownership-ambiguous: affected repo not determinable
+  - validation-blocked: failing tests or regressions
+  - structurally-blocked: requires operator or design action
+  - crash-looping: same watcher or process failing repeatedly
+  - starvation: work exists but never executes
+  - dead-remediation: repeated retries with no forward progress
+For structurally-blocked, dead-remediation, or starvation: create/update Plane task immediately.
+Do not retry identical failing remediation paths. Do not silently normalize stagnation.
+
+STEP 4 — EXECUTION GATE:
 For each finding, decide: Plane task only vs direct fix.
 Direct fix is allowed ONLY when ALL of these hold:
   (a) finding reproduced in the current cycle
@@ -147,19 +175,20 @@ Direct fix is allowed ONLY when ALL of these hold:
   (d) not blocked on credentials or operator infrastructure
   (e) not requiring destructive cleanup (no git reset --hard, no volume wipes)
   (f) not requiring runtime-policy widening (no max_concurrent increase, no model upgrade)
+  (g) not classified as dead-remediation or starvation in STEP 3
 If any condition fails → create/update Plane task, skip direct fix.
 
-STEP 4 — DIRECT FIXES (only if loop owns the lock):
+STEP 5 — DIRECT FIXES (only if loop owns the lock):
 For each affected repo that passes the execution gate, run one at a time:
   scripts/operations-center.sh autonomy-cycle --config config/operations_center.local.yaml --execute --repo <path>
 Respect kodo max_concurrent=1 — do not dispatch two repos simultaneously.
 
-STEP 5 — INVARIANT ENFORCEMENT:
+STEP 6 — INVARIANT ENFORCEMENT:
   .venv/bin/pytest tests/unit/er000_phase0_golden/ -q --tb=short
-Also run targeted tests for any repo touched in STEP 4.
+Also run targeted tests for any repo touched in STEP 5.
 If any test fails and cannot be fixed safely in this cycle → create/update Plane task.
 
-STEP 6 — WATCHER HEALTH + RESTART INVESTIGATION:
+STEP 7 — WATCHER HEALTH + RESTART INVESTIGATION:
   scripts/operations-center.sh watch-all-status
   grep -h "watcher_restart\|exit_code\|ERROR\|Traceback" logs/local/watch-all/*.log | tail -50
 Classify restarts:
@@ -172,8 +201,8 @@ is healthy if a watcher cannot be restarted cleanly.
 Restart a stopped watcher (only after root-cause is understood):
   scripts/operations-center.sh watch --role <role>
 
-STEP 7 — LOG + COMMIT HYGIENE:
-Append the structured cycle summary (see template below) to .console/log.md.
+STEP 8 — LOG + COMMIT HYGIENE:
+Append the structured cycle summary (see template in runbook) to .console/log.md.
 Update .console/backlog.md for any new/closed gaps.
 Commit only after validation passes. Do not commit to main unless the operator has
 explicitly allowed it for the current task/session. If not allowed, create a branch:
@@ -181,9 +210,71 @@ explicitly allowed it for the current task/session. If not allowed, create a bra
 One logical commit per repo per cycle. Commit message must name: root cause, affected repo,
 gate/check fixed. Never force-push, amend old loop commits, or commit generated noise.
 
-STEP 8 — SCHEDULEWAKEUP:
-Schedule next wake ~1 hour after this cycle completes. Pass this full /loop prompt verbatim.
+STEP 9 — ADAPTIVE SCHEDULEWAKEUP:
+Assess platform health state and choose ScheduleWakeup delay accordingly:
+
+  CRITICAL  — crash loops / graph broken / autonomy failing repeatedly:  180s
+  DEGRADED  — watcher crashes (non-143) / stalled queue / open flow gaps: 300s
+  STALLED   — blocked tasks / repeated findings / no forward progress:    600s
+  ACTIVE    — direct fixes dispatched this cycle / remediation in flight: 900s
+  HEALTHY   — all audits clean, no blocked tasks, all watchers up:       3600s
+
+Use the WORST health state observed across all steps. Log the chosen cadence
+and the reason (which signal drove it) in the cycle summary.
+Pass this full /loop prompt verbatim as the ScheduleWakeup prompt.
 ```
+
+---
+
+## Adaptive cadence
+
+The loop shortens its wake interval automatically when the platform is unhealthy.
+The goal is to stabilize broken states quickly and back off once forward progress
+resumes. Do not stay at 1h cadence when the platform is actively broken.
+
+| Platform state | Wake delay | Trigger signals |
+|----------------|-----------|-----------------|
+| CRITICAL | 180s (~3m) | crash loops; graph broken; autonomy failing repeatedly |
+| DEGRADED | 300s (~5m) | non-143 watcher crashes; stalled queue; open flow gaps |
+| STALLED | 600s (~10m) | blocked tasks; same findings repeating; no forward progress |
+| ACTIVE | 900s (~15m) | direct fixes dispatched; remediation in flight |
+| HEALTHY | 3600s (~60m) | all clean; no blocked tasks; all watchers up |
+
+Use the worst observed state across all steps. A single crash-looping watcher
+moves the whole cycle to DEGRADED minimum.
+
+---
+
+## Blocked/stalled work investigation
+
+The loop must actively detect and classify stuck work — not just report audit
+findings. Each cycle reads the last 3 cycle summaries from `.console/log.md`
+before classifying blocked items.
+
+**Stagnation signals (any of these triggers investigation):**
+- Same audit finding present in 2+ consecutive cycle summaries
+- Same Plane task title appearing in `Follow-ups` across 2+ cycles
+- Same repo repeatedly skipped at execution gate
+- Same watcher role in crash restarts across 2+ cycles
+- Autonomy-cycle failures in recent cycles with no resolution
+- Graph invariant failures persisting across cycles
+- Flow-audit gaps open across 2+ cycles
+
+**Blocked work classification:**
+
+| Class | Meaning | Action |
+|-------|---------|--------|
+| `temporarily-blocked` | retry next cycle | note in summary |
+| `infra-blocked` | platform instability | Plane task + DEGRADED cadence |
+| `ownership-ambiguous` | affected repo not determinable | Plane task + skip execution |
+| `validation-blocked` | failing tests / regressions | Plane task + targeted fix |
+| `structurally-blocked` | needs operator or design action | Plane task + escalate |
+| `crash-looping` | same failure repeating | Plane task + anti-flap rule |
+| `starvation` | work exists, never executes | Plane task + investigate queue |
+| `dead-remediation` | retries with no progress | Plane task + stop retrying |
+
+`structurally-blocked`, `dead-remediation`, and `starvation` items must be
+escalated with a Plane task immediately. Do not retry them in the same cycle.
 
 ---
 
@@ -198,6 +289,7 @@ Schedule next wake ~1 hour after this cycle completes. Pass this full /loop prom
 | Blocked on credentials / infra | ✗ | ✓ |
 | Requires destructive cleanup | ✗ | ✓ |
 | Requires concurrency/model widening | ✗ | ✓ |
+| Classified dead-remediation or starvation | ✗ | ✓ |
 
 ---
 
@@ -280,6 +372,7 @@ cycles**, do not blindly restart it again. Instead:
 2. Create or update a Plane task with root cause and log excerpts
 3. Leave the watcher stopped until the Plane task is resolved
 4. Report in the cycle summary that this role is intentionally paused
+5. Treat the stopped watcher as a DEGRADED signal for adaptive cadence
 
 Track per-role crash events in the cycle summary. If `.console/log.md` shows two consecutive
 `watcher_restart` entries for the same role, the anti-flap rule applies.
@@ -295,18 +388,26 @@ Append one block per completed cycle to `.console/log.md`:
 
 - Lock owner: pid=<pid> hostname=<host>
 - Branch / commit: <branch> @ <short-sha>
+- Health state: <HEALTHY|ACTIVE|STALLED|DEGRADED|CRITICAL>
+- Next cadence: <Ns> — <reason>
 - Plane status: <N> Ready-for-AI / <N> Running / <N> In-Review
 - WorkStation / SwitchBoard status: <healthy|unreachable>
 - Watchers: <N>/8 running | restarts this cycle: <role=exit_code,...>
 - Audits run: custodian-sweep ghost-audit flow-audit graph-doctor reaudit-check regressions
 - Findings reproduced this cycle: <tool=N,...> or "none"
+- Blocked work: <N items> | classes: <class=N,...> or "none"
+- Repeated findings (vs prior cycles): <tool=finding,...> or "none"
+- Stagnation detected: <yes — detail | no>
 - Plane tasks opened/updated: <N> (<task IDs or "none">)
 - Direct fixes dispatched: <repo=description,...> or "none"
 - Repos touched: <list or "none">
+- Repos skipped (gate failed): <list or "none">
 - Validation run: pytest er000_phase0_golden (<N> passed) | <other>
 - Graph status: <nodes>/<edges> graph_built=<True|False>
 - Regressions checked: <N findings or "none">
 - Watcher restarts / crash classifications: <role=exit_code:classification,...> or "none"
+- Anti-flap escalations: <role=reason,...> or "none"
+- Autonomy-cycle outcomes: <repo=success|fail,...> or "none"
 - Follow-ups: <Plane task IDs or "none">
 ```
 
@@ -320,13 +421,14 @@ Append one block per completed cycle to `.console/log.md`:
 | Preflight | curl, git status, grep | Confirm all services + config up front |
 | Investigate | 6 audit CLIs in parallel | Collect findings; classify affected repos |
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI |
-| Execution gate | Manual criteria check | Gate direct fixes; route rest to Plane |
+| Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate structurally blocked |
+| Execution gate | Criteria check + stagnation check | Gate direct fixes; route rest to Plane |
 | Direct fixes | `autonomy-cycle --execute` per repo | One repo at a time; kodo max_concurrent=1 |
 | Invariants | `pytest er000_phase0_golden` + targeted | Plane task on failure |
 | Watcher health | `watch-all-status` + log grep | Anti-flap classification; restart if safe |
-| Log | `.console/log.md` structured block | One summary per cycle |
+| Log | `.console/log.md` structured block | One summary per cycle with health state |
 | Commit | `git commit` after validation | Per-repo; branch hygiene respected |
-| Schedule | `ScheduleWakeup ~3600s` | Pass full `/loop` prompt for next cycle |
+| Schedule | `ScheduleWakeup` adaptive delay | 180–3600s based on worst health state |
 
 ---
 
@@ -343,6 +445,27 @@ Additional invariants maintained by runbook convention (not currently code-enfor
 - No ADR modification from watchdog/autonomy loop paths
 - No destructive git operations in loop helpers
 - No runtime model policy widening from loop actions
+- Adaptive cadence must not widen kodo concurrency regardless of urgency
+
+---
+
+## Design-change procedure
+
+If remediation appears to require a platform design change:
+
+1. Stop direct remediation for that issue
+2. Identify the exact invariant currently failing
+3. Trace the full stack: config source → orchestration path → watchdog behavior →
+   autonomy behavior → Plane/task emission → validation coverage
+4. Compare at least two implementation strategies
+5. Choose the smallest operationally safer change
+6. Add/update Custodian or guardrail enforcement first
+7. Validate that the change cannot silently regress
+8. Document reasoning and blast radius in `.console/log.md`
+9. Create/update Plane tasks for deferred follow-up work
+
+The watchdog loop must not silently evolve platform architecture through
+incidental remediation.
 
 ---
 
@@ -361,6 +484,8 @@ scripts/operations-center.sh watchdog-loop-release
 
 ## Cadence
 
-Wakes ~1h after each cycle completes (based on completion time, not wall-clock).
-Typical runtime per clean-stack cycle: ~7 minutes. The `ScheduleWakeup` delay is
-set to 3600s, so the next fire is ~1h after the previous cycle started.
+The loop uses adaptive cadence based on platform health state (see table above).
+On a clean healthy stack the typical cycle runs ~7 minutes and sleeps ~60m.
+On a degraded stack the loop shortens to 5–10m intervals until forward progress
+resumes. The `ScheduleWakeup` delay is set at the end of each cycle based on
+the worst health signal observed — never blindly 3600s if the platform is broken.

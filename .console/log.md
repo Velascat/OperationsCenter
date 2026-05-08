@@ -393,6 +393,18 @@ doc (DC7).
 
 ## 2026-05-08 — Link ADR 0002+0003; common_words for ADR 0002 vocabulary
 
+## 2026-05-08 — Harden watchdog loop: adaptive cadence, blocked work investigation, anti-stagnation
+
+Rewrote docs/operator/watchdog_loop.md per canvas task (strengthen OC Platform
+Watchdog Loop). Key additions:
+- Adaptive cadence (180s CRITICAL → 3600s HEALTHY) based on worst health state
+- STEP 3 blocked/stalled work investigation with 8-class blocker taxonomy
+- Anti-stagnation: reads last 3 cycle summaries to detect repeated findings
+- dead-remediation and starvation classes added to execution gate
+- Expanded cycle summary with health-state, cadence, blocked counts, stagnation flag
+- Design-change procedure section added
+- /loop prompt renumbered STEP 0–9; STEP 9 is adaptive ScheduleWakeup
+
 ## 2026-05-08 — Watchdog reviver interval: 2min → 1h
 
 The watchdog bash loop is a blind reviver with no root-cause analysis.
