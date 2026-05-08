@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,16 @@ from .validation import ValidationEvidence
 
 def _utcnow() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def _path_exists(path: str) -> bool:
+    """Existence probe — isolated so tests can monkeypatch and so any
+    OSError (permission, broken symlink, etc.) is treated as 'not present'
+    rather than crashing trace build."""
+    try:
+        return Path(path).exists()
+    except OSError:
+        return False
 
 
 def _new_id() -> str:
@@ -166,4 +177,20 @@ class RunReportBuilder:
             warnings.append("no primary artifacts produced by this run")
         if record.result.failure_category == FailureReasonCategory.NO_CHANGES:
             warnings.append("run completed with no file changes")
+        # Artifact-path staleness — ExecutorRuntime writes stdout/stderr
+        # and an artifact_directory under tmp; if the dir was reaped
+        # between the run and the trace build, surface a warning rather
+        # than silently shipping a dead path. (We intentionally do NOT
+        # error here — stale paths are an operational reality.)
+        ref = record.result.runtime_invocation_ref
+        if ref is not None:
+            for label, path in (
+                ("stdout_path", ref.stdout_path),
+                ("stderr_path", ref.stderr_path),
+                ("artifact_directory", ref.artifact_directory),
+            ):
+                if isinstance(path, str) and path and not _path_exists(path):
+                    warnings.append(
+                        f"runtime_invocation_ref.{label} no longer exists on disk: {path}"
+                    )
         return warnings
