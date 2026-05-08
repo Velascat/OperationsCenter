@@ -333,6 +333,26 @@ def _resolve_binary(binary: str, config_dir: Path) -> str:
     return binary
 
 
+def _resolve_manifest_path(value: Path | None, config_dir: Path) -> Path | None:
+    """Resolve a manifest path that may be ``~``-prefixed or relative.
+
+    Absolute paths pass through unchanged. ``~`` is expanded against the
+    invoking user's home. Relative paths resolve against the config-file
+    directory (matches the kodo.binary resolution pattern).
+    """
+    if value is None:
+        return None
+    expanded = Path(str(value)).expanduser()
+    if expanded.is_absolute():
+        return expanded
+    return (config_dir / expanded).resolve()
+
+
+def _slugify_repo_key(key: str) -> str:
+    """``OperationsCenter`` → ``operationscenter``; ``my_repo`` → ``my-repo``."""
+    return key.lower().replace("_", "-")
+
+
 def load_settings(path: str | Path) -> Settings:
     config_path = Path(path).resolve()
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -341,4 +361,13 @@ def load_settings(path: str | Path) -> Settings:
     settings.kodo.binary = _resolve_binary(settings.kodo.binary, config_dir)
     for profile in settings.kodo_profiles.values():
         profile.binary = _resolve_binary(profile.binary, config_dir)
+    # Resolve platform_manifest paths relative to the config file dir so
+    # operators can write `project_manifest_path: ../VideoFoundry/topology/...`
+    # without hardcoding absolute paths.
+    pm = settings.platform_manifest
+    pm.project_manifest_path = _resolve_manifest_path(pm.project_manifest_path, config_dir)
+    pm.local_manifest_path = _resolve_manifest_path(pm.local_manifest_path, config_dir)
+    # Auto-resolve project_slug from self_repo_key when unset.
+    if pm.project_slug is None and settings.self_repo_key:
+        pm.project_slug = _slugify_repo_key(settings.self_repo_key)
     return settings
