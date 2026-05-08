@@ -25,6 +25,7 @@ from operations_center.contracts.routing import LaneDecision
 from operations_center.execution.artifact_writer import RunArtifactWriter
 from operations_center.execution.coordinator import ExecutionCoordinator
 from operations_center.execution.handoff import ExecutionRuntimeContext
+from operations_center.execution.usage_store import UsageStore
 from operations_center.execution.workspace import WorkspaceManager
 from operations_center.repo_graph_factory import (
     build_effective_repo_graph_from_settings,
@@ -119,6 +120,8 @@ def main() -> int:
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),
         workspace_manager=workspace_manager,
         repo_graph=repo_graph,
+        usage_store=UsageStore(),
+        backend_caps=settings.backend_caps,
     )
 
     try:
