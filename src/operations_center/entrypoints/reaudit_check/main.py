@@ -105,7 +105,7 @@ def main() -> int:
                 for bid, d in results.items()
             },
         }
-        print(json.dumps(report, indent=2, sort_keys=True))
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
     else:
         for bid, d in results.items():
             if not d.needed:

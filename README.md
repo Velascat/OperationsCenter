@@ -33,6 +33,27 @@ For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it
 
 ---
 
+## Quick Start
+
+```bash
+./scripts/operations-center.sh setup
+source .env.operations-center.local
+./scripts/operations-center.sh dev-up
+./scripts/operations-center.sh dev-status
+```
+
+Then:
+
+1. Create a Plane work item in the configured project.
+2. Add labels: `repo: <key>` (e.g. `repo: OperationsCenter`) and `task-kind: goal`.
+3. Optionally write a `## Goal` section in the description, or just write the goal as plain text.
+4. Move it to `Ready for AI`.
+5. Watch the local loop with:
+
+```bash
+./scripts/operations-center.sh dev-status
+```
+
 ## Overview
 
 - **Plane** is the board and source of truth for tasks, states, comments, and labels.
@@ -650,27 +671,6 @@ Top-level config options added in the autonomy hardening phase:
 - `scheduled_tasks:` — list of `{every, title, goal, repo_key, kind}` entries plus optional `at: HH:MM` and `on_days: [mon,...]`. `every` is `<num><unit>` with unit ∈ `m h d w`. Due tasks are created at the start of each propose cycle. State persists to `state/scheduled_tasks_last_run.json`.
 - `cost_per_execution_usd: 0.0` — operator estimate of cost per Kodo task run; enables spend telemetry (0.0 = disabled)
 - `parallel_slots: 1` — number of parallel task-execution threads per watcher lane (1 = serial)
-
-## Quick Start
-
-```bash
-./scripts/operations-center.sh setup
-source .env.operations-center.local
-./scripts/operations-center.sh dev-up
-./scripts/operations-center.sh dev-status
-```
-
-Then:
-
-1. Create a Plane work item in the configured project.
-2. Add labels: `repo: <key>` (e.g. `repo: OperationsCenter`) and `task-kind: goal`.
-3. Optionally write a `## Goal` section in the description, or just write the goal as plain text.
-4. Move it to `Ready for AI`.
-5. Watch the local loop with:
-
-```bash
-./scripts/operations-center.sh dev-status
-```
 
 ## Core Commands
 

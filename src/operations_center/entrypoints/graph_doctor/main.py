@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = 0
 
     if args.json_output:
-        print(json.dumps(report, indent=2))
+        print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
         _print_human(report, exit_code)
     return exit_code
@@ -310,7 +310,7 @@ def _emit_error(
 ) -> None:
     payload = {"status": "error", "message": message, "exit_code": exit_code, **extra}
     if json_output:
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         print(f"✗ graph-doctor: error — {message}")
 

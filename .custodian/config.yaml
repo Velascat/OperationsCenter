@@ -42,6 +42,86 @@ audit:
       # contracts, dispatch locks, etc. are used through their consumers and
       # never directly referenced in test files by ast.Name.
       - "src/operations_center/**/*.py"
+    T6:
+      # OC's surface is tested via integration and end-to-end tests, not by
+      # name-importing each module in test files. Adapters/entrypoints/
+      # backends/executors are exercised through subprocess + HTTP integration
+      # paths, not direct imports.
+      - "src/operations_center/adapters/**"
+      - "src/operations_center/entrypoints/**"
+      - "src/operations_center/backends/**"
+      - "src/operations_center/executors/**"
+      - "src/operations_center/openclaw_shell/**"
+      - "src/operations_center/observer/**"
+      - "src/operations_center/observability/**"
+      - "src/operations_center/scheduled_tasks/**"
+      - "src/operations_center/managed_repos/**"
+      - "src/operations_center/run_memory/**"
+      - "src/operations_center/run_identity/**"
+      - "src/operations_center/lifecycle/**"
+      - "src/operations_center/insights/**"
+      - "src/operations_center/upstream_eval/**"
+      - "src/operations_center/propagation/**"
+      - "src/operations_center/artifact_index/**"
+      - "src/operations_center/audit_contracts/**"
+    T7:
+      # Same rationale as T6. Listed per-layer (not src/**) so a NEW
+      # top-level package without parallel tests still gets flagged.
+      - "src/operations_center/adapters/**"
+      - "src/operations_center/entrypoints/**"
+      - "src/operations_center/backends/**"
+      - "src/operations_center/executors/**"
+      - "src/operations_center/openclaw_shell/**"
+      - "src/operations_center/observer/**"
+      - "src/operations_center/observability/**"
+      - "src/operations_center/scheduled_tasks/**"
+      - "src/operations_center/managed_repos/**"
+      - "src/operations_center/run_memory/**"
+      - "src/operations_center/run_identity/**"
+      - "src/operations_center/lifecycle/**"
+      - "src/operations_center/insights/**"
+      - "src/operations_center/upstream_eval/**"
+      - "src/operations_center/propagation/**"
+      - "src/operations_center/spec_director/**"
+      - "src/operations_center/audit_dispatch/**"
+      - "src/operations_center/audit_governance/**"
+      - "src/operations_center/audit_toolset/**"
+      - "src/operations_center/autonomy_tiers/**"
+      - "src/operations_center/behavior_calibration/**"
+      - "src/operations_center/repo_graph/**"
+      - "src/operations_center/routing/**"
+      - "src/operations_center/decision/**"
+      - "src/operations_center/drift/**"
+      - "src/operations_center/fixture_harvesting/**"
+      - "src/operations_center/mini_regression/**"
+      - "src/operations_center/planning/**"
+      - "src/operations_center/policy/**"
+      - "src/operations_center/proposer/**"
+      - "src/operations_center/slice_replay/**"
+      - "src/operations_center/tuning/**"
+      - "src/operations_center/contracts/**"
+      - "src/operations_center/audit_contracts/**"
+      - "src/operations_center/artifact_index/**"
+      - "src/operations_center/application/**"
+      - "src/operations_center/execution/**"
+      - "src/operations_center/domain/**"
+      - "src/operations_center/config/**"
+      # Top-level scheduled-task entry modules — wired into scheduler, exercised
+      # via integration paths.
+      - src/operations_center/cross_repo_impact.py
+      - src/operations_center/impact_analysis.py
+      - src/operations_center/maintenance_windows.py
+      - src/operations_center/multi_step_planning.py
+      - src/operations_center/post_merge_regression.py
+      - src/operations_center/priority_scans.py
+      - src/operations_center/quality_alerts.py
+      - src/operations_center/reconcile_running.py
+      - src/operations_center/repo_graph_factory.py
+    T8:
+      # Architecture-guard + lock-store-concurrency tests don't import the
+      # code under audit — they probe via subprocess + filesystem.
+      - tests/test_architecture_cleanup_guards.py
+      - tests/unit/audit_dispatch/test_lock_store_concurrency.py
     C1:
       - src/operations_center/observer/collectors/todo_signal.py
       - src/operations_center/observer/artifact_writer.py
