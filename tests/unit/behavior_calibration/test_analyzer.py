@@ -36,7 +36,7 @@ def _make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibratio
 
 
 def _base_entry(
-    artifact_id: str = "videofoundry:representative:TopicSelectionStage:topic_selection",
+    artifact_id: str = "example_managed_repo:audit_type_1:TopicSelectionStage:topic_selection",
 ) -> dict:
     return {
         "artifact_id": artifact_id,
@@ -74,16 +74,16 @@ def _make_manifest_payload(
     return {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": run_id,
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "manifest_status": manifest_status,
         "run_status": run_status,
         "created_at": "2026-04-26T12:00:00Z",
         "updated_at": "2026-04-26T12:01:00Z",
         "finalized_at": "2026-04-26T12:01:00Z",
-        "artifact_root": "../VideoFoundry",
+        "artifact_root": "../ExampleManagedRepo",
         "run_root": _RUN_ROOT,
         "artifacts": artifacts if artifacts is not None else [_base_entry()],
         "excluded_paths": excluded_paths if excluded_paths is not None else [],
@@ -106,9 +106,9 @@ def _write_manifest(tmp_path: Path, payload: dict) -> Path:
 class TestAnalyzerInput:
     def test_raises_if_artifact_index_is_none(self) -> None:
         inp = BehaviorCalibrationInput(
-            repo_id="videofoundry",
+            repo_id="example_managed_repo",
             run_id="r1",
-            audit_type="representative",
+            audit_type="audit_type_1",
             artifact_index=None,
             analysis_profile=AnalysisProfile.SUMMARY,
         )
@@ -230,7 +230,7 @@ class TestProducerComplianceProfile:
 
     def test_detects_unknown_content_type(self, tmp_path: Path) -> None:
         entry = {
-            "artifact_id": "videofoundry:representative:Unknown:artifact",
+            "artifact_id": "example_managed_repo:audit_type_1:Unknown:artifact",
             "artifact_kind": "unknown",
             "path": "tools/audit/report/representative/Bucket_run999/artifact.bin",
             "relative_path": "artifact.bin",

@@ -14,7 +14,7 @@ This CLI is read-only. It does not:
   - scan directories
   - modify manifests
   - harvest fixtures
-  - import VideoFoundry code
+  - import ExampleManagedRepo code
 """
 
 from __future__ import annotations

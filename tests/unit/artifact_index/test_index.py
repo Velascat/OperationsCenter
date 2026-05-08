@@ -30,7 +30,7 @@ class TestBuildArtifactIndex:
     def test_preserves_repo_id(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(completed_manifest_file)
         index = build_artifact_index(manifest, completed_manifest_file)
-        assert index.source.repo_id == "videofoundry"
+        assert index.source.repo_id == "example_managed_repo"
 
     def test_preserves_run_id(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(completed_manifest_file)
@@ -40,7 +40,7 @@ class TestBuildArtifactIndex:
     def test_preserves_audit_type(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(completed_manifest_file)
         index = build_artifact_index(manifest, completed_manifest_file)
-        assert index.source.audit_type == "representative"
+        assert index.source.audit_type == "audit_type_1"
 
     def test_indexes_all_manifest_artifacts(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(completed_manifest_file)

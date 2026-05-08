@@ -11,7 +11,7 @@ Orchestration flow:
   6. Discover run_status.json and artifact_manifest_path (Phase 3).
   7. Return ManagedAuditDispatchResult.
 
-Hard boundary: this module never imports VideoFoundry code.
+Hard boundary: this module never imports ExampleManagedRepo code.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def _resolve_abs_working_dir(
         return str(wd)
 
     # invocation_working_dir is relative — resolve against repo_root from config.
-    # repo_root in YAML (e.g., "../VideoFoundry") is relative to OpsCenter root.
+    # repo_root in YAML (e.g., "../ExampleManagedRepo") is relative to OpsCenter root.
     config = load_managed_repo_config(repo_id, config_dir=config_dir)
     repo_root_abs = (_OC_ROOT / config.repo_root).resolve()
     return str((repo_root_abs / wd).resolve())

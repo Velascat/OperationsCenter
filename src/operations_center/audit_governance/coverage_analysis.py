@@ -3,7 +3,7 @@
 """Post-dispatch coverage analysis bridge.
 
 After a managed audit dispatch finishes successfully, the consuming repo
-(e.g. VideoFoundry's representative pipeline) writes ``coverage.json`` into
+(e.g. ExampleManagedRepo's representative pipeline) writes ``coverage.json`` into
 its bucket directory. This module locates that file via the Phase 7 artifact
 index and invokes Custodian's ``custodian audit --enable-coverage`` against
 the consuming repo's working tree to produce CV1/CV2/CV3 findings.

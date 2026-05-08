@@ -16,11 +16,11 @@ from operations_center.audit_dispatch.lifecycle import (
 from operations_center.audit_dispatch.models import FailureKind
 from operations_center.audit_toolset import ManagedAuditInvocationRequest
 
-_RUN_ID = "videofoundry_representative_20260426T120000Z_aabb1122"
+_RUN_ID = "example_managed_repo_audit_type_1_20260426T120000Z_aabb1122"
 
 _MINIMAL_INVOCATION = {
-    "repo_id": "videofoundry",
-    "audit_type": "representative",
+    "repo_id": "example_managed_repo",
+    "audit_type": "audit_type_1",
     "run_id": _RUN_ID,
     "working_directory": ".",
     "command": "python -m tools.audit.run_representative_audit",
@@ -39,10 +39,10 @@ def _write_run_status(bucket_dir: Path, run_id: str, *, manifest_rel_path: str |
     payload = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": run_id,
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "status": "completed",
         "artifact_manifest_path": manifest_rel_path,
         "metadata": {},
@@ -56,10 +56,10 @@ def _write_manifest(path: Path) -> None:
     payload = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": _RUN_ID,
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "manifest_status": "completed",
         "run_status": "completed",
         "created_at": "2026-04-26T12:00:00Z",

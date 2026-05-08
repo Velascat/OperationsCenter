@@ -35,9 +35,9 @@ def _make_input(index, profile: AnalysisProfile, **kwargs) -> BehaviorCalibratio
 class TestBehaviorCalibrationInput:
     def test_requires_artifact_index(self, completed_index) -> None:
         inp = BehaviorCalibrationInput(
-            repo_id="videofoundry",
+            repo_id="example_managed_repo",
             run_id="run999",
-            audit_type="representative",
+            audit_type="audit_type_1",
             artifact_index=completed_index,
             analysis_profile=AnalysisProfile.SUMMARY,
         )
@@ -99,8 +99,8 @@ class TestCalibrationRecommendation:
             priority=RecommendationPriority.HIGH,
             summary="fix something",
             rationale="because it's broken",
-            affected_repo_id="videofoundry",
-            affected_audit_type="representative",
+            affected_repo_id="example_managed_repo",
+            affected_audit_type="audit_type_1",
             suggested_action="do X",
         )
         assert r.requires_human_review is True
@@ -110,8 +110,8 @@ class TestCalibrationRecommendation:
             priority=RecommendationPriority.LOW,
             summary="fix",
             rationale="reason",
-            affected_repo_id="videofoundry",
-            affected_audit_type="representative",
+            affected_repo_id="example_managed_repo",
+            affected_audit_type="audit_type_1",
             suggested_action="do Y",
         )
         with pytest.raises(Exception):
@@ -122,8 +122,8 @@ class TestCalibrationRecommendation:
             priority=RecommendationPriority.MEDIUM,
             summary="investigate",
             rationale="missing files",
-            affected_repo_id="videofoundry",
-            affected_audit_type="representative",
+            affected_repo_id="example_managed_repo",
+            affected_audit_type="audit_type_1",
             suggested_action="check logs",
         )
         data = json.loads(r.model_dump_json())
@@ -138,7 +138,7 @@ class TestBehaviorCalibrationReport:
         json_str = report.model_dump_json()
         data = json.loads(json_str)
         assert data["schema_version"] == "1.0"
-        assert data["repo_id"] == "videofoundry"
+        assert data["repo_id"] == "example_managed_repo"
 
     def test_report_has_errors_detects_error_findings(self) -> None:
         summary = ArtifactIndexSummary(
@@ -149,9 +149,9 @@ class TestBehaviorCalibrationReport:
             manifest_limitations=[],
         )
         report = BehaviorCalibrationReport(
-            repo_id="videofoundry",
+            repo_id="example_managed_repo",
             run_id="r1",
-            audit_type="representative",
+            audit_type="audit_type_1",
             analysis_profile=AnalysisProfile.SUMMARY,
             artifact_index_summary=summary,
             findings=[
@@ -174,9 +174,9 @@ class TestBehaviorCalibrationReport:
             manifest_limitations=[],
         )
         report = BehaviorCalibrationReport(
-            repo_id="videofoundry",
+            repo_id="example_managed_repo",
             run_id="r1",
-            audit_type="representative",
+            audit_type="audit_type_1",
             analysis_profile=AnalysisProfile.SUMMARY,
             artifact_index_summary=summary,
             findings=[

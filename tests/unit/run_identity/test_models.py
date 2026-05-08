@@ -13,11 +13,11 @@ from operations_center.run_identity.models import ManagedRunIdentity, is_valid_r
 
 _NOW = datetime(2026, 4, 26, 16, 42, 33, tzinfo=timezone.utc)
 
-_VALID_RUN_ID = "videofoundry_representative_20260426T164233Z_a1b2c3d4"
+_VALID_RUN_ID = "example_managed_repo_audit_type_1_20260426T164233Z_a1b2c3d4"
 
 _MINIMAL = {
-    "repo_id": "videofoundry",
-    "audit_type": "representative",
+    "repo_id": "example_managed_repo",
+    "audit_type": "audit_type_1",
     "run_id": _VALID_RUN_ID,
     "created_at": _NOW.isoformat(),
 }
@@ -28,13 +28,13 @@ class TestIsValidRunId:
         assert is_valid_run_id(_VALID_RUN_ID)
 
     def test_stack_authoring_with_underscore_in_type(self) -> None:
-        assert is_valid_run_id("videofoundry_stack_authoring_20260426T164233Z_b5c6d7e8")
+        assert is_valid_run_id("example_managed_repo_audit_type_2_20260426T164233Z_b5c6d7e8")
 
     def test_rejects_missing_suffix(self) -> None:
-        assert not is_valid_run_id("videofoundry_representative_20260426T164233Z")
+        assert not is_valid_run_id("example_managed_repo_audit_type_1_20260426T164233Z")
 
     def test_rejects_missing_timestamp(self) -> None:
-        assert not is_valid_run_id("videofoundry_representative_a1b2c3d4")
+        assert not is_valid_run_id("example_managed_repo_audit_type_1_a1b2c3d4")
 
     def test_rejects_empty_string(self) -> None:
         assert not is_valid_run_id("")
@@ -43,23 +43,23 @@ class TestIsValidRunId:
         assert not is_valid_run_id("3dead998d4c44e1cb296bef061de50f3")
 
     def test_rejects_uppercase(self) -> None:
-        assert not is_valid_run_id("VideoFoundry_representative_20260426T164233Z_a1b2c3d4")
+        assert not is_valid_run_id("ExampleManagedRepo_audit_type_1_20260426T164233Z_a1b2c3d4")
 
     def test_rejects_dashes(self) -> None:
-        assert not is_valid_run_id("videofoundry-representative-20260426T164233Z-a1b2c3d4")
+        assert not is_valid_run_id("example_managed_repo-audit_type_1-20260426T164233Z-a1b2c3d4")
 
     def test_rejects_suffix_too_long(self) -> None:
-        assert not is_valid_run_id("videofoundry_representative_20260426T164233Z_a1b2c3d4e5")
+        assert not is_valid_run_id("example_managed_repo_audit_type_1_20260426T164233Z_a1b2c3d4e5")
 
     def test_rejects_suffix_too_short(self) -> None:
-        assert not is_valid_run_id("videofoundry_representative_20260426T164233Z_a1b2c3")
+        assert not is_valid_run_id("example_managed_repo_audit_type_1_20260426T164233Z_a1b2c3")
 
 
 class TestManagedRunIdentity:
     def test_parses_minimal(self) -> None:
         m = ManagedRunIdentity.model_validate(_MINIMAL)
-        assert m.repo_id == "videofoundry"
-        assert m.audit_type == "representative"
+        assert m.repo_id == "example_managed_repo"
+        assert m.audit_type == "audit_type_1"
         assert m.run_id == _VALID_RUN_ID
 
     def test_env_var_defaults_to_audit_run_id(self) -> None:

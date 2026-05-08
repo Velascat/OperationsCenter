@@ -27,8 +27,8 @@ _BUILD_INDEX_TARGET = "operations_center.entrypoints.artifacts.main.build_artifa
 # ---------------------------------------------------------------------------
 
 def _make_mock_index(
-    repo_id: str = "videofoundry",
-    audit_type: str = "representative",
+    repo_id: str = "example_managed_repo",
+    audit_type: str = "audit_type_1",
     run_id: str = "run_001",
     artifacts: list | None = None,
 ) -> MagicMock:
@@ -86,8 +86,8 @@ class TestCmdIndex:
         with patch(_LOAD_MANIFEST_TARGET), patch(_BUILD_INDEX_TARGET, return_value=index):
             out = _runner.invoke(app, ["index", "--manifest", str(mf)])
         assert out.exit_code == 0
-        assert "videofoundry" in out.output
-        assert "representative" in out.output
+        assert "example_managed_repo" in out.output
+        assert "audit_type_1" in out.output
 
     def test_index_not_found_exits_code_1(self, tmp_path: Path):
         from operations_center.artifact_index import ManifestNotFoundError

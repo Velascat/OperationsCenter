@@ -54,7 +54,7 @@ def _find_run_status_path(
 ) -> Path | None:
     """Locate run_status.json by searching for the bucket containing run_id.
 
-    The VideoFoundry bucket directory name includes the run_id string following
+    The ExampleManagedRepo bucket directory name includes the run_id string following
     the naming convention: {channel_slug}_{YYYYMMDD}_{HHMMSS}_{run_id}.
 
     This is a targeted lookup by known run_id — not arbitrary artifact scanning.

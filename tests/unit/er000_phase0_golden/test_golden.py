@@ -12,7 +12,7 @@ Sections:
                                  backend-unavailable result deterministically)
   2. Contract validation       — OC's Pydantic mirrors round-trip through
                                  their canonical example fixtures
-  3. Boundary enforcement      — VideoFoundry imports forbidden inside OC src;
+  3. Boundary enforcement      — ExampleManagedRepo imports forbidden inside OC src;
                                  SwitchBoard package free of orchestration
                                  symbols (forward-looking allowlist/denylist)
   4. CLI smoke                 — `operations-center-audit --help` reaches the
@@ -178,8 +178,8 @@ class TestContractValidation:
 # ===========================================================================
 
 
-class TestBoundaryNoVideoFoundryImports:
-    """No active VideoFoundry runtime imports in OC source.
+class TestBoundaryNoExampleManagedRepoImports:
+    """No active ExampleManagedRepo runtime imports in OC source.
 
     The project's broader invariant checks moved to Custodian
     (`.custodian/architecture.py`); this freeze test inlines a minimal AST
@@ -211,8 +211,8 @@ class TestBoundaryNoVideoFoundryImports:
                                 if top == forbidden_top:
                                     hits.append((entry, node.lineno, alias.name))
                         elif isinstance(node, ast.ImportFrom):
-                            # `from videofoundry.x import Y` — module is set,
-                            # `from .videofoundry import Y` — module is 'videofoundry'
+                            # `from example_managed_repo.x import Y` — module is set,
+                            # `from .example_managed_repo import Y` — module is 'example_managed_repo'
                             # but level>0 (relative). Skip relative imports.
                             if node.level and node.level > 0:
                                 continue
@@ -222,10 +222,10 @@ class TestBoundaryNoVideoFoundryImports:
                                 hits.append((entry, node.lineno, mod))
         return hits
 
-    def test_no_videofoundry_imports_in_oc_src(self) -> None:
-        hits = self._scan_for_imports(_OC_SRC, "videofoundry")
+    def test_no_example_managed_repo_imports_in_oc_src(self) -> None:
+        hits = self._scan_for_imports(_OC_SRC, "example_managed_repo")
         assert hits == [], (
-            "VideoFoundry runtime imports inside OperationsCenter src:\n"
+            "ExampleManagedRepo runtime imports inside OperationsCenter src:\n"
             + "\n".join(f"  {p}:{ln} → {sym}" for p, ln, sym in hits)
         )
 

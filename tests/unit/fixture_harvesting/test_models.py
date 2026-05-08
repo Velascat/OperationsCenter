@@ -40,7 +40,7 @@ def _make_summary() -> ArtifactIndexSummary:
 
 def _make_fixture_artifact(*, copied: bool = True) -> FixtureArtifact:
     return FixtureArtifact(
-        source_artifact_id="videofoundry:representative:SomeStage:artifact",
+        source_artifact_id="example_managed_repo:audit_type_1:SomeStage:artifact",
         artifact_kind="stage_report",
         source_stage="SomeStage",
         location="run_root",
@@ -55,10 +55,10 @@ def _make_fixture_artifact(*, copied: bool = True) -> FixtureArtifact:
 
 def _make_pack() -> FixturePack:
     return FixturePack(
-        fixture_pack_id="videofoundry__run999__minimal_failure__20260426_120000",
-        source_repo_id="videofoundry",
+        fixture_pack_id="example_managed_repo__run999__minimal_failure__20260426_120000",
+        source_repo_id="example_managed_repo",
         source_run_id="run999",
-        source_audit_type="representative",
+        source_audit_type="audit_type_1",
         source_manifest_path="/tmp/manifest.json",
         source_index_summary=_make_summary(),
         harvest_profile=HarvestProfile.MINIMAL_FAILURE,
@@ -67,19 +67,19 @@ def _make_pack() -> FixturePack:
 
 class TestFixturePackId:
     def test_make_fixture_pack_id_is_path_safe(self) -> None:
-        pack_id = make_fixture_pack_id("videofoundry", "run999", HarvestProfile.MINIMAL_FAILURE)
+        pack_id = make_fixture_pack_id("example_managed_repo", "run999", HarvestProfile.MINIMAL_FAILURE)
         assert re.match(r"^[a-zA-Z0-9_\-]+$", pack_id), f"Not path-safe: {pack_id!r}"
 
     def test_make_fixture_pack_id_contains_repo_id(self) -> None:
-        pack_id = make_fixture_pack_id("videofoundry", "run999", HarvestProfile.MINIMAL_FAILURE)
-        assert "videofoundry" in pack_id
+        pack_id = make_fixture_pack_id("example_managed_repo", "run999", HarvestProfile.MINIMAL_FAILURE)
+        assert "example_managed_repo" in pack_id
 
     def test_make_fixture_pack_id_contains_run_id(self) -> None:
-        pack_id = make_fixture_pack_id("videofoundry", "run999", HarvestProfile.MINIMAL_FAILURE)
+        pack_id = make_fixture_pack_id("example_managed_repo", "run999", HarvestProfile.MINIMAL_FAILURE)
         assert "run999" in pack_id
 
     def test_make_fixture_pack_id_contains_profile(self) -> None:
-        pack_id = make_fixture_pack_id("videofoundry", "run999", HarvestProfile.STAGE_SLICE)
+        pack_id = make_fixture_pack_id("example_managed_repo", "run999", HarvestProfile.STAGE_SLICE)
         assert "stage_slice" in pack_id
 
     def test_make_fixture_pack_id_no_spaces(self) -> None:
@@ -87,7 +87,7 @@ class TestFixturePackId:
         assert " " not in pack_id
 
     def test_make_fixture_pack_id_no_colons(self) -> None:
-        pack_id = make_fixture_pack_id("videofoundry", "run:999", HarvestProfile.MANUAL_SELECTION)
+        pack_id = make_fixture_pack_id("example_managed_repo", "run:999", HarvestProfile.MANUAL_SELECTION)
         assert ":" not in pack_id
 
 
@@ -104,7 +104,7 @@ class TestFixtureArtifact:
 
     def test_fixture_artifact_references_source_id(self) -> None:
         fa = _make_fixture_artifact()
-        assert fa.source_artifact_id == "videofoundry:representative:SomeStage:artifact"
+        assert fa.source_artifact_id == "example_managed_repo:audit_type_1:SomeStage:artifact"
 
     def test_fixture_artifact_copied_false_has_error(self) -> None:
         fa = _make_fixture_artifact(copied=False)
@@ -115,7 +115,7 @@ class TestFixtureArtifact:
         fa = _make_fixture_artifact()
         data = json.loads(fa.model_dump_json())
         assert data["copied"] is True
-        assert data["source_artifact_id"] == "videofoundry:representative:SomeStage:artifact"
+        assert data["source_artifact_id"] == "example_managed_repo:audit_type_1:SomeStage:artifact"
 
 
 class TestFixtureFindingReference:
@@ -145,7 +145,7 @@ class TestFixturePack:
         pack = _make_pack()
         data = json.loads(pack.model_dump_json())
         assert data["schema_version"] == "1.0"
-        assert data["source_repo_id"] == "videofoundry"
+        assert data["source_repo_id"] == "example_managed_repo"
 
     def test_fixture_pack_artifact_count(self) -> None:
         pack = _make_pack()

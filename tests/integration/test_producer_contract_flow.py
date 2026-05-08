@@ -2,13 +2,13 @@
 # Copyright (C) 2026 Velascat
 """Integration test: Phase 5 fake-producer contract flow.
 
-Simulates what a VideoFoundry audit would produce (run_status.json +
+Simulates what a ExampleManagedRepo audit would produce (run_status.json +
 artifact_manifest.json), then validates that the OpsCenter Phase 6→7
-discovery chain can load and index the artifacts without any VideoFoundry
+discovery chain can load and index the artifacts without any ExampleManagedRepo
 code imports.
 
-This test does NOT call the real VideoFoundry subprocess. It writes the
-files that VideoFoundry would produce, exactly matching the Phase 2 contract.
+This test does NOT call the real ExampleManagedRepo subprocess. It writes the
+files that ExampleManagedRepo would produce, exactly matching the Phase 2 contract.
 """
 
 from __future__ import annotations
@@ -21,21 +21,21 @@ from operations_center.artifact_index import build_artifact_index, load_artifact
 from operations_center.audit_toolset.discovery import load_run_status_entrypoint
 
 
-_REPO_ID = "videofoundry"
-_AUDIT_TYPE = "representative"
+_REPO_ID = "example_managed_repo"
+_AUDIT_TYPE = "audit_type_1"
 _RUN_ID = "FakeProducer_run001_2026042600000000"
 
 
 # ---------------------------------------------------------------------------
-# Fake producer helpers (simulate VideoFoundry output)
+# Fake producer helpers (simulate ExampleManagedRepo output)
 # ---------------------------------------------------------------------------
 
 def _write_run_status(run_dir: Path, manifest_path: Path) -> Path:
-    """Write a run_status.json as VideoFoundry would after a successful audit."""
+    """Write a run_status.json as ExampleManagedRepo would after a successful audit."""
     status = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
+        "producer": "example_managed_repo",
         "run_id": _RUN_ID,
         "repo_id": _REPO_ID,
         "audit_type": _AUDIT_TYPE,
@@ -54,11 +54,11 @@ def _write_run_status(run_dir: Path, manifest_path: Path) -> Path:
 
 
 def _write_artifact_manifest(run_dir: Path, artifact_file: Path) -> Path:
-    """Write an artifact_manifest.json as VideoFoundry would produce."""
+    """Write an artifact_manifest.json as ExampleManagedRepo would produce."""
     manifest = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
+        "producer": "example_managed_repo",
         "repo_id": _REPO_ID,
         "run_id": _RUN_ID,
         "audit_type": _AUDIT_TYPE,
@@ -177,7 +177,7 @@ def test_fake_producer_failed_run_status_loads(tmp_path: Path):
     failed_status = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
+        "producer": "example_managed_repo",
         "run_id": _RUN_ID,
         "repo_id": _REPO_ID,
         "audit_type": _AUDIT_TYPE,
@@ -198,8 +198,8 @@ def test_fake_producer_failed_run_status_loads(tmp_path: Path):
     assert run_status.error == "SIGTERM received"
 
 
-def test_no_videofoundry_imports_in_discovery_chain():
-    """The Phase 6→7 discovery chain must never import VideoFoundry code."""
+def test_no_example_managed_repo_imports_in_discovery_chain():
+    """The Phase 6→7 discovery chain must never import ExampleManagedRepo code."""
     import ast
     from pathlib import Path as _Path
 
@@ -214,11 +214,11 @@ def test_no_videofoundry_imports_in_discovery_chain():
             tree = ast.parse(source)
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:
-                    assert not node.module.startswith("videofoundry"), (
-                        f"{package}/{py_file.name} imports videofoundry — forbidden"
+                    assert not node.module.startswith("example_managed_repo"), (
+                        f"{package}/{py_file.name} imports example_managed_repo — forbidden"
                     )
                 if isinstance(node, ast.Import):
                     for alias in node.names:
-                        assert not alias.name.startswith("videofoundry"), (
-                            f"{package}/{py_file.name} imports videofoundry — forbidden"
+                        assert not alias.name.startswith("example_managed_repo"), (
+                            f"{package}/{py_file.name} imports example_managed_repo — forbidden"
                         )

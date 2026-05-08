@@ -4,7 +4,7 @@
 
 Covers the full request → evaluate → approve → run round-trip using
 typer.testing.CliRunner. Dispatch is always monkeypatched — no real
-VideoFoundry subprocess is invoked.
+ExampleManagedRepo subprocess is invoked.
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ _DISPATCH_TARGET = "operations_center.audit_governance.runner.dispatch_managed_a
 
 def _make_request_file(tmp_path: Path, **kwargs) -> Path:
     defaults = dict(
-        repo_id="videofoundry",
-        audit_type="representative",
+        repo_id="example_managed_repo",
+        audit_type="audit_type_1",
         requested_by="alice",
         requested_reason="fixture refresh",
         urgency="normal",
@@ -52,8 +52,8 @@ def _make_request_file(tmp_path: Path, **kwargs) -> Path:
 
 def _make_decision_file(tmp_path: Path, request: AuditGovernanceRequest, **eval_kwargs) -> tuple[Path, AuditGovernanceDecision]:
     cfg = GovernanceConfig(
-        known_repos=eval_kwargs.get("known_repos", ["videofoundry"]),
-        known_audit_types=eval_kwargs.get("known_audit_types", {"videofoundry": ["representative"]}),
+        known_repos=eval_kwargs.get("known_repos", ["example_managed_repo"]),
+        known_audit_types=eval_kwargs.get("known_audit_types", {"example_managed_repo": ["audit_type_1"]}),
     )
     results = evaluate_governance_policies(
         request,
@@ -70,8 +70,8 @@ def _make_dispatch_result() -> ManagedAuditDispatchResult:
     from datetime import UTC, datetime
     now = datetime.now(UTC)
     return ManagedAuditDispatchResult(
-        repo_id="videofoundry",
-        audit_type="representative",
+        repo_id="example_managed_repo",
+        audit_type="audit_type_1",
         run_id="cli_test_run_001",
         status=DispatchStatus.COMPLETED,
         started_at=now,
@@ -88,22 +88,22 @@ class TestCmdRequest:
     def test_prints_request_json_to_stdout(self):
         result = _runner.invoke(app, [
             "request",
-            "--repo", "videofoundry",
-            "--type", "representative",
+            "--repo", "example_managed_repo",
+            "--type", "audit_type_1",
             "--reason", "manual fixture refresh",
             "--requested-by", "alice",
         ])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["repo_id"] == "videofoundry"
-        assert data["audit_type"] == "representative"
+        assert data["repo_id"] == "example_managed_repo"
+        assert data["audit_type"] == "audit_type_1"
 
     def test_writes_request_to_file(self, tmp_path: Path):
         out = tmp_path / "req.json"
         result = _runner.invoke(app, [
             "request",
-            "--repo", "videofoundry",
-            "--type", "representative",
+            "--repo", "example_managed_repo",
+            "--type", "audit_type_1",
             "--reason", "manual refresh",
             "--requested-by", "alice",
             "--output", str(out),
@@ -111,13 +111,13 @@ class TestCmdRequest:
         assert result.exit_code == 0
         assert out.exists()
         data = json.loads(out.read_text())
-        assert data["repo_id"] == "videofoundry"
+        assert data["repo_id"] == "example_managed_repo"
 
     def test_invalid_urgency_exits_nonzero(self):
         result = _runner.invoke(app, [
             "request",
-            "--repo", "videofoundry",
-            "--type", "representative",
+            "--repo", "example_managed_repo",
+            "--type", "audit_type_1",
             "--reason", "test",
             "--requested-by", "alice",
             "--urgency", "invalid_urgency_value",
@@ -125,7 +125,7 @@ class TestCmdRequest:
         assert result.exit_code != 0
 
     def test_missing_required_flags_exits_nonzero(self):
-        result = _runner.invoke(app, ["request", "--repo", "videofoundry"])
+        result = _runner.invoke(app, ["request", "--repo", "example_managed_repo"])
         assert result.exit_code != 0
 
 
@@ -139,8 +139,8 @@ class TestCmdEvaluate:
         result = _runner.invoke(app, [
             "evaluate",
             "--request", str(req_path),
-            "--known-repos", "videofoundry",
-            "--known-types", "representative",
+            "--known-repos", "example_managed_repo",
+            "--known-types", "audit_type_1",
         ])
         assert result.exit_code == 0
 
@@ -149,8 +149,8 @@ class TestCmdEvaluate:
         result = _runner.invoke(app, [
             "evaluate",
             "--request", str(req_path),
-            "--known-repos", "videofoundry",
-            "--known-types", "representative",
+            "--known-repos", "example_managed_repo",
+            "--known-types", "audit_type_1",
         ])
         assert result.exit_code != 0
 
@@ -166,8 +166,8 @@ class TestCmdEvaluate:
         result = _runner.invoke(app, [
             "evaluate",
             "--request", str(req_path),
-            "--known-repos", "videofoundry",
-            "--known-types", "representative",
+            "--known-repos", "example_managed_repo",
+            "--known-types", "audit_type_1",
         ])
         assert "APPROVED" in result.output.upper() or "NEEDS_MANUAL_APPROVAL" in result.output.upper()
 
@@ -179,8 +179,8 @@ class TestCmdEvaluate:
 class TestCmdApprove:
     def test_approve_needs_manual_approval_decision(self, tmp_path: Path):
         req = AuditGovernanceRequest(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             requested_by="alice",
             requested_reason="test",
             urgency="urgent",
@@ -228,8 +228,8 @@ class TestCmdRun:
             result = _runner.invoke(app, [
                 "run",
                 "--request", str(req_path),
-                "--known-repos", "videofoundry",
-                "--known-types", "representative",
+                "--known-repos", "example_managed_repo",
+                "--known-types", "audit_type_1",
                 "--output-dir", str(tmp_path / "out"),
                 "--state-dir", str(tmp_path / "state"),
             ])
@@ -241,8 +241,8 @@ class TestCmdRun:
         result = _runner.invoke(app, [
             "run",
             "--request", str(req_path),
-            "--known-repos", "videofoundry",
-            "--known-types", "representative",
+            "--known-repos", "example_managed_repo",
+            "--known-types", "audit_type_1",
             "--output-dir", str(tmp_path / "out"),
             "--state-dir", str(tmp_path / "state"),
         ])
@@ -253,8 +253,8 @@ class TestCmdRun:
         result = _runner.invoke(app, [
             "run",
             "--request", str(req_path),
-            "--known-repos", "videofoundry",
-            "--known-types", "representative",
+            "--known-repos", "example_managed_repo",
+            "--known-types", "audit_type_1",
             "--output-dir", str(tmp_path / "out"),
             "--state-dir", str(tmp_path / "state"),
         ])
@@ -262,8 +262,8 @@ class TestCmdRun:
 
     def test_run_with_approval_file_dispatches(self, tmp_path: Path):
         req = AuditGovernanceRequest(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             requested_by="alice",
             requested_reason="test",
             urgency="urgent",
@@ -283,8 +283,8 @@ class TestCmdRun:
                 "run",
                 "--request", str(req_path),
                 "--approval", str(approval_path),
-                "--known-repos", "videofoundry",
-                "--known-types", "representative",
+                "--known-repos", "example_managed_repo",
+                "--known-types", "audit_type_1",
                 "--output-dir", str(tmp_path / "out"),
                 "--state-dir", str(tmp_path / "state"),
             ])
@@ -310,16 +310,16 @@ class TestCmdInspect:
         from operations_center.audit_governance import run_governed_audit
 
         req = AuditGovernanceRequest(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             requested_by="alice",
             requested_reason="inspect test",
             urgency="normal",
             related_suite_report_path="/suite.json",
         )
         cfg = GovernanceConfig(
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         dispatch_mock = MagicMock(return_value=_make_dispatch_result())
         with patch(_DISPATCH_TARGET, dispatch_mock):
@@ -330,7 +330,7 @@ class TestCmdInspect:
             "--report", run_result.report_path,
         ])
         assert result.exit_code == 0
-        assert "videofoundry" in result.output
+        assert "example_managed_repo" in result.output
 
     def test_inspect_missing_report_exits_nonzero(self, tmp_path: Path):
         result = _runner.invoke(app, [

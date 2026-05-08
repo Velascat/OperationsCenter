@@ -44,7 +44,7 @@ class ManagedAuditDispatchRequest(BaseModel, frozen=True):
     invocation (identity, command, env) internally using Phase 1–4 contracts.
     """
 
-    repo_id: str = Field(description="Managed repo identifier (e.g. 'videofoundry')")
+    repo_id: str = Field(description="Managed repo identifier (e.g. 'example_managed_repo')")
     audit_type: str = Field(description="Audit type declared in the repo config")
     metadata: dict[str, Any] = Field(default_factory=dict)
     allow_unverified_command: bool = Field(

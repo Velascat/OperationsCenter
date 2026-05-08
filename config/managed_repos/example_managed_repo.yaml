@@ -1,0 +1,123 @@
+# OperationsCenter — Managed Repo Contract: example template
+#
+# This file describes the structure of a managed-repo binding. It is a
+# tracked **template**, not an active binding. Operators copy this file
+# to `config/managed_repos/local/<repo_id>.yaml` (gitignored) and edit
+# it to bind OperationsCenter to a specific private repo.
+#
+# Boundary rule (enforced by policy, not by this file):
+#   OperationsCenter may invoke the managed repo's commands.
+#   OperationsCenter may read files produced by the managed repo.
+#   OperationsCenter must NEVER import the managed repo's modules.
+#   OperationsCenter must NEVER depend on the managed repo's Python internals.
+
+repo_id: example_managed_repo
+repo_name: ExampleManagedRepo
+repo_root: ../ExampleManagedRepo    # relative to OperationsCenter repo root
+
+# ---------------------------------------------------------------------------
+# Run ID injection
+# ---------------------------------------------------------------------------
+# OperationsCenter is the source of truth for run_id.
+# The managed repo uses AUDIT_RUN_ID when present; local/dev fallback may
+# exist but OpsCenter must not depend on it.
+run_id:
+  source: operations_center
+  env_var: AUDIT_RUN_ID
+  format: uuid_hex                  # uuid4().hex — 32 hex chars, no dashes
+  required_for_managed_runs: true
+
+# ---------------------------------------------------------------------------
+# Capabilities
+# ---------------------------------------------------------------------------
+capabilities:
+  - audit
+
+# ---------------------------------------------------------------------------
+# Audit capability
+# ---------------------------------------------------------------------------
+audit:
+  output_discovery:
+    entry_point: run_status.json
+    chain:
+      - file: run_status.json
+        field: artifact_manifest_path
+        status: planned               # field gated on Phase 2 + Phase 5
+        phase_required: "2+5"
+      - file: artifact_manifest.json
+        status: not_yet_available
+        phase_required: "2+5"
+    notes: >
+      Output discovery follows run_status.json -> artifact_manifest_path
+      -> artifact_manifest.json. Both files conform to the canonical
+      contract in audit_contracts/. OpsCenter must not scan directories
+      to discover artifacts — wait for the managed repo to advertise
+      them through the manifest chain.
+
+  bucket_naming: "{producer_slug}_{YYYYMMDD}_{HHMMSS}_{run_id_hex}"
+
+  audit_types:
+
+    - audit_type: audit_type_1
+      command: example-managed-repo audit type_1
+      command_status: verified
+      working_dir: .
+      env_injected:
+        - AUDIT_RUN_ID
+      output_dir: tools/audit/report/audit_type_1
+      status_file: "{output_dir}/{bucket}/run_status.json"
+      run_status_finalization: true
+      status_values: [in_progress, complete, failed]
+      evidence: source_inspected_no_run
+      notes: >
+        Replace this audit_type entry with the real shape your managed
+        repo's audit produces. command_status starts as not_yet_run and
+        flips to verified once Phase 0 source inspection confirms the
+        invocation contract.
+
+    - audit_type: audit_type_2
+      command: <managed-repo command for audit_type_2>
+      command_status: not_yet_run
+      working_dir: .
+      env_injected:
+        - AUDIT_RUN_ID
+      output_dir: tools/audit/report/audit_type_2
+      status_file: "{output_dir}/{bucket}/run_status.json"
+      run_status_finalization: false
+      status_values: [in_progress]
+      evidence: source_inspected_no_run
+      notes: >
+        Audit types whose producer never writes a final status set
+        run_status_finalization: false. OpsCenter readers must accept
+        in_progress as terminal until the producer adds finalization.
+
+# ---------------------------------------------------------------------------
+# Path layout (descriptive — not final Phase 2 vocabulary)
+# ---------------------------------------------------------------------------
+path_layout:
+  run_root: >
+    Files at the top level of the bucket directory.
+  artifacts_subdir: >
+    Files under artifacts/ subdirectories inside the bucket.
+  named_subdir: >
+    Files under a named subdirectory at the bucket level (not under artifacts/).
+  repo_singleton: >
+    Fixed path outside any per-run bucket. Overwritten in-place on each run.
+    No run_id in path.
+  auxiliary_or_noise: >
+    Infrastructure files that appear in buckets but are not audit artifacts.
+
+# ---------------------------------------------------------------------------
+# Boundary policy
+# ---------------------------------------------------------------------------
+boundary:
+  allowed:
+    - invoke the managed repo's commands via subprocess
+    - read files produced by the managed repo (run_status.json, artifact_manifest.json)
+    - set environment variables for the managed repo's processes (AUDIT_RUN_ID)
+  forbidden:
+    - import any of the managed repo's Python modules
+    - depend on the managed repo's Python package internals
+    - scan arbitrary directories to discover artifacts (use run_status.json chain only)
+    - read the managed repo's source code at runtime
+    - call the managed repo's functions directly

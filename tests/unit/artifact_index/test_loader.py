@@ -22,7 +22,7 @@ class TestLoadArtifactManifest:
         manifest = load_artifact_manifest(example_completed_manifest_path)
         assert manifest.manifest_status == ManifestStatus.COMPLETED
         assert manifest.run_status == RunStatus.COMPLETED
-        assert manifest.repo_id == "videofoundry"
+        assert manifest.repo_id == "example_managed_repo"
         assert len(manifest.artifacts) > 0
 
     def test_loads_failed_example(self, example_failed_manifest_path: Path) -> None:
@@ -59,7 +59,7 @@ class TestLoadArtifactManifest:
 
     def test_accepts_path_as_string(self, completed_manifest_file: Path) -> None:
         manifest = load_artifact_manifest(str(completed_manifest_file))
-        assert manifest.repo_id == "videofoundry"
+        assert manifest.repo_id == "example_managed_repo"
 
     def test_preserves_artifact_count(self, example_completed_manifest_path: Path) -> None:
         manifest = load_artifact_manifest(example_completed_manifest_path)

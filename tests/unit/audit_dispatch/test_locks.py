@@ -26,76 +26,76 @@ def _registry() -> ManagedRepoAuditLockRegistry:
 class TestLockAcquire:
     def test_acquire_returns_lock(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
+        lock = reg.acquire("example_managed_repo")
         assert isinstance(lock, ManagedRepoAuditLock)
         lock.release()
 
     def test_lock_repo_id(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
-        assert lock.repo_id == "videofoundry"
+        lock = reg.acquire("example_managed_repo")
+        assert lock.repo_id == "example_managed_repo"
         lock.release()
 
     def test_double_acquire_same_repo_raises(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
-        with pytest.raises(RepoLockAlreadyHeldError, match="videofoundry"):
-            reg.acquire("videofoundry")
+        lock = reg.acquire("example_managed_repo")
+        with pytest.raises(RepoLockAlreadyHeldError, match="example_managed_repo"):
+            reg.acquire("example_managed_repo")
         lock.release()
 
     def test_different_repos_can_be_acquired_concurrently(self) -> None:
         reg = _registry()
-        lock_a = reg.acquire("videofoundry")
+        lock_a = reg.acquire("example_managed_repo")
         lock_b = reg.acquire("other_repo")
-        assert reg.is_held("videofoundry")
+        assert reg.is_held("example_managed_repo")
         assert reg.is_held("other_repo")
         lock_a.release()
         lock_b.release()
 
     def test_acquire_after_release_succeeds(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
+        lock = reg.acquire("example_managed_repo")
         lock.release()
-        lock2 = reg.acquire("videofoundry")
-        assert reg.is_held("videofoundry")
+        lock2 = reg.acquire("example_managed_repo")
+        assert reg.is_held("example_managed_repo")
         lock2.release()
 
 
 class TestLockRelease:
     def test_release_clears_held(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
-        assert reg.is_held("videofoundry")
+        lock = reg.acquire("example_managed_repo")
+        assert reg.is_held("example_managed_repo")
         lock.release()
-        assert not reg.is_held("videofoundry")
+        assert not reg.is_held("example_managed_repo")
 
     def test_double_release_is_idempotent(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
+        lock = reg.acquire("example_managed_repo")
         lock.release()
         lock.release()  # should not raise
-        assert not reg.is_held("videofoundry")
+        assert not reg.is_held("example_managed_repo")
 
     def test_context_manager_releases_on_exit(self) -> None:
         reg = _registry()
-        with reg.acquire("videofoundry"):
-            assert reg.is_held("videofoundry")
-        assert not reg.is_held("videofoundry")
+        with reg.acquire("example_managed_repo"):
+            assert reg.is_held("example_managed_repo")
+        assert not reg.is_held("example_managed_repo")
 
     def test_context_manager_releases_on_exception(self) -> None:
         reg = _registry()
         try:
-            with reg.acquire("videofoundry"):
+            with reg.acquire("example_managed_repo"):
                 raise RuntimeError("boom")
         except RuntimeError:
             pass
-        assert not reg.is_held("videofoundry")
+        assert not reg.is_held("example_managed_repo")
 
 
 class TestRegistryState:
     def test_is_held_false_initially(self) -> None:
         reg = _registry()
-        assert not reg.is_held("videofoundry")
+        assert not reg.is_held("example_managed_repo")
 
     def test_held_repos_empty_initially(self) -> None:
         reg = _registry()
@@ -113,11 +113,11 @@ class TestRegistryState:
 
     def test_held_repos_is_snapshot_not_live(self) -> None:
         reg = _registry()
-        lock = reg.acquire("videofoundry")
+        lock = reg.acquire("example_managed_repo")
         snapshot = reg.held_repos
         lock.release()
         # snapshot is a frozenset taken before release — it remains unchanged
-        assert "videofoundry" in snapshot
+        assert "example_managed_repo" in snapshot
 
 
 class TestLazyStaleSweep:
@@ -137,11 +137,11 @@ class TestLazyStaleSweep:
         proc.wait()
         store = PersistentLockStore(tmp_path)
         store._write_atomic(
-            tmp_path / "videofoundry.lock",
+            tmp_path / "example_managed_repo.lock",
             PersistentLockPayload(
-                repo_id="videofoundry",
+                repo_id="example_managed_repo",
                 run_id="leftover",
-                audit_type="representative",
+                audit_type="audit_type_1",
                 oc_pid=proc.pid,
                 started_at="2026-05-04T00:00:00Z",
                 command="x",
@@ -151,7 +151,7 @@ class TestLazyStaleSweep:
 
         # Fresh registry (simulates OC restart) — first acquire sweeps + succeeds.
         reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
-        lock = reg.acquire("videofoundry", run_id="new")
+        lock = reg.acquire("example_managed_repo", run_id="new")
         assert lock.payload is not None
         assert lock.payload.run_id == "new"
         lock.release()
@@ -174,11 +174,11 @@ class TestLazyStaleSweep:
         proc.wait()
         store = PersistentLockStore(tmp_path)
         store._write_atomic(
-            tmp_path / "videofoundry.lock",
+            tmp_path / "example_managed_repo.lock",
             PersistentLockPayload(
-                repo_id="videofoundry",
+                repo_id="example_managed_repo",
                 run_id="leftover",
-                audit_type="representative",
+                audit_type="audit_type_1",
                 oc_pid=proc.pid,
                 started_at="2026-05-04T00:00:00Z",
                 command="x",
@@ -187,7 +187,7 @@ class TestLazyStaleSweep:
         )
         # The lazy sweep won't run again — but try_acquire will still detect
         # the stale lock at acquire time because is_alive() returns False.
-        lock2 = reg.acquire("videofoundry", run_id="new")
+        lock2 = reg.acquire("example_managed_repo", run_id="new")
         assert lock2.payload is not None
         assert lock2.payload.run_id == "new"
         lock2.release()
@@ -201,26 +201,26 @@ class TestIdentityWiring:
 
         reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
         lock = reg.acquire(
-            "videofoundry",
+            "example_managed_repo",
             run_id="vid_rep_xyz",
-            audit_type="representative",
+            audit_type="audit_type_1",
             command="python -m foo",
             expected_run_status_path="/tmp/x",
         )
         assert lock.payload is not None
         assert lock.payload.run_id == "vid_rep_xyz"
-        assert lock.payload.audit_type == "representative"
+        assert lock.payload.audit_type == "audit_type_1"
         assert lock.payload.oc_pid == os.getpid()
         assert lock.payload.audit_pid is None
         lock.release()
 
     def test_update_audit_pid_persists(self, tmp_path) -> None:
         reg = ManagedRepoAuditLockRegistry(state_dir=tmp_path)
-        lock = reg.acquire("videofoundry", run_id="r1")
+        lock = reg.acquire("example_managed_repo", run_id="r1")
         lock.update_audit_pid(audit_pid=4242, audit_pgid=4242)
         assert lock.payload is not None
         assert lock.payload.audit_pid == 4242
-        on_disk = reg.store.read("videofoundry")
+        on_disk = reg.store.read("example_managed_repo")
         assert on_disk is not None and on_disk.audit_pid == 4242
         lock.release()
 
@@ -235,7 +235,7 @@ class TestThreadSafety:
         def attempt():
             barrier.wait()
             try:
-                lock = reg.acquire("videofoundry")
+                lock = reg.acquire("example_managed_repo")
                 successes.append(lock)
             except RepoLockAlreadyHeldError:
                 failures.append(True)

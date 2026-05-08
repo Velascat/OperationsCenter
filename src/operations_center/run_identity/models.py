@@ -10,8 +10,8 @@ run_id follows a stable, path-safe, log-safe format:
 
 Example:
 
-    videofoundry_representative_20260426T164233Z_a1b2c3d4
-    videofoundry_stack_authoring_20260426T164233Z_b5c6d7e8
+    example_managed_repo_audit_type_1_20260426T164233Z_a1b2c3d4
+    example_managed_repo_audit_type_2_20260426T164233Z_b5c6d7e8
 
 Components:
     repo_id      lowercase alphanumeric + underscore

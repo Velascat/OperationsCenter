@@ -42,43 +42,34 @@ class TestExampleManagedRepoProfileSeparation:
         assert ManagedRunStatus is not None
 
 
-class TestExampleManagedRepoAllSixAuditTypes:
-    def test_all_six_audit_types_have_specs(self) -> None:
+class TestExampleManagedRepoAuditTypes:
+    def test_all_audit_types_have_specs(self) -> None:
         spec_types = {s.audit_type for s in EXAMPLE_MANAGED_REPO_PROFILE.audit_type_specs}
         expected = {at.value for at in ExampleManagedRepoAuditType}
         assert spec_types == expected
 
-    def test_representative_has_finalization(self) -> None:
-        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("representative")
+    def test_audit_type_1_has_finalization(self) -> None:
+        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("audit_type_1")
         assert spec is not None
         assert spec.run_status_finalization is True
 
-    def test_five_types_lack_finalization(self) -> None:
+    def test_audit_type_2_lacks_finalization(self) -> None:
         non_finalizing = EXAMPLE_MANAGED_REPO_PROFILE.audit_types_without_finalization
-        assert "representative" not in non_finalizing
-        assert len(non_finalizing) == 5
+        assert non_finalizing == ["audit_type_2"]
 
-    def test_stack_authoring_output_dir_is_authoring(self) -> None:
-        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("stack_authoring")
+
+class TestExampleManagedRepoEvidence:
+    def test_finalized_audit_type_has_phase_0_evidence(self) -> None:
+        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("audit_type_1")
         assert spec is not None
-        assert "authoring" in spec.output_dir
-        assert "stack_authoring" not in spec.output_dir
+        assert spec.phase_0_evidence
 
-
-class TestExampleManagedRepoPhase0Evidence:
-    def test_representative_evidence_is_real_run(self) -> None:
-        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("representative")
+    def test_unfinalized_audit_type_has_phase_0_evidence(self) -> None:
+        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("audit_type_2")
         assert spec is not None
-        assert "inspected" in spec.phase_0_evidence
-
-    def test_non_representative_evidence_is_source_only(self) -> None:
-        for at in ("enrichment", "ideation", "render", "segmentation", "stack_authoring"):
-            spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec(at)
-            assert spec is not None
-            assert "no_run" in spec.phase_0_evidence
+        assert spec.phase_0_evidence
 
     def test_run_status_finalization_gap_documented(self) -> None:
-        assert "five" in EXAMPLE_MANAGED_REPO_PROFILE.run_status_finalization_gap.lower()
         assert "in_progress" in EXAMPLE_MANAGED_REPO_PROFILE.run_status_finalization_gap
 
     def test_legacy_status_value_documented(self) -> None:
@@ -109,7 +100,7 @@ class TestExampleManagedRepoExcludedPathPatterns:
 
 class TestManagedRepoPathQuirks:
     def test_path_quirks_documented(self) -> None:
-        assert len(EXAMPLE_MANAGED_REPO_PROFILE.path_quirks) >= 3
+        assert len(EXAMPLE_MANAGED_REPO_PROFILE.path_quirks) >= 2
 
     def test_non_uniform_layout_quirk_documented(self) -> None:
         quirk_descs = " ".join(q.description for q in EXAMPLE_MANAGED_REPO_PROFILE.path_quirks).lower()

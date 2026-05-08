@@ -26,10 +26,10 @@ def _write_manifest_with_coverage(tmp_path: Path) -> Path:
     payload = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": "test_run",
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "manifest_status": "completed",
         "run_status": "completed",
         "created_at": "2026-05-04T00:00:00Z",
@@ -39,7 +39,7 @@ def _write_manifest_with_coverage(tmp_path: Path) -> Path:
         "run_root": "bucket",
         "artifacts": [
             {
-                "artifact_id": "videofoundry:representative:lifecycle:coverage",
+                "artifact_id": "example_managed_repo:audit_type_1:lifecycle:coverage",
                 "artifact_kind": "json_report",
                 "path": str(coverage_json.relative_to(tmp_path)),
                 "relative_path": "coverage.json",
@@ -145,10 +145,10 @@ class TestRunPostDispatchCoverageAudit:
         mp.write_text(json.dumps({
             "schema_version": "1.0",
             "contract_name": "managed-repo-audit",
-            "producer": "videofoundry",
-            "repo_id": "videofoundry",
+            "producer": "example_managed_repo",
+            "repo_id": "example_managed_repo",
             "run_id": "r1",
-            "audit_type": "representative",
+            "audit_type": "audit_type_1",
             "manifest_status": "completed",
             "run_status": "completed",
             "created_at": "2026-05-04T00:00:00Z",

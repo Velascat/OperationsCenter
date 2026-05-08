@@ -26,78 +26,78 @@ _NOW = datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC)
 
 class TestDispatchRequestValidation:
     def test_minimal_request_is_valid(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
-        assert req.repo_id == "videofoundry"
-        assert req.audit_type == "representative"
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
+        assert req.repo_id == "example_managed_repo"
+        assert req.audit_type == "audit_type_1"
 
     def test_empty_repo_id_raises(self) -> None:
         with pytest.raises(ValidationError, match="repo_id"):
-            ManagedAuditDispatchRequest(repo_id="", audit_type="representative")
+            ManagedAuditDispatchRequest(repo_id="", audit_type="audit_type_1")
 
     def test_whitespace_repo_id_raises(self) -> None:
         with pytest.raises(ValidationError, match="repo_id"):
-            ManagedAuditDispatchRequest(repo_id="   ", audit_type="representative")
+            ManagedAuditDispatchRequest(repo_id="   ", audit_type="audit_type_1")
 
     def test_empty_audit_type_raises(self) -> None:
         with pytest.raises(ValidationError, match="audit_type"):
-            ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="")
+            ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="")
 
     def test_timeout_zero_raises(self) -> None:
         with pytest.raises(ValidationError, match="timeout"):
             ManagedAuditDispatchRequest(
-                repo_id="videofoundry", audit_type="representative", timeout_seconds=0
+                repo_id="example_managed_repo", audit_type="audit_type_1", timeout_seconds=0
             )
 
     def test_timeout_negative_raises(self) -> None:
         with pytest.raises(ValidationError, match="timeout"):
             ManagedAuditDispatchRequest(
-                repo_id="videofoundry", audit_type="representative", timeout_seconds=-1
+                repo_id="example_managed_repo", audit_type="audit_type_1", timeout_seconds=-1
             )
 
     def test_timeout_positive_is_valid(self) -> None:
         req = ManagedAuditDispatchRequest(
-            repo_id="videofoundry", audit_type="representative", timeout_seconds=300.0
+            repo_id="example_managed_repo", audit_type="audit_type_1", timeout_seconds=300.0
         )
         assert req.timeout_seconds == 300.0
 
     def test_timeout_none_is_valid(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
         assert req.timeout_seconds is None
 
     def test_default_metadata_is_empty_dict(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
         assert req.metadata == {}
 
     def test_allow_unverified_default_is_false(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
         assert req.allow_unverified_command is False
 
     def test_base_env_default_is_none(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
         assert req.base_env is None
 
     def test_cwd_override_default_is_none(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
         assert req.cwd_override is None
 
     def test_correlation_id_optional(self) -> None:
         req = ManagedAuditDispatchRequest(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             correlation_id="test-corr-001",
         )
         assert req.correlation_id == "test-corr-001"
 
     def test_requested_by_optional(self) -> None:
         req = ManagedAuditDispatchRequest(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             requested_by="scheduler",
         )
         assert req.requested_by == "scheduler"
 
     def test_request_is_frozen(self) -> None:
-        req = ManagedAuditDispatchRequest(repo_id="videofoundry", audit_type="representative")
+        req = ManagedAuditDispatchRequest(repo_id="example_managed_repo", audit_type="audit_type_1")
         with pytest.raises(Exception):
             req.repo_id = "other"  # type: ignore[misc]
 
@@ -109,9 +109,9 @@ class TestDispatchRequestValidation:
 
 def _make_result(**overrides) -> ManagedAuditDispatchResult:
     base: dict = {
-        "repo_id": "videofoundry",
-        "audit_type": "representative",
-        "run_id": "videofoundry_representative_20260426T120000Z_aabb1122",
+        "repo_id": "example_managed_repo",
+        "audit_type": "audit_type_1",
+        "run_id": "example_managed_repo_audit_type_1_20260426T120000Z_aabb1122",
         "status": DispatchStatus.COMPLETED,
         "process_exit_code": 0,
         "started_at": _NOW,

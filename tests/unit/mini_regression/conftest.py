@@ -3,7 +3,7 @@
 """Shared fixtures for mini_regression tests.
 
 Suite definitions are built from fixture packs created via Phase 9 harvesting.
-No VideoFoundry audits run. No managed repo code is imported.
+No ExampleManagedRepo audits run. No managed repo code is imported.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ _RUN_ROOT = "tools/audit/report/representative/Bucket_run999"
 # ---------------------------------------------------------------------------
 
 def _base_entry(
-    artifact_id: str = "videofoundry:representative:TopicSelectionStage:topic_selection",
+    artifact_id: str = "example_managed_repo:audit_type_1:TopicSelectionStage:topic_selection",
 ) -> dict:
     return {
         "artifact_id": artifact_id,
@@ -59,7 +59,7 @@ def _base_entry(
 
 
 def _missing_entry(
-    artifact_id: str = "videofoundry:representative:VoiceOverStage:asr",
+    artifact_id: str = "example_managed_repo:audit_type_1:VoiceOverStage:asr",
 ) -> dict:
     return {
         "artifact_id": artifact_id,
@@ -95,16 +95,16 @@ def _make_manifest_payload(
     return {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "representative",
+        "producer": "example_managed_repo",
+        "repo_id": "audit_type_1",
         "run_id": "Bucket_run999",
-        "audit_type": "videofoundry_audit",
+        "audit_type": "example_managed_repo_audit",
         "manifest_status": manifest_status,
         "run_status": run_status,
         "created_at": "2026-04-26T12:00:00Z",
         "updated_at": "2026-04-26T12:01:00Z",
         "finalized_at": "2026-04-26T12:01:00Z",
-        "artifact_root": "../VideoFoundry",
+        "artifact_root": "../ExampleManagedRepo",
         "run_root": _RUN_ROOT,
         "artifacts": artifacts if artifacts is not None else [_base_entry()],
         "excluded_paths": [],

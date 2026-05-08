@@ -64,7 +64,7 @@ def _status_color(decision: str) -> str:
 
 @app.command("request")
 def cmd_request(
-    repo: str = typer.Option(..., "--repo", "-r", help="Managed repo ID (e.g. 'videofoundry')."),
+    repo: str = typer.Option(..., "--repo", "-r", help="Managed repo ID (e.g. 'example_managed_repo')."),
     audit_type: str = typer.Option(..., "--type", "-t", help="Audit type."),
     reason: str = typer.Option(..., "--reason", help="Why the full audit is needed."),
     requested_by: str = typer.Option(..., "--requested-by", help="Operator identity."),

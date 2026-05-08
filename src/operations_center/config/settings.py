@@ -487,7 +487,7 @@ def load_settings(path: str | Path) -> Settings:
     for profile in settings.kodo_profiles.values():
         profile.binary = _resolve_binary(profile.binary, config_dir)
     # Resolve platform_manifest paths relative to the config file dir so
-    # operators can write `project_manifest_path: ../VideoFoundry/topology/...`
+    # operators can write `project_manifest_path: ../ExampleManagedRepo/topology/...`
     # without hardcoding absolute paths.
     pm = settings.platform_manifest
     pm.project_manifest_path = _resolve_manifest_path(pm.project_manifest_path, config_dir)

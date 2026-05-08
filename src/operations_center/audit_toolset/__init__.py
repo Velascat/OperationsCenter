@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Audit toolset contract layer for managed repo audits.
 
-Phase 3 of the OpsCenter ↔ VideoFoundry audit system.
+Phase 3 of the OpsCenter ↔ ExampleManagedRepo audit system.
 
 Public surface
 --------------

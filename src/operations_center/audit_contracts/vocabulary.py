@@ -145,27 +145,24 @@ class Limitation(str, Enum):
 # ---------------------------------------------------------------------------
 
 class ExampleManagedRepoAuditType(str, Enum):
-    """The six audit types supported by the example managed repo."""
-    REPRESENTATIVE = "representative"
-    ENRICHMENT = "enrichment"
-    IDEATION = "ideation"
-    RENDER = "render"
-    SEGMENTATION = "segmentation"
-    STACK_AUTHORING = "stack_authoring"
+    """Audit types declared by the example managed-repo template.
+
+    Real bindings carry the bound managed repo's actual audit-type
+    vocabulary in their private YAML config. The values here are
+    placeholders that exercise the loader + dispatch contracts.
+    """
+    AUDIT_TYPE_1 = "audit_type_1"
+    AUDIT_TYPE_2 = "audit_type_2"
 
 
 class ExampleManagedRepoSourceStage(str, Enum):
-    """Stage names observed in the example managed repo's audit output (Phase 0 ground truth)."""
-    TOPIC_SELECTION = "TopicSelectionStage"
-    OUTLINE_PLANNING = "OutlinePlanningStage"
-    SCRIPT_WRITING = "ScriptWritingStage"
-    SCRIPT_SEGMENTATION = "ScriptSegmentationStage"
-    SCRIPT_ENRICHMENT = "ScriptEnrichmentStage"
-    FACT_CHECK = "FactCheckStage"
-    STRUCTURED_FACT_CHECK = "StructuredFactCheckStage"
-    AUTHOR_PROSODY = "AuthorProsodyStage"
-    VOICE_OVER = "VoiceOverStage"
-    VOICE_SAMPLE_CLEAN = "VoiceSampleCleanStage"
+    """Source stage names declared by the example managed-repo template.
+
+    Placeholder vocabulary. Real managed repos declare their actual
+    pipeline stage names in their private profile.
+    """
+    STAGE_1 = "Stage1"
+    STAGE_2 = "Stage2"
     LIFECYCLE = "lifecycle"
     POST_RUN = "post_run"
     ARCHITECTURE_INVARIANTS = "architecture_invariants"
@@ -173,28 +170,19 @@ class ExampleManagedRepoSourceStage(str, Enum):
 
 
 class ExampleManagedRepoArtifactKind(str, Enum):
-    """Artifact kind vocabulary for the example managed repo's audit outputs.
+    """Artifact kind vocabulary declared by the example managed-repo template.
 
-    Based on Phase 0 ground truth. Not exhaustive — unknown artifacts
-    should use UNKNOWN rather than fail.
+    Placeholder vocabulary. The set is intentionally small — real
+    managed repos extend this with their own artifact-kind enum in
+    their private profile.
     """
     RUN_STATUS = "run_status"
     STAGE_REPORT = "stage_report"
-    AUDIT_REPORT = "audit_report"
     JSON_REPORT = "json_report"
-    JSONL_REPORT = "jsonl_report"
-    TEXT_REPORT = "text_report"
-    SCRIPT_CONTRACT = "script_contract"
-    SCRIPT_ARTIFACT = "script_artifact"
-    AUTHORING_ARTIFACT = "authoring_artifact"
-    RENDERING_ARTIFACT = "rendering_artifact"
-    ALIGNMENT_ARTIFACT = "alignment_artifact"
-    TIMING_ARTIFACT = "timing_artifact"
-    VISUAL_ARTIFACT = "visual_artifact"
-    ARCHITECTURE_INVARIANT = "architecture_invariant"
     LOG = "log"
     TRACEBACK = "traceback"
     METADATA = "metadata"
+    ARCHITECTURE_INVARIANT = "architecture_invariant"
     UNKNOWN = "unknown"
 
 

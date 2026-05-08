@@ -29,7 +29,7 @@ _LOAD_REPORT_TARGET = "operations_center.entrypoints.calibration.main.load_calib
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_mock_index(repo_id: str = "videofoundry", audit_type: str = "representative") -> MagicMock:
+def _make_mock_index(repo_id: str = "example_managed_repo", audit_type: str = "audit_type_1") -> MagicMock:
     index = MagicMock()
     index.source.repo_id = repo_id
     index.source.audit_type = audit_type
@@ -39,8 +39,8 @@ def _make_mock_index(repo_id: str = "videofoundry", audit_type: str = "represent
 
 def _make_mock_report(has_errors: bool = False) -> MagicMock:
     report = MagicMock()
-    report.repo_id = "videofoundry"
-    report.audit_type = "representative"
+    report.repo_id = "example_managed_repo"
+    report.audit_type = "audit_type_1"
     report.analysis_profile.value = "summary"
     report.has_errors = has_errors
     report.findings = []
@@ -56,8 +56,8 @@ def _make_mock_report(has_errors: bool = False) -> MagicMock:
     report.artifact_index_summary = summary
 
     report.model_dump_json = MagicMock(return_value=json.dumps({
-        "repo_id": "videofoundry",
-        "audit_type": "representative",
+        "repo_id": "example_managed_repo",
+        "audit_type": "audit_type_1",
         "analysis_profile": "summary",
     }))
     return report
@@ -85,7 +85,7 @@ class TestCmdAnalyze:
         ):
             out = _runner.invoke(app, ["analyze", "--manifest", str(mf), "--profile", "summary"])
         assert out.exit_code == 0
-        assert "videofoundry" in out.output
+        assert "example_managed_repo" in out.output
 
     def test_analyze_json_output(self, tmp_path: Path):
         mf = _make_manifest_file(tmp_path)
@@ -182,7 +182,7 @@ class TestCmdReport:
         with patch(_LOAD_REPORT_TARGET, return_value=report):
             out = _runner.invoke(app, ["report", str(report_file)])
         assert out.exit_code == 0
-        assert "videofoundry" in out.output
+        assert "example_managed_repo" in out.output
 
     def test_report_not_found_exits_code_1(self, tmp_path: Path):
         with patch(_LOAD_REPORT_TARGET, side_effect=FileNotFoundError("missing")):

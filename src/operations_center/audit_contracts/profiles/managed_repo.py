@@ -85,10 +85,10 @@ class ManagedRepoAuditProfile(BaseModel):
 
     # Phase 0 documented gaps — must be reflected in manifests until fixed
     run_status_finalization_gap: str = (
-        "Five of six audit types (enrichment, ideation, render, segmentation, "
-        "stack_authoring) use prepare_audit_bucket() which writes initial "
-        "'in_progress' but never writes a final status. "
-        "Phase 5 must add finalization logic to all five types."
+        "Audit types whose producer never writes a final run_status.json "
+        "have run_status_finalization=False. OpsCenter readers must accept "
+        "the legacy 'in_progress' value as terminal for those types until "
+        "the producer adds finalization logic."
     )
     legacy_status_value: str = (
         "Pre-Phase-5 producers emit 'in_progress' instead of 'running'. "
@@ -102,11 +102,13 @@ class ManagedRepoAuditProfile(BaseModel):
         description="Glob patterns for infrastructure files to exclude.",
     )
 
-    # Bucket naming convention
-    bucket_naming_pattern: str = "{channel_slug}_{YYYYMMDD}_{HHMMSS}_{run_id_hex}"
+    # Bucket naming convention. Real bindings substitute their own slug
+    # vocabulary in place of `producer_slug` (e.g. tenant id, channel id,
+    # workspace name) — whatever uniquely identifies a producer run.
+    bucket_naming_pattern: str = "{producer_slug}_{YYYYMMDD}_{HHMMSS}_{run_id_hex}"
     bucket_naming_note: str = (
-        "channel_slug is the sanitized YouTube channel name. "
-        "run_id_hex is uuid4().hex (32 chars, no dashes)."
+        "producer_slug is whatever the bound managed repo uses to disambiguate "
+        "concurrent runs. run_id_hex is uuid4().hex (32 chars, no dashes)."
     )
 
     model_config = {"frozen": True}
@@ -130,77 +132,26 @@ class ManagedRepoAuditProfile(BaseModel):
 EXAMPLE_MANAGED_REPO_PROFILE = ManagedRepoAuditProfile(
     audit_type_specs=[
         ManagedRepoAuditTypeSpec(
-            audit_type=ExampleManagedRepoAuditType.REPRESENTATIVE.value,
-            output_dir="tools/audit/report/representative",
+            audit_type=ExampleManagedRepoAuditType.AUDIT_TYPE_1.value,
+            output_dir="tools/audit/report/audit_type_1",
             run_status_finalization=True,
-            phase_0_evidence="one_run_inspected_in_progress",
-            limitations=[
-                Limitation.PARTIAL_RUN,
-                Limitation.PATH_LAYOUT_NON_UNIFORM,
-            ],
+            phase_0_evidence="example_finalized_audit_type",
+            limitations=[],
             notes=(
-                "One real run inspected (interrupted during rendering). "
-                "Authoring artifacts confirmed present. "
-                "Delivery/post-run artifacts absent from inspected run."
+                "Example audit type that finalizes run_status.json. Real bindings "
+                "set this to true for any audit that emits a terminal status."
             ),
         ),
         ManagedRepoAuditTypeSpec(
-            audit_type=ExampleManagedRepoAuditType.ENRICHMENT.value,
-            output_dir="tools/audit/report/enrichment",
+            audit_type=ExampleManagedRepoAuditType.AUDIT_TYPE_2.value,
+            output_dir="tools/audit/report/audit_type_2",
             run_status_finalization=False,
-            phase_0_evidence="source_inspected_no_run",
-            limitations=[
-                Limitation.NON_REPRESENTATIVE_AUDIT_UNVERIFIED,
-                Limitation.PRODUCER_NOT_FINALIZED,
-            ],
-            notes="No runs available. run_status.json never finalized.",
-        ),
-        ManagedRepoAuditTypeSpec(
-            audit_type=ExampleManagedRepoAuditType.IDEATION.value,
-            output_dir="tools/audit/report/ideation",
-            run_status_finalization=False,
-            phase_0_evidence="source_inspected_no_run",
-            limitations=[
-                Limitation.NON_REPRESENTATIVE_AUDIT_UNVERIFIED,
-                Limitation.PRODUCER_NOT_FINALIZED,
-            ],
-            notes="No runs available. run_status.json never finalized.",
-        ),
-        ManagedRepoAuditTypeSpec(
-            audit_type=ExampleManagedRepoAuditType.RENDER.value,
-            output_dir="tools/audit/report/render",
-            run_status_finalization=False,
-            phase_0_evidence="source_inspected_no_run",
-            limitations=[
-                Limitation.NON_REPRESENTATIVE_AUDIT_UNVERIFIED,
-                Limitation.PRODUCER_NOT_FINALIZED,
-            ],
-            notes="No runs available. run_status.json never finalized.",
-        ),
-        ManagedRepoAuditTypeSpec(
-            audit_type=ExampleManagedRepoAuditType.SEGMENTATION.value,
-            output_dir="tools/audit/report/segmentation",
-            run_status_finalization=False,
-            phase_0_evidence="source_inspected_no_run",
-            limitations=[
-                Limitation.NON_REPRESENTATIVE_AUDIT_UNVERIFIED,
-                Limitation.PRODUCER_NOT_FINALIZED,
-            ],
-            notes="No runs available. run_status.json never finalized.",
-        ),
-        ManagedRepoAuditTypeSpec(
-            audit_type=ExampleManagedRepoAuditType.STACK_AUTHORING.value,
-            # NOTE: directory name is "authoring", not "stack_authoring" (Phase 0 finding)
-            output_dir="tools/audit/report/authoring",
-            run_status_finalization=False,
-            phase_0_evidence="source_inspected_no_run",
-            limitations=[
-                Limitation.NON_REPRESENTATIVE_AUDIT_UNVERIFIED,
-                Limitation.PRODUCER_NOT_FINALIZED,
-            ],
+            phase_0_evidence="example_unfinalized_audit_type",
+            limitations=[Limitation.PRODUCER_NOT_FINALIZED],
             notes=(
-                "No runs available. Directory is 'authoring' not 'stack_authoring'. "
-                "run_status.json never finalized."
+                "Example audit type that does not finalize run_status.json. "
+                "OpsCenter readers must accept in_progress as terminal until "
+                "the producer adds finalization."
             ),
         ),
     ],
@@ -209,22 +160,16 @@ EXAMPLE_MANAGED_REPO_PROFILE = ManagedRepoAuditProfile(
     path_quirks=[
         ManagedRepoPathQuirk(
             description=(
-                "Artifacts land in at least four distinct locations relative to the bucket: "
-                "run_root, artifacts/authoring/, artifacts/script_contract/ScriptWriting/, "
-                "audit/, and text_overlay/. Path layout is non-uniform across audit types."
+                "Path layout may be non-uniform — artifacts can land in run_root, "
+                "artifacts subdirectories, or named subdirs depending on producer "
+                "stage. Real bindings document the specific layout the bound "
+                "managed repo produces."
             ),
             example=(
-                "run_root: Connective_Contours_topic_selection.json | "
-                "artifacts_subdir: artifacts/authoring/Connective_Contours_evidence_pack.json | "
-                "audit_subdir: audit/Connective_Contours_audit__voicesamplecleanstage__deadcode_report.txt"
+                "run_root: bucket_top_level.json | "
+                "artifacts_subdir: artifacts/<stage>/<file>.json | "
+                "audit_subdir: audit/<file>.txt"
             ),
-        ),
-        ManagedRepoPathQuirk(
-            description=(
-                "stack_authoring output directory is named 'authoring', not 'stack_authoring'. "
-                "The CLI name and the directory name do not match."
-            ),
-            example="tools/audit/report/authoring/ (not stack_authoring/)",
         ),
         ManagedRepoPathQuirk(
             description=(
@@ -232,19 +177,6 @@ EXAMPLE_MANAGED_REPO_PROFILE = ManagedRepoAuditProfile(
                 "per-run bucket. It has no run_id and is overwritten in-place."
             ),
             example="tools/audit/report/architecture_invariants/latest.json",
-        ),
-        ManagedRepoPathQuirk(
-            description=(
-                "ASR observation paths in voice_over_asr_observations.jsonl reference "
-                "files in the managed repo's temp/ tree, not in the audit bucket. "
-                "These are transient delivery files, not stable audit artifacts."
-            ),
-        ),
-        ManagedRepoPathQuirk(
-            description=(
-                "Large script object files (script_object__*.json) may be 1.5–1.6 MB. "
-                "The manifest records paths only; it must not embed content."
-            ),
         ),
     ],
     excluded_path_patterns=[
