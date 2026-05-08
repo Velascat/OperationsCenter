@@ -3,6 +3,14 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — X1 cross-repo config wired
+
+Added `audit.cross_repo.platform_manifest_repo: ../PlatformManifest` to `.custodian/config.yaml`. X1 live-run: 0 legacy-name findings.
+
+## Watchdog 2026-05-08 15:07 — All clean, loop started
+
+Cycle 1. ghost=0 flow=0 graph=ok reaudit=no-triggers regressions=0 custodian=0 repos swept. Triage: nothing to promote. Golden tests: 15/15 pass. All 7 watchers + watchdog alive. Runtime downgraded opus→sonnet (all rules) + kodo default orchestrator updated. Self-paced loop running hourly via ScheduleWakeup.
+
 - Observability skeleton shipped in-repo + bridge script retired (2026-05-08, on `chore/retire-observability-bridge-script` + WorkStation #16): Closes the WorkStation half of Round 3's observability finding. WorkStation #16 ships `config/observability/{prometheus.yml,grafana/provisioning/datasources/prometheus.yaml,README.md}` and updates `compose/profiles/observability.yml` mount paths from `../../config/...` (sibling-of-WorkStation, no clean clone authored) to `../config/...` (in-repo). Verified live: `docker compose ... -f compose/profiles/observability.yml up -d` against the new layout produces both prometheus + grafana healthy on first try, no manual setup, no sudo. Companion OC change in this commit: deleted `scripts/observability-first-run.sh` (now obsolete), updated `docs/operator/workstation_compose_smoke.md` so the observability section reflects the clean state with a small historical note for old machines that may still carry stale root-owned stub dirs from the pre-#16 layout. Memory entry rewritten — local-machine-bootstrapped framing replaced with in-repo-skeleton framing; the hard port-3000 rule (Grafana ↔ Archon collision) is preserved unchanged. Verification Gaps Rev 1 fully closed.
 
 - Observability first-run script (2026-05-08, on `docs/observability-first-run-script`): Replaces the multi-step manual unblock from Round 3's runbook with a single executable: `scripts/observability-first-run.sh`. Removes any Docker-auto-created stubs at `$HOME/Documents/GitHub/config/observability/` (uses `sudo` once for cleanup), reclaims the dir for the running user (`chown -R $USER:$USER`) so future writes don't need sudo, then authors idempotent skeleton `prometheus.yml` + Grafana datasource provisioning (won't overwrite existing files). Runbook (`docs/operator/workstation_compose_smoke.md`) updated to point at the script with a one-line invocation, and gains a "Why this script exists" section that names the underlying Docker bind-mount-auto-creates-as-root behavior plus the long-term fix path (WorkStation should ship the skeleton). Bridge until the WorkStation backlog item lands.
