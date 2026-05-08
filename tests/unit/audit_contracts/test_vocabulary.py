@@ -22,23 +22,23 @@ from operations_center.audit_contracts.vocabulary import (
     ManifestStatus,
     RunStatus,
     ValidFor,
-    VideoFoundryArtifactKind,
-    VideoFoundryAuditType,
-    VideoFoundrySourceStage,
-    VIDEOFOUNDRY_PROFILE_ENUMS,
+    ExampleManagedRepoArtifactKind,
+    ExampleManagedRepoAuditType,
+    ExampleManagedRepoSourceStage,
+    EXAMPLE_MANAGED_REPO_PROFILE_ENUMS,
 )
 
 
 class TestGenericVsProfileSeparation:
     def test_generic_enums_are_distinct_from_profile_enums(self) -> None:
         generic_names = {e.__name__ for e in GENERIC_ENUMS}
-        profile_names = {e.__name__ for e in VIDEOFOUNDRY_PROFILE_ENUMS}
+        profile_names = {e.__name__ for e in EXAMPLE_MANAGED_REPO_PROFILE_ENUMS}
         assert generic_names.isdisjoint(profile_names), (
             "Generic enums must not overlap with VideoFoundry profile enums"
         )
 
     def test_videofoundry_audit_type_is_not_in_generic_enums(self) -> None:
-        assert VideoFoundryAuditType not in GENERIC_ENUMS
+        assert ExampleManagedRepoAuditType not in GENERIC_ENUMS
 
     def test_run_status_is_generic(self) -> None:
         assert RunStatus in GENERIC_ENUMS
@@ -141,7 +141,7 @@ class TestLimitation:
 
 class TestVideoFoundryProfile:
     def test_all_six_audit_types_present(self) -> None:
-        values = {m.value for m in VideoFoundryAuditType}
+        values = {m.value for m in ExampleManagedRepoAuditType}
         expected = {
             "representative", "enrichment", "ideation",
             "render", "segmentation", "stack_authoring",
@@ -149,11 +149,11 @@ class TestVideoFoundryProfile:
         assert values == expected
 
     def test_audit_types_are_strings(self) -> None:
-        for m in VideoFoundryAuditType:
+        for m in ExampleManagedRepoAuditType:
             assert isinstance(m.value, str)
 
     def test_source_stage_includes_known_stages(self) -> None:
-        values = {m.value for m in VideoFoundrySourceStage}
+        values = {m.value for m in ExampleManagedRepoSourceStage}
         expected_subset = {
             "TopicSelectionStage",
             "ScriptWritingStage",
@@ -164,7 +164,7 @@ class TestVideoFoundryProfile:
         assert expected_subset <= values
 
     def test_artifact_kind_includes_required_kinds(self) -> None:
-        values = {m.value for m in VideoFoundryArtifactKind}
+        values = {m.value for m in ExampleManagedRepoArtifactKind}
         expected_subset = {
             "run_status", "stage_report", "audit_report",
             "architecture_invariant", "alignment_artifact",
