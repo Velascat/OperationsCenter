@@ -126,3 +126,38 @@ class TestSlugAutoResolve:
         )
         s = load_settings(cfg)
         assert s.platform_manifest.project_slug is None
+
+
+class TestWorkScopeManifestPath:
+    """v0.9.0+ — work_scope_manifest_path settings + XOR with project_manifest_path."""
+
+    def test_work_scope_path_pass_through(self, tmp_path: Path) -> None:
+        cfg = _write_config(
+            tmp_path,
+            "\nplatform_manifest:\n"
+            "  work_scope_manifest_path: ./work_scope.yaml\n",
+        )
+        s = load_settings(cfg)
+        assert s.platform_manifest.work_scope_manifest_path == tmp_path / "work_scope.yaml"
+        assert s.platform_manifest.project_manifest_path is None
+
+    def test_both_paths_set_rejected(self, tmp_path: Path) -> None:
+        cfg = _write_config(
+            tmp_path,
+            "\nplatform_manifest:\n"
+            "  project_manifest_path: ./project.yaml\n"
+            "  work_scope_manifest_path: ./work_scope.yaml\n",
+        )
+        with pytest.raises(Exception, match="mutually exclusive"):
+            load_settings(cfg)
+
+    def test_work_scope_only_no_project(self, tmp_path: Path) -> None:
+        cfg = _write_config(
+            tmp_path,
+            "\nplatform_manifest:\n"
+            "  enabled: true\n"
+            "  work_scope_manifest_path: ./scope.yaml\n",
+        )
+        s = load_settings(cfg)
+        assert s.platform_manifest.work_scope_manifest_path is not None
+        assert s.platform_manifest.project_manifest_path is None

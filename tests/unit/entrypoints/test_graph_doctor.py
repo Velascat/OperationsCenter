@@ -191,3 +191,73 @@ class TestHumanOutput:
         out = capsys.readouterr().out
         assert "✗ graph-doctor: fail_graph_none" in out
         assert "warnings" in out
+
+
+# ---------------------------------------------------------------------------
+# v0.9.0+ mode reporting
+# ---------------------------------------------------------------------------
+
+
+_PROJECT_YAML = (
+    'manifest_kind: project\n'
+    'manifest_version: "1.0.0"\n'
+    'repos:\n'
+    '  myproj_api:\n'
+    '    canonical_name: MyProjAPI\n'
+    '    visibility: private\n'
+    '    runtime_role: project_service\n'
+)
+
+
+class TestMode:
+    def test_platform_only_mode(self, tmp_path: Path, capsys) -> None:
+        cfg = _write_config(tmp_path)
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["platform_manifest"]["mode"] == "platform_only"
+
+    def test_project_mode(self, tmp_path: Path, capsys) -> None:
+        proj = tmp_path / "project.yaml"
+        proj.write_text(_PROJECT_YAML, encoding="utf-8")
+        cfg = _write_config(
+            tmp_path,
+            f"\nplatform_manifest:\n  project_manifest_path: {proj}\n",
+        )
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["platform_manifest"]["mode"] == "project"
+        assert report["platform_manifest"]["project_manifest_path"] == str(proj)
+
+    def test_work_scope_mode(self, tmp_path: Path, capsys) -> None:
+        proj = tmp_path / "project.yaml"
+        proj.write_text(_PROJECT_YAML, encoding="utf-8")
+        ws = tmp_path / "work_scope.yaml"
+        ws.write_text(
+            'manifest_kind: work_scope\n'
+            'manifest_version: "1.0.0"\n'
+            'includes:\n'
+            f'  - {{name: P, project_manifest_path: {proj}}}\n',
+            encoding="utf-8",
+        )
+        cfg = _write_config(
+            tmp_path,
+            f"\nplatform_manifest:\n  work_scope_manifest_path: {ws}\n",
+        )
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["platform_manifest"]["mode"] == "work_scope"
+        assert report["platform_manifest"]["work_scope_manifest_path"] == str(ws)
+        assert report["graph_built"] is True
+        assert report["nodes_by_source"]["project"] >= 1
+
+    def test_disabled_mode(self, tmp_path: Path, capsys) -> None:
+        cfg = _write_config(
+            tmp_path, "\nplatform_manifest:\n  enabled: false\n"
+        )
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["platform_manifest"]["mode"] == "disabled"

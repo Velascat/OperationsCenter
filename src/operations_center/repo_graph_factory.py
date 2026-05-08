@@ -25,10 +25,13 @@ from platform_manifest import (
 def build_effective_repo_graph(
     *,
     project_manifest_path: Path | None = None,
+    work_scope_manifest_path: Path | None = None,
     local_manifest_path: Path | None = None,
 ) -> RepoGraph:
-    """Compose the platform manifest with optional project + local layers.
+    """Compose the platform manifest with optional project/work-scope + local layers.
 
+    Exactly one of ``project_manifest_path`` and ``work_scope_manifest_path``
+    may be set (mutually exclusive — single-project vs work-scope mode).
     The platform base is always the bundled ``data/platform_manifest.yaml``
     that ships with the installed ``platform-manifest`` package — OC
     never overrides this base.
@@ -36,6 +39,7 @@ def build_effective_repo_graph(
     return load_effective_graph(
         default_config_path(),
         project=project_manifest_path,
+        work_scope=work_scope_manifest_path,
         local=local_manifest_path,
     )
 
@@ -69,19 +73,28 @@ def build_effective_repo_graph_from_settings(
     if not pm.enabled:
         return None
 
-    project_path = _resolve_project_manifest_path(pm, repo_root)
+    work_scope_path = pm.work_scope_manifest_path
+    # Project path is only resolved (with topology/ fallback) when
+    # work-scope mode is not selected. The two are mutually exclusive
+    # at the settings layer.
+    project_path = (
+        None if work_scope_path is not None
+        else _resolve_project_manifest_path(pm, repo_root)
+    )
     local_path = _resolve_local_manifest_path(pm, repo_root, _logger)
 
     try:
         return build_effective_repo_graph(
             project_manifest_path=project_path,
+            work_scope_manifest_path=work_scope_path,
             local_manifest_path=local_path,
         )
     except RepoGraphConfigError as exc:
         _logger.warning(
-            "EffectiveRepoGraph construction failed (project=%s local=%s): %s; "
+            "EffectiveRepoGraph construction failed "
+            "(project=%s work_scope=%s local=%s): %s; "
             "continuing without graph context",
-            project_path, local_path, exc,
+            project_path, work_scope_path, local_path, exc,
         )
         return None
     except Exception as exc:  # noqa: BLE001 — defensive: never block OC startup
