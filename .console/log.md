@@ -324,3 +324,20 @@ OC findings: 364 → 73.
 - DC7: linked the upstream-patch-evaluation, routing-tuning, post-merge-hook,
   and execution-boundary ADR docs from docs/README.md.
 
+
+## 2026-05-08 — CI regression guard
+
+Added .github/workflows/custodian-audit.yml + .hooks/pre-push.
+Both run `custodian-multi --fail-on-findings`. CI is the source of
+truth; pre-push catches regressions before they hit GitHub.
+
+
+## 2026-05-08 — CI fix: Direct URL pip install syntax
+
+
+## 2026-05-08 — Drift cleanup caught by new CI guard
+
+run_show/main.py: split semicolon statements (E702), ensure_ascii=False on
+the JSON dump (C41). docs/README.md: linked the archon_workflow_registration
+doc (DC7).
+

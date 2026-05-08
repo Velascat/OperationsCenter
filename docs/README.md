@@ -23,6 +23,7 @@ This directory holds OC-specific material.
 - [operator/manifest_authoring.md](operator/manifest_authoring.md) — How to author a `topology/project_manifest.yaml` for a project repo.
 - [operator/manifest_wiring.md](operator/manifest_wiring.md) — How OC picks up project + local manifests at runtime; the `platform_manifest:` settings block.
 - [operator/propagation/post-merge-hook.md](operator/propagation/post-merge-hook.md) — Post-merge propagation hook setup.
+- [operator/archon_workflow_registration.md](operator/archon_workflow_registration.md) — Archon workflow registration handshake.
 
 ## Backends
 

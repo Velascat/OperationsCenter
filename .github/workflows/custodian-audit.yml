@@ -1,0 +1,37 @@
+# Custodian regression guard.
+# Runs on every push and PR to main. Fails CI on any new finding.
+# The repo is expected to be at zero findings on main; this guard
+# stops drift from creeping back in.
+name: custodian-audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Custodian
+        run: |
+          python -m pip install --upgrade pip
+          pip install "custodian[tools] @ git+https://github.com/Velascat/Custodian.git@main"
+          pip install ruff vulture ty
+
+      - name: Install repo (best-effort, for adapter passes)
+        run: |
+          if [ -f pyproject.toml ]; then
+            pip install -e . || true
+          fi
+
+      - name: Run Custodian audit
+        run: |
+          custodian-multi --repos . --fail-on-findings --no-color

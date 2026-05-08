@@ -96,7 +96,8 @@ def _print_trace(trace: dict) -> None:
     routing = trace.get("routing") or {}
     if routing:
         table = Table(title="SwitchBoard routing", show_header=True, header_style="bold")
-        table.add_column("field"); table.add_column("value")
+        table.add_column("field")
+        table.add_column("value")
         for field in (
             "decision_id", "selected_lane", "selected_backend",
             "policy_rule_matched", "rationale", "switchboard_version",
@@ -112,7 +113,8 @@ def _print_trace(trace: dict) -> None:
     ref = trace.get("runtime_invocation_ref")
     if ref:
         table = Table(title="RxP runtime invocation", show_header=True, header_style="bold")
-        table.add_column("field"); table.add_column("value")
+        table.add_column("field")
+        table.add_column("value")
         for field in ("invocation_id", "runtime_name", "runtime_kind",
                       "stdout_path", "stderr_path", "artifact_directory"):
             if field in ref:
@@ -167,7 +169,7 @@ def show(
     payload = json.loads(trace_path.read_text(encoding="utf-8"))
 
     if as_json:
-        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False))
         return
     _console.print(f"[dim]source: {trace_path}[/dim]\n")
     _print_trace(payload)
