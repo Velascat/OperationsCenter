@@ -241,10 +241,19 @@ class ArchonHttpWorkflowDispatcher:
         poll_url = f"{self._base_url}/api/workflows/runs/by-worker/{conversation_id}"
 
         # D1 strict: goal_text reaches Archon verbatim, no framing.
-        body = json.dumps({
+        # Per-request runtime override (provider/model) is sent in the body
+        # only when populated — Archon's patched route (PATCH-001) accepts
+        # these fields optionally, and stock/upstream Archon ignores them
+        # gracefully (Zod schema is .extend()-able, not .strict()).
+        body_payload: dict[str, Any] = {
             "conversationId": conversation_id,
             "message": config.goal_text,
-        })
+        }
+        if config.provider:
+            body_payload["provider"] = config.provider
+        if config.model:
+            body_payload["model"] = config.model
+        body = json.dumps(body_payload)
 
         metadata: dict[str, str] = {
             "http.url": kickoff_url,
@@ -264,6 +273,10 @@ class ArchonHttpWorkflowDispatcher:
             "archon.workflow_name": workflow_name,
             "archon.task_branch": config.task_branch or "",
             "archon.workflow_type": config.workflow_type,
+            # OC-side observability for the per-request runtime override —
+            # never reaches Archon (those go in the kickoff body above).
+            "archon.runtime_provider": config.provider or "",
+            "archon.runtime_model": config.model or "",
         }
 
         # Carry caller-supplied metadata through (string-only).

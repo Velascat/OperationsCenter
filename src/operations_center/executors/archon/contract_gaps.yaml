@@ -39,3 +39,27 @@
   fork_threshold: "no fork — local binder fix"
   status: mitigated
   patch_deadline: null
+
+- id: G-005
+  gap: "stock Archon's POST /api/workflows/:name/run accepts only {conversationId, message} — no per-request runtime channel for HTTP-mode dispatch"
+  discovered_at: "2026-05-07"
+  backend_version: "0.3.10 (Velascat/Archon @ fd6d75e7)"
+  impact: |
+    G-001 was originally mitigated via .archon/config.yaml in the worktree
+    (CLI mode). But the new HTTP-mode dispatcher (OperationsCenter#85) runs
+    Archon as a long-running container — the worktree-config write is
+    effectively dead in that path because the container's cwd isn't OC's
+    worktree. Without a wire-level override, every HTTP dispatch would
+    inherit the workflow YAML's baked-in provider/model, defeating
+    RuntimeBinding's per-request guarantee.
+  workaround: |
+    FORKED 2026-05-07: branch feat/per-request-runtime-override on
+    Velascat/Archon adds optional `provider`/`model` fields to
+    runWorkflowBodySchema. Threaded through HandleMessageContext.runtimeOverride
+    into dispatchOrchestratorWorkflow; applied by mutating the in-memory
+    workflow object's provider/model before any executeWorkflow call. OC's
+    ArchonHttpWorkflowDispatcher sends them on the kickoff body when set.
+    See patches/archon/PATCH-001.yaml.
+  fork_threshold: "MET — wire-level override is required for HTTP-mode RuntimeBinding to function; cannot enforce externally without a control surface"
+  status: forked
+  patch_deadline: null

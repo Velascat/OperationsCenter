@@ -425,6 +425,102 @@ class TestStrictGoalText:
 # ---------------------------------------------------------------------------
 
 
+class TestRuntimeOverrideInBody:
+    """When ArchonWorkflowConfig carries provider/model, the dispatcher must
+    include them on the kickoff body. Archon's patched route honors the
+    override (PATCH-001); upstream Archon ignores unknown fields gracefully.
+    """
+
+    def test_provider_and_model_in_kickoff_body(
+        self, tmp_path, _patch_http_client,
+    ):
+        captured: dict = {}
+
+        def _handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path
+            method = request.method
+            if path == HEALTH:
+                return httpx.Response(200, json={"status": "ok"})
+            if path == CONVS:
+                return httpx.Response(200, json={
+                    "conversationId": "cv", "id": "db",
+                })
+            if path.endswith("/run") and method == "POST":
+                captured["body"] = json.loads(request.read())
+                return httpx.Response(200, json={
+                    "accepted": True, "status": "started",
+                })
+            if path.startswith(BY_WORKER):
+                return httpx.Response(200, json={
+                    "run": {"id": "r1", "status": "completed", "metadata": {}},
+                })
+            if "/runs/r1" in path and method == "GET":
+                return httpx.Response(200, json={
+                    "run": {"id": "r1", "status": "completed", "metadata": {}},
+                    "events": [],
+                })
+            if path.endswith("/abandon"):
+                return httpx.Response(200)
+            return httpx.Response(404, text=f"unmatched: {method} {path}")
+
+        transport = httpx.MockTransport(_handler)
+        _patch_http_client["transport"] = transport
+        dispatcher = _make_dispatcher(transport)
+
+        cfg = _config(tmp_path)
+        cfg = ArchonWorkflowConfig(
+            **{**cfg.__dict__, "provider": "claude", "model": "opus"},
+        )
+        capture = dispatcher.dispatch(cfg)
+        assert capture.outcome == "success"
+        assert captured["body"]["provider"] == "claude"
+        assert captured["body"]["model"] == "opus"
+        # goal_text + conversationId still present per D1.
+        assert captured["body"]["message"] == cfg.goal_text
+        assert captured["body"]["conversationId"] == "cv"
+
+    def test_no_provider_or_model_omits_them_from_body(
+        self, tmp_path, _patch_http_client,
+    ):
+        captured: dict = {}
+
+        def _handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path
+            method = request.method
+            if path == HEALTH:
+                return httpx.Response(200, json={"status": "ok"})
+            if path == CONVS:
+                return httpx.Response(200, json={
+                    "conversationId": "cv", "id": "db",
+                })
+            if path.endswith("/run") and method == "POST":
+                captured["body"] = json.loads(request.read())
+                return httpx.Response(200, json={
+                    "accepted": True, "status": "started",
+                })
+            if path.startswith(BY_WORKER):
+                return httpx.Response(200, json={
+                    "run": {"id": "r1", "status": "completed", "metadata": {}},
+                })
+            if "/runs/r1" in path and method == "GET":
+                return httpx.Response(200, json={
+                    "run": {"id": "r1", "status": "completed", "metadata": {}},
+                    "events": [],
+                })
+            if path.endswith("/abandon"):
+                return httpx.Response(200)
+            return httpx.Response(404, text=f"unmatched: {method} {path}")
+
+        transport = httpx.MockTransport(_handler)
+        _patch_http_client["transport"] = transport
+        dispatcher = _make_dispatcher(transport)
+
+        capture = dispatcher.dispatch(_config(tmp_path))
+        assert capture.outcome == "success"
+        assert "provider" not in captured["body"]
+        assert "model" not in captured["body"]
+
+
 class TestRuntimeRegistration:
     def test_dispatcher_registers_async_http_runner_idempotently(self):
         runtime = ExecutorRuntime()
