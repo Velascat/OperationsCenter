@@ -135,6 +135,11 @@ class ExecutionCoordinator:
 
         request = self._builder.build(bundle, runtime, policy_decision)
 
+        # Pre-dispatch contract impact analysis. Logs a structured INFO
+        # line and returns a metadata dict (empty when no graph or no
+        # impact) that we merge into the observability record below.
+        pre_dispatch_metadata = self._log_contract_impact(request)
+
         # Pre-execution: clone the repo into the workspace and create the
         # task branch. Skipped when no WorkspaceManager is configured (unit
         # tests that mock adapters do not need a workspace).
@@ -191,12 +196,13 @@ class ExecutionCoordinator:
                 repo_graph_context=self._repo_graph,
             )
 
+        merged_metadata = {**pre_dispatch_metadata, **(runtime_metadata or {})}
         record, trace = self._observe(
             bundle,
             result,
             policy_decision,
             raw_detail_refs=raw_detail_refs,
-            runtime_metadata=runtime_metadata,
+            runtime_metadata=merged_metadata,
             request=request,
         )
         # ER-002 — index the finalized result. Single write site for
@@ -292,6 +298,58 @@ class ExecutionCoordinator:
             logger.warning(
                 "Run memory indexing failed for run %s: %s", request.run_id, exc,
             )
+
+    def _log_contract_impact(self, request: ExecutionRequest) -> dict[str, Any]:
+        """Pre-dispatch hook: log contract-change blast radius for ``request.repo_key``.
+
+        Returns a metadata dict that will be merged into the observability
+        record. Empty dict when no graph is configured, the repo_key
+        doesn't resolve, or the target has no consumers.
+        """
+        if self._repo_graph is None:
+            return {}
+        try:
+            from platform_manifest import RepoGraph
+
+            from operations_center.impact_analysis import (
+                compute_contract_impact,
+            )
+        except Exception:  # noqa: BLE001 — defensive: never block dispatch
+            return {}
+
+        if not isinstance(self._repo_graph, RepoGraph):
+            return {}
+        try:
+            summary = compute_contract_impact(self._repo_graph, request.repo_key)
+        except Exception as exc:  # noqa: BLE001 — defensive
+            logger.warning(
+                "Contract impact analysis failed for repo_key=%r: %s",
+                request.repo_key, exc,
+            )
+            return {}
+
+        if summary is None or not summary.has_impact():
+            return {}
+
+        public = [n.canonical_name for n in summary.public_affected]
+        private = [n.canonical_name for n in summary.private_affected]
+        logger.info(
+            "contract change in %s affects %d consumer(s) [public=%d private=%d]: %s",
+            summary.target.canonical_name,
+            len(summary.affected),
+            len(public),
+            len(private),
+            ", ".join(n.canonical_name for n in summary.affected),
+        )
+        return {
+            "contract_impact": {
+                "target": summary.target.canonical_name,
+                "target_repo_id": summary.target.repo_id,
+                "affected_count": len(summary.affected),
+                "public_affected": public,
+                "private_affected": private,
+            }
+        }
 
     def _observe(
         self,
