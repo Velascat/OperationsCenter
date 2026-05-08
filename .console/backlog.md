@@ -4,7 +4,18 @@ _Durable work inventory. Update after each meaningful chunk of progress._
 
 ## In Progress
 
-- [x] **Post-extraction runtime architecture validation (2026-05-08, on `validate/post-extraction-runtime-2026-05-08`)**: 5-run validation matrix executed (happy / failure / timeout / Archon mocked / non-Archon direct_local). Architecture validated end-to-end at the contract level; identity invariant holds; boundary cleanliness good. Surfaced 3 traceability gaps (G-V01 HIGH: `ExecutionResult` drops RxP `invocation_id` linkage; G-V02 MEDIUM: routing rationale missing from record metadata; G-V03 LOW: `execution_trace.json` is status-only) plus G-V04 G-005 unaddressed and G-V05 live-Archon deferred (container not running). Report at `.console/validation/post_extraction_runtime_2026-05-08.md`. Verdict: **architecture mostly valid; fix G-V01 before broader use**.
+(none — runtime boundary extraction validation arc complete; see "Done" below)
+
+## Up Next — Runtime Observability Hardening arc
+
+Operational/observational polish on top of the validated architecture.
+None of these items reopen boundaries.
+
+- [ ] **Archon workflow registration playbook**: Document (and where appropriate ship) the operator steps to register an `archon-assist` workflow against a running Archon container so the OC live happy-path workflow_run can be observed. Environment-only — no OC code change. Outcome: rev3's "what the live container could not validate" line becomes coverable.
+- [ ] **Capacity-exhaustion regression fixture**: Pin one real claude-code "out of extra usage" stdout sample as a fixture under `tests/unit/backends/fixtures/` and add a regression test that feeds it through `classify_capacity_exhaustion` + a real adapter so the classifier can't silently regress on the in-the-wild form.
+- [ ] **`oc run-show <run_id>` — single-command provenance reader**: Read-only CLI that prints the full provenance chain from `execution_trace.json` alone (OC run_id → RxP invocation → SwitchBoard rule → captured artifacts). Validates from the operator's seat that the trace really is self-contained.
+- [ ] **Artifact path staleness checks**: When `RunReportBuilder.build_report` forwards `runtime_invocation_ref.stdout_path` into the trace, verify the file still exists at trace-build time and surface a warning (not an error) when the temp dir was reaped. Same for `artifact_directory`.
+- [ ] **Routing rationale completeness smoke check**: Add a smoke test that any non-stub SwitchBoard implementation populates `policy_rule_matched` + `switchboard_version` (rationale already enforced by current code). Catches partial decisions before they reach `execution_record.json`.
 
 ## Up Next
 
