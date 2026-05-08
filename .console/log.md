@@ -3,6 +3,32 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — feat/managed-repo-config-gaps: 4 gaps closed
+
+- Gap 1: `ManagedRepoConfig` gains `@model_validator(mode="after")` — enforces
+  `audit` present when capabilities includes "audit", `audit_types` non-empty,
+  `repo_id`/`repo_name` non-blank. All 3 paths tested; example config passes.
+- Gap 2: ADR 0004 `docs/architecture/adr/0004-managed-repo-private-overlay.md`
+  — documents the private overlay pattern, privacy invariant rationale, alternatives.
+- Gap 3: `docs/operator/managed_repo_troubleshooting.md` — operator runbook for
+  config setup, common mistakes, field migration, dispatch debugging.
+- Gap 4: OC11 detector added to `.custodian/detectors.py` — AST-extracts all
+  Pydantic field names from `models.py` and checks each appears in
+  `example_managed_repo.yaml`; caught `phases_from_source` missing (now fixed).
+- VF branch fix: P-class plumbing commit cherry-picked to VF `dev`
+  (was on `main` only); Zonos submodule pointer unchanged.
+
+## 2026-05-08T22:40Z — Loop cycle (STALLED → unblocked)
+
+Health: STALLED — confirmed closed-loop stagnation. Board entering cycle: Blocked=7 Backlog=5 InReview=4 Running=1, Ready-for-AI=0.
+Forward progress: NO — propose emitted 2-3 candidates 3 consecutive runs, created=0 skipped=2-3 each time. Duplicate deadlock confirmed.
+Closed-loop stagnation: YES — propose→skip→Blocked→workers ignore→repeat with zero queue movement.
+Queue deadlock: YES — 5 OC tasks (self-modify:approved) stuck in Blocked; deduplication prevented new task creation.
+Action: moved 5 OC tasks Blocked→Backlog (safe: all self-modify:approved, failed prior kodo runs). CxRP campaign tasks left as-is.
+Board after: Backlog=10, Blocked=2. Auto-promoter will re-queue to Ready-for-AI next propose cycle.
+Tests: 15/15 golden pass. Watchers: 8/8, no non-143 restarts.
+Cadence: ACTIVE (900s) — fix dispatched, monitoring for queue drain.
+
 ## 2026-05-08T21:58Z — Loop cycle (HEALTHY, starvation watch)
 
 Health: HEALTHY. Board: Blocked=7 Backlog=5 InReview=4 Running=1 Done=4 Cancelled=7. No Ready-for-AI tasks.

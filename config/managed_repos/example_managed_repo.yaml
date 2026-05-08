@@ -67,6 +67,7 @@ audit:
       output_dir: tools/audit/report/audit_type_1
       status_file: "{output_dir}/{bucket}/run_status.json"
       run_status_finalization: true
+      phases_from_source: []            # list of phase names the producer writes to run_status
       status_values: [in_progress, complete, failed]
       evidence: source_inspected_no_run
       notes: >
