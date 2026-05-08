@@ -102,6 +102,9 @@ def to_cxrp_lane_decision(
 
     metadata: dict[str, Any] = {
         "policy_rule_matched": oc.policy_rule_matched,
+        # Hardening arc item 5 — ensure switchboard_version round-trips.
+        # CxRP has no top-level field for it, so it rides in metadata.
+        "switchboard_version": oc.switchboard_version,
     }
     if extra_metadata:
         metadata.update(extra_metadata)
@@ -151,6 +154,9 @@ def from_cxrp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
         confidence=payload.get("confidence", 1.0),
         policy_rule_matched=metadata.get("policy_rule_matched"),
         rationale=payload.get("rationale") or None,
+        # Hardening arc item 5 — switchboard_version rides in metadata
+        # because CxRP has no top-level field for it.
+        switchboard_version=metadata.get("switchboard_version"),
         alternatives_considered=[
             LaneName(alt["executor"])
             for alt in payload.get("alternatives", [])
