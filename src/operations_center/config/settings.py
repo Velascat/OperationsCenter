@@ -28,6 +28,27 @@ class GitSettings(BaseModel):
     signing_key: str | None = None
 
 
+class BackendCapSettings(BaseModel):
+    """Per-backend execution cap (Option A — per-backend caps).
+
+    Mirror of ``RepoSettings.max_daily_executions`` but keyed on the
+    backend that powers the dispatch (``kodo``, ``archon``, ``aider``,
+    ``openclaw``, ...). Either field may be ``None`` to skip that
+    window — typical use is daily-only for a young backend you're
+    trust-building (``max_per_day: 5``) and unset hourly until you see
+    the actual rate.
+
+    Checked via ``UsageStore.budget_decision_for_backend()`` *after*
+    the global hourly/daily and per-repo caps pass. Backends with no
+    entry in ``Settings.backend_caps`` are unconstrained at this layer
+    — the global cap still applies. Backward-compatible: existing
+    kodo-only deployments behave identically until they opt in.
+    """
+
+    max_per_hour: int | None = None
+    max_per_day: int | None = None
+
+
 class ArchonSettings(BaseModel):
     """Settings for the Archon HTTP workflow backend.
 
@@ -255,6 +276,9 @@ class Settings(BaseModel):
     platform_manifest: PlatformManifestSettings = Field(default_factory=PlatformManifestSettings)
     aider: AiderSettings = Field(default_factory=AiderSettings)
     aider_local: AiderLocalSettings = Field(default_factory=AiderLocalSettings)
+    # Per-backend hourly/daily caps. Empty by default (no per-backend cap;
+    # global cap still applies). See BackendCapSettings docstring.
+    backend_caps: dict[str, BackendCapSettings] = Field(default_factory=dict)
     repos: dict[str, RepoSettings]
     reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")

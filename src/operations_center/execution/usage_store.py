@@ -256,7 +256,16 @@ class UsageStore:
         signature: str,
         now: datetime,
         repo_key: str | None = None,
+        backend: str | None = None,
     ) -> None:
+        """Record one execution event.
+
+        ``backend`` (e.g. ``"kodo"``, ``"archon"``, ``"aider"``) is optional
+        for backward compatibility but should be supplied by all new callers.
+        It feeds ``budget_decision_for_backend()`` so the per-backend caps in
+        ``Settings.backend_caps`` can be enforced. Without it, only the
+        global hourly/daily and per-repo caps apply.
+        """
         with self._exclusive():
             data = self.load()
             attempts = dict(data.get("task_attempts", {}))
@@ -274,6 +283,8 @@ class UsageStore:
             }
             if repo_key:
                 event["repo_key"] = repo_key
+            if backend:
+                event["backend"] = backend
             self._append_event(data, event, now=now)
 
     def record_execution_outcome(
@@ -425,6 +436,78 @@ class UsageStore:
                 window="daily",
                 limit=max_daily,
                 current=repo_count,
+            )
+        return BudgetDecision(allowed=True)
+
+    # ---------------------------------------------------------------------------
+    # Per-backend execution budget (mirrors per-repo, additive)
+    # ---------------------------------------------------------------------------
+
+    def budget_decision_for_backend(
+        self,
+        backend: str,
+        *,
+        max_per_hour: int | None = None,
+        max_per_day: int | None = None,
+        now: datetime,
+    ) -> "BudgetDecision":
+        """Return a BudgetDecision for one backend's hourly/daily cap.
+
+        Counts only ``execution`` events whose ``backend`` field matches.
+        Either limit may be ``None`` to skip that window. Returns ``allowed``
+        when both windows pass (or when both limits are None — the
+        backend has no per-backend cap configured).
+
+        Callers should check this *after* the global budget passes
+        (``budget_decision()``) and *after* the per-repo cap if
+        applicable. Backends with no entry in
+        ``Settings.backend_caps`` are unconstrained at this layer —
+        only the global cap applies.
+
+        Events recorded *before* the ``backend`` field was added simply
+        don't match this filter; they continue to count toward the
+        global cap but not toward any per-backend limit. This makes the
+        rollout backward-compatible: callers can adopt the new field
+        opportunistically.
+        """
+        if not backend:
+            return BudgetDecision(allowed=True)
+        if max_per_hour is None and max_per_day is None:
+            return BudgetDecision(allowed=True)
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        cutoff_hour = now - timedelta(hours=1)
+        cutoff_day = now - timedelta(days=1)
+        hourly = 0
+        daily = 0
+        for e in events:
+            if e.get("kind") != "execution":
+                continue
+            if e.get("backend") != backend:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(e["timestamp"]))
+            except (ValueError, KeyError):
+                continue
+            if ts >= cutoff_day:
+                daily += 1
+                if ts >= cutoff_hour:
+                    hourly += 1
+        if max_per_hour is not None and hourly >= max_per_hour:
+            return BudgetDecision(
+                allowed=False,
+                reason="backend_budget_exceeded",
+                window="hourly",
+                limit=max_per_hour,
+                current=hourly,
+            )
+        if max_per_day is not None and daily >= max_per_day:
+            return BudgetDecision(
+                allowed=False,
+                reason="backend_budget_exceeded",
+                window="daily",
+                limit=max_per_day,
+                current=daily,
             )
         return BudgetDecision(allowed=True)
 
