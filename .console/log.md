@@ -3,6 +3,16 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — Watchdog runbook: behavioral/executor analysis expansion
+
+Added 4 new sections and strengthened /loop STEP 3 with 10 canvas-task changes:
+behavioral convergence analysis (convergent/weakly-convergent/non-convergent/divergent),
+semantic duplicate remediation detection, automation self-deception detection,
+executor-quality investigation. BEHAVIORAL CONVERGENCE CHECK block added to STEP 3.
+HEALTHY cadence forbidden extended to cover non-convergent/divergent/self-deception states.
+7 new cycle summary fields. Blocked work classification extended with non-convergent and divergent.
+5 new custodian guardrail invariants.
+
 ## 2026-05-08 — feat/managed-repo-config-gaps: 4 gaps closed
 
 - Gap 1: `ManagedRepoConfig` gains `@model_validator(mode="after")` — enforces

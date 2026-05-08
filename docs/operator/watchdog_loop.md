@@ -179,6 +179,55 @@ QUEUE-UNBLOCKING INVESTIGATION — when starvation or closed-loop stagnation is 
   - Determine whether tasks should safely move: Blocked→Backlog or Blocked→Ready-for-AI
   - Do not blindly mutate queue state — but investigate the unblock path and escalate immediately
 
+BEHAVIORAL CONVERGENCE CHECK — after stagnation/starvation classification:
+Read the last 3 cycle summaries and classify automation behavior:
+  CONVERGENT: retries materially evolve platform state toward resolution
+  WEAKLY-CONVERGENT: progress occurring slowly but directionally
+  NON-CONVERGENT: retries reproduce semantically equivalent outcomes with no net state change
+  DIVERGENT: automation making platform health measurably worse each cycle
+
+Classify NON-CONVERGENT when ANY hold:
+  - Same propose duplicates skipped in 2+ consecutive cycles with no queue evolution
+  - Same repo targeted by autonomy-cycle 3+ times with same failure or no-change outcome
+  - Regression retries recreate identical findings each cycle
+  - Blocked tasks recycled to Ready-for-AI with the same execution outcome repeatedly
+  - Remediation titles/labels/root-causes semantically equivalent across multiple cycles
+
+Classify DIVERGENT when:
+  - Board health metrics worsening vs prior cycles despite active remediation
+  - Blocked count increasing cycle-over-cycle while remediation runs
+  - Retries introducing new regressions rather than resolving existing ones
+
+SEMANTIC DUPLICATE DETECTION — compare across cycles:
+  - Task titles with high textual similarity targeting the same repo
+  - Same root-cause keywords in consecutive remediation attempts
+  - Same regression signature reproduced after a "successful" fix
+  - Same failure outcome for the same repo+task_type combination
+If detected: classify non-convergent, escalate via Plane task, do NOT retry equivalent path.
+
+REMEDIATION LINEAGE — before any direct fix or Plane task, check:
+  - How many prior cycles targeted this exact finding?
+  - Did prior remediation attempts change the execution outcome?
+  - Did the remediation strategy adapt after failure?
+If 2+ equivalent prior attempts with no outcome change: classify dead-remediation.
+Do NOT replay identical remediation paths. Include prior-attempt history in the Plane task.
+
+AUTOMATION SELF-DECEPTION — classify and escalate immediately when:
+  - Retries/cycles occur but queue/task state never changes (activity without state evolution)
+  - Tasks recreated under new IDs with semantically equivalent scope
+  - Watchers healthy and propose active, but board state frozen across 2+ cycles
+  - Remediation logs "completed" but the same regression immediately recurs
+This condition forbids HEALTHY cadence regardless of individual audit cleanliness.
+
+EXECUTOR-QUALITY INVESTIGATION — when non-convergent, divergent, or self-deception is classified:
+  Investigate what the automation/framework actually DID, not merely whether it ran:
+  - Did any retry change the execution strategy?
+  - Did the planner emit tasks that evolved the queue state?
+  - Did the autonomy-cycle pick a different remediation path after prior failure?
+  - Did the propose stage adapt its candidate selection after repeated skips?
+  - Did the execution path ever reach a worker, or was it blocked before dispatch?
+  Do not accept "automation ran" as evidence of quality. Require evidence of adaptation.
+
 Classify each blocked item:
   - temporarily-blocked: retry next cycle — only valid when forward progress IS occurring elsewhere
   - infra-blocked: platform instability preventing execution
@@ -186,11 +235,13 @@ Classify each blocked item:
   - validation-blocked: failing tests or regressions
   - structurally-blocked: requires operator or design action
   - crash-looping: same watcher or process failing repeatedly
-  - starvation: work exists and remediation is generated, but produces no net forward progress
-  - dead-remediation: retries occurring without any state improvement
-  - closed-loop stagnation: platform generates activity without measurable queue or execution progress
+  - starvation: work exists and candidates generated, but no net forward progress
+  - dead-remediation: retries occurring without any state improvement or adaptation
+  - closed-loop stagnation: activity without measurable queue or execution progress
+  - non-convergent: retries reproducing equivalent outcomes with no evolution
+  - divergent: automation making platform health measurably worse
 
-For starvation, dead-remediation, closed-loop stagnation, or structurally-blocked: create/update Plane task immediately. Do not use "monitor for recurrence" language. Do not retry identical failing remediation paths.
+For starvation, dead-remediation, closed-loop stagnation, non-convergent, divergent, or structurally-blocked: create/update Plane task immediately. Do not use "monitor for recurrence" language. Do not retry identical failing remediation paths.
 
 FORWARD PROGRESS CHECK — before classifying as temporarily-blocked, confirm at least one of:
   - Blocked count decreased vs prior cycle
@@ -199,6 +250,7 @@ FORWARD PROGRESS CHECK — before classifying as temporarily-blocked, confirm at
   - Regressions resolved
   - Watcher stabilized after crash
   - Autonomy-cycle outcomes improved
+  - Remediation strategy demonstrably adapted (not just re-ran)
 If none apply and remediation is actively running, classify as stagnation, not temporary delay.
 
 STEP 4 — EXECUTION GATE:
@@ -238,7 +290,15 @@ Restart a stopped watcher (only after root-cause is understood):
 
 STEP 8 — LOG + COMMIT HYGIENE:
 Append the structured cycle summary (see template in runbook) to .console/log.md.
+The summary MUST include behavioral convergence fields:
+  - Behavioral convergence: <convergent|weakly-convergent|non-convergent|divergent>
+  - Executor adaptation observed: <yes/no + reason>
+  - Semantic duplicate remediation suspected: <yes/no>
+  - Automation self-deception detected: <yes/no>
+  - Retry quality: <adaptive|repetitive|degenerate>
+  - Queue evolution quality: <healthy|stalled|cycling>
 Update .console/backlog.md for any new/closed gaps.
+IMPORTANT: Run git diff --staged before committing to ensure only loop-owned files are staged.
 Commit only after validation passes. Do not commit to main unless the operator has
 explicitly allowed it for the current task/session. If not allowed, create a branch:
   git checkout -b oc-watchdog/<YYYYMMDD-HHMM>-<short-topic>
@@ -260,8 +320,15 @@ FORBIDDEN: Do not choose HEALTHY cadence if any of these are true:
   - Blocked tasks with self-modify:approved and zero Ready-for-AI
   - propose tasks_created=0/None while candidates emitted
   - blocked count unchanged from prior cycle while remediation ran
+  - behavioral convergence classified as non-convergent or divergent
+  - automation self-deception detected
+  - 2+ consecutive cycles with semantically equivalent failed remediation and no adaptation
 
-Use the WORST health state observed across all steps. Starvation/stagnation signals
+Non-convergent automation: STALLED minimum cadence.
+Divergent automation: DEGRADED minimum cadence.
+Automation self-deception: DEGRADED minimum cadence + create Plane escalation task.
+
+Use the WORST health state observed across all steps. Starvation/stagnation/convergence signals
 force STALLED minimum immediately — single cycle evidence is sufficient.
 Log the chosen cadence and the driving signal in the cycle summary.
 Pass this full /loop prompt verbatim as the ScheduleWakeup prompt.
@@ -289,8 +356,11 @@ resumes. Do not stay at 1h cadence when the platform is actively broken.
 - `tasks_created=0/None` from propose while candidates were emitted
 - Blocked tasks with `self-modify:approved` and zero Ready-for-AI
 - Blocked count unchanged from prior cycle while remediation ran
+- Behavioral convergence classified as non-convergent or divergent
+- Automation self-deception detected (activity without state evolution)
+- 2+ consecutive cycles of semantically equivalent failed remediation with no strategy adaptation
 
-A single demonstrated starvation/stagnation cycle drops cadence to STALLED minimum.
+A single demonstrated starvation/stagnation/non-convergence cycle drops cadence immediately.
 It does not require two consecutive cycles of evidence.
 
 ---
@@ -335,6 +405,9 @@ Examples:
 | Starvation | No forward progress despite active work generation | STALLED minimum |
 | Dead-remediation | Retries occurring without any state improvement | STALLED minimum |
 | Closed-loop stagnation | Activity without measurable progress | STALLED minimum |
+| Non-convergent automation | Retries reproduce equivalent outcomes with no evolution | STALLED minimum |
+| Divergent automation | Platform health worsening under active remediation | DEGRADED minimum |
+| Automation self-deception | Activity logs but state never evolves | DEGRADED minimum |
 | Blocked queue deadlock | Work trapped in non-executable state | DEGRADED |
 
 ### Forbidden language
@@ -344,7 +417,136 @@ Do not write:
 - "flagging for next cycle"
 - "will assess again after one more cycle"
 
-once the evidence already demonstrates a closed retry/no-progress pattern.
+once the evidence already demonstrates a closed retry/no-progress pattern. Similarly, do not
+write "automation is running normally" when convergence analysis shows non-convergent behavior.
+
+---
+
+## Behavioral convergence analysis
+
+**Definition:** Automation behavior is convergent when retries, remediation, and planning
+evolve platform state toward resolution rather than reproducing equivalent outcomes repeatedly.
+
+| Convergence state | Meaning | Required action |
+|------------------|---------|-----------------|
+| `convergent` | Retries evolve toward resolution | Note in summary |
+| `weakly-convergent` | Progress occurring slowly but directionally | Monitor; note in summary |
+| `non-convergent` | Retries reproduce equivalent outcomes with no net state change | STALLED + Plane task |
+| `divergent` | Automation making platform health measurably worse | DEGRADED + escalate |
+
+### Non-convergent signals (any of these is sufficient)
+
+- Same propose duplicates skipped in 2+ consecutive cycles with no queue evolution
+- Same repo targeted by autonomy-cycle 3+ times with identical failure or no-change outcome
+- Regression retries recreate identical findings each cycle
+- Blocked tasks recycled to Ready-for-AI with the same failed execution outcome repeatedly
+- Remediation titles/labels/root-causes semantically equivalent across multiple cycles without strategy change
+
+### Divergent signals
+
+- Blocked count increasing cycle-over-cycle while remediation is actively running
+- Retries introducing new regressions rather than resolving existing ones
+- Board health metrics worsening across consecutive cycles despite audits reporting clean
+
+### What convergence is NOT
+
+Convergence is not measured by whether the automation ran or produced logs. A retry that
+produces the same outcome as all prior retries is not convergent even if it ran successfully.
+The watchdog must ask: **did the automation adapt after failure?** If not, it is not converging.
+
+### Remediation lineage
+
+Before any direct fix or Plane task creation, check the remediation history:
+
+1. How many prior cycles targeted this exact finding?
+2. Did prior remediation attempts change the execution outcome?
+3. Did the strategy adapt, or was it a replay of the same path?
+
+If 2+ equivalent prior attempts produced no outcome change: classify `dead-remediation`.
+Do not replay identical paths. Include the prior-attempt history in the Plane task description.
+
+---
+
+## Semantic duplicate remediation detection
+
+The watchdog does not require LLM-based semantic analysis. Compare across cycle summaries:
+
+- **Title similarity** — task titles targeting the same repo with >80% shared tokens
+- **Root-cause keywords** — same root-cause summary appearing in consecutive remediation attempts
+- **Regression signatures** — same test name/path failing after a "successful" fix
+- **Failure outcomes** — same repo+task_type+outcome combination repeated across cycles
+- **Label overlap** — same `family:` and `area:` label combination on consecutive tasks
+
+If any pattern is detected:
+1. Classify as non-convergent
+2. Create a Plane task with: which cycles showed the duplication, what was equivalent, what strategy should differ
+3. Do NOT create another equivalent task
+4. Do NOT retry the equivalent remediation path this cycle
+
+Semantic duplication is evidence of planner non-convergence, not bad luck. The watchdog
+must surface it rather than treating each retry as an independent fresh attempt.
+
+---
+
+## Automation self-deception
+
+**Definition:** The platform reports activity, retries, task creation, or remediation
+while meaningful execution progress does not occur. The system appears healthy by
+operational metrics while producing no forward progress.
+
+### Detection signals
+
+- Retries and cycles run but queue/task state is frozen across 2+ cycles
+- Tasks recreated under new IDs with semantically equivalent scope and labels
+- Watchers all healthy and propose active, but board state unchanged between cycles
+- Remediation logs "completed" but the same regression or gap immediately recurs
+- `propose.tasks_created > 0` but Blocked count never decreases
+- Custodian sweep reports 0 findings but flow-audit reports the same open gaps cycle-over-cycle
+
+### Why it matters
+
+Automation self-deception means the platform's health signals are decoupled from reality.
+A cycle summary that says "audits clean, tasks created, watchers running" may still be
+describing a frozen platform. The watchdog must not confuse **activity** with **progress**.
+
+### Required response
+
+1. Classify the cycle as containing automation self-deception in the summary
+2. Investigate: which specific metric claimed progress while state did not change?
+3. Create a Plane task: what is the deception mechanism? (duplicate creation? false-clean audit?)
+4. DEGRADED cadence minimum — HEALTHY is forbidden
+5. Do not retry the same execution path this cycle
+
+---
+
+## Executor-quality investigation
+
+When non-convergent, divergent, or self-deception is classified, investigate what the
+automation/framework actually **did**, not merely whether it produced output.
+
+### Evidence to examine
+
+| Question | Where to look |
+|----------|--------------|
+| Did the retry change execution strategy? | Compare task labels/descriptions across cycles |
+| Did the planner emit tasks that evolved queue state? | Compare Blocked/Ready counts before/after propose |
+| Did autonomy-cycle pick a different path after failure? | Autonomy-cycle logs + cycle summary history |
+| Did propose adapt candidate selection after repeated skips? | propose log events: `tasks_skipped`, `tasks_created` trend |
+| Did the execution path reach a worker? | Watcher logs + Running state transitions |
+| Did remediation adapt after failure? | Failure categories in consecutive cycle summaries |
+
+### Classification
+
+| Executor quality | Evidence | Required action |
+|----------------|----------|-----------------|
+| `adaptive` | Strategy materially changed after failure | Convergent — continue |
+| `repetitive` | Same strategy rerun without adaptation | Non-convergent — escalate |
+| `degenerate` | Retries making state worse or introducing new failures | Divergent — escalate + DEGRADED |
+
+### Guardrail
+
+Do not accept "automation ran without errors" as evidence of quality. Require evidence that
+the automation strategy **changed** after a prior failure before classifying as adaptive.
 
 ---
 
@@ -427,11 +629,14 @@ before classifying blocked items.
 | `structurally-blocked` | needs operator or design action | Plane task + escalate |
 | `crash-looping` | same failure repeating | Plane task + anti-flap rule |
 | `starvation` | work exists and candidates generated, but no net forward progress | Plane task + STALLED + investigate queue |
-| `dead-remediation` | retries with no state improvement | Plane task + STALLED + stop retrying |
+| `dead-remediation` | retries with no state improvement or adaptation | Plane task + STALLED + stop retrying |
 | `closed-loop stagnation` | activity without measurable progress | Plane task + STALLED + investigate loop |
+| `non-convergent` | retries reproducing equivalent outcomes with no evolution | Plane task + STALLED + convergence analysis |
+| `divergent` | automation measurably worsening platform health | Plane task + DEGRADED + executor investigation |
 
-`structurally-blocked`, `dead-remediation`, `starvation`, and `closed-loop stagnation`
-must be escalated with a Plane task immediately. Do not retry them in the same cycle.
+`structurally-blocked`, `dead-remediation`, `starvation`, `closed-loop stagnation`,
+`non-convergent`, and `divergent` must be escalated with a Plane task immediately.
+Do not retry them in the same cycle.
 Do not use "monitor for recurrence" language once the pattern is demonstrated.
 
 ---
@@ -571,6 +776,13 @@ Append one block per completed cycle to `.console/log.md`:
 - Watcher restarts / crash classifications: <role=exit_code:classification,...> or "none"
 - Anti-flap escalations: <role=reason,...> or "none"
 - Autonomy-cycle outcomes: <repo=success|fail,...> or "none"
+- Behavioral convergence: <convergent|weakly-convergent|non-convergent|divergent>
+- Executor adaptation observed: <yes — reason | no — reason>
+- Semantic duplicate remediation suspected: <yes — N cycles / no>
+- Remediation lineage investigated: <yes — N prior attempts | no>
+- Automation self-deception detected: <yes — detail | no>
+- Retry quality: <adaptive|repetitive|degenerate>
+- Queue evolution quality: <healthy|stalled|cycling>
 - Follow-ups: <Plane task IDs or "none">
 ```
 
@@ -585,7 +797,8 @@ Append one block per completed cycle to `.console/log.md`:
 | Investigate | 6 audit CLIs in parallel | Collect findings; classify affected repos |
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
-| Execution gate | Criteria check + stagnation check | Gate direct fixes; route rest to Plane |
+| Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
+| Execution gate | Criteria check + stagnation/convergence check | Gate direct fixes; route rest to Plane |
 | Direct fixes | `autonomy-cycle --execute` per repo | One repo at a time; kodo max_concurrent=1 |
 | Invariants | `pytest er000_phase0_golden` + targeted | Plane task on failure |
 | Watcher health | `watch-all-status` + log grep | Anti-flap classification; restart if safe |
@@ -609,9 +822,14 @@ Additional invariants maintained by runbook convention (not currently code-enfor
 - No destructive git operations in loop helpers
 - No runtime model policy widening from loop actions
 - Adaptive cadence must not widen kodo concurrency regardless of urgency
-- **HEALTHY cadence forbidden while starvation or closed-loop stagnation is active**
+- **HEALTHY cadence forbidden while starvation, closed-loop stagnation, non-convergent, or divergent automation is active**
 - **Demonstrated stagnation escalates immediately — "monitor for recurrence" is not an action**
 - **Repeated duplicate remediation generation with zero queue movement is starvation, not noise**
+- **Non-convergent automation (retries with no adaptation) requires STALLED cadence + Plane task**
+- **Divergent automation (health worsening under remediation) requires DEGRADED cadence + escalation**
+- **Automation self-deception (activity without state evolution) forbids HEALTHY cadence**
+- **Semantic duplicate remediation across 2+ cycles requires lineage investigation before retry**
+- **"Automation ran" is not evidence of quality — adaptation after failure must be demonstrated**
 
 ---
 
