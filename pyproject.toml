@@ -55,6 +55,8 @@ operations-center-reaudit-check     = "operations_center.entrypoints.reaudit_che
 operations-center-graph-doctor      = "operations_center.entrypoints.graph_doctor.main:main"
 # Cross-repo task chaining — manual trigger (R5.2).
 operations-center-propagate         = "operations_center.entrypoints.propagate.main:main"
+# Cross-repo task chaining — inspect parent-child chains (R5.5).
+operations-center-propagation-links = "operations_center.entrypoints.propagation_links.main:main"
 # Phase 14 fork-management engine extracted to SourceRegistry.
 # Use the `source-registry` CLI directly with
 #   --registry registry/source_registry.yaml

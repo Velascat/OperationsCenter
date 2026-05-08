@@ -1,0 +1,55 @@
+# SAMPLE — copy to <contract-repo>/.github/workflows/propagate.yml
+# See docs/operator/propagation/post-merge-hook.md for the full runbook.
+name: Propagate contract change
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  propagate:
+    name: Notify downstream consumers
+    runs-on: ubuntu-latest
+    if: github.event.repository.fork == false
+    steps:
+      - name: Checkout OperationsCenter
+        uses: actions/checkout@v4
+        with:
+          repository: Velascat/OperationsCenter
+          token: ${{ secrets.OC_REPO_TOKEN }}
+          path: oc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install OperationsCenter
+        working-directory: oc
+        run: pip install -e .
+
+      - name: Stage OC config
+        env:
+          OC_PROPAGATE_CONFIG: ${{ secrets.OC_PROPAGATE_CONFIG }}
+        run: |
+          mkdir -p oc/config
+          printf '%s' "$OC_PROPAGATE_CONFIG" > oc/config/operations_center.local.yaml
+
+      - name: Propagate
+        working-directory: oc
+        env:
+          PLANE_API_TOKEN: ${{ secrets.PLANE_API_TOKEN }}
+        run: |
+          operations-center-propagate \
+            --target ${{ github.event.repository.name }} \
+            --version ${{ github.sha }} \
+            --config config/operations_center.local.yaml \
+            --require-enabled \
+            --json
+
+      - name: Upload propagation records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: propagation-records-${{ github.sha }}
+          path: oc/state/propagation/*.json
+          retention-days: 90
