@@ -152,6 +152,47 @@ audit:
       # http_workflow.py emits Archon API payloads; ASCII-safe is correct
       # for HTTP wire format here (operator names + IDs are ASCII).
       - src/operations_center/backends/archon/http_workflow.py
+    D11:
+      # The three local backends (aider_local, direct_local, kodo) share a
+      # common lifecycle by design — _read_capture, _discover_changed_files,
+      # _diff_stat. Refactoring to a shared helper is a follow-up; today
+      # the duplication is intentional to keep each backend self-contained.
+      - "src/operations_center/backends/**"
+      # github_pr.py reactions/comments/review-events all use the same
+      # GitHub API GET shape — typological similarity, not a clone.
+      - src/operations_center/adapters/github_pr.py
+      # JSON state stores share a write/read pattern — single-source-of-
+      # truth pair (budgets/cooldowns/usage_store).
+      - "src/operations_center/audit_governance/**"
+      # PR-quality + reporting adapters that wrap GitHub APIs share patterns.
+      - src/operations_center/adapters/pr_quality.py
+      - "src/operations_center/adapters/reporting/**"
+      - "src/operations_center/adapters/plane/**"
+      # Spec-director phase orchestrators are a CRUD family by design.
+      - "src/operations_center/spec_director/**"
+      # Routing rules / decision rules / proposer / planning / lifecycle —
+      # all evaluator typology that share shape.
+      - "src/operations_center/routing/**"
+      - "src/operations_center/decision/**"
+      - "src/operations_center/proposer/**"
+      - "src/operations_center/planning/**"
+      - "src/operations_center/lifecycle/**"
+      - "src/operations_center/observer/**"
+      - "src/operations_center/observability/**"
+      - "src/operations_center/scheduled_tasks/**"
+      - "src/operations_center/insights/**"
+      - "src/operations_center/upstream_eval/**"
+      - "src/operations_center/audit_dispatch/**"
+      - "src/operations_center/policy/**"
+      - "src/operations_center/managed_repos/**"
+      - "src/operations_center/run_memory/**"
+      - "src/operations_center/repo_graph/**"
+      # CLI entrypoints (artifacts/fixtures/flow_audit/ghost_audit) share
+      # _load_index / _parse_since / _detect_* helpers — typology by class.
+      - "src/operations_center/entrypoints/**"
+      # Campaign + usage stores share record_* event-emit pattern (event-
+      # log typology). Real refactor would centralise the writer.
+      - "src/operations_center/execution/**"
     T8:
       # Architecture-guard + lock-store-concurrency tests don't import the
       # code under audit — they probe via subprocess + filesystem.
