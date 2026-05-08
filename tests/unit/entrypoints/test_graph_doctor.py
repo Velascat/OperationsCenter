@@ -359,3 +359,66 @@ class TestPerIncludeBreakdown:
         assert "includes (1):" in out
         assert "ProjectA" in out
         assert "+1 nodes" in out
+
+
+# ---------------------------------------------------------------------------
+# Platform-manifest version + per-visibility counts (DoD #1, #2)
+# ---------------------------------------------------------------------------
+
+
+class TestPlatformManifestVersionReporting:
+    def test_version_field_present_in_json(self, tmp_path: Path, capsys) -> None:
+        cfg = _write_config(tmp_path)
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        # platform-manifest is an installed dependency; version should resolve
+        assert "version" in report["platform_manifest"]
+        version = report["platform_manifest"]["version"]
+        assert version is not None
+        # Looks like a PEP 440 version
+        assert any(ch.isdigit() for ch in version)
+
+    def test_version_in_human_output(self, tmp_path: Path, capsys) -> None:
+        cfg = _write_config(tmp_path)
+        rc = main(["--config", str(cfg)])
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "platform_manifest_version:" in out
+
+
+class TestNodesByVisibility:
+    def test_platform_only_reports_all_public(self, tmp_path: Path, capsys) -> None:
+        cfg = _write_config(tmp_path)
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        nbv = report["nodes_by_visibility"]
+        # Bundled platform manifest has only public nodes
+        assert nbv["public"] == report["nodes_total"]
+        assert nbv.get("private", 0) == 0
+
+    def test_project_with_private_node_reports_private_count(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        proj = tmp_path / "p.yaml"
+        proj.write_text(_PROJECT_YAML, encoding="utf-8")
+        cfg = _write_config(
+            tmp_path, f"\nplatform_manifest:\n  project_manifest_path: {proj}\n"
+        )
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        nbv = report["nodes_by_visibility"]
+        # _PROJECT_YAML adds one private node (myproj_api)
+        assert nbv["private"] == 1
+        assert nbv["public"] == report["nodes_total"] - 1
+
+    def test_human_output_includes_visibility_breakdown(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        cfg = _write_config(tmp_path)
+        rc = main(["--config", str(cfg)])
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "nodes_by_visibility:" in out
