@@ -17,7 +17,7 @@ dependencies = [
   "source-registry @ git+https://github.com/Velascat/SourceRegistry.git",
   "rxp @ git+https://github.com/Velascat/RxP.git",
   "executor-runtime @ git+https://github.com/Velascat/ExecutorRuntime.git",
-  "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.3.0",
+  "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.5.0",
 ]
 
 [project.scripts]
@@ -51,6 +51,8 @@ operations-center-autonomy-tiers    = "operations_center.entrypoints.autonomy_ti
 operations-center-ci-monitor        = "operations_center.entrypoints.ci_monitor.main:main"
 # Phase 13 — re-audit trigger evaluator. Cron-friendly; nonzero exit when stale.
 operations-center-reaudit-check     = "operations_center.entrypoints.reaudit_check.main:main"
+# Manifest primitive — diagnose EffectiveRepoGraph wiring (R4.1).
+operations-center-graph-doctor      = "operations_center.entrypoints.graph_doctor.main:main"
 # Phase 14 fork-management engine extracted to SourceRegistry.
 # Use the `source-registry` CLI directly with
 #   --registry registry/source_registry.yaml
