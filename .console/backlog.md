@@ -7,6 +7,17 @@ _Durable work inventory. Update after each meaningful chunk of progress._
 (none — runtime boundary extraction validation arc complete; Runtime
 Observability Hardening arc complete; next arc proposed in ADR 0002)
 
+## Up Next — Verification Gaps arc
+
+Items where declared architecture has outpaced operationally exercised
+architecture. None require new design; all close concrete gaps surfaced
+during the post-Hardening verification sweep (2026-05-08).
+
+- [x] **VideoFoundry platform-manifest pin bump (2026-05-08, VF PR #895 — done)**: PM 1.0.0 was released, VF still pinned `>=0.7,<1.0`, OC's contract-impact hook silently dispatched with `graph_built=False`. Bumped to `>=0.7,<2.0`. graph-doctor now reports `graph_built=True` (11 nodes / 14 edges). OC-side regression test added in `tests/unit/entrypoints/test_graph_doctor.py::TestVersionPinRegression` — asserts that a project manifest pinning an unsatisfiable PM range surfaces explicitly as `status=fail_graph_none` with the constraint named in the warning, so a future "swallow the warning to make doctor green" change can't regress us.
+- [ ] **SwitchBoard live verification rev**: Same shape as Archon Rev 3. Compose profile + startup runbook + smoke script + integration suite passing against a real HTTP service. Targets `tests/integration/test_routing_live.py` (3 currently-failing tests pre-existing because no live service runs). Success criteria: route request round-trips against real service; structured response validates as CxRP `LaneDecision`; service survives restart cycle. **Verification-only** — no SwitchBoard scope expansion.
+- [ ] **SourceRegistry status — wire it or document the stub**: Imported in exactly one production module (`execution/binding.py`); zero test coverage. Resolve the four-revs-of-ducking ambiguity by picking one of: (A) document as intentional future hook with a `TODO(boundary)` and one minimal smoke test; (B) add real execution-path coverage if it's meant to participate today; (C) remove if the seam is premature. Likely-correct default: A.
+- [ ] **WorkStation compose profile smoke per profile**: Four profiles exist (`archon`, `core`, `dev`, `observability`); only `archon` has been smoke-tested. Per profile produce: startup command + expected containers + expected healthy state + ports + health endpoints + known caveats. Goal is operational confidence, not deep feature validation. `observability` particularly worth boot-testing since monitoring stacks rot silently if nobody runs them.
+
 ## Up Next — Backend Card Axis Expansion arc (proposed)
 
 ADR 0002 at `docs/architecture/adr/0002-backend-card-axis-expansion.md`
