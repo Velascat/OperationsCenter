@@ -24,14 +24,32 @@ _(none — system locked at Rev 10)_
 - [ ] **File upstream PR for Archon PATCH-001 (no branch — operational gate, 2026-05-08)**: Tracked at `patches/archon/PATCH-001.yaml` (`pushed: false`). Wait until OC has dispatched **≥10 real Archon workflows with override applied** AND captured at least one trace where the override produced a different SDK call than the workflow YAML default (e.g. workflow says `model: sonnet`, override says `model: opus`, claude SDK gets `opus`). Pitch needs to be reframed for upstream Archon users (external orchestrators, multi-tenant deployments, A/B model testing per request) — OC's per-request RuntimeBinding isn't a coleam00/Archon concern on its own. When the gate trips: file against coleam00/Archon, set `patches/archon/PATCH-001.yaml::pushed: true` and `pushed_pr_url`. Until then, gated on `archon.enabled: true` somewhere non-test + a registered codebase + an LLM key in the container.
 
 
-- [ ] **3-layer manifest rollout next steps (no branch yet)**:
-  - Author project manifests for the remaining managed/private repos (NetworkRuntime if it becomes part of OC's dispatch path; future project shells)
-  - Add a `Settings.platform_manifest.project_slug` default convention or auto-discover from `Settings.self_repo_key` so operators don't have to set it
-  - Author per-machine `~/.config/workstation/manifests/<slug>.local.yaml` for the dev box and verify WS discovery picks it up under a real OC run
-  - Surface `contract_impact` in the operator-facing CLI output (today it lands in observability metadata only) — pre-dispatch confirmation prompt or post-run summary
-  - Wire the impact summary into `tools/audit/report` artifacts so historical runs preserve blast radius
+- [x] **3-layer manifest primitive — operationally complete (2026-05-08, R1–R4 across PM/VF/Warehouse/OC)**: All 14 DoD items met. R1 schema CI + validate CLI, R2 operator runbooks + example.yaml block, R3 path resolution + slug auto-resolve + `effective` CLI, R4 graph-doctor + integration smoke. PM tagged through v0.5.0. Operator now sees blast-radius warnings on every contract-touching dispatch; failures degrade gracefully; pattern is discoverable from main.
 
-- [ ] **3-layer manifest — cross-repo task chaining (DEFERRED, design-not-yet)**: Use the impact set to auto-queue downstream re-validation tasks when a contract repo (CxRP/RxP/PlatformManifest) is touched. Requires (1) a scheduler/queue that consumes ContractImpactSummary, (2) policy on which kinds of changes auto-trigger downstream tasks vs require operator confirmation, (3) per-consumer task templates. Gated until operator demand is real.
+- [ ] **R7 — Edge type expansion (next, post-manifest-primitive)**: Audit + design landed (see log entry "R5/R6/R7 audit + design"). Phases:
+  - **R7.1**: `RepoGraph.who_dispatches_to(repo_id) -> list[RepoNode]` query. Promotes the existing `dispatches_to` edge from informational to first-class queryable. No schema change. ~half day.
+  - **R7.2**: New `RepoEdgeType.BUNDLES_ASSETS_FROM` + `RepoGraph.who_consumes_assets_of(repo_id) -> list[RepoNode]` query. PM minor bump v0.6.0. JSON schema + tests + docs. ~half day.
+  - **R7.3**: Author the VF→Warehouse `bundles_assets_from` edge in VF's project manifest (real consumer use case that justified the type). ~half day.
+  - **Stop point**: Live with R7.1+R7.2+R7.3 for a few days before R6. Validates that "edge vocabulary determines what the graph can mean" carries through to real queries operators ask.
+  - **Deferred edge types**: `monitors_health_of` (wait for WS health graph), `forks_from` (wait for SourceRegistry cross-graph queries), `triggers_revalidation_of` (likely subsumed by R5's propagation infra using `depends_on_contracts_from`).
+
+- [ ] **R6 — Multi-project composition via shell repo (after R7 settles)**: Shell-repo pattern (Shape A) — auditable architecture > runtime trivia. PM `_resolve_includes()` recursive loader with cycle detection + collision rules (duplicate repo_id = hard fail; cycles = hard fail; visibility never widens; cross-suite edges allowed). Phases:
+  - **R6.1**: PM `_resolve_includes` recursion + cycle detection + collision rules + 12-15 tests (`composition.py` extension). ~1 day.
+  - **R6.2**: PM schema update — optional `includes: list[{name, project_manifest_path}]` on project schema. Bump PM v0.7.0 (after R7.2's v0.6.0). ~half day.
+  - **R6.3**: Authoring docs update + reference example. Don't ship a real `VideoFoundrySuite/` repo until VF + Warehouse logically want to be one suite. ~half day.
+  - **Future (NOT v1)**: `suite_id` for stable identities independent of repo path. Wait until VF Suite / AI Platform Suite / Customer Suite all want shared identity.
+
+- [ ] **R5 — Cross-repo task chaining (after R6 settles, biggest scope)**: Glue between existing systems — `compute_contract_impact()` + `scheduled_tasks/runner.py` pattern + `PlaneClient.create_issue()` + `cross_repo_impact._check_cross_repo_impact()` (S7-6, already shipped). Default policy: Backlog status, not auto-execute — prevents recursive AI task storms / notification spam / propagation loops / implicit trust escalation. **Mandatory observability**: every automated propagation action emits a structured artifact/report from day one. Phases:
+  - **R5.1**: `propagation/` package — `policy.py`, `registry.py`, `dedup.py`, `propagator.py`, `links.py`. Library only, no entrypoint. Tests for each piece. ~2 days.
+  - **R5.2**: `operations-center-propagate` entrypoint — manual mode (`--target CxRP --since <commit>`). Integration test with real PlaneClient stub. ~1 day.
+  - **R5.3**: `Settings.contract_change_propagation` block + per-repo `propagation_template` overrides + operator docs. ~1 day.
+  - **R5.4**: Post-merge hook reference workflow on contract repos (CxRP/RxP/PlatformManifest). Dogfood on one real change. ~1 day.
+  - **R5.5**: `propagation_links` CLI to inspect parent-child chains. ~half day.
+  - **Trust boundary**: every consumer task lands in Backlog with `revalidation: pending-review` label. Operator promotes after triage. Per-pair opt-in `auto_promote_to_ready: true` once trust accrues.
+  - **Idempotency**: dedup key = `(target_repo_id, consumer_repo_id, target_version_or_sha)`. Default 24h window.
+  - **Parent-child links**: structured `<!-- propagation:source -->` block in every Plane task body for traceability + dedup anchors + graph lineage + operator context. No DB needed.
+
+- [ ] Phase 13 or next operator directive TBD (after R5/R6/R7 land)
 
 - [ ] Phase 13 or next operator directive TBD
 
