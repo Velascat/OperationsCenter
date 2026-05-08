@@ -2,6 +2,6 @@
 # Copyright (C) 2026 Velascat
 """Producer profiles for the managed-repo audit contract."""
 
-from .videofoundry import VideoFoundryProducerProfile, VIDEOFOUNDRY_PROFILE
+from .managed_repo import ManagedRepoAuditProfile, EXAMPLE_MANAGED_REPO_PROFILE
 
-__all__ = ["VideoFoundryProducerProfile", "VIDEOFOUNDRY_PROFILE"]
+__all__ = ["ManagedRepoAuditProfile", "EXAMPLE_MANAGED_REPO_PROFILE"]

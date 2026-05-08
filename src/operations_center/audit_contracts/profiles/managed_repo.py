@@ -21,13 +21,13 @@ from pydantic import BaseModel, Field
 
 from ..vocabulary import (
     Limitation,
-    VideoFoundryArtifactKind,
-    VideoFoundryAuditType,
-    VideoFoundrySourceStage,
+    ExampleManagedRepoArtifactKind,
+    ExampleManagedRepoAuditType,
+    ExampleManagedRepoSourceStage,
 )
 
 
-class VideoFoundryAuditTypeSpec(BaseModel):
+class ManagedRepoAuditTypeSpec(BaseModel):
     """Per-audit-type metadata for VideoFoundry."""
     audit_type: str
     output_dir: str
@@ -39,7 +39,7 @@ class VideoFoundryAuditTypeSpec(BaseModel):
     model_config = {"frozen": True}
 
 
-class VideoFoundryPathQuirk(BaseModel):
+class ManagedRepoPathQuirk(BaseModel):
     """A known path-layout quirk specific to VideoFoundry."""
     description: str
     example: str | None = None
@@ -47,7 +47,7 @@ class VideoFoundryPathQuirk(BaseModel):
     model_config = {"frozen": True}
 
 
-class VideoFoundryProducerProfile(BaseModel):
+class ManagedRepoAuditProfile(BaseModel):
     """VideoFoundry-specific metadata for the managed-repo audit contract.
 
     This profile is consumed by OpsCenter tooling that needs to interpret
@@ -61,7 +61,7 @@ class VideoFoundryProducerProfile(BaseModel):
     contract_version: str = "1.0"
 
     # Supported audit types with per-type metadata
-    audit_type_specs: list[VideoFoundryAuditTypeSpec] = Field(default_factory=list)
+    audit_type_specs: list[ManagedRepoAuditTypeSpec] = Field(default_factory=list)
 
     # Known source stage names (from Phase 0 ground truth)
     known_source_stages: list[str] = Field(default_factory=list)
@@ -70,7 +70,7 @@ class VideoFoundryProducerProfile(BaseModel):
     known_artifact_kinds: list[str] = Field(default_factory=list)
 
     # Path quirks specific to VideoFoundry
-    path_quirks: list[VideoFoundryPathQuirk] = Field(default_factory=list)
+    path_quirks: list[ManagedRepoPathQuirk] = Field(default_factory=list)
 
     # Repository singleton: architecture_invariants
     architecture_invariants_singleton_path: str = (
@@ -110,7 +110,7 @@ class VideoFoundryProducerProfile(BaseModel):
 
     model_config = {"frozen": True}
 
-    def get_audit_type_spec(self, audit_type: str) -> VideoFoundryAuditTypeSpec | None:
+    def get_audit_type_spec(self, audit_type: str) -> ManagedRepoAuditTypeSpec | None:
         return next((s for s in self.audit_type_specs if s.audit_type == audit_type), None)
 
     @property
@@ -126,10 +126,10 @@ class VideoFoundryProducerProfile(BaseModel):
 # Canonical VideoFoundry profile instance
 # ---------------------------------------------------------------------------
 
-VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
+EXAMPLE_MANAGED_REPO_PROFILE = ManagedRepoAuditProfile(
     audit_type_specs=[
-        VideoFoundryAuditTypeSpec(
-            audit_type=VideoFoundryAuditType.REPRESENTATIVE.value,
+        ManagedRepoAuditTypeSpec(
+            audit_type=ExampleManagedRepoAuditType.REPRESENTATIVE.value,
             output_dir="tools/audit/report/representative",
             run_status_finalization=True,
             phase_0_evidence="one_run_inspected_in_progress",
@@ -143,8 +143,8 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
                 "Delivery/post-run artifacts absent from inspected run."
             ),
         ),
-        VideoFoundryAuditTypeSpec(
-            audit_type=VideoFoundryAuditType.ENRICHMENT.value,
+        ManagedRepoAuditTypeSpec(
+            audit_type=ExampleManagedRepoAuditType.ENRICHMENT.value,
             output_dir="tools/audit/report/enrichment",
             run_status_finalization=False,
             phase_0_evidence="source_inspected_no_run",
@@ -154,8 +154,8 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
             ],
             notes="No runs available. run_status.json never finalized.",
         ),
-        VideoFoundryAuditTypeSpec(
-            audit_type=VideoFoundryAuditType.IDEATION.value,
+        ManagedRepoAuditTypeSpec(
+            audit_type=ExampleManagedRepoAuditType.IDEATION.value,
             output_dir="tools/audit/report/ideation",
             run_status_finalization=False,
             phase_0_evidence="source_inspected_no_run",
@@ -165,8 +165,8 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
             ],
             notes="No runs available. run_status.json never finalized.",
         ),
-        VideoFoundryAuditTypeSpec(
-            audit_type=VideoFoundryAuditType.RENDER.value,
+        ManagedRepoAuditTypeSpec(
+            audit_type=ExampleManagedRepoAuditType.RENDER.value,
             output_dir="tools/audit/report/render",
             run_status_finalization=False,
             phase_0_evidence="source_inspected_no_run",
@@ -176,8 +176,8 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
             ],
             notes="No runs available. run_status.json never finalized.",
         ),
-        VideoFoundryAuditTypeSpec(
-            audit_type=VideoFoundryAuditType.SEGMENTATION.value,
+        ManagedRepoAuditTypeSpec(
+            audit_type=ExampleManagedRepoAuditType.SEGMENTATION.value,
             output_dir="tools/audit/report/segmentation",
             run_status_finalization=False,
             phase_0_evidence="source_inspected_no_run",
@@ -187,8 +187,8 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
             ],
             notes="No runs available. run_status.json never finalized.",
         ),
-        VideoFoundryAuditTypeSpec(
-            audit_type=VideoFoundryAuditType.STACK_AUTHORING.value,
+        ManagedRepoAuditTypeSpec(
+            audit_type=ExampleManagedRepoAuditType.STACK_AUTHORING.value,
             # NOTE: directory name is "authoring", not "stack_authoring" (Phase 0 finding)
             output_dir="tools/audit/report/authoring",
             run_status_finalization=False,
@@ -203,10 +203,10 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
             ),
         ),
     ],
-    known_source_stages=[s.value for s in VideoFoundrySourceStage],
-    known_artifact_kinds=[k.value for k in VideoFoundryArtifactKind],
+    known_source_stages=[s.value for s in ExampleManagedRepoSourceStage],
+    known_artifact_kinds=[k.value for k in ExampleManagedRepoArtifactKind],
     path_quirks=[
-        VideoFoundryPathQuirk(
+        ManagedRepoPathQuirk(
             description=(
                 "Artifacts land in at least four distinct locations relative to the bucket: "
                 "run_root, artifacts/authoring/, artifacts/script_contract/ScriptWriting/, "
@@ -218,28 +218,28 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
                 "audit_subdir: audit/Connective_Contours_audit__voicesamplecleanstage__deadcode_report.txt"
             ),
         ),
-        VideoFoundryPathQuirk(
+        ManagedRepoPathQuirk(
             description=(
                 "stack_authoring output directory is named 'authoring', not 'stack_authoring'. "
                 "The CLI name and the directory name do not match."
             ),
             example="tools/audit/report/authoring/ (not stack_authoring/)",
         ),
-        VideoFoundryPathQuirk(
+        ManagedRepoPathQuirk(
             description=(
                 "architecture_invariants is a repo-level singleton written outside any "
                 "per-run bucket. It has no run_id and is overwritten in-place."
             ),
             example="tools/audit/report/architecture_invariants/latest.json",
         ),
-        VideoFoundryPathQuirk(
+        ManagedRepoPathQuirk(
             description=(
                 "ASR observation paths in voice_over_asr_observations.jsonl reference "
                 "files in VideoFoundry/temp/voice_over_delivery/, not in the audit bucket. "
                 "These are transient delivery files, not stable audit artifacts."
             ),
         ),
-        VideoFoundryPathQuirk(
+        ManagedRepoPathQuirk(
             description=(
                 "Large script object files (script_object__*.json) may be 1.5–1.6 MB. "
                 "The manifest records paths only; it must not embed content."
@@ -256,4 +256,4 @@ VIDEOFOUNDRY_PROFILE = VideoFoundryProducerProfile(
 )
 
 
-__all__ = ["VideoFoundryProducerProfile", "VideoFoundryAuditTypeSpec", "VIDEOFOUNDRY_PROFILE"]
+__all__ = ["ManagedRepoAuditProfile", "ManagedRepoAuditTypeSpec", "EXAMPLE_MANAGED_REPO_PROFILE"]

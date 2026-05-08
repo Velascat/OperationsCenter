@@ -144,7 +144,7 @@ class Limitation(str, Enum):
 # Future managed repos define their own profile vocabulary.
 # ---------------------------------------------------------------------------
 
-class VideoFoundryAuditType(str, Enum):
+class ExampleManagedRepoAuditType(str, Enum):
     """The six audit types supported by VideoFoundry."""
     REPRESENTATIVE = "representative"
     ENRICHMENT = "enrichment"
@@ -154,7 +154,7 @@ class VideoFoundryAuditType(str, Enum):
     STACK_AUTHORING = "stack_authoring"
 
 
-class VideoFoundrySourceStage(str, Enum):
+class ExampleManagedRepoSourceStage(str, Enum):
     """Stage names observed in VideoFoundry audit output (Phase 0 ground truth)."""
     TOPIC_SELECTION = "TopicSelectionStage"
     OUTLINE_PLANNING = "OutlinePlanningStage"
@@ -172,7 +172,7 @@ class VideoFoundrySourceStage(str, Enum):
     UNKNOWN = "unknown"
 
 
-class VideoFoundryArtifactKind(str, Enum):
+class ExampleManagedRepoArtifactKind(str, Enum):
     """Artifact kind vocabulary for VideoFoundry audit outputs.
 
     Based on Phase 0 ground truth. Not exhaustive — unknown artifacts
@@ -207,8 +207,8 @@ GENERIC_ENUMS = (
     ArtifactStatus, ConsumerType, ValidFor, Limitation,
 )
 
-VIDEOFOUNDRY_PROFILE_ENUMS = (
-    VideoFoundryAuditType, VideoFoundrySourceStage, VideoFoundryArtifactKind,
+EXAMPLE_MANAGED_REPO_PROFILE_ENUMS = (
+    ExampleManagedRepoAuditType, ExampleManagedRepoSourceStage, ExampleManagedRepoArtifactKind,
 )
 
 __all__ = [
@@ -224,8 +224,8 @@ __all__ = [
     "Limitation",
     "GENERIC_ENUMS",
     # videofoundry profile
-    "VideoFoundryAuditType",
-    "VideoFoundrySourceStage",
-    "VideoFoundryArtifactKind",
-    "VIDEOFOUNDRY_PROFILE_ENUMS",
+    "ExampleManagedRepoAuditType",
+    "ExampleManagedRepoSourceStage",
+    "ExampleManagedRepoArtifactKind",
+    "EXAMPLE_MANAGED_REPO_PROFILE_ENUMS",
 ]

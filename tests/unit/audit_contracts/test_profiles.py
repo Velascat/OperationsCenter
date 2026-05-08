@@ -12,25 +12,25 @@ Verifies the profile:
 from __future__ import annotations
 
 
-from operations_center.audit_contracts.profiles import VIDEOFOUNDRY_PROFILE, VideoFoundryProducerProfile
+from operations_center.audit_contracts.profiles import EXAMPLE_MANAGED_REPO_PROFILE, ManagedRepoAuditProfile
 from operations_center.audit_contracts.vocabulary import (
     GENERIC_ENUMS,
-    VideoFoundryAuditType,
+    ExampleManagedRepoAuditType,
 )
 
 
 class TestVideoFoundryProfileSeparation:
     def test_producer_id_is_videofoundry(self) -> None:
-        assert VIDEOFOUNDRY_PROFILE.producer_id == "videofoundry"
+        assert EXAMPLE_MANAGED_REPO_PROFILE.producer_id == "videofoundry"
 
     def test_profile_does_not_import_generic_enums(self) -> None:
         # The profile must not BE a generic enum; it is a producer extension.
-        assert not isinstance(VIDEOFOUNDRY_PROFILE, tuple(GENERIC_ENUMS))
+        assert not isinstance(EXAMPLE_MANAGED_REPO_PROFILE, tuple(GENERIC_ENUMS))
 
     def test_another_producer_could_define_own_profile(self) -> None:
         # Demonstrate reuse: a second producer can define a minimal profile
         # without touching the generic contract.
-        other = VideoFoundryProducerProfile(
+        other = ManagedRepoAuditProfile(
             producer_id="other_repo",
             audit_type_specs=[],
             known_source_stages=[],
@@ -44,22 +44,22 @@ class TestVideoFoundryProfileSeparation:
 
 class TestVideoFoundryAllSixAuditTypes:
     def test_all_six_audit_types_have_specs(self) -> None:
-        spec_types = {s.audit_type for s in VIDEOFOUNDRY_PROFILE.audit_type_specs}
-        expected = {at.value for at in VideoFoundryAuditType}
+        spec_types = {s.audit_type for s in EXAMPLE_MANAGED_REPO_PROFILE.audit_type_specs}
+        expected = {at.value for at in ExampleManagedRepoAuditType}
         assert spec_types == expected
 
     def test_representative_has_finalization(self) -> None:
-        spec = VIDEOFOUNDRY_PROFILE.get_audit_type_spec("representative")
+        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("representative")
         assert spec is not None
         assert spec.run_status_finalization is True
 
     def test_five_types_lack_finalization(self) -> None:
-        non_finalizing = VIDEOFOUNDRY_PROFILE.audit_types_without_finalization
+        non_finalizing = EXAMPLE_MANAGED_REPO_PROFILE.audit_types_without_finalization
         assert "representative" not in non_finalizing
         assert len(non_finalizing) == 5
 
     def test_stack_authoring_output_dir_is_authoring(self) -> None:
-        spec = VIDEOFOUNDRY_PROFILE.get_audit_type_spec("stack_authoring")
+        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("stack_authoring")
         assert spec is not None
         assert "authoring" in spec.output_dir
         assert "stack_authoring" not in spec.output_dir
@@ -67,52 +67,52 @@ class TestVideoFoundryAllSixAuditTypes:
 
 class TestVideoFoundryPhase0Evidence:
     def test_representative_evidence_is_real_run(self) -> None:
-        spec = VIDEOFOUNDRY_PROFILE.get_audit_type_spec("representative")
+        spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec("representative")
         assert spec is not None
         assert "inspected" in spec.phase_0_evidence
 
     def test_non_representative_evidence_is_source_only(self) -> None:
         for at in ("enrichment", "ideation", "render", "segmentation", "stack_authoring"):
-            spec = VIDEOFOUNDRY_PROFILE.get_audit_type_spec(at)
+            spec = EXAMPLE_MANAGED_REPO_PROFILE.get_audit_type_spec(at)
             assert spec is not None
             assert "no_run" in spec.phase_0_evidence
 
     def test_run_status_finalization_gap_documented(self) -> None:
-        assert "five" in VIDEOFOUNDRY_PROFILE.run_status_finalization_gap.lower()
-        assert "in_progress" in VIDEOFOUNDRY_PROFILE.run_status_finalization_gap
+        assert "five" in EXAMPLE_MANAGED_REPO_PROFILE.run_status_finalization_gap.lower()
+        assert "in_progress" in EXAMPLE_MANAGED_REPO_PROFILE.run_status_finalization_gap
 
     def test_legacy_status_value_documented(self) -> None:
-        assert "in_progress" in VIDEOFOUNDRY_PROFILE.legacy_status_value
+        assert "in_progress" in EXAMPLE_MANAGED_REPO_PROFILE.legacy_status_value
 
 
 class TestVideoFoundryArchitectureInvariants:
     def test_singleton_path_set(self) -> None:
-        assert "latest.json" in VIDEOFOUNDRY_PROFILE.architecture_invariants_singleton_path
+        assert "latest.json" in EXAMPLE_MANAGED_REPO_PROFILE.architecture_invariants_singleton_path
 
     def test_singleton_note_mentions_repo_singleton(self) -> None:
-        assert "repo_singleton" in VIDEOFOUNDRY_PROFILE.architecture_invariants_note
+        assert "repo_singleton" in EXAMPLE_MANAGED_REPO_PROFILE.architecture_invariants_note
 
 
 class TestVideoFoundryExcludedPathPatterns:
     def test_coverage_ini_excluded(self) -> None:
-        patterns = VIDEOFOUNDRY_PROFILE.excluded_path_patterns
+        patterns = EXAMPLE_MANAGED_REPO_PROFILE.excluded_path_patterns
         assert "coverage.ini" in patterns
 
     def test_coverage_data_excluded(self) -> None:
-        patterns = VIDEOFOUNDRY_PROFILE.excluded_path_patterns
+        patterns = EXAMPLE_MANAGED_REPO_PROFILE.excluded_path_patterns
         assert any(".coverage" in p for p in patterns)
 
     def test_sitecustomize_excluded(self) -> None:
-        patterns = VIDEOFOUNDRY_PROFILE.excluded_path_patterns
+        patterns = EXAMPLE_MANAGED_REPO_PROFILE.excluded_path_patterns
         assert "sitecustomize.py" in patterns
 
 
-class TestVideoFoundryPathQuirks:
+class TestManagedRepoPathQuirks:
     def test_path_quirks_documented(self) -> None:
-        assert len(VIDEOFOUNDRY_PROFILE.path_quirks) >= 3
+        assert len(EXAMPLE_MANAGED_REPO_PROFILE.path_quirks) >= 3
 
     def test_non_uniform_layout_quirk_documented(self) -> None:
-        quirk_descs = " ".join(q.description for q in VIDEOFOUNDRY_PROFILE.path_quirks).lower()
+        quirk_descs = " ".join(q.description for q in EXAMPLE_MANAGED_REPO_PROFILE.path_quirks).lower()
         assert "non-uniform" in quirk_descs or "uniform" in quirk_descs
 
 

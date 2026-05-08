@@ -11,7 +11,7 @@ Two layers:
     artifact_manifest — ManagedArtifactManifest, ManagedArtifactEntry, ExcludedPath
 
   VideoFoundry producer profile (VF-specific, not the contract itself):
-    profiles.videofoundry — VideoFoundryProducerProfile, VIDEOFOUNDRY_PROFILE
+    profiles.videofoundry — ManagedRepoAuditProfile, EXAMPLE_MANAGED_REPO_PROFILE
 
 Contract version: 1.0
 """
@@ -32,10 +32,10 @@ from .vocabulary import (
     PathRole,
     RunStatus,
     ValidFor,
-    VideoFoundryArtifactKind,
-    VideoFoundryAuditType,
-    VideoFoundrySourceStage,
-    VIDEOFOUNDRY_PROFILE_ENUMS,
+    ExampleManagedRepoArtifactKind,
+    ExampleManagedRepoAuditType,
+    ExampleManagedRepoSourceStage,
+    EXAMPLE_MANAGED_REPO_PROFILE_ENUMS,
 )
 
 CONTRACT_VERSION = "1.0"
@@ -58,10 +58,10 @@ __all__ = [
     "Limitation",
     "GENERIC_ENUMS",
     # videofoundry profile vocabulary
-    "VideoFoundryAuditType",
-    "VideoFoundrySourceStage",
-    "VideoFoundryArtifactKind",
-    "VIDEOFOUNDRY_PROFILE_ENUMS",
+    "ExampleManagedRepoAuditType",
+    "ExampleManagedRepoSourceStage",
+    "ExampleManagedRepoArtifactKind",
+    "EXAMPLE_MANAGED_REPO_PROFILE_ENUMS",
     # constants
     "CONTRACT_VERSION",
     "CONTRACT_NAME",
