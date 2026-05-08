@@ -17,7 +17,7 @@ dependencies = [
   "source-registry @ git+https://github.com/Velascat/SourceRegistry.git",
   "rxp @ git+https://github.com/Velascat/RxP.git",
   "executor-runtime @ git+https://github.com/Velascat/ExecutorRuntime.git",
-  "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.5.0",
+  "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.8.0",
 ]
 
 [project.scripts]
