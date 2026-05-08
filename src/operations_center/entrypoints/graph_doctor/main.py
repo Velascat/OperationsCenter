@@ -120,6 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         "platform_manifest": {
             "enabled": pm.enabled,
             "mode": mode,
+            "version": _resolve_platform_manifest_version(),
             "project_slug": pm.project_slug,
             "project_manifest_path": str(pm.project_manifest_path) if pm.project_manifest_path else None,
             "work_scope_manifest_path": str(pm.work_scope_manifest_path) if pm.work_scope_manifest_path else None,
@@ -141,6 +142,10 @@ def main(argv: list[str] | None = None) -> int:
         for e in graph.edges:
             per_edge_source[e.source.value] = per_edge_source.get(e.source.value, 0) + 1
         report["edges_by_source"] = per_edge_source
+        per_visibility: dict[str, int] = {}
+        for n in graph.list_nodes():
+            per_visibility[n.visibility.value] = per_visibility.get(n.visibility.value, 0) + 1
+        report["nodes_by_visibility"] = per_visibility
 
         # In work-scope mode, attribute nodes/edges to each include by
         # composing each include's project manifest standalone against
@@ -176,6 +181,7 @@ def _print_human(report: dict[str, object], exit_code: int) -> None:
     pm: dict[str, object] = pm_raw if isinstance(pm_raw, dict) else {}  # ty:ignore[invalid-assignment]
     print(f"  enabled:                  {pm.get('enabled')}")
     print(f"  mode:                     {pm.get('mode')}")
+    print(f"  platform_manifest_version: {pm.get('version') or '(unknown)'}")
     print(f"  project_slug:             {pm.get('project_slug') or '(none)'}")
     print(f"  project_manifest_path:    {pm.get('project_manifest_path') or '(none)'}")
     print(f"  work_scope_manifest_path: {pm.get('work_scope_manifest_path') or '(none)'}")
@@ -188,10 +194,13 @@ def _print_human(report: dict[str, object], exit_code: int) -> None:
         print(f"  edges_total:            {report.get('edges_total')}")
         nbs = report.get("nodes_by_source")
         ebs = report.get("edges_by_source")
+        nbv = report.get("nodes_by_visibility")
         if nbs:
             print(f"  nodes_by_source:        {nbs}")
         if ebs:
             print(f"  edges_by_source:        {ebs}")
+        if nbv:
+            print(f"  nodes_by_visibility:    {nbv}")
     includes = report.get("includes")
     if isinstance(includes, list) and includes:
         print(f"  includes ({len(includes)}):")
@@ -213,6 +222,16 @@ def _print_human(report: dict[str, object], exit_code: int) -> None:
         print(f"  warnings ({len(warnings)}):")
         for w in warnings:
             print(f"    - {w}")
+
+
+def _resolve_platform_manifest_version() -> str | None:
+    """Return the installed platform-manifest distribution version, or None
+    if the package isn't installed via metadata-discoverable means."""
+    from importlib import metadata as _md
+    try:
+        return _md.version("platform-manifest")
+    except _md.PackageNotFoundError:
+        return None
 
 
 def _compute_per_include_breakdown(
