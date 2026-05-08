@@ -101,12 +101,28 @@ def main(argv: list[str] | None = None) -> int:
         line.strip() for line in log_buffer.getvalue().splitlines() if line.strip()
     ]
 
+    # Determine selected composition mode for the operator-facing report.
+    if not pm.enabled:
+        mode = "disabled"
+    elif pm.work_scope_manifest_path is not None:
+        mode = "work_scope"
+    elif pm.project_manifest_path is not None:
+        mode = "project"
+    else:
+        # Factory may still discover topology/project_manifest.yaml from
+        # repo_root — but we only know that after the build attempt. For
+        # the operator report, anything not explicitly set is reported as
+        # platform_only here.
+        mode = "platform_only"
+
     report: dict[str, object] = {
         "config": str(config_path),
         "platform_manifest": {
             "enabled": pm.enabled,
+            "mode": mode,
             "project_slug": pm.project_slug,
             "project_manifest_path": str(pm.project_manifest_path) if pm.project_manifest_path else None,
+            "work_scope_manifest_path": str(pm.work_scope_manifest_path) if pm.work_scope_manifest_path else None,
             "local_manifest_path": str(pm.local_manifest_path) if pm.local_manifest_path else None,
         },
         "repo_root": str(args.repo_root) if args.repo_root else None,
@@ -150,10 +166,12 @@ def _print_human(report: dict[str, object], exit_code: int) -> None:
     print(f"  config:                 {report['config']}")
     pm_raw = report["platform_manifest"]
     pm: dict[str, object] = pm_raw if isinstance(pm_raw, dict) else {}  # ty:ignore[invalid-assignment]
-    print(f"  enabled:                {pm.get('enabled')}")
-    print(f"  project_slug:           {pm.get('project_slug') or '(none)'}")
-    print(f"  project_manifest_path:  {pm.get('project_manifest_path') or '(none)'}")
-    print(f"  local_manifest_path:    {pm.get('local_manifest_path') or '(none)'}")
+    print(f"  enabled:                  {pm.get('enabled')}")
+    print(f"  mode:                     {pm.get('mode')}")
+    print(f"  project_slug:             {pm.get('project_slug') or '(none)'}")
+    print(f"  project_manifest_path:    {pm.get('project_manifest_path') or '(none)'}")
+    print(f"  work_scope_manifest_path: {pm.get('work_scope_manifest_path') or '(none)'}")
+    print(f"  local_manifest_path:      {pm.get('local_manifest_path') or '(none)'}")
     print(f"  repo_root:              {report.get('repo_root') or '(none)'}")
     print(f"  graph_built:            {report['graph_built']}")
     nodes_total = report.get("nodes_total")

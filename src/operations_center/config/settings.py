@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from operations_center.execution.models import ExecutionControlSettings
 
@@ -319,20 +319,41 @@ class RepoSettings(BaseModel):
 class PlatformManifestSettings(BaseModel):
     """Configuration for the EffectiveRepoGraph composition pipeline.
 
-    Composition order is platform → project → local. The platform base is
-    always the bundled ``platform_manifest.yaml`` shipped by the
-    ``platform-manifest`` package. ``project_manifest_path`` and
-    ``local_manifest_path`` layer on top per the PlatformManifest design.
+    Composition order is platform → (project XOR work_scope) → local. The
+    platform base is always the bundled ``platform_manifest.yaml`` shipped
+    by the ``platform-manifest`` package. The second layer is exactly one
+    of:
+
+    - ``project_manifest_path``: a single ProjectManifest describing one
+      project unit.
+    - ``work_scope_manifest_path``: a WorkScopeManifest composing multiple
+      ProjectManifests via explicit ``includes:`` (PM v0.9.0+).
+
+    Setting both is a configuration error. ``local_manifest_path`` layers
+    on top of either.
 
     All fields default to None; the loader returns the platform-only graph
-    when nothing project- or local-specific is configured. Set
-    ``enabled=False`` to skip graph construction entirely.
+    when nothing is configured. Set ``enabled=False`` to skip graph
+    construction entirely.
     """
 
     enabled: bool = True
     project_slug: str | None = None
     project_manifest_path: Path | None = None
+    work_scope_manifest_path: Path | None = None
     local_manifest_path: Path | None = None
+
+    @model_validator(mode="after")
+    def _project_xor_work_scope(self) -> "PlatformManifestSettings":
+        if self.project_manifest_path is not None and self.work_scope_manifest_path is not None:
+            raise ValueError(
+                "platform_manifest: 'project_manifest_path' and "
+                "'work_scope_manifest_path' are mutually exclusive — "
+                "set exactly one. Use project_manifest_path for a single "
+                "project; use work_scope_manifest_path for a multi-project "
+                "OC work scope (PM v0.9.0+)."
+            )
+        return self
 
 
 class _PropagationPairOverride(BaseModel):
@@ -491,6 +512,7 @@ def load_settings(path: str | Path) -> Settings:
     # without hardcoding absolute paths.
     pm = settings.platform_manifest
     pm.project_manifest_path = _resolve_manifest_path(pm.project_manifest_path, config_dir)
+    pm.work_scope_manifest_path = _resolve_manifest_path(pm.work_scope_manifest_path, config_dir)
     pm.local_manifest_path = _resolve_manifest_path(pm.local_manifest_path, config_dir)
     # Auto-resolve project_slug from self_repo_key when unset.
     if pm.project_slug is None and settings.self_repo_key:

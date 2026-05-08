@@ -28,6 +28,7 @@ class _PlatformManifestSettingsLike(BaseModel):
     enabled: bool = True
     project_slug: str | None = None
     project_manifest_path: Path | None = None
+    work_scope_manifest_path: Path | None = None
     local_manifest_path: Path | None = None
 
 
@@ -145,3 +146,65 @@ class TestErrorSwallow:
         with caplog.at_level(logging.WARNING):
             g = build_effective_repo_graph_from_settings(s)  # type: ignore[arg-type]
         assert g is None
+
+
+# ---------------------------------------------------------------------------
+# v0.9.0+ — work-scope mode
+# ---------------------------------------------------------------------------
+
+
+_WORK_SCOPE_YAML_TEMPLATE = (
+    'manifest_kind: work_scope\n'
+    'manifest_version: "1.0.0"\n'
+    'includes:\n'
+    '  - {{name: MyProj, project_manifest_path: {project_path}}}\n'
+)
+
+
+class TestWorkScopeMode:
+    def test_explicit_work_scope_path_loads(self, tmp_path: Path) -> None:
+        proj = tmp_path / "project.yaml"
+        proj.write_text(_PROJECT_YAML, encoding="utf-8")
+        ws = tmp_path / "work_scope.yaml"
+        ws.write_text(
+            _WORK_SCOPE_YAML_TEMPLATE.format(project_path=proj),
+            encoding="utf-8",
+        )
+        s = _settings(work_scope_manifest_path=ws)
+        g = build_effective_repo_graph_from_settings(s)  # type: ignore[arg-type]
+        assert g is not None
+        assert g.resolve("MyProjAPI") is not None
+        assert g.resolve("OperationsCenter") is not None
+
+    def test_work_scope_takes_precedence_over_topology_convention(
+        self, tmp_path: Path
+    ) -> None:
+        # Even with a topology/project_manifest.yaml lying around,
+        # explicit work_scope_manifest_path means the project topology
+        # convention is not consulted.
+        topology = tmp_path / "topology"
+        topology.mkdir()
+        (topology / "project_manifest.yaml").write_text(_PROJECT_YAML, encoding="utf-8")
+        # Different project, included by the work scope:
+        other_proj = tmp_path / "other_project.yaml"
+        other_proj.write_text(
+            'manifest_kind: project\n'
+            'manifest_version: "1.0.0"\n'
+            'repos:\n'
+            '  other_api:\n'
+            '    canonical_name: OtherAPI\n'
+            '    visibility: private\n',
+            encoding="utf-8",
+        )
+        ws = tmp_path / "work_scope.yaml"
+        ws.write_text(
+            _WORK_SCOPE_YAML_TEMPLATE.format(project_path=other_proj),
+            encoding="utf-8",
+        )
+        s = _settings(work_scope_manifest_path=ws)
+        g = build_effective_repo_graph_from_settings(s, repo_root=tmp_path)  # type: ignore[arg-type]
+        assert g is not None
+        # OtherAPI from the work scope is present; MyProjAPI from the
+        # topology convention is NOT auto-loaded when work-scope mode wins.
+        assert g.resolve("OtherAPI") is not None
+        assert g.resolve("MyProjAPI") is None
