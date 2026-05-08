@@ -169,7 +169,7 @@ report_root: tools/report/kodo_plane
 #
 # platform_manifest:
 #   enabled: true
-#   project_slug: video-foundry        # for WorkStation LocalManifest discovery
+#   project_slug: <managed-repo>              # for WorkStation LocalManifest discovery
 #   project_manifest_path: /home/dev/Documents/GitHub/<managed-repo>/topology/project_manifest.yaml
 #   local_manifest_path:   /home/dev/Documents/GitHub/<managed-repo>/topology/local_manifest.yaml
 
@@ -193,3 +193,28 @@ report_root: tools/report/kodo_plane
 #       reason: trusted pair
 #   record_dir: state/propagation           # PropagationRecord artifacts
 #   dedup_path: state/propagation/dedup.json
+
+# ---------------------------------------------------------------------------
+# Global resource gate (optional)
+# ---------------------------------------------------------------------------
+# Reserves host headroom for co-tenant workloads sharing this box. The
+# gate runs *before* per-backend caps so a mix of small dispatches
+# across many backends still can't drain the budget reserved for
+# co-tenants. Both fields are optional; an empty resource_gate: block
+# means "no global gate" and only per-backend caps fire.
+#
+# Calibration:
+#   max_concurrent           — total in-flight dispatches across ALL
+#                              backends. A safe default is one less
+#                              than the sum of your per-backend
+#                              max_concurrent values, so at least one
+#                              backend slot stays free at saturation.
+#   min_available_memory_mb  — pre-dispatch /proc/meminfo check. Set
+#                              this to the memory the *co-tenant*
+#                              pipelines on this host need to make
+#                              forward progress. 12288 MB (12 GiB)
+#                              is a conservative starting point.
+#
+# resource_gate:
+#   max_concurrent: 6
+#   min_available_memory_mb: 12288
