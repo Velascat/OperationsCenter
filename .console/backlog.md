@@ -26,30 +26,31 @@ _(none — system locked at Rev 10)_
 
 - [x] **3-layer manifest primitive — operationally complete (2026-05-08, R1–R4 across PM/VF/Warehouse/OC)**: All 14 DoD items met. R1 schema CI + validate CLI, R2 operator runbooks + example.yaml block, R3 path resolution + slug auto-resolve + `effective` CLI, R4 graph-doctor + integration smoke. PM tagged through v0.5.0. Operator now sees blast-radius warnings on every contract-touching dispatch; failures degrade gracefully; pattern is discoverable from main.
 
-- [ ] **R7 — Edge type expansion (next, post-manifest-primitive)**: Audit + design landed (see log entry "R5/R6/R7 audit + design"). Phases:
-  - **R7.1**: `RepoGraph.who_dispatches_to(repo_id) -> list[RepoNode]` query. Promotes the existing `dispatches_to` edge from informational to first-class queryable. No schema change. ~half day.
-  - **R7.2**: New `RepoEdgeType.BUNDLES_ASSETS_FROM` + `RepoGraph.who_consumes_assets_of(repo_id) -> list[RepoNode]` query. PM minor bump v0.6.0. JSON schema + tests + docs. ~half day.
-  - **R7.3**: Author the VF→Warehouse `bundles_assets_from` edge in VF's project manifest (real consumer use case that justified the type). ~half day.
-  - **Stop point**: Live with R7.1+R7.2+R7.3 for a few days before R6. Validates that "edge vocabulary determines what the graph can mean" carries through to real queries operators ask.
-  - **Deferred edge types**: `monitors_health_of` (wait for WS health graph), `forks_from` (wait for SourceRegistry cross-graph queries), `triggers_revalidation_of` (likely subsumed by R5's propagation infra using `depends_on_contracts_from`).
+- [x] **R7 — Edge type expansion (2026-05-08, complete across PM/VF)**:
+  - **R7.1** PM v0.6.0 (PR #6) — `RepoGraph.who_dispatches_to(repo_id) -> list[RepoNode]`. Promotes existing `DISPATCHES_TO` edge from informational to first-class queryable. No schema change. 4 new tests.
+  - **R7.2** PM v0.7.0 (PR #7) — `RepoEdgeType.BUNDLES_ASSETS_FROM` + `RepoGraph.who_consumes_assets_of(repo_id)`. First new edge type since v0.3 — justified by real query "what breaks if Warehouse changes its asset format?". JSON schemas (platform + project) updated. 3 new tests.
+  - **R7.3** VF #894 — `VideoFoundry → Warehouse (bundles_assets_from)` edge authored in VF's `topology/project_manifest.yaml`. Bumped PM pin `>=0.3,<1.0` → `>=0.7,<1.0`; CI workflow pin bumped `@v0.4.0` → `@v0.7.0`. Composition smoke: `who_consumes_assets_of('warehouse')` returns `[VideoFoundry]`.
+  - **Deferred edge types** (per design rule — "add new edge types only when a real query needs them"): `monitors_health_of` (wait for WS health graph), `forks_from` (wait for SourceRegistry cross-graph queries), `triggers_revalidation_of` (subsumed by R5 propagation infra using `depends_on_contracts_from`).
 
-- [ ] **R6 — Multi-project composition via shell repo (after R7 settles)**: Shell-repo pattern (Shape A) — auditable architecture > runtime trivia. PM `_resolve_includes()` recursive loader with cycle detection + collision rules (duplicate repo_id = hard fail; cycles = hard fail; visibility never widens; cross-suite edges allowed). Phases:
-  - **R6.1**: PM `_resolve_includes` recursion + cycle detection + collision rules + 12-15 tests (`composition.py` extension). ~1 day.
-  - **R6.2**: PM schema update — optional `includes: list[{name, project_manifest_path}]` on project schema. Bump PM v0.7.0 (after R7.2's v0.6.0). ~half day.
-  - **R6.3**: Authoring docs update + reference example. Don't ship a real `VideoFoundrySuite/` repo until VF + Warehouse logically want to be one suite. ~half day.
-  - **Future (NOT v1)**: `suite_id` for stable identities independent of repo path. Wait until VF Suite / AI Platform Suite / Customer Suite all want shared identity.
+- [x] **R6 — Multi-project composition via shell repo (2026-05-08, complete on PM + OC)**:
+  - **R6.1+R6.2** PM v0.8.0 (PR #8) — `_resolve_includes()` recursive loader with cycle detection + depth limit (default 4); collision rules (platform redefinition / sibling collision / shell-vs-sub collision all hard-fail); cross-sub-project edges allowed; sub-projects still can't add platform-to-platform edges. Visibility never widens. JSON schema gains optional `includes: [{name, project_manifest_path}]` on project. 14 new tests.
+  - **R6.3** OC PR #104 — `docs/operator/manifest_authoring.md` gains "Multi-repo project — shell pattern (PM v0.8+)" section: when-to-use-it, file layout, shell example, composition rules table, OC pointing convention, rationale for shell-vs-monolith.
+  - **NO real shell repo authored** — machinery shipped per audit's recommendation; first suite manifest is operator-driven (when VF + Warehouse logically want to be one suite).
+  - **Deferred to v1+ minor**: `suite_id` for stable identities independent of repo path.
 
-- [ ] **R5 — Cross-repo task chaining (after R6 settles, biggest scope)**: Glue between existing systems — `compute_contract_impact()` + `scheduled_tasks/runner.py` pattern + `PlaneClient.create_issue()` + `cross_repo_impact._check_cross_repo_impact()` (S7-6, already shipped). Default policy: Backlog status, not auto-execute — prevents recursive AI task storms / notification spam / propagation loops / implicit trust escalation. **Mandatory observability**: every automated propagation action emits a structured artifact/report from day one. Phases:
-  - **R5.1**: `propagation/` package — `policy.py`, `registry.py`, `dedup.py`, `propagator.py`, `links.py`. Library only, no entrypoint. Tests for each piece. ~2 days.
-  - **R5.2**: `operations-center-propagate` entrypoint — manual mode (`--target CxRP --since <commit>`). Integration test with real PlaneClient stub. ~1 day.
-  - **R5.3**: `Settings.contract_change_propagation` block + per-repo `propagation_template` overrides + operator docs. ~1 day.
-  - **R5.4**: Post-merge hook reference workflow on contract repos (CxRP/RxP/PlatformManifest). Dogfood on one real change. ~1 day.
-  - **R5.5**: `propagation_links` CLI to inspect parent-child chains. ~half day.
-  - **Trust boundary**: every consumer task lands in Backlog with `revalidation: pending-review` label. Operator promotes after triage. Per-pair opt-in `auto_promote_to_ready: true` once trust accrues.
-  - **Idempotency**: dedup key = `(target_repo_id, consumer_repo_id, target_version_or_sha)`. Default 24h window.
-  - **Parent-child links**: structured `<!-- propagation:source -->` block in every Plane task body for traceability + dedup anchors + graph lineage + operator context. No DB needed.
+- [x] **R5 — Cross-repo task chaining (2026-05-08, complete on OC)**:
+  - **R5.1** OC PR #105 — `propagation/` library: `policy.py` (PropagationPolicy + PropagationSettings — disabled by default; per-edge-type opt-in; per-pair overrides for skip/backlog/ready_for_ai), `registry.py` (PropagationRegistry + TaskTemplate with pair → target-wildcard → consumer-wildcard → default fallback), `dedup.py` (PropagationDedupStore + DedupKey — JSON sidecar in state/; (target, consumer, version) key + 24h window), `links.py` (ParentLink + format_parent_link — `<!-- propagation:source -->` HTML-comment block), `propagator.py` (ContractChangePropagator orchestrator + **mandatory observability floor**: every run writes a PropagationRecord artifact regardless of whether tasks fired). 22 new tests.
+  - **R5.2+R5.3** OC PR #106 — `operations-center-propagate` entrypoint (`--target`, `--version`, `--config`, `--require-enabled`, `--dry-run`, `--json`); `propagation/plane_adapter.py::PlaneTaskCreator` wraps `PlaneClient.create_issue` + transition; `Settings.contract_change_propagation` block (enabled / auto_trigger_edge_types / dedup_window_hours / pair_overrides / record_dir / dedup_path); operator runbook in `docs/operator/manifest_wiring.md`; commented block in `config/operations_center.example.yaml`. 9 new tests.
+  - **R5.4+R5.5** OC PR #107 — Post-merge hook reference (`docs/operator/propagation/post-merge-hook.md` + sample `post-merge-hook.workflow.yml`) for auto-trigger via GitHub Actions on contract repos; `operations-center-propagation-links` inspection CLI with `list / show <run_id> / latest --target X` subcommands. 9 new tests.
+  - **Safety floor**: cross-repo propagation disabled by default; tasks land in Backlog (not Ready for AI); per-pair opt-in for promotion; mandatory observability artifacts; failed task creation recorded but dedup NOT stamped (retries can re-fire); two disable paths (config flag OR workflow toggle).
 
-- [ ] Phase 13 or next operator directive TBD (after R5/R6/R7 land)
+- [ ] **Live + observe phase (no branch — recommended next)**: Per the audit's "stop and live with it" guidance. Watch for:
+  - Does VF + Warehouse logically want to be one suite repo? (validates R6 in production)
+  - Does `bundles_assets_from` feel natural when operators ask "what depends on Warehouse?"
+  - Does an actual contract change to CxRP/RxP/PlatformManifest produce useful propagation tasks?
+  - Each is a real-world signal. Machinery is shipped; next move is observation.
+
+- [ ] Phase 13 or next operator directive TBD (after R5/R6/R7 settle in production)
 
 - [ ] Phase 13 or next operator directive TBD
 
