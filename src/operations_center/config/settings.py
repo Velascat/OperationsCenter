@@ -300,12 +300,42 @@ class PlatformManifestSettings(BaseModel):
     local_manifest_path: Path | None = None
 
 
+class _PropagationPairOverride(BaseModel):
+    """One operator-authored (target, consumer) policy override."""
+
+    target_repo_id: str
+    consumer_repo_id: str
+    action: str  # "skip" | "backlog" | "ready_for_ai"
+    reason: str = "operator override"
+
+
+class ContractChangePropagationSettings(BaseModel):
+    """Configuration for the cross-repo task chaining engine (R5).
+
+    Disabled by default. Operators flip ``enabled`` and choose which
+    edge types auto-trigger downstream tasks. See
+    docs/operator/manifest_wiring.md for the full operator runbook.
+    """
+
+    enabled: bool = False
+    auto_trigger_edge_types: list[str] = Field(default_factory=list)
+    dedup_window_hours: int = 24
+    pair_overrides: list[_PropagationPairOverride] = Field(default_factory=list)
+    # Where PropagationRecord artifacts land; relative paths resolve
+    # against the OC repo root at runtime.
+    record_dir: Path = Path("state/propagation")
+    dedup_path: Path = Path("state/propagation/dedup.json")
+
+
 class Settings(BaseModel):
     plane: PlaneSettings
     git: GitSettings
     kodo: KodoSettings
     archon: ArchonSettings = Field(default_factory=ArchonSettings)
     platform_manifest: PlatformManifestSettings = Field(default_factory=PlatformManifestSettings)
+    contract_change_propagation: ContractChangePropagationSettings = Field(
+        default_factory=ContractChangePropagationSettings
+    )
     aider: AiderSettings = Field(default_factory=AiderSettings)
     aider_local: AiderLocalSettings = Field(default_factory=AiderLocalSettings)
     # Per-backend hourly/daily caps. Empty by default (no per-backend cap;

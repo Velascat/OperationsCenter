@@ -172,3 +172,24 @@ report_root: tools/report/kodo_plane
 #   project_slug: video-foundry        # for WorkStation LocalManifest discovery
 #   project_manifest_path: /home/dev/Documents/GitHub/VideoFoundry/topology/project_manifest.yaml
 #   local_manifest_path:   /home/dev/Documents/GitHub/VideoFoundry/topology/local_manifest.yaml
+
+# ---------------------------------------------------------------------------
+# Cross-repo task chaining (R5 — operations-center-propagate)
+# ---------------------------------------------------------------------------
+# When a contract repo changes, walk the impact set and create Plane
+# tasks for downstream consumers. Disabled by default — opt in
+# deliberately. See docs/operator/manifest_wiring.md for the full
+# operator runbook including pair_overrides for trusted-pair
+# auto-promotion.
+#
+# contract_change_propagation:
+#   enabled: false                          # nothing fires until you opt in
+#   auto_trigger_edge_types: []             # e.g. [depends_on_contracts_from]
+#   dedup_window_hours: 24                  # suppress same key within window
+#   pair_overrides:                         # per-(target, consumer) trust
+#     - target_repo_id: cxrp
+#       consumer_repo_id: operations_center
+#       action: ready_for_ai                # skip | backlog | ready_for_ai
+#       reason: trusted pair
+#   record_dir: state/propagation           # PropagationRecord artifacts
+#   dedup_path: state/propagation/dedup.json
