@@ -334,3 +334,10 @@ truth; pre-push catches regressions before they hit GitHub.
 
 ## 2026-05-08 — CI fix: Direct URL pip install syntax
 
+
+## 2026-05-08 — Drift cleanup caught by new CI guard
+
+run_show/main.py: split semicolon statements (E702), ensure_ascii=False on
+the JSON dump (C41). docs/README.md: linked the archon_workflow_registration
+doc (DC7).
+
