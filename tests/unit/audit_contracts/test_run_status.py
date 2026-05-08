@@ -10,8 +10,8 @@ from operations_center.audit_contracts.vocabulary import RunStatus
 
 
 _MINIMAL_VALID = {
-    "producer": "videofoundry",
-    "repo_id": "videofoundry",
+    "producer": "example_managed_repo",
+    "repo_id": "example_managed_repo",
     "run_id": "3dead998d4c44e1cb296bef061de50f3",
     "audit_type": "representative",
     "status": "completed",

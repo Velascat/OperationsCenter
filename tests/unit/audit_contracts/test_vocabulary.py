@@ -4,7 +4,7 @@
 
 Verifies that:
 - Generic enums contain all required values.
-- VideoFoundry profile enums are clearly separated from generic enums.
+- Example managed-repo profile enums are clearly separated from generic enums.
 - Round-trip serialisation works.
 - All six VF audit types are present.
 """
@@ -34,10 +34,10 @@ class TestGenericVsProfileSeparation:
         generic_names = {e.__name__ for e in GENERIC_ENUMS}
         profile_names = {e.__name__ for e in EXAMPLE_MANAGED_REPO_PROFILE_ENUMS}
         assert generic_names.isdisjoint(profile_names), (
-            "Generic enums must not overlap with VideoFoundry profile enums"
+            "Generic enums must not overlap with example managed-repo profile enums"
         )
 
-    def test_videofoundry_audit_type_is_not_in_generic_enums(self) -> None:
+    def test_example_managed_repo_audit_type_is_not_in_generic_enums(self) -> None:
         assert ExampleManagedRepoAuditType not in GENERIC_ENUMS
 
     def test_run_status_is_generic(self) -> None:
@@ -139,7 +139,7 @@ class TestLimitation:
         assert required <= values
 
 
-class TestVideoFoundryProfile:
+class TestExampleManagedRepoProfile:
     def test_all_six_audit_types_present(self) -> None:
         values = {m.value for m in ExampleManagedRepoAuditType}
         expected = {

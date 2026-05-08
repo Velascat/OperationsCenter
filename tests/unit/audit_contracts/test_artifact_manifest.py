@@ -25,8 +25,8 @@ from operations_center.audit_contracts.vocabulary import (
 _NOW = datetime(2026, 4, 26, 15, 34, 55, tzinfo=timezone.utc)
 
 _MINIMAL_MANIFEST = {
-    "producer": "videofoundry",
-    "repo_id": "videofoundry",
+    "producer": "example_managed_repo",
+    "repo_id": "example_managed_repo",
     "run_id": "3dead998d4c44e1cb296bef061de50f3",
     "audit_type": "representative",
     "manifest_status": "completed",
@@ -36,7 +36,7 @@ _MINIMAL_MANIFEST = {
 }
 
 _MINIMAL_ARTIFACT = {
-    "artifact_id": "videofoundry:representative:TopicSelectionStage:topic_selection",
+    "artifact_id": "example_managed_repo:representative:TopicSelectionStage:topic_selection",
     "artifact_kind": "stage_report",
     "path": "tools/audit/report/representative/bucket/topic_selection.json",
     "location": "run_root",
@@ -97,7 +97,7 @@ class TestManagedArtifactManifest:
     def test_singleton_artifacts_property(self) -> None:
         singleton = {
             **_MINIMAL_ARTIFACT,
-            "artifact_id": "videofoundry:repo_singleton:arch:latest",
+            "artifact_id": "example_managed_repo:repo_singleton:arch:latest",
             "location": "repo_singleton",
         }
         data = {**_MINIMAL_MANIFEST, "artifacts": [_MINIMAL_ARTIFACT, singleton]}
@@ -108,7 +108,7 @@ class TestManagedArtifactManifest:
     def test_artifact_by_id(self) -> None:
         data = {**_MINIMAL_MANIFEST, "artifacts": [_MINIMAL_ARTIFACT]}
         m = ManagedArtifactManifest.model_validate(data)
-        found = m.artifact_by_id("videofoundry:representative:TopicSelectionStage:topic_selection")
+        found = m.artifact_by_id("example_managed_repo:representative:TopicSelectionStage:topic_selection")
         assert found is not None
         assert found.location == Location.RUN_ROOT
 

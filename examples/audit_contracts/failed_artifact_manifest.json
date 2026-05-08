@@ -2,8 +2,8 @@
   "_example_note": "Synthetic contract example — not a real run. Models the Phase 0 interrupted representative run pattern: authoring artifacts present, rendering/delivery artifacts missing.",
   "schema_version": "1.0",
   "contract_name": "managed-repo-audit",
-  "producer": "videofoundry",
-  "repo_id": "videofoundry",
+  "producer": "example_managed_repo",
+  "repo_id": "example_managed_repo",
   "run_id": "aabbccdd11223344aabbccdd11223344",
   "audit_type": "representative",
   "manifest_status": "partial",
@@ -11,11 +11,11 @@
   "created_at": "2026-04-26T10:00:02Z",
   "updated_at": "2026-04-26T10:45:22Z",
   "finalized_at": "2026-04-26T10:45:22Z",
-  "artifact_root": "../VideoFoundry",
+  "artifact_root": "../ExampleManagedRepo",
   "run_root": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344",
   "artifacts": [
     {
-      "artifact_id": "videofoundry:representative:TopicSelectionStage:topic_selection",
+      "artifact_id": "example_managed_repo:representative:TopicSelectionStage:topic_selection",
       "artifact_kind": "stage_report",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344/Connective_Contours_Connective_Contours_topic_selection.json",
       "relative_path": "Connective_Contours_Connective_Contours_topic_selection.json",
@@ -35,7 +35,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:ScriptWritingStage:script_draft",
+      "artifact_id": "example_managed_repo:representative:ScriptWritingStage:script_draft",
       "artifact_kind": "script_contract",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344/artifacts/script_contract/ScriptWriting/Connective_Contours_script_draft.json",
       "relative_path": "artifacts/script_contract/ScriptWriting/Connective_Contours_script_draft.json",
@@ -55,7 +55,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:AuthorProsodyStage:prosody_plan",
+      "artifact_id": "example_managed_repo:representative:AuthorProsodyStage:prosody_plan",
       "artifact_kind": "timing_artifact",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344/Connective_Contours_AuthorProsodyStage.json",
       "relative_path": "Connective_Contours_AuthorProsodyStage.json",
@@ -75,7 +75,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:VoiceOverStage:asr_observations",
+      "artifact_id": "example_managed_repo:representative:VoiceOverStage:asr_observations",
       "artifact_kind": "alignment_artifact",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344/Connective_Contours_voice_over_asr_observations.jsonl",
       "relative_path": "Connective_Contours_voice_over_asr_observations.jsonl",
@@ -95,7 +95,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:representative:post_run:final_delivery_quality_summary",
+      "artifact_id": "example_managed_repo:representative:post_run:final_delivery_quality_summary",
       "artifact_kind": "json_report",
       "path": "tools/audit/report/representative/Connective_Contours_20260426_100000_aabbccdd11223344aabbccdd11223344/final_delivery_quality_summary.json",
       "relative_path": "final_delivery_quality_summary.json",
@@ -115,7 +115,7 @@
       "metadata": {}
     },
     {
-      "artifact_id": "videofoundry:repo_singleton:architecture_invariants:latest",
+      "artifact_id": "example_managed_repo:repo_singleton:architecture_invariants:latest",
       "artifact_kind": "architecture_invariant",
       "path": "tools/audit/report/architecture_invariants/latest.json",
       "relative_path": null,

@@ -1,18 +1,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
 """
-videofoundry.py — VideoFoundry producer profile for the managed-repo audit contract.
+managed_repo.py — example managed-repo producer profile for the managed-repo audit contract.
 
-VideoFoundry is the FIRST producer profile, not the contract itself.
+This module ships the example producer profile shape (data values
+belong in private config — see PR-C); it is not the contract itself.
 Generic contract fields are defined in audit_contracts.run_status and
 audit_contracts.artifact_manifest. This profile captures only what is
-specific to VideoFoundry.
+specific to one bound managed repo.
 
 Another managed repo would create its own profile module without touching
 the generic contract.
 
 Phase 0 ground truth drives all values here. See:
-  docs/architecture/videofoundry/videofoundry_audit_ground_truth.md
+  docs/architecture/managed-repos/audit_ground_truth.md
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from ..vocabulary import (
 
 
 class ManagedRepoAuditTypeSpec(BaseModel):
-    """Per-audit-type metadata for VideoFoundry."""
+    """Per-audit-type metadata for a managed repo."""
     audit_type: str
     output_dir: str
     run_status_finalization: bool
@@ -40,7 +41,7 @@ class ManagedRepoAuditTypeSpec(BaseModel):
 
 
 class ManagedRepoPathQuirk(BaseModel):
-    """A known path-layout quirk specific to VideoFoundry."""
+    """A known path-layout quirk specific to one bound managed repo."""
     description: str
     example: str | None = None
 
@@ -48,16 +49,16 @@ class ManagedRepoPathQuirk(BaseModel):
 
 
 class ManagedRepoAuditProfile(BaseModel):
-    """VideoFoundry-specific metadata for the managed-repo audit contract.
+    """Managed-repo-specific metadata for the managed-repo audit contract.
 
     This profile is consumed by OpsCenter tooling that needs to interpret
-    VideoFoundry artifacts. It does NOT redefine the generic contract.
+    the bound managed repo's artifacts. It does NOT redefine the generic contract.
 
     Generic contract: audit_contracts.run_status, audit_contracts.artifact_manifest
-    This profile: VideoFoundry-only assumptions, quirks, Phase 0 gaps.
+    This profile: managed-repo-specific assumptions, quirks, Phase 0 gaps.
     """
 
-    producer_id: str = "videofoundry"
+    producer_id: str = "example_managed_repo"
     contract_version: str = "1.0"
 
     # Supported audit types with per-type metadata
@@ -69,7 +70,7 @@ class ManagedRepoAuditProfile(BaseModel):
     # Known artifact kind vocabulary
     known_artifact_kinds: list[str] = Field(default_factory=list)
 
-    # Path quirks specific to VideoFoundry
+    # Path quirks specific to the bound managed repo
     path_quirks: list[ManagedRepoPathQuirk] = Field(default_factory=list)
 
     # Repository singleton: architecture_invariants
@@ -90,7 +91,7 @@ class ManagedRepoAuditProfile(BaseModel):
         "Phase 5 must add finalization logic to all five types."
     )
     legacy_status_value: str = (
-        "VideoFoundry currently emits 'in_progress' instead of 'running'. "
+        "Pre-Phase-5 producers emit 'in_progress' instead of 'running'. "
         "Phase 5 must switch to 'running'. "
         "OpsCenter readers must accept 'in_progress' during transition."
     )
@@ -123,7 +124,7 @@ class ManagedRepoAuditProfile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Canonical VideoFoundry profile instance
+# Example managed-repo profile instance
 # ---------------------------------------------------------------------------
 
 EXAMPLE_MANAGED_REPO_PROFILE = ManagedRepoAuditProfile(
@@ -235,7 +236,7 @@ EXAMPLE_MANAGED_REPO_PROFILE = ManagedRepoAuditProfile(
         ManagedRepoPathQuirk(
             description=(
                 "ASR observation paths in voice_over_asr_observations.jsonl reference "
-                "files in VideoFoundry/temp/voice_over_delivery/, not in the audit bucket. "
+                "files in the managed repo's temp/ tree, not in the audit bucket. "
                 "These are transient delivery files, not stable audit artifacts."
             ),
         ),

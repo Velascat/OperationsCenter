@@ -5,8 +5,8 @@ vocabulary.py — controlled vocabulary for the managed-repo audit contract.
 
 Two layers are defined here:
 
-  Generic layer — reusable by any managed repo (not VideoFoundry-specific).
-  VideoFoundry profile layer — VF-specific values, clearly namespaced.
+  Generic layer — reusable by any managed repo.
+  Example managed-repo profile layer — bound-repo values, clearly namespaced.
 
 All enums are str-based so they round-trip cleanly through JSON.
 """
@@ -25,9 +25,9 @@ class RunStatus(str, Enum):
 
     Canonical values for run_status.json and artifact manifests.
 
-    Decision: VideoFoundry currently emits "in_progress" (legacy).
+    Decision: pre-Phase-5 producers emit "in_progress" (legacy).
     The contract canonicalises this to RUNNING. Phase 5 must switch
-    VideoFoundry to emit "running". IN_PROGRESS_LEGACY is accepted
+    producers to emit "running". IN_PROGRESS_LEGACY is accepted
     during the transition period by readers but must not be emitted
     by compliant producers.
     """
@@ -37,7 +37,7 @@ class RunStatus(str, Enum):
     FAILED = "failed"
     INTERRUPTED = "interrupted"
     UNKNOWN = "unknown"
-    # Legacy: VideoFoundry currently emits this instead of "running".
+    # Legacy: pre-Phase-5 producers emit this instead of "running".
     # Readers must accept it; producers must not emit it after Phase 5.
     IN_PROGRESS_LEGACY = "in_progress"
 
@@ -137,15 +137,15 @@ class Limitation(str, Enum):
 
 
 # ---------------------------------------------------------------------------
-# VideoFoundry-specific profile vocabulary
+# Example managed-repo profile vocabulary
 #
-# These values describe what VideoFoundry currently produces.
+# These values describe what the example managed repo currently produces.
 # They are not part of the generic managed-repo contract.
 # Future managed repos define their own profile vocabulary.
 # ---------------------------------------------------------------------------
 
 class ExampleManagedRepoAuditType(str, Enum):
-    """The six audit types supported by VideoFoundry."""
+    """The six audit types supported by the example managed repo."""
     REPRESENTATIVE = "representative"
     ENRICHMENT = "enrichment"
     IDEATION = "ideation"
@@ -155,7 +155,7 @@ class ExampleManagedRepoAuditType(str, Enum):
 
 
 class ExampleManagedRepoSourceStage(str, Enum):
-    """Stage names observed in VideoFoundry audit output (Phase 0 ground truth)."""
+    """Stage names observed in the example managed repo's audit output (Phase 0 ground truth)."""
     TOPIC_SELECTION = "TopicSelectionStage"
     OUTLINE_PLANNING = "OutlinePlanningStage"
     SCRIPT_WRITING = "ScriptWritingStage"
@@ -173,7 +173,7 @@ class ExampleManagedRepoSourceStage(str, Enum):
 
 
 class ExampleManagedRepoArtifactKind(str, Enum):
-    """Artifact kind vocabulary for VideoFoundry audit outputs.
+    """Artifact kind vocabulary for the example managed repo's audit outputs.
 
     Based on Phase 0 ground truth. Not exhaustive — unknown artifacts
     should use UNKNOWN rather than fail.
@@ -223,7 +223,7 @@ __all__ = [
     "ValidFor",
     "Limitation",
     "GENERIC_ENUMS",
-    # videofoundry profile
+    # example managed-repo profile
     "ExampleManagedRepoAuditType",
     "ExampleManagedRepoSourceStage",
     "ExampleManagedRepoArtifactKind",

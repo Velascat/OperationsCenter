@@ -10,8 +10,8 @@ Two layers:
     run_status  — ManagedRunStatus (run_status.json model)
     artifact_manifest — ManagedArtifactManifest, ManagedArtifactEntry, ExcludedPath
 
-  VideoFoundry producer profile (VF-specific, not the contract itself):
-    profiles.videofoundry — ManagedRepoAuditProfile, EXAMPLE_MANAGED_REPO_PROFILE
+  Example managed-repo producer profile (data values move to private config):
+    profiles.managed_repo — ManagedRepoAuditProfile, EXAMPLE_MANAGED_REPO_PROFILE
 
 Contract version: 1.0
 """
@@ -57,7 +57,7 @@ __all__ = [
     "ValidFor",
     "Limitation",
     "GENERIC_ENUMS",
-    # videofoundry profile vocabulary
+    # example managed-repo profile vocabulary
     "ExampleManagedRepoAuditType",
     "ExampleManagedRepoSourceStage",
     "ExampleManagedRepoArtifactKind",
