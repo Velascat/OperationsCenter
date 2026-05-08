@@ -44,7 +44,7 @@ notes: |
   - actual workflow.runtime_override_applied log can only be observed with a
     registered codebase (no codebase → bail before workflow execute)
 
-  Why fork rather than upstream-first: per Dave's "managed forks first" pattern
+  Why fork rather than upstream-first: per the "managed forks first" pattern
   (SourceRegistry: "Adapters first; fork when invariants can't be enforced
   externally"). The OC integration needed this channel to ship; we apply the
   fix on the Velascat/Archon fork now and file an upstream PR later when the
