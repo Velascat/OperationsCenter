@@ -36,6 +36,9 @@ audit:
     - "src/operations_center/executors/**"
     - "tests/**"
 
+  cross_repo:
+    platform_manifest_repo: ../PlatformManifest
+
   exclude_paths:
     T1:
       # OC is tested through integration and end-to-end tests, not unit tests
