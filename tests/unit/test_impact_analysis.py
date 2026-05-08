@@ -162,3 +162,61 @@ class TestSummaryStructure:
         private_ids = {n.repo_id for n in summary.private_affected}
         assert public_ids.isdisjoint(private_ids)
         assert public_ids | private_ids == {n.repo_id for n in summary.affected}
+
+
+# ---------------------------------------------------------------------------
+# Effective graph composed via WorkScopeManifest — impact spans includes
+# ---------------------------------------------------------------------------
+
+
+class TestEffectiveGraphWithWorkScope:
+    """v0.9.0+ — impact analysis must work on graphs built from a WorkScopeManifest."""
+
+    def test_impact_spans_two_included_projects(self, tmp_path: Path) -> None:
+        # Two project manifests, each declaring a private consumer of CxRP.
+        # Composed via a WorkScopeManifest, contract impact on CxRP must
+        # surface BOTH consumers alongside the public platform consumers.
+        proj_a = tmp_path / "a.yaml"
+        proj_a.write_text(
+            'manifest_kind: project\n'
+            'manifest_version: "1.0.0"\n'
+            'repos:\n'
+            '  proj_a_api:\n'
+            '    canonical_name: ProjectAAPI\n'
+            '    visibility: private\n'
+            'edges:\n'
+            '  - {from: ProjectAAPI, to: CxRP, type: depends_on_contracts_from}\n',
+            encoding="utf-8",
+        )
+        proj_b = tmp_path / "b.yaml"
+        proj_b.write_text(
+            'manifest_kind: project\n'
+            'manifest_version: "1.0.0"\n'
+            'repos:\n'
+            '  proj_b_api:\n'
+            '    canonical_name: ProjectBAPI\n'
+            '    visibility: private\n'
+            'edges:\n'
+            '  - {from: ProjectBAPI, to: CxRP, type: depends_on_contracts_from}\n',
+            encoding="utf-8",
+        )
+        ws = tmp_path / "work_scope.yaml"
+        ws.write_text(
+            'manifest_kind: work_scope\n'
+            'manifest_version: "1.0.0"\n'
+            'includes:\n'
+            f'  - {{name: A, project_manifest_path: {proj_a}}}\n'
+            f'  - {{name: B, project_manifest_path: {proj_b}}}\n',
+            encoding="utf-8",
+        )
+        g = build_effective_repo_graph(work_scope_manifest_path=ws)
+        summary = compute_contract_impact(g, "CxRP")
+        assert summary is not None
+        names = {n.canonical_name for n in summary.affected}
+        # Public platform consumers PLUS both private include consumers
+        assert {"OperationsCenter", "SwitchBoard", "OperatorConsole",
+                "ProjectAAPI", "ProjectBAPI"} == names
+        assert len(summary.public_affected) == 3
+        assert len(summary.private_affected) == 2
+        # Privates are both Visibility.PRIVATE
+        assert all(n.visibility is Visibility.PRIVATE for n in summary.private_affected)

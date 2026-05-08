@@ -51,6 +51,16 @@ DEFAULT_SWITCHBOARD_DENYLIST: tuple[str, ...] = (
     "RuntimeResult",
     # Fork management — SourceRegistry owns this; SB has no business with forks.
     "SourceRegistry",
+    # PlatformManifest composition — manifests are loaded by OC and consumed
+    # by SB as input only. SB must not load, merge, or own composition.
+    "load_repo_graph",
+    "load_effective_graph",
+    "load_default_repo_graph",
+    "PlatformManifestSettings",
+    "build_effective_repo_graph",
+    "build_effective_repo_graph_from_settings",
+    "WorkScopeManifest",
+    "ManifestKind",
 )
 
 
