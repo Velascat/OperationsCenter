@@ -228,11 +228,31 @@ class RepoSettings(BaseModel):
     executor: str = "kodo"
 
 
+class PlatformManifestSettings(BaseModel):
+    """Configuration for the EffectiveRepoGraph composition pipeline.
+
+    Composition order is platform → project → local. The platform base is
+    always the bundled ``platform_manifest.yaml`` shipped by the
+    ``platform-manifest`` package. ``project_manifest_path`` and
+    ``local_manifest_path`` layer on top per the PlatformManifest design.
+
+    All fields default to None; the loader returns the platform-only graph
+    when nothing project- or local-specific is configured. Set
+    ``enabled=False`` to skip graph construction entirely.
+    """
+
+    enabled: bool = True
+    project_slug: str | None = None
+    project_manifest_path: Path | None = None
+    local_manifest_path: Path | None = None
+
+
 class Settings(BaseModel):
     plane: PlaneSettings
     git: GitSettings
     kodo: KodoSettings
     archon: ArchonSettings = Field(default_factory=ArchonSettings)
+    platform_manifest: PlatformManifestSettings = Field(default_factory=PlatformManifestSettings)
     aider: AiderSettings = Field(default_factory=AiderSettings)
     aider_local: AiderLocalSettings = Field(default_factory=AiderLocalSettings)
     repos: dict[str, RepoSettings]

@@ -26,6 +26,9 @@ from operations_center.execution.artifact_writer import RunArtifactWriter
 from operations_center.execution.coordinator import ExecutionCoordinator
 from operations_center.execution.handoff import ExecutionRuntimeContext
 from operations_center.execution.workspace import WorkspaceManager
+from operations_center.repo_graph_factory import (
+    build_effective_repo_graph_from_settings,
+)
 from operations_center.planning.models import ProposalDecisionBundle
 
 
@@ -109,9 +112,13 @@ def main() -> int:
         max_lines=_env_int("OPS_CENTER_MAX_LINES"),
         repo_settings_lookup=lambda key: (settings.repos or {}).get(key),
     )
+    repo_graph = build_effective_repo_graph_from_settings(
+        settings, repo_root=Path.cwd(),
+    )
     coordinator = ExecutionCoordinator(
         adapter_registry=CanonicalBackendRegistry.from_settings(settings),
         workspace_manager=workspace_manager,
+        repo_graph=repo_graph,
     )
 
     try:
