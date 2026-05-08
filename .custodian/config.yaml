@@ -507,6 +507,9 @@ audit:
     - _run_with_claude_fallback
     - is_quota_exhausted
     - visibility
+    # ADR 0002 backend card axis vocabulary (orchestration / mechanism labels).
+    - local_subprocess
+    - single_agent
 
   # F3-exempt field names: schema/documentation fields never accessed by dot
   # notation because they're serialized to JSON and consumed by external readers,

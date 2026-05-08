@@ -58,6 +58,10 @@ This directory holds OC-specific material.
 - [architecture/adr/](architecture/adr/) — OC architecture decision records.
   - [architecture/adr/0001-execution-boundary-operationscenter.md](architecture/adr/0001-execution-boundary-operationscenter.md) —
     Decision to make OperationsCenter the execution boundary.
+  - [architecture/adr/0002-backend-card-axis-expansion.md](architecture/adr/0002-backend-card-axis-expansion.md) —
+    Backend card axis expansion (orchestration + mechanism).
+  - [architecture/adr/0003-tiered-cognition-experimental-rails.md](architecture/adr/0003-tiered-cognition-experimental-rails.md) —
+    Tiered cognition + experimental rails.
 
 ### Managed-repo audit contracts
 
