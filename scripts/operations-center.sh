@@ -11,6 +11,7 @@ WATCH_DIR="${LOG_DIR}/watch-all"
 REPORT_DIR="${ROOT_DIR}/tools/report/kodo_plane"
 PLANE_MANAGER="${ROOT_DIR}/deployment/plane/manage.sh"
 JANITOR_MAX_AGE_DAYS="${OPERATIONS_CENTER_RETENTION_DAYS:-1}"
+WATCHDOG_LOOP_LOCK="${LOG_DIR}/watchdog_loop.lock"
 
 ensure_venv() {
   ensure_pip_conf
@@ -156,11 +157,79 @@ Usage:
   scripts/operations-center.sh analyze-artifacts [--repo NAME] [--limit N] [--json]
   scripts/operations-center.sh tune-autonomy [--window N] [--apply]
   scripts/operations-center.sh promote-backlog [--family FAMILY] [--execute]
+  scripts/operations-center.sh watchdog-loop-acquire
+  scripts/operations-center.sh watchdog-loop-release
+  scripts/operations-center.sh watchdog-loop-status
 
 Environment:
   OPERATIONS_CENTER_CONFIG   Override config path (default: ${CONFIG_PATH})
   OPERATIONS_CENTER_ENV_FILE Override env file path (default: ${ENV_PATH})
 EOF
+}
+
+# ── Platform Watchdog Loop ownership lock ────────────────────────────────────
+# Prevents two Claude Code sessions from running the same platform loop at once.
+# Lock file: logs/local/watchdog_loop.lock (JSON: pid, timestamp, hostname,
+# repo_root, purpose). Uses PID liveness — stale locks are auto-reclaimed.
+
+acquire_watchdog_loop_lock() {
+  mkdir -p "${LOG_DIR}"
+  if [[ -f "${WATCHDOG_LOOP_LOCK}" ]]; then
+    local lock_pid
+    lock_pid=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('pid',''))" \
+               "${WATCHDOG_LOOP_LOCK}" 2>/dev/null || echo "")
+    if [[ -n "${lock_pid}" ]] && kill -0 "${lock_pid}" 2>/dev/null; then
+      echo "ERROR: watchdog loop lock held by live PID ${lock_pid} — aborting." >&2
+      cat "${WATCHDOG_LOOP_LOCK}" >&2
+      return 1
+    else
+      echo "Reclaiming stale watchdog loop lock (PID ${lock_pid:-unknown} is dead)."
+    fi
+  fi
+  local shell_pid=${PPID}
+  python3 - "${WATCHDOG_LOOP_LOCK}" "${ROOT_DIR}" "${shell_pid}" <<'PY'
+import json, socket, sys
+from datetime import datetime
+path, repo_root, pid = sys.argv[1], sys.argv[2], int(sys.argv[3])
+payload = {
+    "pid":       pid,
+    "timestamp": datetime.now().isoformat(timespec="seconds"),
+    "hostname":  socket.gethostname(),
+    "repo_root": repo_root,
+    "purpose":   "OC Platform Watchdog Loop",
+}
+with open(path, "w") as f:
+    json.dump(payload, f, indent=2)
+print(f"watchdog loop lock acquired: pid={pid} lock={path}")
+PY
+}
+
+release_watchdog_loop_lock() {
+  if [[ -f "${WATCHDOG_LOOP_LOCK}" ]]; then
+    rm -f "${WATCHDOG_LOOP_LOCK}"
+    echo "watchdog loop lock released: ${WATCHDOG_LOOP_LOCK}"
+  else
+    echo "watchdog loop lock not held"
+  fi
+}
+
+check_watchdog_loop_lock() {
+  if [[ ! -f "${WATCHDOG_LOOP_LOCK}" ]]; then
+    echo "watchdog loop: unlocked"
+    return 0
+  fi
+  local lock_pid
+  lock_pid=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('pid',''))" \
+             "${WATCHDOG_LOOP_LOCK}" 2>/dev/null || echo "")
+  if [[ -n "${lock_pid}" ]] && kill -0 "${lock_pid}" 2>/dev/null; then
+    echo "watchdog loop: LOCKED (live PID ${lock_pid})"
+    cat "${WATCHDOG_LOOP_LOCK}"
+    return 1
+  else
+    echo "watchdog loop: stale lock (PID ${lock_pid:-unknown} is dead — safe to reclaim)"
+    cat "${WATCHDOG_LOOP_LOCK}"
+    return 2
+  fi
 }
 
 watch_pid_file() {
@@ -762,6 +831,15 @@ PYEOF
     ;;
   watchdog-stop)
     stop_watchdog
+    ;;
+  watchdog-loop-acquire)
+    acquire_watchdog_loop_lock
+    ;;
+  watchdog-loop-release)
+    release_watchdog_loop_lock
+    ;;
+  watchdog-loop-status)
+    check_watchdog_loop_lock
     ;;
   *)
     usage

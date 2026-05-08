@@ -7,6 +7,14 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 Added `audit.cross_repo.platform_manifest_repo: ../PlatformManifest` to `.custodian/config.yaml`. X1 live-run: 0 legacy-name findings.
 
+## 2026-05-08 — Watchdog loop hardening (OC10 detector, lock helper, hardened runbook)
+
+scripts/operations-center.sh: watchdog-loop-acquire/release/status commands — PPID-based
+lock at logs/local/watchdog_loop.lock, stale-reclaim via kill -0 liveness check.
+.custodian/detectors.py: OC10 kodo max_concurrent must be 1 (reads local config;
+passes silently on CI). docs/operator/watchdog_loop.md: all 12 hardening outcomes.
+See previous entry for full change summary.
+
 ## 2026-05-08 — Brainstorm retry + model downgrade + watchdog loop hardening (12 outcomes)
 
 spec_director/brainstorm.py: _clean_raw extracted, one-shot retry on YAML front-matter
