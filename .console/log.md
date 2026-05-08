@@ -12,6 +12,14 @@ Dirty tree: .custodian/config.yaml modified by active kodo run (plumbing block) 
 Starvation watch: 5 OC tasks (self-modify: approved) stuck in Blocked, not Ready-for-AI. 2 CxRP spec-campaign tasks also Blocked (campaign 3h old, temporarily-blocked). Propose stage: tasks_created=None. Monitoring for recurrence next cycle.
 Cadence: HEALTHY → 3600s (starvation flag is not yet confirmed across 2 cycles).
 
+## 2026-05-08 — Watchdog loop runbook + /loop prompt: starvation/stagnation hardening
+
+Tightened starvation definition (single-cycle evidence sufficient), added closed-loop
+stagnation class, queue-unblocking investigation rules, forward-progress invariant,
+forbidden-HEALTHY-during-starvation cadence rule, 5 new cycle summary fields.
+Root cause: loop correctly detected starvation signals but classified as "potential" and
+stayed at HEALTHY cadence — this is now explicitly forbidden by runbook invariants.
+
 ## 2026-05-08 — P-class plumbing config wired in `.custodian/config.yaml`
 
 Added `audit.plumbing` block with three artifact contracts: heartbeat (role/at/status → OperatorConsole mtime check), usage.json (top-level + event sub-keys → budget/rate display), active.json (campaigns → campaign pane). P2 ignore_keys suppress TUI state dict false positives. All three P1/P2/P3 = 0 findings.
