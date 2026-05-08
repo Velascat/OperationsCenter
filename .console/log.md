@@ -466,3 +466,12 @@ at the correct path and reflect the `--per-kind` flag that also exists.
 - Watcher restarts / crash classifications: goal=143:benign-SIGTERM, test=143:benign-SIGTERM, improve=143:benign-SIGTERM
 - Follow-ups: none
 
+
+## 2026-05-08T21:38Z — Loop cycle (HEALTHY)
+
+Health: HEALTHY. Board: Blocked=7 Backlog=5 InReview=4 Running=1 Done=4 Cancelled=7. No Ready-for-AI tasks.
+Investigations: custodian 0 findings, ghost 0 events, flow 0 gaps, graph OK, reaudit clean, regressions 0.
+Triage: nothing to rescore/await.
+Tests: 15/15 golden pass.
+Watchers: all 8 alive; 3x exit-143 (benign SIGTERM from today's restart). Heartbeats fresh.
+Cadence: HEALTHY → 3600s next wakeup.
