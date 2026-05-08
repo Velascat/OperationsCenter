@@ -122,6 +122,7 @@ def main() -> int:
         repo_graph=repo_graph,
         usage_store=UsageStore(),
         backend_caps=settings.backend_caps,
+        resource_gate=settings.resource_gate,
     )
 
     try:
