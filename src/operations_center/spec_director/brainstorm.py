@@ -67,27 +67,34 @@ class BrainstormService:
         except Exception as exc:
             raise BrainstormError(f"claude CLI call failed: {exc}") from exc
 
-        # The CLI may wrap the spec in a markdown code fence (```markdown ... ```)
-        # or add conversational preamble. Strip both so the parser sees raw spec text.
-        import re as _re
-        # Remove ```markdown / ```yaml / ``` fences and their closing ```
-        raw = _re.sub(r"^```(?:markdown|yaml)?\n", "", raw, flags=_re.MULTILINE)
-        raw = _re.sub(r"\n```\s*(?:\n|$)", "\n", raw, flags=_re.MULTILINE)
-        raw = raw.strip()
-        # Find the --- that is immediately followed by a YAML key (word: value),
-        # skipping bare --- separators that appear before the real front matter.
-        m = _re.search(r"(---\n\w+:)", raw)
-        if m:
-            raw = raw[m.start():]
-
+        raw = self._clean_raw(raw)
         try:
             fm = SpecFrontMatter.from_spec_text(raw)
-        except Exception as exc:
+        except Exception as first_exc:
             import logging as _logging
             _logging.getLogger(__name__).error(
                 "brainstorm_parse_failure | first_300: %r", raw[:300]
             )
-            raise BrainstormError(f"Response missing valid YAML front matter: {exc}") from exc
+            # One retry: feed the bad response back with an explicit correction prompt.
+            retry_prompt = (
+                f"{user_content}\n\n"
+                "--- CORRECTION ---\n"
+                "Your previous response did not begin with the required YAML front matter block. "
+                "Do NOT describe or summarise existing specs. "
+                "Generate a BRAND NEW spec document. "
+                "The very first line of your response MUST be `---` followed immediately by the "
+                "YAML front matter fields (campaign_id, slug, phases, repos, area_keywords, "
+                "status, created_at). No preamble, no prose before the `---`."
+            )
+            try:
+                raw = self._clean_raw(
+                    call_claude(retry_prompt, system_prompt=_SYSTEM_PROMPT, model=self._model)
+                )
+                fm = SpecFrontMatter.from_spec_text(raw)
+            except Exception as retry_exc:
+                raise BrainstormError(
+                    f"Response missing valid YAML front matter after retry: {retry_exc}"
+                ) from first_exc
 
         return BrainstormResult(
             spec_text=raw,
@@ -98,6 +105,17 @@ class BrainstormService:
             prompt_tokens=0,
             completion_tokens=0,
         )
+
+    @staticmethod
+    def _clean_raw(raw: str) -> str:
+        import re as _re
+        raw = _re.sub(r"^```(?:markdown|yaml)?\n", "", raw, flags=_re.MULTILINE)
+        raw = _re.sub(r"\n```\s*(?:\n|$)", "\n", raw, flags=_re.MULTILINE)
+        raw = raw.strip()
+        m = _re.search(r"(---\n\w+:)", raw)
+        if m:
+            raw = raw[m.start():]
+        return raw
 
     @staticmethod
     def _build_user_prompt(bundle: ContextBundle) -> str:

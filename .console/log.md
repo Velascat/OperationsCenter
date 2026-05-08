@@ -7,6 +7,18 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
 Added `audit.cross_repo.platform_manifest_repo: ../PlatformManifest` to `.custodian/config.yaml`. X1 live-run: 0 legacy-name findings.
 
+## 2026-05-08 — Brainstorm retry + model downgrade + watchdog loop hardening (12 outcomes)
+
+spec_director/brainstorm.py: _clean_raw extracted, one-shot retry on YAML front-matter
+parse failure (model was describing existing spec instead of generating new one).
+runtime_binding_policy.yaml: refactor+feature rules opus→sonnet (low-cost posture).
+scripts/operations-center.sh: watchdog-loop-acquire/release/status (PPID-based lock,
+JSON payload, stale-reclaim). .custodian/detectors.py: OC10 kodo max_concurrent must
+be 1. docs/operator/watchdog_loop.md: full hardening rewrite — lock ownership,
+preflight checklist, execution gate, deterministic affected-repo discovery, branch
+hygiene, destructive-action guardrails, anti-flap escalation, structured cycle summary,
+updated /loop prompt, Custodian enforcement.
+
 ## Watchdog 2026-05-08 15:07 — All clean, loop started
 
 Cycle 1. ghost=0 flow=0 graph=ok reaudit=no-triggers regressions=0 custodian=0 repos swept. Triage: nothing to promote. Golden tests: 15/15 pass. All 7 watchers + watchdog alive. Runtime downgraded opus→sonnet (all rules) + kodo default orchestrator updated. Self-paced loop running hourly via ScheduleWakeup.

@@ -13,23 +13,23 @@
 # the bundled DEFAULT_POLICY in runtime_binding_policy.py is used instead.
 
 rules:
-  - name: refactor_premium
+  - name: refactor_balanced
     when:
       task_type: refactor
       lane: claude_cli
     bind:
       kind: cli_subscription
       provider: anthropic
-      model: opus
+      model: sonnet
 
-  - name: feature_premium
+  - name: feature_balanced
     when:
       task_type: feature
       lane: claude_cli
     bind:
       kind: cli_subscription
       provider: anthropic
-      model: opus
+      model: sonnet
 
   - name: test_balanced
     when:

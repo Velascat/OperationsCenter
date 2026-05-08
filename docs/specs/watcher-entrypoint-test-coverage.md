@@ -11,7 +11,7 @@ area_keywords:
   - entrypoints/board_worker
   - entrypoints/pr_review_watcher
   - adapters
-status: active
+status: cancelled
 created_at: 2026-04-27T00:00:00Z
 ---
 
