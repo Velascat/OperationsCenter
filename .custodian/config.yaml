@@ -473,7 +473,9 @@ plugins:
 detectors:
   - module: ".custodian/detectors.py:build_oc_detectors"
   - module: ".custodian/architecture.py:build_oc_architecture_detectors"
-  - module: ".custodian/doc_conventions.py:build_oc_doc_convention_detectors"
+  # DC1-DC5 doc-convention detectors moved to Custodian native (DC-class).
+  # Configure via the top-level `doc_conventions:` block if defaults need
+  # tuning; otherwise the natives just work.
 
 maintenance:
   stale_pr_days: 7
