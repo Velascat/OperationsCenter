@@ -3,6 +3,15 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08T21:58Z — Loop cycle (HEALTHY, starvation watch)
+
+Health: HEALTHY. Board: Blocked=7 Backlog=5 InReview=4 Running=1 Done=4 Cancelled=7. No Ready-for-AI tasks.
+Investigations: custodian 0, ghost 0, flow 0 gaps, graph OK, reaudit clean, regressions 0. Triage: nothing.
+Tests: 15/15 golden pass. Watchers: 8/8 alive, no non-143 restarts.
+Dirty tree: .custodian/config.yaml modified by active kodo run (plumbing block) — left untouched.
+Starvation watch: 5 OC tasks (self-modify: approved) stuck in Blocked, not Ready-for-AI. 2 CxRP spec-campaign tasks also Blocked (campaign 3h old, temporarily-blocked). Propose stage: tasks_created=None. Monitoring for recurrence next cycle.
+Cadence: HEALTHY → 3600s (starvation flag is not yet confirmed across 2 cycles).
+
 ## 2026-05-08 — P-class plumbing config wired in `.custodian/config.yaml`
 
 Added `audit.plumbing` block with three artifact contracts: heartbeat (role/at/status → OperatorConsole mtime check), usage.json (top-level + event sub-keys → budget/rate display), active.json (campaigns → campaign pane). P2 ignore_keys suppress TUI state dict false positives. All three P1/P2/P3 = 0 findings.
