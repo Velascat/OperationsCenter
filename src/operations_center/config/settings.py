@@ -81,6 +81,41 @@ class BackendCapSettings(BaseModel):
     max_concurrent: int | None = None
 
 
+class ResourceGateSettings(BaseModel):
+    """Global resource gate that runs before any per-backend cap.
+
+    The gate exists to reserve host headroom for **co-tenant workloads**
+    on the same machine — operator-defined background pipelines that
+    cannot tolerate having OC dispatches drain the RAM/CPU budget out
+    from under them. Per-backend caps (``BackendCapSettings``) are
+    still useful, but they only protect against a single backend
+    stampeding; a mix of small dispatches across many backends can
+    still push the box past what the co-tenants need to make forward
+    progress.
+
+    Both fields are optional; an empty ``resource_gate:`` block means
+    "no global gate" and only per-backend caps fire.
+
+    - ``max_concurrent`` — total in-flight OC dispatches across **all**
+      backends. Counted as ``execution_started`` minus
+      ``execution_finished`` events with no backend filter.
+    - ``min_available_memory_mb`` — pre-dispatch check that free RAM
+      (read from ``/proc/meminfo``) is at least this much, regardless
+      of which backend is dispatching.
+
+    Typical config (calibrated for a host that shares its CPU/RAM with
+    a heavy background pipeline; leaves 12 GiB and at most 6
+    concurrent OC runs free for the co-tenant)::
+
+        resource_gate:
+          max_concurrent: 6
+          min_available_memory_mb: 12288   # reserve 12 GiB for co-tenants
+    """
+
+    max_concurrent: int | None = None
+    min_available_memory_mb: int | None = None
+
+
 class ArchonSettings(BaseModel):
     """Settings for the Archon HTTP workflow backend.
 
@@ -341,6 +376,10 @@ class Settings(BaseModel):
     # Per-backend hourly/daily caps. Empty by default (no per-backend cap;
     # global cap still applies). See BackendCapSettings docstring.
     backend_caps: dict[str, BackendCapSettings] = Field(default_factory=dict)
+    # Global resource gate. Runs *before* per-backend caps and reserves
+    # host headroom for co-tenant workloads sharing the box. Empty by
+    # default (no gate). See ResourceGateSettings docstring.
+    resource_gate: ResourceGateSettings = Field(default_factory=ResourceGateSettings)
     repos: dict[str, RepoSettings]
     reviewer: ReviewerSettings = Field(default_factory=ReviewerSettings)
     report_root: Path = Path("tools/report/kodo_plane")

@@ -626,6 +626,86 @@ class UsageStore:
                 in_flight.discard(tid)
         return len(in_flight)
 
+    def total_concurrent_runs(self, *, now: datetime) -> int:
+        """In-flight dispatches across all backends.
+
+        Same algorithm as ``concurrent_runs_for_backend`` without the
+        backend filter — used by the global resource gate that reserves
+        host headroom for co-tenant workloads regardless of which OC
+        backend is dispatching.
+        """
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        cutoff = now - timedelta(hours=24)
+        in_flight: set[tuple[str, str]] = set()
+        for e in events:
+            ts_raw = e.get("timestamp")
+            if not isinstance(ts_raw, str):
+                continue
+            try:
+                ts = datetime.fromisoformat(ts_raw)
+            except ValueError:
+                continue
+            if ts < cutoff:
+                continue
+            tid = e.get("task_id")
+            backend = e.get("backend") or ""
+            if not isinstance(tid, str):
+                continue
+            kind = e.get("kind")
+            if kind == "execution_started":
+                in_flight.add((backend, tid))
+            elif kind == "execution_finished":
+                in_flight.discard((backend, tid))
+        return len(in_flight)
+
+    def global_concurrency_decision(
+        self,
+        *,
+        max_concurrent: int | None,
+        now: datetime,
+    ) -> "BudgetDecision":
+        """Block when total in-flight runs are at the global cap."""
+        if max_concurrent is None:
+            return BudgetDecision(allowed=True)
+        in_flight = self.total_concurrent_runs(now=now)
+        if in_flight >= max_concurrent:
+            return BudgetDecision(
+                allowed=False,
+                reason="global_concurrency_exceeded",
+                window="in_flight",
+                limit=max_concurrent,
+                current=in_flight,
+            )
+        return BudgetDecision(allowed=True)
+
+    def global_memory_decision(
+        self,
+        *,
+        min_available_memory_mb: int | None,
+    ) -> "BudgetDecision":
+        """Block when free RAM is below the global headroom floor.
+
+        Mirrors ``memory_decision_for_backend`` without a backend tag —
+        the gate reserves memory for co-tenant workloads on the same
+        host regardless of which backend is dispatching. Returns allowed
+        when ``/proc/meminfo`` is unreadable (non-Linux dev box).
+        """
+        if min_available_memory_mb is None:
+            return BudgetDecision(allowed=True)
+        avail = self.available_memory_mb()
+        if avail == 0:
+            return BudgetDecision(allowed=True)
+        if avail < min_available_memory_mb:
+            return BudgetDecision(
+                allowed=False,
+                reason="global_memory_insufficient",
+                window="instant",
+                limit=min_available_memory_mb,
+                current=avail,
+            )
+        return BudgetDecision(allowed=True)
+
     def concurrency_decision_for_backend(
         self,
         backend: str,
