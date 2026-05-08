@@ -66,6 +66,9 @@ class KodoRunCapture:
     duration_ms: int
     timeout_hit: bool = False
     artifacts: list[KodoArtifactCapture] = field(default_factory=list)
+    # G-V01 — RxP linkage. None on legacy/test fixtures that don't construct
+    # via the invoker.
+    invocation_ref: object | None = None
 
     @property
     def succeeded(self) -> bool:

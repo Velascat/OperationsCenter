@@ -91,11 +91,16 @@ class OpenClawBackendInvoker:
         self._runtime.register("manual", ManualRunner(_dispatcher))
         rxp_result = self._runtime.run(invocation)
 
+        from operations_center.backends._runtime_ref import runtime_invocation_ref
+        ref = runtime_invocation_ref(invocation, rxp_result)
+
         if not raw_holder:
-            return _capture_from_rejection(
+            cap = _capture_from_rejection(
                 prepared=prepared, rxp_result=rxp_result,
                 started_at=started_at, finished_at=_now(),
             )
+            cap.invocation_ref = ref
+            return cap
         raw = raw_holder[0]
 
         finished_at = _parse_iso(rxp_result.finished_at)
@@ -119,6 +124,7 @@ class OpenClawBackendInvoker:
             finished_at=finished_at,
             duration_ms=duration_ms,
             timeout_hit=timeout_hit,
+            invocation_ref=ref,
         )
 
 

@@ -102,6 +102,8 @@ class OpenClawRunCapture:
     finished_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     duration_ms: int = 0
     timeout_hit: bool = False
+    # G-V01 — RxP linkage; see ExecutionResult.runtime_invocation_ref.
+    invocation_ref: object | None = None
 
     @property
     def succeeded(self) -> bool:

@@ -29,6 +29,7 @@ from operations_center.contracts.enums import (
     ValidationStatus,
 )
 from operations_center.contracts.execution import ExecutionArtifact, ExecutionRequest, ExecutionResult
+from operations_center.backends._runtime_ref import runtime_invocation_ref
 
 
 class AiderLocalBackendAdapter:
@@ -103,6 +104,7 @@ class AiderLocalBackendAdapter:
             failure_category=failure_category,
             failure_reason=failure_reason,
             artifacts=artifacts,
+            runtime_invocation_ref=run_result.invocation_ref,
         )
 
     def _build_command(self, message_file: str) -> list[str]:
@@ -144,19 +146,23 @@ class AiderLocalBackendAdapter:
                 success=False,
                 output=f"[aider_local] Binary not found: {self._settings.binary}",
                 metadata={"command": command, "binary_missing": True},
+                invocation_ref=runtime_invocation_ref(invocation),
             )
 
+        ref = runtime_invocation_ref(invocation, rxp_result)
         if rxp_result.status == "rejected":
             return _AiderLocalRunResult(
                 success=False,
                 output=rxp_result.error_summary or "executor runtime rejected invocation",
                 metadata={"command": command},
+                invocation_ref=ref,
             )
         if rxp_result.status == "timed_out":
             return _AiderLocalRunResult(
                 success=False,
                 output=f"[aider_local] Timed out after {self._settings.timeout_seconds}s",
                 metadata={"command": command, "timeout_hit": True},
+                invocation_ref=ref,
             )
 
         stdout = _read_capture(rxp_result.stdout_path)
@@ -167,6 +173,7 @@ class AiderLocalBackendAdapter:
             output=output,
             exit_code=rxp_result.exit_code,
             metadata={"command": command, "model": self._settings.model},
+            invocation_ref=ref,
         )
 
 
@@ -178,11 +185,13 @@ class _AiderLocalRunResult:
         output: str,
         exit_code: int | None = None,
         metadata: dict[str, object] | None = None,
+        invocation_ref=None,
     ) -> None:
         self.success = success
         self.output = output
         self.exit_code = exit_code
         self.metadata = metadata or {}
+        self.invocation_ref = invocation_ref
 
 
 def _read_capture(path: str | None) -> str:

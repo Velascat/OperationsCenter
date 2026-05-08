@@ -162,6 +162,9 @@ class ArchonHttpWorkflowDispatcher:
         # ── Step 5: Dispatch via AsyncHttpRunner ─────────────────────
         rxp_result = self._runtime.run(invocation)
 
+        from operations_center.backends._runtime_ref import runtime_invocation_ref
+        ref = runtime_invocation_ref(invocation, rxp_result)
+
         # ── Step 6: Resolve run_id via by-worker, then full detail ────
         finished_at = _now()
         timeout_hit = rxp_result.status == "timed_out" or _is_timeout_summary(
@@ -179,16 +182,18 @@ class ArchonHttpWorkflowDispatcher:
         if timeout_hit:
             if run_id:
                 archon_cancel_run(self._base_url, run_id)
-            return _timeout_capture(
+            cap = _timeout_capture(
                 config=config,
                 run_id=run_id,
                 workflow_events=run_detail.events,
                 started_at=started_at,
                 finished_at=finished_at,
             )
+            cap.invocation_ref = ref
+            return cap
 
         if not run_detail.ok:
-            return _failure_capture(
+            cap = _failure_capture(
                 config=config,
                 started_at=started_at,
                 finished_at=finished_at,
@@ -198,6 +203,8 @@ class ArchonHttpWorkflowDispatcher:
                     f"runner status={rxp_result.status}"
                 ),
             )
+            cap.invocation_ref = ref
+            return cap
 
         outcome, exit_code, error_text = _map_status(
             run_detail.status, run_detail.metadata,
@@ -223,6 +230,7 @@ class ArchonHttpWorkflowDispatcher:
             finished_at=finished_at,
             duration_ms=duration_ms,
             timeout_hit=False,
+            invocation_ref=ref,
         )
 
     # ------------------------------------------------------------------

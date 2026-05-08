@@ -83,6 +83,9 @@ class KodoBackendInvoker:
 
         artifacts = _extract_artifacts(stdout_text, stderr_text)
 
+        from operations_center.backends._runtime_ref import runtime_invocation_ref
+        ref = runtime_invocation_ref(invocation, rxp_result)
+
         return KodoRunCapture(
             run_id=prepared.run_id,
             exit_code=rxp_result.exit_code if rxp_result.exit_code is not None else -1,
@@ -94,6 +97,7 @@ class KodoBackendInvoker:
             duration_ms=duration_ms,
             timeout_hit=timeout_hit,
             artifacts=artifacts,
+            invocation_ref=ref,
         )
 
     # ------------------------------------------------------------------

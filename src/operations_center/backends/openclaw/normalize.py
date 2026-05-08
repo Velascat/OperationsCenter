@@ -112,6 +112,7 @@ def normalize(
         failure_category=failure_category,
         failure_reason=failure_reason,
         artifacts=artifacts,
+        runtime_invocation_ref=getattr(capture, "invocation_ref", None),
     )
 
 
