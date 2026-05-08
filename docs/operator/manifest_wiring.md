@@ -14,16 +14,23 @@ OC's local config (`config/operations_center.local.yaml`, gitignored) carries an
 platform_manifest:
   enabled: true                          # default; set false to skip composition entirely
   project_slug: my-project                # for WorkStation LocalManifest discovery
-  project_manifest_path: /home/dev/Documents/GitHub/MyProject/topology/project_manifest.yaml
-  local_manifest_path:   /home/dev/Documents/GitHub/MyProject/topology/local_manifest.yaml
+
+  # Use exactly one of project_manifest_path / work_scope_manifest_path:
+  project_manifest_path:    /home/dev/Documents/GitHub/MyProject/topology/project_manifest.yaml
+  # work_scope_manifest_path: /home/dev/Documents/GitHub/MyProductSuite/topology/work_scope_manifest.yaml
+
+  local_manifest_path: /home/dev/Documents/GitHub/MyProject/topology/local_manifest.yaml
 ```
 
 | Field | Meaning |
 |---|---|
 | `enabled` | When false, no graph is composed (coordinator runs with `repo_graph=None`); contract-impact logging stays silent |
 | `project_slug` | Used by WorkStation's `discover_local_manifest()` if `local_manifest_path` is unset; looks at `~/.config/workstation/manifests/<slug>.local.yaml` |
-| `project_manifest_path` | Explicit override; takes precedence over the cwd convention |
+| `project_manifest_path` | Single-project mode. Explicit override; takes precedence over the cwd convention. Mutually exclusive with `work_scope_manifest_path` |
+| `work_scope_manifest_path` | Multi-project work-scope mode (PM v0.9.0+). Points at a `WorkScopeManifest` that composes multiple `ProjectManifest`s via explicit `includes:`. Mutually exclusive with `project_manifest_path` |
 | `local_manifest_path` | Explicit override; takes precedence over WS discovery |
+
+Setting both `project_manifest_path` and `work_scope_manifest_path` is a configuration error — `load_settings()` raises at OC startup. Run `operations-center-graph-doctor` to confirm the selected mode (`project | work_scope | platform_only | disabled`).
 
 **Defaults are operator-friendly:** `enabled=true`, all paths None. With nothing configured OC uses the bundled platform-only graph (9 public repos), which still drives contract-impact logging for any platform-targeted dispatch.
 
@@ -31,7 +38,10 @@ platform_manifest:
 
 The factory `build_effective_repo_graph_from_settings(settings, *, repo_root=None)` resolves paths in this order:
 
-### Project layer
+### Second-layer manifest (project XOR work_scope)
+
+If `settings.platform_manifest.work_scope_manifest_path` is set, OC dispatches to PM's work-scope slot directly — the topology convention below is **not** consulted. Otherwise the project resolution order is:
+
 1. `settings.platform_manifest.project_manifest_path` (explicit)
 2. `<repo_root>/topology/project_manifest.yaml` (cwd convention — when `repo_root` is provided)
 3. None → platform-only graph
@@ -72,19 +82,25 @@ Dispatches against non-contract repos (leaves, project services without consumer
 
 ## Switching projects
 
-v0.3 of PlatformManifest deliberately supports **one project per OC instance**. To switch which project OC sees:
+One OC instance composes against one second-layer manifest. To switch:
 
 ```yaml
-# In config/operations_center.local.yaml
+# In config/operations_center.local.yaml — single-project mode
 platform_manifest:
   project_slug: warehouse
   project_manifest_path: /home/dev/Documents/GitHub/Warehouse/topology/project_manifest.yaml
   local_manifest_path:   /home/dev/Documents/GitHub/Warehouse/topology/local_manifest.yaml
 ```
 
-Or run OC from inside a project repo's working directory and let the cwd convention do the work — no settings change required.
+```yaml
+# work-scope mode — composes multiple ProjectManifests
+platform_manifest:
+  project_slug: media-product-suite
+  work_scope_manifest_path: /home/dev/Documents/GitHub/MediaProductSuite/topology/work_scope_manifest.yaml
+  local_manifest_path:      /home/dev/Documents/GitHub/MediaProductSuite/topology/local_manifest.yaml
+```
 
-Multi-project composition (one effective graph spanning multiple `topology/project_manifest.yaml` files) is a future PlatformManifest feature; today, it's "one OC instance, one project."
+In single-project mode, running OC from inside a project repo's working directory lets the cwd convention pick up `topology/project_manifest.yaml` — no settings change required. Work-scope mode requires explicit `work_scope_manifest_path`; the convention does not apply.
 
 ## What's gitignored vs committed
 

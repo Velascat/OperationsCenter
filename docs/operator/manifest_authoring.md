@@ -90,34 +90,37 @@ Private nodes never leak into PlatformManifest's bundled YAML — the loader rej
 ## Validate before committing
 
 ```bash
-pip install "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.4.0"
+pip install "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.9.0"
 
-platform-manifest validate topology/project_manifest.yaml --expected project
+platform-manifest validate topology/project_manifest.yaml   --expected project
+platform-manifest validate topology/work_scope_manifest.yaml --expected work_scope
 ```
 
 Two-stage check (JSON Schema + Python loader); exit `0` clean, `1` validation failed. Set up a `manifest-validate.yml` GitHub Actions workflow that runs the same command on every PR so drift is caught before merge.
 
-## Multi-repo project — shell pattern (PM v0.8+)
+## Multi-repo work scopes — `WorkScopeManifest` (PM v0.9+)
 
-When several repos together form one logical project, use a **shell manifest repo**. Each constituent repo keeps its own `topology/project_manifest.yaml`; one dedicated shell repo includes all of them.
+When several repos together form one OperationsCenter work scope, author a **WorkScopeManifest** (`manifest_kind: work_scope`) in a dedicated shell repo. Each constituent repo keeps its own `topology/project_manifest.yaml`; one work-scope manifest composes them.
 
-### When to use a shell repo
+> **Migrating from the v0.8 project-shell pattern**: `manifest_kind: project` with `includes:` is deprecated as of PM v0.9.0 (still loads with a `DeprecationWarning`) and will hard-fail in PM v1.0.0. Migration is a one-line change: `manifest_kind: project` → `manifest_kind: work_scope`. The `includes:` shape is unchanged. See [migration](#migration-from-v08-project-shell-style) below.
+
+### When to author a `WorkScopeManifest`
 
 - ✅ Two or more repos collaborate as one product (e.g. `MediaProductAPI` + `MediaProductWorker` + `MediaProductAssets`)
 - ✅ You want OperationsCenter to see all of them in one merged graph
 - ✅ Cross-repo edges (`repo A bundles_assets_from repo B`) span the suite
-- ❌ Two repos happen to coexist but aren't logically one project (each gets its own standalone manifest)
+- ❌ Two repos happen to coexist but aren't logically one work scope (each gets its own standalone `ProjectManifest`)
 
 ### Shape
 
 ```
 MediaProductSuite/                          # the dedicated shell repo
   topology/
-    project_manifest.yaml                   # references all sub-projects
+    work_scope_manifest.yaml                # composes all constituent ProjectManifests
     local_manifest.example.yaml             # per-machine wiring for the whole suite
     local_manifest.yaml                     # gitignored
 
-MediaProductCore/                           # constituent repos keep their own manifests
+MediaProductCore/                           # each constituent keeps its own ProjectManifest
   topology/
     project_manifest.yaml
 
@@ -126,57 +129,90 @@ MediaProductAssets/
     project_manifest.yaml
 ```
 
-### Shell manifest example
+### `WorkScopeManifest` example
 
 ```yaml
-manifest_kind: project
+manifest_kind: work_scope
 manifest_version: "1.0.0"
 
 platform_manifest:
   name: PlatformManifest
-  version_constraint: ">=0.8,<1.0"
+  version_constraint: ">=0.9,<1.0"
 
-# Order matters: included manifests apply in sequence. Earlier includes
-# may be referenced by later ones via canonical name.
+# Required. Order matters — earlier includes may be referenced by later
+# ones via canonical name.
 includes:
   - name: MediaProductCore
     project_manifest_path: ../MediaProductCore/topology/project_manifest.yaml
   - name: MediaProductAssets
     project_manifest_path: ../MediaProductAssets/topology/project_manifest.yaml
 
-# The shell may also declare its own repos (rare — usually empty).
+# Optional. Work-scope-level repos rarely needed — usually empty.
 repos: {}
 
-# Cross-suite edges that don't belong in any constituent's manifest
-# go here. Example: a deployment-pipeline repo that orchestrates both
-# constituents above.
+# Cross-suite edges that don't belong in any constituent's manifest go
+# here. Carry Source.WORK_SCOPE provenance, distinguishing them from
+# project-internal edges in impact analyses.
 edges: []
 ```
 
-### Composition rules across the shell
+### Composition rules
 
 The loader enforces, in addition to the single-project rules:
 
 | Rule | Behavior on violation |
 |---|---|
-| Two sub-projects declare the same `repo_id` | Hard fail — `'X' already declared by an included sub-project` |
-| Sub-project tries to redefine a platform `repo_id` | Hard fail — same as single-project case |
-| Cycle (A includes B includes A) | Hard fail — `cycle detected` |
-| Excessive nesting (>4 deep by default) | Hard fail — `depth exceeded` |
-| Sub-project edge between two platform nodes | Hard fail — sub-projects can't reshape platform's internal graph |
-| Sub-project edge to/from a sibling sub-project | **Allowed** — this is the whole point |
+| Two included projects declare the same `repo_id` | Hard fail — `'X' already declared by an included project` |
+| Included project tries to redefine a platform `repo_id` | Hard fail |
+| Work-scope manifest tries to redefine a platform `repo_id` | Hard fail |
+| Work-scope edge between two platform nodes | Hard fail |
+| Cycle (A includes B includes A) | Hard fail |
+| Excessive nesting (>4 deep by default) | Hard fail |
+| Edge to/from a sibling included project | **Allowed** — the whole point |
 
-### Pointing OC at a shell
+### Pointing OC at a `WorkScopeManifest`
 
 ```yaml
 # config/operations_center.local.yaml
 platform_manifest:
   project_slug: media-product-suite
-  project_manifest_path: ../MediaProductSuite/topology/project_manifest.yaml
-  local_manifest_path:   ../MediaProductSuite/topology/local_manifest.yaml
+  # Use exactly one of project_manifest_path / work_scope_manifest_path:
+  work_scope_manifest_path: ../MediaProductSuite/topology/work_scope_manifest.yaml
+  local_manifest_path:      ../MediaProductSuite/topology/local_manifest.yaml
 ```
 
-The merged graph contains all constituent repos' nodes, all their edges, plus the shell's own additions. OC's contract-impact analysis spans the whole suite.
+Setting both `project_manifest_path` and `work_scope_manifest_path` is a configuration error — OC's settings layer enforces XOR at config load. Run `operations-center-graph-doctor` to confirm `mode: work_scope` is reported.
+
+The merged graph contains all included projects' nodes + edges, plus the work scope's own additions (Source.WORK_SCOPE). OC's contract-impact analysis spans the whole suite.
+
+### Migration from v0.8 project-shell style
+
+If you have a manifest authored under PM v0.8.x using `manifest_kind: project` with `includes:`:
+
+```diff
+- manifest_kind: project
++ manifest_kind: work_scope
+  manifest_version: "1.0.0"
+  platform_manifest:
+    name: PlatformManifest
+-   version_constraint: ">=0.8,<1.0"
++   version_constraint: ">=0.9,<1.0"
+  includes:
+    - name: ...
+      project_manifest_path: ...
+```
+
+And in your OC config:
+
+```diff
+  platform_manifest:
+    project_slug: media-product-suite
+-   project_manifest_path: ../MediaProductSuite/topology/project_manifest.yaml
++   work_scope_manifest_path: ../MediaProductSuite/topology/work_scope_manifest.yaml
+    local_manifest_path: ../MediaProductSuite/topology/local_manifest.yaml
+```
+
+(Optionally rename `project_manifest.yaml` → `work_scope_manifest.yaml` to match the new vocabulary; only the manifest's `manifest_kind` field is load-bearing.)
 
 ### Why not "just declare all repos in one big manifest"?
 
