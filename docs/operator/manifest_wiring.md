@@ -111,6 +111,60 @@ The factory degrades gracefully — OC startup never fails because of a manifest
 
 To make these louder during ops, watch for `EffectiveRepoGraph construction failed` in the OC log. Or run a one-shot doctor command (coming in a follow-up round).
 
+## Cross-repo task chaining (R5)
+
+When a contract repo (CxRP/RxP/PlatformManifest, or your own contract repo) changes, downstream consumers may need re-validation runs. The `operations-center-propagate` entrypoint walks the contract-impact set and creates Plane tasks per the `contract_change_propagation:` settings block.
+
+### Settings
+
+```yaml
+# config/operations_center.local.yaml
+contract_change_propagation:
+  enabled: false                          # default — nothing fires until you opt in
+  auto_trigger_edge_types: []             # default — no edge types auto-fire
+  dedup_window_hours: 24                  # don't re-fire same (target,consumer,version) within window
+  pair_overrides: []                      # per-pair skip/backlog/ready_for_ai
+  record_dir: state/propagation           # PropagationRecord artifacts land here
+  dedup_path: state/propagation/dedup.json
+```
+
+### Manual trigger
+
+```bash
+operations-center-propagate \
+    --target cxrp \
+    --version <commit-sha> \
+    --config config/operations_center.local.yaml \
+    --dry-run                             # preview without hitting Plane
+```
+
+### What gets created
+
+For each consumer in the impact set, a Plane task with:
+
+- Title: *"Re-validate {consumer} after {target} change"*
+- Body prelude with target/version/edge_type substitution
+- Labels: `revalidation`, `pending-review`
+- A structured `<!-- propagation:source -->` block at the bottom carrying target/version/edge_type/run_id for traceability
+- State: **Backlog** (operator promotes to "Ready for AI" after triage)
+
+### Promote a trusted pair
+
+```yaml
+contract_change_propagation:
+  enabled: true
+  auto_trigger_edge_types: [depends_on_contracts_from]
+  pair_overrides:
+    - target_repo_id: cxrp
+      consumer_repo_id: operations_center
+      action: ready_for_ai
+      reason: trusted pair — auto-promote after CxRP change
+```
+
+### Mandatory observability
+
+Every `propagate()` run writes a `PropagationRecord` artifact to `state/propagation/<run_id>.json` regardless of whether tasks fired. This is the audit trail for *"why did/didn't propagation fire?"* — operators always have a record without re-running.
+
 ## Related
 
 - [Manifest Authoring](manifest_authoring.md) — what to put in `topology/project_manifest.yaml`
