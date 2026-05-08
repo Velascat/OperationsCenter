@@ -50,7 +50,7 @@ class TestListWorkflows:
     def test_lists_workflows(self, monkeypatch):
         def _list(base_url, **_kw):
             return [
-                WorkflowSummary(name="archon-goal-default", description="Generic goal"),
+                WorkflowSummary(name="archon-assist", description="Generic goal"),
                 WorkflowSummary(name="archon-fix-pr", description="Fix a PR"),
             ]
 
@@ -60,7 +60,7 @@ class TestListWorkflows:
         )
         result = runner.invoke(app, ["--list-workflows"])
         assert result.exit_code == 0
-        assert "archon-goal-default" in result.stdout
+        assert "archon-assist" in result.stdout
         assert "archon-fix-pr" in result.stdout
 
     def test_empty_list_exits_one(self, monkeypatch):

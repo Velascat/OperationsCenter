@@ -42,10 +42,10 @@ class ArchonSettings(BaseModel):
     poll_interval_seconds: float = 2.0
     workflow_names: dict[str, str] = Field(
         default_factory=lambda: {
-            "goal":    "archon-goal-default",
-            "fix_pr":  "archon-fix-github-issue-dag",
-            "test":    "archon-test-default",
-            "improve": "archon-improve-default",
+            "goal":    "archon-assist",
+            "fix_pr":  "archon-fix-github-issue",
+            "test":    "archon-test-loop-dag",
+            "improve": "archon-refactor-safely",
         },
     )
 

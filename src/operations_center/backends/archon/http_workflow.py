@@ -60,13 +60,16 @@ from .models import ArchonArtifactCapture, ArchonRunCapture, ArchonWorkflowConfi
 
 logger = logging.getLogger(__name__)
 
-# Default workflow_type → Archon workflow name. Operators override via
-# ArchonSettings.workflow_names if they ship custom YAML workflows.
+# Default workflow_type → Archon workflow name. Mapped to workflows that
+# actually ship as bundled defaults in Velascat/Archon main (verified
+# against a live container 2026-05-07 — see project_archon_api_quirks
+# memory + WS design doc). Operators override via
+# ArchonSettings.workflow_names when they ship custom YAML workflows.
 DEFAULT_WORKFLOW_NAMES: dict[str, str] = {
-    "goal":    "archon-goal-default",
-    "fix_pr":  "archon-fix-github-issue-dag",
-    "test":    "archon-test-default",
-    "improve": "archon-improve-default",
+    "goal":    "archon-assist",            # general-purpose; always available
+    "fix_pr":  "archon-fix-github-issue",  # NB: not "...-dag" (that's a different sibling)
+    "test":    "archon-test-loop-dag",
+    "improve": "archon-refactor-safely",
 }
 
 _TERMINAL_STATES = ("completed", "failed", "cancelled", "paused")

@@ -233,14 +233,14 @@ class TestArchonCancel:
 class TestArchonListWorkflows:
     def test_list_response(self):
         payload = [
-            {"name": "archon-goal-default", "description": "goal"},
-            {"name": "archon-fix-github-issue-dag", "description": "fix"},
+            {"name": "archon-assist", "description": "goal"},
+            {"name": "archon-fix-github-issue", "description": "fix"},
         ]
         client = _stub_client(response=httpx.Response(200, json=payload))
         result = archon_list_workflows("http://archon.test", client=client)
         assert len(result) == 2
         assert isinstance(result[0], WorkflowSummary)
-        assert result[0].name == "archon-goal-default"
+        assert result[0].name == "archon-assist"
 
     def test_object_with_workflows_key(self):
         payload = {"workflows": [{"name": "a"}, {"name": "b"}]}
