@@ -393,6 +393,13 @@ doc (DC7).
 
 ## 2026-05-08 — Link ADR 0002+0003; common_words for ADR 0002 vocabulary
 
+## 2026-05-08 — Watchdog reviver interval: 2min → 1h
+
+The watchdog bash loop is a blind reviver with no root-cause analysis.
+2-minute polling masked crash loops. Changed sleep 120 → sleep 3600 so
+the operator loop (hourly) is the primary crash detector and the watchdog
+is a backstop only.
+
 ## 2026-05-08 — Fix phantom entrypoints/watchdog reference in audit docs
 
 G8 (ghost_work_audit.md) and F1 (flow_audit.md) both referenced

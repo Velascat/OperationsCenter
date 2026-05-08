@@ -418,7 +418,7 @@ start_watchdog() {
   rm -f "${pid_file}"
   mkdir -p "${WATCH_DIR}"
   local log_file="${WATCH_DIR}/$(timestamp)_watchdog.log"
-  # Runs every 2 minutes; revives any watcher whose PID file exists but PID is dead.
+  # Runs every hour; revives any watcher whose PID file exists but PID is dead.
   # Exits when its own PID file is removed (by stop_watchdog / dev-down).
   setsid /bin/bash -lc "
     cd '${ROOT_DIR}'
@@ -427,7 +427,7 @@ start_watchdog() {
     set +a
     _ROLES='goal test improve propose review spec intake'
     while [[ -f '${pid_file}' ]]; do
-      sleep 120
+      sleep 3600
       [[ ! -f '${pid_file}' ]] && break
       for _r in \$_ROLES; do
         _pf='${WATCH_DIR}'/\"\$_r\".pid
