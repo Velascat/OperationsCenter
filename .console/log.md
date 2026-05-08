@@ -3,6 +3,10 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — P-class plumbing config wired in `.custodian/config.yaml`
+
+Added `audit.plumbing` block with three artifact contracts: heartbeat (role/at/status → OperatorConsole mtime check), usage.json (top-level + event sub-keys → budget/rate display), active.json (campaigns → campaign pane). P2 ignore_keys suppress TUI state dict false positives. All three P1/P2/P3 = 0 findings.
+
 ## 2026-05-08 — Watchdog heartbeat every 5 min; propose heartbeat after child exits
 
 Watchdog slept 3600s between heartbeats — replaced single sleep with 12×300s loop, writing each iteration.
