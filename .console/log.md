@@ -296,3 +296,21 @@ OC findings: 364 → 73.
 - DC8: moved Quick Start before Overview in README.
 - C41: added ensure_ascii=False to json.dumps in run_memory/{cli,index}
   and entrypoints/{graph_doctor,reaudit_check} mains.
+
+## 2026-05-08 — Custodian round: OC clean (73 → 0)
+
+- Added the deeper-layer T6 packages (audit_dispatch/governance/toolset,
+  autonomy_tiers, behavior_calibration, repo_graph, routing, decision,
+  drift, fixture_harvesting, mini_regression, planning, policy, proposer,
+  slice_replay, tuning, spec_director, contracts, application, execution,
+  domain, config) — same layers already exempt from T7.
+- C29 settings.py + coordinator.py (canonical settings + central dispatcher,
+  splitting fragments cohesion).
+- C13 += executors/** (subprocess env-overlay layer).
+- C41 backends/archon/http_workflow.py (ASCII-safe correct for Archon HTTP).
+- T2 schema-validation tests + startup-wiring (raise/side-effect IS the assert).
+- common_words += autonomy-gap design-doc symbols (renamed/removed helpers).
+- known_values += audit_report, kodo_version (K2 vocabulary).
+- DC7: linked the upstream-patch-evaluation, routing-tuning, post-merge-hook,
+  and execution-boundary ADR docs from docs/README.md.
+
