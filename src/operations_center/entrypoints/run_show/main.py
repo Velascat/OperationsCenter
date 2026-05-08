@@ -110,6 +110,18 @@ def _print_trace(trace: dict) -> None:
     else:
         _console.print("[dim](no routing block on this trace)[/dim]")
 
+    provenance = trace.get("provenance") or {}
+    if provenance:
+        table = Table(title="SourceRegistry provenance", show_header=True, header_style="bold")
+        table.add_column("field")
+        table.add_column("value")
+        for field in ("source", "repo", "ref", "patches"):
+            if field in provenance:
+                table.add_row(field, _render(provenance[field]))
+        _console.print(table)
+    else:
+        _console.print("[dim](no SourceRegistry provenance on this trace)[/dim]")
+
     ref = trace.get("runtime_invocation_ref")
     if ref:
         table = Table(title="RxP runtime invocation", show_header=True, header_style="bold")
