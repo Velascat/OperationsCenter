@@ -170,6 +170,61 @@ class TestInvocationErrors:
 # ---------------------------------------------------------------------------
 
 
+class TestVersionPinRegression:
+    """Catch the silent-degradation pattern that bit VF on PM 1.0.0.
+
+    PlatformManifest bumped to 1.0.0 while VF's project manifest still
+    pinned ``>=0.7,<1.0``. OC's contract-impact hook continued to dispatch
+    successfully but silently produced no graph context — the
+    blast-radius warnings were disabled across every dispatch with no
+    visible failure. Graph-doctor *did* surface it, which is why we caught
+    it; this test pins that surfacing behavior so a future "swallow the
+    warning to make doctor green" change can't regress us.
+    """
+
+    def test_project_pin_excluding_installed_pm_is_explicit(
+        self, tmp_path: Path, capsys,
+    ) -> None:
+        proj = tmp_path / "project.yaml"
+        # An impossible upper bound so the constraint can't be satisfied
+        # by any released PlatformManifest version (current or future).
+        proj.write_text(
+            'manifest_kind: project\n'
+            'manifest_version: "1.0.0"\n'
+            'platform_manifest:\n'
+            '  name: PlatformManifest\n'
+            '  version_constraint: ">=0.0.1,<0.0.2"\n'
+            'repos:\n'
+            '  example:\n'
+            '    canonical_name: Example\n'
+            '    visibility: private\n',
+            encoding="utf-8",
+        )
+        cfg = _write_config(
+            tmp_path,
+            f"\nplatform_manifest:\n  project_manifest_path: {proj}\n",
+        )
+
+        rc = main(["--config", str(cfg), "--json"])
+        report = json.loads(capsys.readouterr().out)
+
+        # graph-doctor must mark this as a failure, not silently succeed
+        # with a degraded graph.
+        assert rc == 1
+        assert report["status"] == "fail_graph_none"
+        assert report["graph_built"] is False
+
+        # The warning must name the constraint string so an operator can
+        # find the right manifest to bump without trial and error.
+        warnings = report.get("warnings") or []
+        assert any(
+            "version_constraint" in w
+            or ">=0.0.1" in w
+            or "does not satisfy" in w
+            for w in warnings
+        ), f"warnings missing version-pin context: {warnings}"
+
+
 class TestHumanOutput:
     def test_human_default_ok(self, tmp_path: Path, capsys) -> None:
         cfg = _write_config(tmp_path)
