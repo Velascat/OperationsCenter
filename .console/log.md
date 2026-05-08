@@ -18,6 +18,16 @@ _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 - VF branch fix: P-class plumbing commit cherry-picked to VF `dev`
   (was on `main` only); Zonos submodule pointer unchanged.
 
+## 2026-05-08T23:02Z — Loop cycle (HEALTHY, G8 recovery)
+
+Health: HEALTHY. Board entering: Ready-for-AI=3 Backlog=5 Running=2 InReview=4 Blocked=3 Done=4 Cancelled=7.
+Forward progress: YES — lint regression task actively running; spec director brainstorm in flight.
+Ghost audit G8: 1 stale Running task — 925be138 "Restore repeated missing test_signal coverage" running 245 min (kodo timeout 3600s, far exceeded). No kodo process active for it → orphaned. Direct fix: transitioned Running→Backlog.
+Triage: clean (nothing applied).
+Tests: 15/15 golden pass. Watchers: 8/8, exit-143 restarts only (benign).
+Board after: Ready-for-AI=4 Backlog=5 Running=1 Blocked=3.
+Cadence: HEALTHY (3600s) — queue flowing, single orphaned task recovered.
+
 ## 2026-05-08T22:40Z — Loop cycle (STALLED → unblocked)
 
 Health: STALLED — confirmed closed-loop stagnation. Board entering cycle: Blocked=7 Backlog=5 InReview=4 Running=1, Ready-for-AI=0.
