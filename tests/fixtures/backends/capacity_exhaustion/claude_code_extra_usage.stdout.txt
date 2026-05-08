@@ -1,0 +1,12 @@
+╭───────────────────────────────────────────────╮
+│ ✻ Welcome to Claude Code!                     │
+╰───────────────────────────────────────────────╯
+ Tip: Press Tab at the start of a line to enable extended thinking
+ Tip: Continue this conversation in chat at https://claude.ai/code
+
+> Run lint pass on the audit module
+
+I'll start by checking the current lint state.
+
+You're out of extra usage · resets 4:20am
+Run "claude config" or visit https://www.anthropic.com/claude-code/usage to upgrade.
