@@ -729,21 +729,38 @@ class UsageStore:
 
     @staticmethod
     def available_memory_mb() -> int:
-        """Return free RAM in MB by reading /proc/meminfo. 0 on non-Linux."""
+        """Return available memory in MB (RAM + swap headroom).
+
+        Reads ``MemAvailable`` and ``SwapFree`` from ``/proc/meminfo``.
+        Both contribute to "memory the host can hand to a new process
+        without OOM-killing"; including swap matches operator intent
+        when configuring ``min_available_memory_mb`` as a co-tenant
+        headroom floor (the system can absorb a brief RAM spike by
+        paging cold pages out, so SwapFree is a real cushion).
+        Returns 0 on non-Linux hosts where /proc/meminfo is absent.
+        """
+        mem_avail_mb = 0
+        swap_free_mb = 0
         try:
             with open("/proc/meminfo", encoding="utf-8") as fh:
                 for line in fh:
                     if line.startswith("MemAvailable:"):
-                        # "MemAvailable:   12345 kB"
                         parts = line.split()
                         if len(parts) >= 2:
                             try:
-                                return int(parts[1]) // 1024
+                                mem_avail_mb = int(parts[1]) // 1024
                             except ValueError:
-                                return 0
+                                pass
+                    elif line.startswith("SwapFree:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try:
+                                swap_free_mb = int(parts[1]) // 1024
+                            except ValueError:
+                                pass
         except OSError:
-            pass
-        return 0
+            return 0
+        return mem_avail_mb + swap_free_mb
 
     def memory_decision_for_backend(
         self,
