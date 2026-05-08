@@ -332,10 +332,24 @@ def run_once(settings: Any, client: PlaneClient) -> None:
     }, ensure_ascii=False))
 
 
+def _write_heartbeat(status_dir: Path | None) -> None:
+    if status_dir is None:
+        return
+    try:
+        hb = status_dir / "heartbeat_spec.json"
+        hb.write_text(
+            json.dumps({"role": "spec", "at": datetime.now(UTC).isoformat(), "status": "idle"}),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Spec director — autonomous spec-driven campaign manager")
     parser.add_argument("--config", required=True)
     parser.add_argument("--once", action="store_true", help="Run one cycle and exit")
+    parser.add_argument("--status-dir", type=Path, default=None, help="Directory for heartbeat_spec.json")
     args = parser.parse_args()
 
     settings = load_settings(args.config)
@@ -353,6 +367,7 @@ def main() -> None:
             return
         cycle = 0
         while True:
+            _write_heartbeat(args.status_dir)
             try:
                 run_once(settings, client)
             except Exception as exc:

@@ -208,6 +208,19 @@ def _has_inotifywait() -> bool:
     return shutil.which("inotifywait") is not None
 
 
+def _write_heartbeat(status_dir: Path | None) -> None:
+    if status_dir is None:
+        return
+    try:
+        hb = status_dir / "heartbeat_intake.json"
+        hb.write_text(
+            json.dumps({"role": "intake", "at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()), "status": "idle"}),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
 def _drain_queue(config_path: Path, venv_python: str) -> None:
     """Process all current queue files."""
     QUEUE_DIR.mkdir(parents=True, exist_ok=True)
@@ -226,12 +239,13 @@ def _drain_queue(config_path: Path, venv_python: str) -> None:
             logger.warning("intake: leaving queue file %s for inspection", f.name)
 
 
-def _watch_loop_inotify(config_path: Path, venv_python: str) -> None:
+def _watch_loop_inotify(config_path: Path, venv_python: str, status_dir: Path | None = None) -> None:
     """Event-driven loop using inotifywait with POLL_INTERVAL timeout as heartbeat."""
     logger.info("intake: starting inotifywait watch on %s", QUEUE_DIR)
     QUEUE_DIR.mkdir(parents=True, exist_ok=True)
 
     while True:
+        _write_heartbeat(status_dir)
         # Drain anything already there before blocking
         _drain_queue(config_path, venv_python)
 
@@ -254,11 +268,12 @@ def _watch_loop_inotify(config_path: Path, venv_python: str) -> None:
             break
 
 
-def _watch_loop_poll(config_path: Path, venv_python: str) -> None:
+def _watch_loop_poll(config_path: Path, venv_python: str, status_dir: Path | None = None) -> None:
     """Polling fallback when inotifywait is not available."""
     logger.info("intake: inotifywait not found — polling every %ds", POLL_INTERVAL)
     while True:
         try:
+            _write_heartbeat(status_dir)
             _drain_queue(config_path, venv_python)
             time.sleep(POLL_INTERVAL)
         except KeyboardInterrupt:
@@ -274,6 +289,7 @@ def main() -> int:
     parser.add_argument("--config", required=True, type=Path, help="Path to operations_center config YAML")
     parser.add_argument("--queue-dir", type=Path, default=QUEUE_DIR, help="Override queue directory")
     parser.add_argument("--once", action="store_true", help="Drain queue once and exit (no watch loop)")
+    parser.add_argument("--status-dir", type=Path, default=None, help="Directory for heartbeat_intake.json")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args()
 
@@ -293,9 +309,9 @@ def main() -> int:
         return 0
 
     if _has_inotifywait():
-        _watch_loop_inotify(args.config, python)
+        _watch_loop_inotify(args.config, python, status_dir=args.status_dir)
     else:
-        _watch_loop_poll(args.config, python)
+        _watch_loop_poll(args.config, python, status_dir=args.status_dir)
 
     return 0
 

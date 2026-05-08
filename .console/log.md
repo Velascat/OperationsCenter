@@ -3,6 +3,13 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — Heartbeat writes added to intake, spec, propose, watchdog
+
+Added --status-dir flag to intake and spec_director entrypoints; both now write
+heartbeat_{role}.json each loop iteration. Propose and watchdog bash wrappers in
+operations-center.sh also write heartbeat files. Fixes permanent "stalled" banner
+for all 4 roles in OperatorConsole watcher_status_pane.
+
 ## 2026-05-08 — X1 cross-repo config wired
 
 Added `audit.cross_repo.platform_manifest_repo: ../PlatformManifest` to `.custodian/config.yaml`. X1 live-run: 0 legacy-name findings.

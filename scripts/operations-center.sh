@@ -283,7 +283,8 @@ start_watch_role() {
       trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
       while true; do
         '${VENV_DIR}/bin/python' -m operations_center.entrypoints.intake.main \
-          --config '${CONFIG_PATH}' &
+          --config '${CONFIG_PATH}' \
+          --status-dir '${WATCH_DIR}' &
         _child_pid=\$!
         wait \$_child_pid
         _exit=\$?
@@ -324,7 +325,8 @@ start_watch_role() {
       trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
       while true; do
         '${VENV_DIR}/bin/python' -u -m operations_center.entrypoints.spec_director.main \
-          --config '${CONFIG_PATH}' &
+          --config '${CONFIG_PATH}' \
+          --status-dir '${WATCH_DIR}' &
         _child_pid=\$!
         wait \$_child_pid
         _exit=\$?
@@ -342,6 +344,9 @@ start_watch_role() {
       _child_pid=''
       trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
       while true; do
+        printf '{\"role\":\"propose\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
+          "\$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+          > '${WATCH_DIR}/heartbeat_propose.json'
         '${VENV_DIR}/bin/python' -m operations_center.entrypoints.pipeline_trigger.main \
           --config '${CONFIG_PATH}' \
           --execute &
@@ -427,6 +432,9 @@ start_watchdog() {
     set +a
     _ROLES='goal test improve propose review spec intake'
     while [[ -f '${pid_file}' ]]; do
+      printf '{\"role\":\"watchdog\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
+        "\$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+        > '${WATCH_DIR}/heartbeat_watchdog.json'
       sleep 3600
       [[ ! -f '${pid_file}' ]] && break
       for _r in \$_ROLES; do
