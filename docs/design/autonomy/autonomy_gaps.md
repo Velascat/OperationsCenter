@@ -562,7 +562,7 @@ the function is a no-op.
 | S5-2 | Kodo process tree cleanup | kodo timeout | `KodoAdapter._run_subprocess`, `os.killpg` |
 | S5-3 | Per-task-kind running TTL | reconcile at watcher startup | `reconcile_stale_running_issues`, `_RUNNING_TTL_MINUTES` |
 | S5-4 | Disk space guardrail | before usage store and cycle report writes | `_check_disk_space`, `UsageStore.save()` |
-| S5-5 | Quota exhaustion detection | after each kodo execution | `KodoAdapter.is_quota_exhausted`, `record_kodo_quota_event` |
+| S5-5 | Quota exhaustion detection | after each kodo execution | `KodoAdapter.is_quota_exhausted`, `record_quota_event` |
 | S5-6 | Task urgency scoring | watcher candidate selection | `issue_urgency_score`, `select_watch_candidate` |
 | S5-7 | Board saturation backpressure | before proposing (watcher + autonomy-cycle) | `handle_propose_cycle`, `autonomy_cycle/main.py` |
 | S5-8 | Scope violation recording | after policy-retry violations | `record_scope_violation`, `service.py` |
@@ -637,11 +637,11 @@ Both thresholds are constants (`_DISK_MIN_MB = 50`, `_DISK_WARN_MB = 200`).
 **Fix:**
 - `KodoAdapter._HARD_QUOTA_EXHAUSTED_SIGNALS` — phrases that indicate a billing-level limit (`insufficient_quota`, `you've exceeded your usage limit`, `upgrade your plan`, etc.)
 - `KodoAdapter.is_quota_exhausted(result)` — returns True when the result contains these signals
-- `UsageStore.record_kodo_quota_event(task_id, role, now)` — records a `kodo_quota_event` that does **not** feed the circuit breaker
+- `UsageStore.record_quota_event(task_id, role, backend, now)` — records a `quota_event` that does **not** feed the circuit breaker
 - `_is_quota_exhausted_result(result)` in `main.py` — checks `execution_stderr_excerpt` for the same patterns
-- In `handle_goal_task` and `handle_test_task`: when quota is exhausted, calls `record_kodo_quota_event` instead of `record_execution_outcome`. This prevents the circuit breaker from opening on an infrastructure failure rather than a task-quality failure.
+- In `handle_goal_task` and `handle_test_task`: when quota is exhausted, calls `record_quota_event` instead of `record_execution_outcome`. This prevents the circuit breaker from opening on an infrastructure failure rather than a task-quality failure.
 
-**Files:** `adapters/kodo/adapter.py` (`_HARD_QUOTA_EXHAUSTED_SIGNALS`, `is_quota_exhausted`), `execution/usage_store.py` (`record_kodo_quota_event`), `entrypoints/worker/main.py` (`_QUOTA_EXHAUSTED_EXCERPT_SIGNALS`, `_is_quota_exhausted_result`, `handle_goal_task`, `handle_test_task`)
+**Files:** `adapters/kodo/adapter.py` (`_HARD_QUOTA_EXHAUSTED_SIGNALS`, `is_quota_exhausted`), `execution/usage_store.py` (`record_quota_event`), `entrypoints/worker/main.py` (`_QUOTA_EXHAUSTED_EXCERPT_SIGNALS`, `_is_quota_exhausted_result`, `handle_goal_task`, `handle_test_task`)
 
 ---
 
@@ -931,7 +931,7 @@ reviewer:
 
 **Problem:** When a kodo version upgrade caused widespread failures, it was impossible to distinguish "kodo bug" from "task quality issue" in the usage store. The circuit breaker would open, but the root cause remained opaque.
 
-**Fix:** `_get_kodo_version(binary)` is cached per watcher startup (module-level dict). The result is passed as `kodo_version=` to `UsageStore.record_execution_outcome()`. When the kodo version transitions mid-window (old version → new version or vice versa), the circuit-breaker check skips outcomes from the old version in its sliding window to prevent a version upgrade from triggering a false positive.
+**Fix:** `_get_kodo_version(binary)` is cached per watcher startup (module-level dict). The result is passed as `backend_version=` to `UsageStore.record_execution_outcome()`. When the backend version transitions mid-window (old version → new version or vice versa), the circuit-breaker check skips outcomes from the old version in its sliding window to prevent a version upgrade from triggering a false positive.
 
 **Files:** `entrypoints/worker/main.py` (`_get_kodo_version`, `_kodo_version_cache`, called from `handle_goal_task`/`handle_test_task`), `execution/usage_store.py` (`record_execution_outcome`, version-transition check in `budget_decision`)
 

@@ -280,3 +280,101 @@ def test_settings_backend_caps_default_empty():
         repos={},
     )
     assert s.backend_caps == {}
+
+
+# ---------------------------------------------------------------------------
+# Naming migration: full rename, no aliases or shims
+# ---------------------------------------------------------------------------
+
+
+def test_record_execution_outcome_persists_backend_and_version(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_execution_outcome(
+        task_id="T1", role="goal", succeeded=True, now=now,
+        backend="kodo", backend_version="0.4.272",
+    )
+    data = store.load()
+    ev = next(e for e in data["events"] if e.get("kind") == "execution_outcome")
+    assert ev.get("backend") == "kodo"
+    assert ev.get("backend_version") == "0.4.272"
+    # Old kodo-named field never written by the new code.
+    assert "kodo_version" not in ev
+
+
+def test_record_execution_outcome_kodo_version_kwarg_is_gone(monkeypatch, tmp_path: Path) -> None:
+    """Full rename: kodo_version kwarg no longer accepted."""
+    import pytest
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    with pytest.raises(TypeError):
+        store.record_execution_outcome(
+            task_id="T1", role="goal", succeeded=True, now=now,
+            kodo_version="0.4.272",   # type: ignore[call-arg]
+        )
+
+
+def test_record_quota_event_writes_quota_event_kind(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_quota_event(task_id="T1", role="goal", backend="archon", now=now)
+    data = store.load()
+    ev = next(e for e in data["events"] if e.get("kind") == "quota_event")
+    assert ev.get("backend") == "archon"
+    # Old kind never written.
+    assert not any(e.get("kind") == "kodo_quota_event" for e in data["events"])
+
+
+def test_record_quota_event_requires_backend(monkeypatch, tmp_path: Path) -> None:
+    """Quota exhaustion is meaningless without knowing the backend."""
+    import pytest
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    with pytest.raises(TypeError):
+        store.record_quota_event(  # type: ignore[call-arg]
+            task_id="T1", role="goal", now=now,
+        )
+
+
+def test_record_kodo_quota_event_is_removed(monkeypatch, tmp_path: Path) -> None:
+    """Old method name no longer exists on UsageStore."""
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    assert not hasattr(store, "record_kodo_quota_event")
+
+
+def test_audit_export_uses_quota_event_kind(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_quota_event(task_id="T1", role="goal", backend="archon", now=now)
+    rows = store.audit_export(window_days=1, now=now + timedelta(seconds=1))
+    quota_rows = [r for r in rows if r.get("outcome") == "quota_exhausted"]
+    assert len(quota_rows) == 1
+    assert quota_rows[0].get("backend") == "archon"
+
+
+def test_circuit_breaker_uses_backend_version_only(monkeypatch, tmp_path: Path) -> None:
+    """Mixed-version window blocks the breaker; single-version triggers it.
+
+    Verifies the breaker reads backend_version (no kodo_version fallback).
+    """
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_EXEC_PER_HOUR", "100")
+    monkeypatch.setenv("OPERATIONS_CENTER_MAX_EXEC_PER_DAY", "100")
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    # 5 failed outcomes, all same backend_version → breaker should open
+    for i in range(5):
+        store.record_execution_outcome(
+            task_id=f"T{i}", role="goal", succeeded=False,
+            now=now - timedelta(minutes=10 * i),
+            backend="kodo", backend_version="0.4.272",
+        )
+    decision = store.budget_decision(now=now)
+    assert decision.allowed is False
+    assert decision.reason == "circuit_breaker_open"
