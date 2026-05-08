@@ -105,5 +105,6 @@ class FailureReasonCategory(str, Enum):
     NO_CHANGES = "no_changes"
     CONFLICT = "conflict"
     POLICY_BLOCKED = "policy_blocked"
+    BUDGET_EXHAUSTED = "budget_exhausted"
     ROUTING_ERROR = "routing_error"
     UNKNOWN = "unknown"

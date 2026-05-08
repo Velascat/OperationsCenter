@@ -36,6 +36,8 @@ from operations_center.planning.models import ProposalDecisionBundle
 from operations_center.policy.engine import PolicyEngine
 from operations_center.policy.models import PolicyDecision, PolicyStatus
 
+from datetime import UTC, datetime
+
 from .handoff import ExecutionRequestBuilder, ExecutionRuntimeContext
 from .recovery_loop import (
     RecoveryAction,
@@ -47,7 +49,12 @@ from .recovery_loop import (
     bounded_sleep,
     build_default_engine,
 )
+from .usage_store import UsageStore
 from .workspace import WorkspaceManager
+
+if TYPE_CHECKING:
+    from operations_center.config.settings import BackendCapSettings
+    from operations_center.execution.models import BudgetDecision
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +97,8 @@ class ExecutionCoordinator:
         runtime_binding_policy: "RuntimeBindingPolicy | None" = None,
         run_memory_index_dir: Path | None = None,
         repo_graph: object | None = None,
+        usage_store: UsageStore | None = None,
+        backend_caps: dict[str, "BackendCapSettings"] | None = None,
     ) -> None:
         self._registry = adapter_registry
         self._policy = policy_engine or PolicyEngine.from_defaults()
@@ -110,6 +119,14 @@ class ExecutionCoordinator:
         self._run_memory_index_dir = run_memory_index_dir
         # ER-001 — optional repo graph context handed to lifecycle plan stage.
         self._repo_graph = repo_graph
+        # Per-backend rate / concurrency / RAM enforcement. Both default to
+        # None so existing tests (which construct the coordinator with stub
+        # adapters) keep passing unchanged. When ``usage_store`` is supplied
+        # but ``backend_caps`` is empty, dispatches still record started/
+        # finished + execution events for observability — the rate-cap
+        # check itself is a no-op for backends without an entry in the map.
+        self._usage_store = usage_store
+        self._backend_caps: dict[str, "BackendCapSettings"] = dict(backend_caps or {})
 
     def execute(
         self,
@@ -162,18 +179,74 @@ class ExecutionCoordinator:
                     executed=False,
                 )
 
-        adapter = self._registry.for_backend(bundle.decision.selected_backend)
-        result, raw_detail_refs, runtime_metadata, recovery_actions, policy_decision = (
-            self._run_with_recovery_loop(
-                adapter=adapter,
-                bundle=bundle,
-                runtime=runtime,
+        # Pre-dispatch backend cap enforcement (rate / concurrency / RAM).
+        # Returns (decision, allowed). When not allowed we surface a
+        # canonical "skipped due to backend cap" result and don't dispatch.
+        backend_name = bundle.decision.selected_backend.value
+        cap_decision = self._evaluate_backend_caps(backend_name)
+        if cap_decision is not None and not cap_decision.allowed:
+            result = _backend_capped_result(request, cap_decision, backend_name)
+            record, trace = self._observe(bundle, result, policy_decision)
+            self._record_run_memory(request=request, result=result, bundle=bundle)
+            return ExecutionRunOutcome(
                 request=request,
                 policy_decision=policy_decision,
+                result=result,
+                record=record,
+                trace=trace,
+                executed=False,
             )
-        )
+
+        adapter = self._registry.for_backend(bundle.decision.selected_backend)
+
+        # Mark the dispatch in flight for concurrency accounting. The
+        # finished marker fires from a finally block so a crashed adapter
+        # can't deadlock the per-backend max_concurrent cap.
+        if self._usage_store is not None:
+            self._usage_store.record_execution_started(
+                task_id=request.run_id, backend=backend_name,
+                now=datetime.now(UTC),
+            )
+        try:
+            result, raw_detail_refs, runtime_metadata, recovery_actions, policy_decision = (
+                self._run_with_recovery_loop(
+                    adapter=adapter,
+                    bundle=bundle,
+                    runtime=runtime,
+                    request=request,
+                    policy_decision=policy_decision,
+                )
+            )
+        finally:
+            if self._usage_store is not None:
+                self._usage_store.record_execution_finished(
+                    task_id=request.run_id, backend=backend_name,
+                    now=datetime.now(UTC),
+                )
         if recovery_actions:
             result = attach_recovery_metadata(result, tuple(recovery_actions))
+
+        # Tag the dispatch for downstream rate caps + circuit breaker.
+        # Recorded once per coordinator.execute() — the recovery loop's
+        # internal retries don't double-count.
+        if self._usage_store is not None:
+            now = datetime.now(UTC)
+            role = bundle.proposal.task_type.value
+            self._usage_store.record_execution(
+                role=role,
+                task_id=request.run_id,
+                signature=request.run_id,  # one-shot signature; coordinator never reuses run_id
+                now=now,
+                repo_key=request.repo_key,
+                backend=backend_name,
+            )
+            self._usage_store.record_execution_outcome(
+                task_id=request.run_id,
+                role=role,
+                succeeded=result.success,
+                now=now,
+                backend=backend_name,
+            )
 
         # Post-execution: commit any pending changes, push the task branch,
         # optionally open a PR. Failures are logged but non-fatal — the
@@ -298,6 +371,56 @@ class ExecutionCoordinator:
             logger.warning(
                 "Run memory indexing failed for run %s: %s", request.run_id, exc,
             )
+
+    def _evaluate_backend_caps(
+        self,
+        backend_name: str,
+    ) -> "BudgetDecision | None":
+        """Return the first failing backend cap, or None when all pass.
+
+        Chain: per-backend rate → concurrency → RAM. Returns None when:
+          - no usage_store is configured (existing tests / unit-only paths)
+          - the backend has no entry in ``backend_caps`` and no caps fire
+
+        When a cap blocks, the returned ``BudgetDecision`` carries the
+        ``reason`` / ``window`` / ``current`` / ``limit`` fields so the
+        capped-result builder can surface *which* cap fired.
+        """
+        if self._usage_store is None:
+            return None
+        cap = self._backend_caps.get(backend_name)
+        if cap is None:
+            return None
+        now = datetime.now(UTC)
+        # Rate cap (hourly/daily) — uses the existing per-backend helper.
+        if cap.max_per_hour is not None or cap.max_per_day is not None:
+            d = self._usage_store.budget_decision_for_backend(
+                backend_name,
+                max_per_hour=cap.max_per_hour,
+                max_per_day=cap.max_per_day,
+                now=now,
+            )
+            if not d.allowed:
+                return d
+        # Concurrency cap.
+        if cap.max_concurrent is not None:
+            d = self._usage_store.concurrency_decision_for_backend(
+                backend_name,
+                max_concurrent=cap.max_concurrent,
+                now=now,
+            )
+            if not d.allowed:
+                return d
+        # RAM threshold.
+        if cap.min_available_memory_mb is not None:
+            d = self._usage_store.memory_decision_for_backend(
+                backend_name,
+                min_available_memory_mb=cap.min_available_memory_mb,
+                now=now,
+            )
+            if not d.allowed:
+                return d
+        return None
 
     def _log_contract_impact(self, request: ExecutionRequest) -> dict[str, Any]:
         """Pre-dispatch hook: log contract-change blast radius for ``request.repo_key``.
@@ -583,6 +706,35 @@ def _policy_engine_crash_result(request, exc: Exception) -> ExecutionResult:
         validation=ValidationSummary(status=ValidationStatus.SKIPPED),
         failure_category=FailureReasonCategory.POLICY_BLOCKED,
         failure_reason=f"PolicyEngine.evaluate raised mid-loop: {exc}",
+    )
+
+
+def _backend_capped_result(
+    request,
+    decision: "BudgetDecision",
+    backend_name: str,
+) -> ExecutionResult:
+    """Build a SKIPPED result when a per-backend cap blocks the dispatch.
+
+    Reason mirrors the BudgetDecision so observability + status panes can
+    surface *which* cap fired (rate / concurrency / RAM).
+    """
+    parts = [
+        f"dispatch skipped — backend={backend_name!r} {decision.reason}",
+    ]
+    if decision.window:
+        parts.append(f"window={decision.window}")
+    if decision.current is not None and decision.limit is not None:
+        parts.append(f"current={decision.current} limit={decision.limit}")
+    return ExecutionResult(
+        run_id=request.run_id,
+        proposal_id=request.proposal_id,
+        decision_id=request.decision_id,
+        status=ExecutionStatus.SKIPPED,
+        success=False,
+        validation=ValidationSummary(status=ValidationStatus.SKIPPED),
+        failure_category=FailureReasonCategory.BUDGET_EXHAUSTED,
+        failure_reason="; ".join(parts),
     )
 
 
