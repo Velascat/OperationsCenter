@@ -61,7 +61,12 @@ def normalize(
     # Stage X crashed"). Trust capture.succeeded only when stdout is
     # also free of the documented failure markers.
     stdout_failure = _scan_stdout_for_internal_failure(capture.stdout or "")
-    if capture.succeeded and stdout_failure is not None:
+    # G-V04 / G-005 — capacity-exhaustion masquerading as success.
+    capacity_excerpt = (
+        _scan_for_capacity_exhaustion(capture.combined_output)
+        if capture.succeeded else None
+    )
+    if capture.succeeded and (stdout_failure is not None or capacity_excerpt is not None):
         status = ExecutionStatus.FAILED
         success = False
     else:
@@ -93,6 +98,12 @@ def normalize(
     if not success and failure_reason is None and stdout_failure is not None:
         failure_reason = stdout_failure
         failure_category = FailureReasonCategory.UNKNOWN
+
+    # G-V04: capacity-exhaustion always wins as the failure reason because
+    # it explains why the run looked successful; surface it explicitly.
+    if not success and capacity_excerpt is not None:
+        failure_reason = capacity_excerpt
+        failure_category = FailureReasonCategory.BACKEND_ERROR
 
     return ExecutionResult(
         run_id=capture.run_id,
@@ -130,6 +141,12 @@ _INTERNAL_FAILURE_PATTERNS = (
     _re.compile(r"\bcrashed:\s+\S", _re.IGNORECASE),
     _re.compile(r"\bStopping run\b", _re.IGNORECASE),
 )
+
+
+def _scan_for_capacity_exhaustion(combined_output: str) -> Optional[str]:
+    """Local alias for the shared capacity-exhaustion classifier."""
+    from operations_center.backends._capacity_classifier import classify_capacity_exhaustion
+    return classify_capacity_exhaustion(combined_output)
 
 
 def _scan_stdout_for_internal_failure(stdout: str) -> Optional[str]:

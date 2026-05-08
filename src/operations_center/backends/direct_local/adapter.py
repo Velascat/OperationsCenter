@@ -34,6 +34,7 @@ from operations_center.contracts.enums import (
     ValidationStatus,
 )
 from operations_center.contracts.execution import ExecutionArtifact, ExecutionRequest, ExecutionResult
+from operations_center.backends._capacity_classifier import classify_capacity_exhaustion
 from operations_center.backends._runtime_ref import runtime_invocation_ref
 
 
@@ -56,6 +57,15 @@ class DirectLocalBackendAdapter:
             constraints=request.constraints_text or "",
         )
         result = self._run(command=command, repo_path=repo_path, env=env)
+
+        # G-V04 — guard against false success when the upstream backend
+        # printed a capacity-exhaustion notice and exited 0.
+        if result.success:
+            capacity_excerpt = classify_capacity_exhaustion(result.output)
+            if capacity_excerpt is not None:
+                result.success = False
+                result.metadata["capacity_exhausted"] = True
+                result.output = capacity_excerpt
 
         changed_files, changed_files_source, changed_files_confidence = _discover_changed_files(repo_path)
         failure_category = _failure_category(result)
@@ -224,6 +234,8 @@ def _failure_category(result) -> Optional[FailureReasonCategory]:
         return None
     if result.metadata.get("timeout_hit"):
         return FailureReasonCategory.TIMEOUT
+    if result.metadata.get("capacity_exhausted"):
+        return FailureReasonCategory.BACKEND_ERROR
     return FailureReasonCategory.BACKEND_ERROR
 
 

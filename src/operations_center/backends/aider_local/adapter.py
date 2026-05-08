@@ -29,6 +29,7 @@ from operations_center.contracts.enums import (
     ValidationStatus,
 )
 from operations_center.contracts.execution import ExecutionArtifact, ExecutionRequest, ExecutionResult
+from operations_center.backends._capacity_classifier import classify_capacity_exhaustion
 from operations_center.backends._runtime_ref import runtime_invocation_ref
 
 
@@ -73,6 +74,15 @@ class AiderLocalBackendAdapter:
                 os.unlink(message_file)
             except OSError:
                 pass
+
+        # G-V04 — guard against false success when the upstream backend
+        # printed a capacity-exhaustion notice and exited 0.
+        if run_result.success:
+            capacity_excerpt = classify_capacity_exhaustion(run_result.output)
+            if capacity_excerpt is not None:
+                run_result.success = False
+                run_result.metadata["capacity_exhausted"] = True
+                run_result.output = capacity_excerpt
 
         changed_files, changed_files_source, changed_files_confidence = _discover_changed_files(repo_path)
         failure_category = _failure_category(run_result)
