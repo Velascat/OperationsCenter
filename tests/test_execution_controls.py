@@ -378,3 +378,158 @@ def test_circuit_breaker_uses_backend_version_only(monkeypatch, tmp_path: Path) 
     decision = store.budget_decision(now=now)
     assert decision.allowed is False
     assert decision.reason == "circuit_breaker_open"
+
+
+# ---------------------------------------------------------------------------
+# Concurrent-runs tracking + per-backend resource thresholds
+# ---------------------------------------------------------------------------
+
+
+def test_concurrent_runs_starts_at_zero(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    assert store.concurrent_runs_for_backend("kodo", now=now) == 0
+
+
+def test_concurrent_runs_increments_on_started(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_execution_started(task_id="T1", backend="archon", now=now)
+    store.record_execution_started(task_id="T2", backend="archon", now=now)
+    store.record_execution_started(task_id="T3", backend="kodo", now=now)
+    assert store.concurrent_runs_for_backend("archon", now=now) == 2
+    assert store.concurrent_runs_for_backend("kodo", now=now) == 1
+    assert store.concurrent_runs_for_backend("aider", now=now) == 0
+
+
+def test_concurrent_runs_decrements_on_finished(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_execution_started(task_id="T1", backend="archon", now=now)
+    store.record_execution_started(task_id="T2", backend="archon", now=now)
+    store.record_execution_finished(task_id="T1", backend="archon", now=now + timedelta(seconds=30))
+    assert store.concurrent_runs_for_backend("archon", now=now + timedelta(seconds=31)) == 1
+
+
+def test_concurrent_runs_excludes_stale_started_events(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """A never-finished dispatch from > 24h ago shouldn't deadlock today."""
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_execution_started(
+        task_id="T-stale", backend="kodo", now=now - timedelta(hours=30),
+    )
+    assert store.concurrent_runs_for_backend("kodo", now=now) == 0
+
+
+def test_concurrency_decision_for_backend_blocks_at_cap(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_execution_started(task_id="T1", backend="kodo", now=now)
+    store.record_execution_started(task_id="T2", backend="kodo", now=now)
+    decision = store.concurrency_decision_for_backend(
+        "kodo", max_concurrent=2, now=now,
+    )
+    assert decision.allowed is False
+    assert decision.reason == "backend_concurrency_exceeded"
+    assert decision.current == 2
+    assert decision.limit == 2
+
+
+def test_concurrency_decision_for_backend_under_cap(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    store.record_execution_started(task_id="T1", backend="kodo", now=now)
+    decision = store.concurrency_decision_for_backend(
+        "kodo", max_concurrent=2, now=now,
+    )
+    assert decision.allowed is True
+
+
+def test_concurrency_decision_no_cap_returns_allowed(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    for i in range(20):
+        store.record_execution_started(task_id=f"T{i}", backend="kodo", now=now)
+    assert store.concurrency_decision_for_backend(
+        "kodo", max_concurrent=None, now=now,
+    ).allowed
+
+
+def test_memory_decision_no_threshold_returns_allowed(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    assert store.memory_decision_for_backend(
+        "kodo", min_available_memory_mb=None, now=now,
+    ).allowed
+
+
+def test_memory_decision_blocks_when_below_threshold(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """available_memory_mb is monkeypatched low — decision should block."""
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    monkeypatch.setattr(UsageStore, "available_memory_mb", staticmethod(lambda: 1024))
+    decision = store.memory_decision_for_backend(
+        "kodo", min_available_memory_mb=6144, now=now,
+    )
+    assert decision.allowed is False
+    assert decision.reason == "backend_memory_insufficient"
+    assert decision.current == 1024
+    assert decision.limit == 6144
+
+
+def test_memory_decision_passes_when_above_threshold(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    monkeypatch.setattr(UsageStore, "available_memory_mb", staticmethod(lambda: 32000))
+    assert store.memory_decision_for_backend(
+        "kodo", min_available_memory_mb=6144, now=now,
+    ).allowed
+
+
+def test_memory_decision_zero_meminfo_returns_allowed(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """Non-Linux dev box (no /proc/meminfo) shouldn't block dispatch."""
+    monkeypatch.setenv("OPERATIONS_CENTER_EXECUTION_USAGE_PATH", str(tmp_path / "usage.json"))
+    store = UsageStore()
+    now = datetime(2026, 5, 8, 12, tzinfo=UTC)
+    monkeypatch.setattr(UsageStore, "available_memory_mb", staticmethod(lambda: 0))
+    assert store.memory_decision_for_backend(
+        "kodo", min_available_memory_mb=6144, now=now,
+    ).allowed
+
+
+def test_backend_cap_settings_resource_fields_default_none():
+    from operations_center.config.settings import BackendCapSettings
+    cap = BackendCapSettings()
+    assert cap.min_available_memory_mb is None
+    assert cap.max_concurrent is None
+    cap2 = BackendCapSettings(
+        max_per_day=5, min_available_memory_mb=8192, max_concurrent=4,
+    )
+    assert cap2.min_available_memory_mb == 8192
+    assert cap2.max_concurrent == 4

@@ -532,6 +532,171 @@ class UsageStore:
         return BudgetDecision(allowed=True)
 
     # ---------------------------------------------------------------------------
+    # Concurrency tracking + per-backend resource thresholds
+    # ---------------------------------------------------------------------------
+
+    def record_execution_started(
+        self,
+        *,
+        task_id: str,
+        backend: str,
+        now: datetime,
+    ) -> None:
+        """Record that a dispatch has started (for concurrency accounting).
+
+        Pair with ``record_execution_finished`` after the dispatch returns.
+        Concurrency is computed as ``execution_started`` events whose
+        matching ``execution_finished`` hasn't been seen yet, scoped to a
+        backend.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_started",
+                    "task_id": task_id,
+                    "backend": backend,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def record_execution_finished(
+        self,
+        *,
+        task_id: str,
+        backend: str,
+        now: datetime,
+    ) -> None:
+        """Record that a dispatch has finished (paired with started).
+
+        The pair (``task_id``, ``backend``) identifies which started event
+        this finished event closes.
+        """
+        with self._exclusive():
+            data = self.load()
+            self._append_event(
+                data,
+                {
+                    "kind": "execution_finished",
+                    "task_id": task_id,
+                    "backend": backend,
+                    "timestamp": now.isoformat(),
+                },
+                now=now,
+            )
+
+    def concurrent_runs_for_backend(
+        self,
+        backend: str,
+        *,
+        now: datetime,
+    ) -> int:
+        """Return how many ``backend`` dispatches are currently in flight.
+
+        Counts ``execution_started`` events whose matching
+        ``execution_finished`` (same task_id + backend) has not been seen.
+        Stale events older than 24h are excluded — a never-finished
+        dispatch from yesterday shouldn't deadlock today's quota.
+        """
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        cutoff = now - timedelta(hours=24)
+        in_flight: set[str] = set()
+        for e in events:
+            ts_raw = e.get("timestamp")
+            if not isinstance(ts_raw, str):
+                continue
+            try:
+                ts = datetime.fromisoformat(ts_raw)
+            except ValueError:
+                continue
+            if ts < cutoff:
+                continue
+            if e.get("backend") != backend:
+                continue
+            tid = e.get("task_id")
+            if not isinstance(tid, str):
+                continue
+            kind = e.get("kind")
+            if kind == "execution_started":
+                in_flight.add(tid)
+            elif kind == "execution_finished":
+                in_flight.discard(tid)
+        return len(in_flight)
+
+    def concurrency_decision_for_backend(
+        self,
+        backend: str,
+        *,
+        max_concurrent: int | None,
+        now: datetime,
+    ) -> "BudgetDecision":
+        """Block when ``concurrent_runs_for_backend(backend)`` is at the cap."""
+        if not backend or max_concurrent is None:
+            return BudgetDecision(allowed=True)
+        in_flight = self.concurrent_runs_for_backend(backend, now=now)
+        if in_flight >= max_concurrent:
+            return BudgetDecision(
+                allowed=False,
+                reason="backend_concurrency_exceeded",
+                window="in_flight",
+                limit=max_concurrent,
+                current=in_flight,
+            )
+        return BudgetDecision(allowed=True)
+
+    @staticmethod
+    def available_memory_mb() -> int:
+        """Return free RAM in MB by reading /proc/meminfo. 0 on non-Linux."""
+        try:
+            with open("/proc/meminfo", encoding="utf-8") as fh:
+                for line in fh:
+                    if line.startswith("MemAvailable:"):
+                        # "MemAvailable:   12345 kB"
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try:
+                                return int(parts[1]) // 1024
+                            except ValueError:
+                                return 0
+        except OSError:
+            pass
+        return 0
+
+    def memory_decision_for_backend(
+        self,
+        backend: str,
+        *,
+        min_available_memory_mb: int | None,
+        now: datetime,
+    ) -> "BudgetDecision":
+        """Block when free RAM is below ``min_available_memory_mb``.
+
+        ``now`` is unused (RAM is read fresh from /proc) but kept in the
+        signature for symmetry with the other ``*_decision_for_backend``
+        helpers so callers can chain them uniformly.
+        """
+        del now  # symmetry-only param; RAM is read live
+        if not backend or min_available_memory_mb is None:
+            return BudgetDecision(allowed=True)
+        avail = self.available_memory_mb()
+        if avail == 0:
+            # Couldn't read /proc/meminfo (non-Linux dev box). Don't block —
+            # the operator's machine isn't the production environment.
+            return BudgetDecision(allowed=True)
+        if avail < min_available_memory_mb:
+            return BudgetDecision(
+                allowed=False,
+                reason="backend_memory_insufficient",
+                window="instant",
+                limit=min_available_memory_mb,
+                current=avail,
+            )
+        return BudgetDecision(allowed=True)
+
+    # ---------------------------------------------------------------------------
     # S6-4: Gradual failure rate degradation detection
     # ---------------------------------------------------------------------------
 
