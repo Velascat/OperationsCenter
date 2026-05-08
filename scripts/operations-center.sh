@@ -345,7 +345,7 @@ start_watch_role() {
       trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
       while true; do
         printf '{\"role\":\"propose\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
-          "\$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+          \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
           > '${WATCH_DIR}/heartbeat_propose.json'
         '${VENV_DIR}/bin/python' -m operations_center.entrypoints.pipeline_trigger.main \
           --config '${CONFIG_PATH}' \
@@ -433,7 +433,7 @@ start_watchdog() {
     _ROLES='goal test improve propose review spec intake'
     while [[ -f '${pid_file}' ]]; do
       printf '{\"role\":\"watchdog\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
-        "\$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" \
+        \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
         > '${WATCH_DIR}/heartbeat_watchdog.json'
       sleep 3600
       [[ ! -f '${pid_file}' ]] && break

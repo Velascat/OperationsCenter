@@ -3,6 +3,11 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-08 — Fix bash syntax error in heartbeat printf (propose + watchdog)
+
+Quoted `"\$(date ...)"` inside a `-lc "..."` string closed the outer double-quote.
+Dropped the inner quotes; unquoted `\$(date ...)` expands correctly inside the inner bash.
+
 ## 2026-05-08 — Heartbeat writes added to intake, spec, propose, watchdog
 
 Added --status-dir flag to intake and spec_director entrypoints; both now write
