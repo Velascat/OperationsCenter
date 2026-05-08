@@ -20,6 +20,8 @@ This directory holds OC-specific material.
 - [operator/switchboard.md](operator/switchboard.md) — Operating against
   SwitchBoard from OC.
 - [operator/weekly_audits.md](operator/weekly_audits.md) — Weekly audit cadence.
+- [operator/manifest_authoring.md](operator/manifest_authoring.md) — How to author a `topology/project_manifest.yaml` for a project repo.
+- [operator/manifest_wiring.md](operator/manifest_wiring.md) — How OC picks up project + local manifests at runtime; the `platform_manifest:` settings block.
 
 ## Backends
 
