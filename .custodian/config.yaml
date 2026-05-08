@@ -148,13 +148,6 @@ audit:
       - tests/unit/er000_phase0_golden/test_golden.py
       - tests/unit/executors/test_normalizers.py
       - tests/unit/executors/test_startup_wiring.py
-    C29:
-      # settings.py is the canonical settings registry — all OC config lives in
-      # one Pydantic settings module by design.
-      # coordinator.py is OC's execution coordinator (the central dispatcher).
-      # Splitting either would fracture an interrelated registry.
-      - src/operations_center/config/settings.py
-      - src/operations_center/execution/coordinator.py
     C41:
       # http_workflow.py emits Archon API payloads; ASCII-safe is correct
       # for HTTP wire format here (operator names + IDs are ASCII).
@@ -286,6 +279,11 @@ audit:
       # policy engine: declarative rule evaluation over many rule types — each
       # rule type needs its own evaluation method; cannot reasonably be split.
       - src/operations_center/policy/engine.py
+      # settings.py is the canonical settings registry — all OC config lives
+      # in one Pydantic settings module by design.
+      - src/operations_center/config/settings.py
+      # coordinator.py is OC's execution coordinator (central dispatcher).
+      - src/operations_center/execution/coordinator.py
     C11:
       # Agent-spawning entrypoints: board_worker, intake, pr_review_watcher invoke
       # the coding backend (kodo, aider, etc.) which runs for an unbounded duration.
@@ -457,6 +455,13 @@ audit:
     - validation_loop
     - velocity_cap_exceeded
     - verified
+    # Autonomy-gap design doc references internal helper symbols that were
+    # renamed/removed; the doc is a design retrospective, not an API spec.
+    - _is_quota_exhausted_result
+    - _run_subprocess
+    - _run_with_claude_fallback
+    - is_quota_exhausted
+    - visibility
 
   # F3-exempt field names: schema/documentation fields never accessed by dot
   # notation because they're serialized to JSON and consumed by external readers,
@@ -468,13 +473,6 @@ audit:
     - evidence_id
     - ref_id
     - workdir_name
-    # Autonomy-gap design doc references internal helper symbols that were
-    # renamed/removed; the doc is a design retrospective, not an API spec.
-    - _is_quota_exhausted_result
-    - _run_subprocess
-    - _run_with_claude_fallback
-    - is_quota_exhausted
-    - visibility
 
   # Plugin-defined audit config keys — suppresses unknown-key warnings in doctor.
   plugin_audit_keys:
