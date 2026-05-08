@@ -118,11 +118,18 @@ class TestArchonAdapterWiring:
         )
         adapter._workflow_type = "goal"
 
+        from operations_center.backends.archon.models import ArchonWorkflowConfig
         with patch("operations_center.backends.archon.adapter.check_support") as cs, \
              patch("operations_center.backends.archon.adapter.map_request") as mr, \
              patch("operations_center.backends.archon.adapter.normalize") as norm:
             cs.return_value = MagicMock(supported=True)
-            mr.return_value = MagicMock()
+            # Use a real ArchonWorkflowConfig — adapter now applies dataclass.replace
+            # to thread binder_provider/binder_model into the prepared config for
+            # the HTTP-mode dispatch path (see PATCH-001).
+            mr.return_value = ArchonWorkflowConfig(
+                run_id="rc", goal_text="g", constraints_text=None,
+                repo_path=ws, task_branch="feat/x", workflow_type="goal",
+            )
             norm.return_value = ExecutionResult(
                 run_id="r1", proposal_id="p", decision_id="d",
                 status=ExecutionStatus.SUCCEEDED, success=True,

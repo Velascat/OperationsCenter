@@ -57,6 +57,15 @@ class ArchonWorkflowConfig:
     validation_commands: list[str] = field(default_factory=list)
     metadata: dict[str, str] = field(default_factory=dict)
     env_overrides: dict[str, str] = field(default_factory=dict)
+    # Per-request runtime override for HTTP-mode dispatch. Populated by
+    # ArchonBackendAdapter from the binder's translation of RuntimeBinding
+    # → Archon's provider/model literals (see executors/archon/binder.py).
+    # Sent on the kickoff body to POST /api/workflows/{name}/run; Archon's
+    # patched route (Velascat/Archon feat/per-request-runtime-override)
+    # threads them through HandleMessageContext.runtimeOverride and applies
+    # them above the workflow YAML's top-level provider/model.
+    provider: Optional[str] = None
+    model: Optional[str] = None
 
 
 @dataclass

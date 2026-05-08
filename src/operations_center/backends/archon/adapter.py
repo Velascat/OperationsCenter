@@ -149,6 +149,11 @@ class ArchonBackendAdapter:
                 binder_label = selection.label
                 binder_provider = selection.provider
                 binder_model = selection.model
+                # CLI-mode Archon reads .archon/config.yaml from cwd. Worktree
+                # write is harmless when the dispatcher actually runs over HTTP
+                # (the file lives on OC's host filesystem, which the Archon
+                # container can't see) — kept for the CLI path that uses the
+                # ArchonAdapter ABC + ManualRunner closure.
                 config_path = write_worktree_config(
                     Path(request.workspace_path), selection,
                 )
@@ -164,6 +169,15 @@ class ArchonBackendAdapter:
                     request.run_id, exc,
                 )
                 return _invocation_error_result(request, f"binder error: {exc}"), None
+
+        # HTTP-mode override: thread the binder's provider/model into the
+        # ArchonWorkflowConfig so the dispatcher sends them on POST /run.
+        # Patched Archon (PATCH-001) honors them via HandleMessageContext.
+        if binder_provider or binder_model:
+            from dataclasses import replace as _replace
+            prepared = _replace(
+                prepared, provider=binder_provider, model=binder_model,
+            )
 
         try:
             capture = self._invoker.invoke(prepared)

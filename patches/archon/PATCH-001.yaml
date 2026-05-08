@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Track record for the per-request runtime override patch on the Archon fork.
+# Format mirrors the kodo PATCH precedent (Velascat/kodo PATCH-001 referenced
+# in OC log 2026-05-05/06).
+
+patch_id: PATCH-001
+source_name: archon
+title: "per-request provider/model override on POST /api/workflows/:name/run"
+status: forked
+fork_branch: feat/per-request-runtime-override
+contract_gap_ref: archon:G-005
+upstream_pr_url: null   # to be filed against coleam00/Archon when ready to upstream
+pushed_pr_url: null
+pushed: false
+push_enabled: false
+
+touched_files:
+  - packages/server/src/routes/schemas/workflow.schemas.ts
+  - packages/server/src/routes/api.ts
+  - packages/server/src/routes/api.workflow-runs.test.ts
+  - packages/core/src/types/index.ts
+  - packages/core/src/index.ts
+  - packages/core/src/orchestrator/orchestrator-agent.ts
+
+notes: |
+  Adds optional `provider` / `model` fields to `runWorkflowBodySchema`. Route
+  handler reads them and threads through `HandleMessageContext.runtimeOverride`
+  (new readonly field). orchestrator-agent's `dispatchOrchestratorWorkflow` and
+  `handleWorkflowRunCommand` accept the override and apply it by mutating the
+  in-memory workflow object's `provider`/`model` before any executeWorkflow call.
+  The mutation is safe — the workflow object is freshly loaded per-run and
+  discarded after dispatch (does not persist back to the YAML on disk).
+
+  When set, override takes precedence over `workflow.provider` / `workflow.model`
+  in the executor's resolution chain (see executor.ts `resolvedProvider`/`resolvedModel`).
+
+  Backward compatible: stock dispatch paths (CLI / Slack / Telegram / GitHub /
+  Discord) never set runtimeOverride, so they continue to behave unchanged.
+
+  Live-validated 2026-05-07 against built-from-source container:
+  - schema accepts {provider, model} fields
+  - 71 bun tests pass (3 new in api.workflow-runs.test.ts)
+  - cmd.workflow_starting fires on dispatch (override path reached)
+  - actual workflow.runtime_override_applied log can only be observed with a
+    registered codebase (no codebase → bail before workflow execute)
+
+  Why fork rather than upstream-first: per Dave's "managed forks first" pattern
+  (SourceRegistry: "Adapters first; fork when invariants can't be enforced
+  externally"). The OC integration needed this channel to ship; we apply the
+  fix on the Velascat/Archon fork now and file an upstream PR later when the
+  integration has matured enough to advocate for the API change.
+
+metadata:
+  archon_version: "0.3.10"
+  archon_upstream_sha_at_fork: "fd6d75e7"
