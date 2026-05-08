@@ -6,7 +6,7 @@ This guide describes how to wire the OperationsCenter governance flow into a CI/
 
 ## Prerequisites
 
-1. The managed repo (e.g. VideoFoundry) is configured in `config/managed_repos/videofoundry.yaml`.
+1. The managed repo is configured in `config/managed_repos/local/<repo_id>.yaml` (gitignored operator overlay).
 2. A `GovernanceConfig` state directory exists and is writable by the CI agent.
 3. The CI agent has write access to an output directory for fixture packs and reports.
 4. A mini regression suite definition (`suite.json`) for the target repo/audit type is available on disk.
@@ -35,7 +35,7 @@ jobs:
     env:
       OC_STATE_DIR: /tmp/oc-state
       OC_OUTPUT_DIR: /tmp/oc-output
-      OC_SUITE_PATH: suites/videofoundry_representative.json
+      OC_SUITE_PATH: suites/<repo_id>_<audit_type>.json
     steps:
       - uses: actions/checkout@v4
 
@@ -52,10 +52,10 @@ jobs:
       - name: Run governed audit (Phase 12)
         run: |
           operations-center-governance run \
-            --repo-id videofoundry \
+            --repo-id <repo_id> \
             --audit-type representative \
             --requested-by "ci/${{ github.actor }}" \
-            --related-suite-report-path "$OC_OUTPUT_DIR/regression/videofoundry_representative/$(ls $OC_OUTPUT_DIR/regression/videofoundry_representative | tail -1)/suite_report.json" \
+            --related-suite-report-path "$OC_OUTPUT_DIR/regression/<repo_id>_<audit_type>/$(ls $OC_OUTPUT_DIR/regression/<repo_id>_<audit_type> | tail -1)/suite_report.json" \
             --state-dir "$OC_STATE_DIR"
         # Exits non-zero if governance denies, defers, or dispatch fails.
 ```
@@ -94,11 +94,11 @@ Governance enforces per-repo cooldown and per-period budget limits configured in
 # config/operations_center.local.yaml (example)
 governance:
   known_repos:
-    - videofoundry
+    - <repo_id>
   known_audit_types:
-    videofoundry:
-      - representative
-      - enrichment
+    <repo_id>:
+      - audit_type_1
+      - audit_type_2
   cooldown_seconds: 3600      # 1 hour minimum between runs
   budget_runs_per_period: 10  # max 10 runs per period
   budget_period_days: 7

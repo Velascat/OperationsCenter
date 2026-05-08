@@ -1,22 +1,22 @@
-# VideoFoundry Audit Artifact Contract
+# the managed repo Audit Artifact Contract
 
 **Contract name:** `managed-repo-audit`  
 **Schema version:** `1.0`  
-**Producer:** `videofoundry`  
-**Related:** [Managed Repo Contract](videofoundry_managed_repo_contract.md) · [Ground Truth](videofoundry_audit_ground_truth.md)
+**Producer:** `<repo_id>`  
+**Related:** [Managed Repo Contract](<repo_id>_managed_repo_contract.md) · [Ground Truth](<repo_id>_audit_ground_truth.md)
 
 ---
 
 ## Purpose
 
-This document defines the artifact contract between OperationsCenter and VideoFoundry for audit runs. OperationsCenter invokes VideoFoundry audit commands and reads the outputs; it never imports VideoFoundry Python code. The contract specifies exactly what files VF must produce, in what shape, so OpsCenter can ingest them without knowing VF internals.
+This document defines the artifact contract between OperationsCenter and the managed repo for audit runs. OperationsCenter invokes the managed repo audit commands and reads the outputs; it never imports the managed repo Python code. The contract specifies exactly what files VF must produce, in what shape, so OpsCenter can ingest them without knowing VF internals.
 
 ---
 
 ## Boundary
 
 ```
-OperationsCenter                VideoFoundry
+OperationsCenter                the managed repo
 ─────────────────────────       ─────────────────────────
 Defines contract schemas        Implements contract schemas
 Generates run_id (uuid4.hex)    Receives run_id via $AUDIT_RUN_ID
@@ -31,7 +31,7 @@ OpsCenter may only invoke commands and read files. No Python imports across the 
 
 ## Phase 0 Ground Truth Inputs
 
-The contract reflects findings from Phase 0 discovery (`videofoundry_audit_ground_truth.md`):
+The contract reflects findings from Phase 0 discovery (`<repo_id>_audit_ground_truth.md`):
 
 - **Only one audit type (representative) has run_status finalization.** The five others (`enrichment`, `ideation`, `render`, `segmentation`, `stack_authoring`) write an initial `in_progress` status via `prepare_audit_bucket()` but never finalize it. Phase 5 must add finalization to all six.
 - **No `artifact_manifest.json` exists yet.** The field `artifact_manifest_path` is absent from all current VF run_status files. The contract makes it `Optional[str]` to accept legacy files, but `is_compliant` returns `False` unless it is present.
@@ -43,7 +43,7 @@ The contract reflects findings from Phase 0 discovery (`videofoundry_audit_groun
 
 ## Phase 1 Managed Repo Relationship
 
-The managed-repo config (`config/managed_repos/videofoundry.yaml`, loaded by `managed_repos.loader`) tells OpsCenter how to invoke VF commands. This artifact contract defines what those commands produce. The two are complementary:
+The managed-repo config (`config/managed_repos/<repo_id>.yaml`, loaded by `managed_repos.loader`) tells OpsCenter how to invoke VF commands. This artifact contract defines what those commands produce. The two are complementary:
 
 - Phase 1 config → how to invoke, where to look for outputs
 - Phase 2 contract (this document) → what the output files must contain
@@ -57,7 +57,7 @@ The managed-repo config (`config/managed_repos/videofoundry.yaml`, loaded by `ma
 | Controlled vocabulary | `src/operations_center/audit_contracts/vocabulary.py` | `audit_contracts.vocabulary` |
 | Run status model | `src/operations_center/audit_contracts/run_status.py` | `audit_contracts.run_status` |
 | Artifact manifest model | `src/operations_center/audit_contracts/artifact_manifest.py` | `audit_contracts.artifact_manifest` |
-| VF producer profile | `src/operations_center/audit_contracts/profiles/videofoundry.py` | `audit_contracts.profiles` |
+| VF producer profile | `src/operations_center/audit_contracts/profiles/<repo_id>.py` | `audit_contracts.profiles` |
 | JSON schemas | `schemas/audit_contracts/` | generated from Pydantic |
 | Examples | `examples/audit_contracts/` | validated against models |
 
@@ -82,13 +82,13 @@ The vocabulary is split into two explicit layers:
 | `ValidFor` | `current_run_only`, `cross_run_comparison`, `latest_snapshot`, `historical_record`, `partial_run_analysis`, `unknown` |
 | `Limitation` | `partial_run`, `missing_downstream_artifacts`, `producer_not_finalized`, `non_representative_audit_unverified`, `repo_singleton_overwritten`, `infrastructure_noise_excluded`, `path_layout_non_uniform`, `unknown` |
 
-**VideoFoundry profile enums** (VF-specific, in `VIDEOFOUNDRY_PROFILE_ENUMS`):
+**the managed repo profile enums** (VF-specific, in `VIDEOFOUNDRY_PROFILE_ENUMS`):
 
 | Enum | Description |
 |------|-------------|
-| `VideoFoundryAuditType` | Six audit types: `representative`, `enrichment`, `ideation`, `render`, `segmentation`, `stack_authoring` |
-| `VideoFoundrySourceStage` | Known stage names from Phase 0 (TopicSelectionStage, etc.) |
-| `VideoFoundryArtifactKind` | Artifact kinds: `run_status`, `stage_report`, `audit_report`, `architecture_invariant`, etc. |
+| `the managed repoAuditType` | Six audit types: `representative`, `enrichment`, `ideation`, `render`, `segmentation`, `stack_authoring` |
+| `the managed repoSourceStage` | Known stage names from Phase 0 (TopicSelectionStage, etc.) |
+| `the managed repoArtifactKind` | Artifact kinds: `run_status`, `stage_report`, `audit_report`, `architecture_invariant`, etc. |
 
 `GENERIC_ENUMS` and `VIDEOFOUNDRY_PROFILE_ENUMS` are disjoint tuples enforced by tests.
 
@@ -104,8 +104,8 @@ Required fields:
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `producer` | `str` | e.g. `"videofoundry"` |
-| `repo_id` | `str` | e.g. `"videofoundry"` |
+| `producer` | `str` | e.g. `"<repo_id>"` |
+| `repo_id` | `str` | e.g. `"<repo_id>"` |
 | `run_id` | `str` | uuid4().hex, injected by OpsCenter via `$AUDIT_RUN_ID` |
 | `audit_type` | `str` | one of the six VF audit types |
 | `status` | `RunStatus` | current run state |
@@ -169,7 +169,7 @@ Each artifact entry:
 | Field | Type | Notes |
 |-------|------|-------|
 | `artifact_id` | `str` | `producer:audit_type:stage:kind` format |
-| `artifact_kind` | `str` | from `VideoFoundryArtifactKind` |
+| `artifact_kind` | `str` | from `the managed repoArtifactKind` |
 | `path` | `str` | path relative to repo root |
 | `location` | `Location` | which bucket/subdir the artifact lives in |
 | `status` | `ArtifactStatus` | `present` or `missing` |
@@ -261,7 +261,7 @@ Both parse cleanly against Pydantic models and are validated by `tests/unit/audi
 
 ## Phase 5 Implementation Requirements
 
-VideoFoundry must implement these changes for `is_compliant` to return `True`:
+the managed repo must implement these changes for `is_compliant` to return `True`:
 
 1. **Write `artifact_manifest.json`** after every audit run (all six types).
 2. **Set `artifact_manifest_path`** in `run_status.json` pointing to the manifest.
@@ -276,12 +276,12 @@ Until Phase 5, OpsCenter treats all VF run_status files as legacy (`is_compliant
 
 ## Cross-Repo Reuse Pattern
 
-The generic contract layer (`vocabulary.py`, `run_status.py`, `artifact_manifest.py`) has no VideoFoundry-specific code. A second managed repo defines its own profile:
+The generic contract layer (`vocabulary.py`, `run_status.py`, `artifact_manifest.py`) has no the managed repo-specific code. A second managed repo defines its own profile:
 
 ```python
-from operations_center.audit_contracts.profiles import VideoFoundryProducerProfile
+from operations_center.audit_contracts.profiles import the managed repoProducerProfile
 
-OTHER_PROFILE = VideoFoundryProducerProfile(
+OTHER_PROFILE = the managed repoProducerProfile(
     producer_id="other_repo",
     audit_type_specs=[...],
     known_source_stages=[...],
@@ -293,12 +293,12 @@ The generic contract models (ManagedRunStatus, ManagedArtifactManifest) are unch
 
 ---
 
-## Generic Contract vs VideoFoundry Profile
+## Generic Contract vs the managed repo Profile
 
 | Layer | What it contains | Who can use it |
 |-------|-----------------|----------------|
 | Generic contract | RunStatus, ManifestStatus, Location, ManagedRunStatus, ManagedArtifactManifest | Any managed repo |
-| VF producer profile | VideoFoundryAuditType, VideoFoundryAuditTypeSpec, VIDEOFOUNDRY_PROFILE | VideoFoundry only |
+| VF producer profile | the managed repoAuditType, the managed repoAuditTypeSpec, VIDEOFOUNDRY_PROFILE | the managed repo only |
 
 `GENERIC_ENUMS` and `VIDEOFOUNDRY_PROFILE_ENUMS` tuples are exported from `vocabulary.py` to allow tests to assert the layers are disjoint.
 
@@ -309,4 +309,4 @@ The generic contract models (ManagedRunStatus, ManagedArtifactManifest) are unch
 - OpsCenter does not validate artifact file contents — only the manifest metadata.
 - OpsCenter does not write `run_status.json` or `artifact_manifest.json` — VF writes them.
 - The contract does not specify how VF internally structures its stages or pipeline.
-- OpsCenter does not import any VideoFoundry Python code at any point.
+- OpsCenter does not import any the managed repo Python code at any point.

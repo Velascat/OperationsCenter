@@ -47,11 +47,16 @@ This directory holds OC-specific material.
 - [architecture/routing/routing-contract-fidelity.md](architecture/routing/routing-contract-fidelity.md)
 - [architecture/adr/](architecture/adr/) — OC architecture decision records.
 
-### VideoFoundry-specific
+### Managed-repo audit contracts
 
-- [architecture/videofoundry/videofoundry_managed_repo_contract.md](architecture/videofoundry/videofoundry_managed_repo_contract.md)
-- [architecture/videofoundry/videofoundry_audit_artifact_contract.md](architecture/videofoundry/videofoundry_audit_artifact_contract.md)
-- [architecture/videofoundry/videofoundry_audit_ground_truth.md](architecture/videofoundry/videofoundry_audit_ground_truth.md)
+The contracts a managed repo must honor for OperationsCenter to audit
+it. Operator-private bindings (which name a specific managed repo)
+live under `config/managed_repos/local/`; the docs below describe the
+shape, not any particular bound repo.
+
+- [architecture/managed-repos/managed_repo_contract.md](architecture/managed-repos/managed_repo_contract.md)
+- [architecture/managed-repos/audit_artifact_contract.md](architecture/managed-repos/audit_artifact_contract.md)
+- [architecture/managed-repos/audit_ground_truth.md](architecture/managed-repos/audit_ground_truth.md)
 
 > **Tuning and upstream-patch evaluation** (`routing-tuning.md`,
 > `upstream-patch-evaluation.md` and their examples) are now sourced from

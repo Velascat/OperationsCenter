@@ -427,10 +427,12 @@ architecture:
         - "src/operations_center/slice_replay/**"
         - "src/operations_center/mini_regression/**"
   invariants:
-    # AI1: src/operations_center must not import managed-repo packages
-    - name: "AI1 managed-repo import (videofoundry)"
-      glob: "src/operations_center/**"
-      forbidden_import_prefix: "videofoundry"
+    # AI1: src/operations_center must not import managed-repo packages.
+    # The bound managed repo's package prefix lives in the private overlay
+    # config/managed_repos/local/<repo_id>.yaml — Custodian config is
+    # public, so the rule here uses placeholder prefixes only. Operators
+    # extend this list in their private overlay's `.custodian/config.yaml`
+    # at the consuming repo.
     - name: "AI1 managed-repo import (tools.audit)"
       glob: "src/operations_center/**"
       forbidden_import_prefix: "tools.audit"
@@ -485,3 +487,14 @@ tools:
   semgrep:
     configs:
       - .custodian/rules/semgrep
+
+# ---------------------------------------------------------------------------
+# Privacy / boundary enforcement (Custodian B-class)
+# ---------------------------------------------------------------------------
+# OperationsCenter ships in a public repo. Managed repos it binds to may
+# be private. Names listed here cause Custodian B1 to fail any tracked
+# file that mentions them, with the noted path patterns excluded.
+privacy:
+  private_repo_names:
+    - VideoFoundry
+    - videofoundry

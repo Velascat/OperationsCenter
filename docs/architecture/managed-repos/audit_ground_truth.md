@@ -1,4 +1,4 @@
-# VideoFoundry Audit Ground Truth Report
+# the managed repo Audit Ground Truth Report
 
 **Phase**: 0 — Ground Truth (Read-Only Discovery)
 **Date**: 2026-04-26
@@ -8,7 +8,7 @@
 
 ## Scope
 
-Read-only inspection of real VideoFoundry audit runs and source code to understand what the system actually produces today — before OpsCenter defines contracts around those outputs.
+Read-only inspection of real the managed repo audit runs and source code to understand what the system actually produces today — before OpsCenter defines contracts around those outputs.
 
 No schemas were created. No implementation was changed. No contracts were designed.
 
@@ -16,7 +16,7 @@ No schemas were created. No implementation was changed. No contracts were design
 
 ## Repositories Inspected
 
-- `VideoFoundry` — audit runner, artifact producer
+- `the managed repo` — audit runner, artifact producer
 - `OperationsCenter` — contract owner (no VF code imported; only files read)
 
 ---
@@ -203,7 +203,7 @@ tools/audit/report/architecture_invariants/warning_triage.md
 {
   "status": "warn",
   "checked_at": "2026-04-25T23:03:05.350975+00:00",
-  "repo_root": "/home/dev/Documents/GitHub/VideoFoundry",
+  "repo_root": "/home/dev/Documents/GitHub/the managed repo",
   "summary": { "pass": 41, "warn": 190, "fail": 0, "known_legacy": 7 },
   "findings": [
     {
