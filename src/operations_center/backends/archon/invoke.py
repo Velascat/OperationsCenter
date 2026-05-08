@@ -82,54 +82,54 @@ class StubArchonAdapter(ArchonAdapter):
 
 
 class HttpArchonAdapter(ArchonAdapter):
-    """Concrete archon adapter — health-probe only.
+    """Concrete archon adapter backed by Archon's HTTP workflow API.
 
     Connects to a running Archon instance (deployed by WorkStation
-    via ``compose/profiles/archon.yml``) and verifies reachability
-    via ``GET /api/health``. **Does not yet dispatch workflows** —
-    Archon's actual API is conversation-driven and async, and OC's
-    integration with that surface needs design work (see
-    ``.console/log.md`` backlog item *"Archon real workflow
-    integration"*).
+    via ``compose/profiles/archon.yml``) and dispatches workflows
+    end-to-end: conversation create → workflow run → poll-until-terminal
+    → status mapping → abandon/cancel. The actual transport flow lives
+    in :class:`ArchonHttpWorkflowDispatcher` (``http_workflow.py``);
+    this adapter is a thin shim that satisfies the ``ArchonAdapter``
+    ABC and converts the dispatcher's ``ArchonRunCapture`` to the
+    ``ArchonRunResult`` the invoker expects.
 
-    What this adapter gives you today:
-      - the seam is in place (no longer abstract-only)
-      - operators can verify archon is up via the standalone
-        health probe
-      - any caller that ``adapter.run(config)`` invokes gets a
-        clear ``"workflow dispatch not implemented"`` failure
-        rather than a misleading success or a NotImplementedError
-        crash mid-pipeline
+    See ``WorkStation/docs/architecture/adapters/archon-real-workflow-integration.md``
+    for the design.
     """
 
-    def __init__(self, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        *,
+        workflow_names: dict[str, str] | None = None,
+        poll_interval_seconds: float = 2.0,
+        runtime: ExecutorRuntime | None = None,
+    ) -> None:
         # Lazy import keeps the abstract module loadable without httpx.
         from operations_center.backends.archon.http_client import DEFAULT_BASE_URL
+        from operations_center.backends.archon.http_workflow import (
+            ArchonHttpWorkflowDispatcher,
+        )
         self._base_url = base_url or DEFAULT_BASE_URL
+        self._dispatcher = ArchonHttpWorkflowDispatcher(
+            base_url=self._base_url,
+            runtime=runtime,
+            workflow_names=workflow_names,
+            poll_interval_seconds=poll_interval_seconds,
+        )
 
     @property
     def base_url(self) -> str:
         return self._base_url
 
     def run(self, config: ArchonWorkflowConfig) -> ArchonRunResult:
-        from operations_center.backends.archon.http_client import archon_health_probe
-        probe = archon_health_probe(self._base_url)
-        if not probe.ok:
-            return ArchonRunResult(
-                outcome="failure",
-                exit_code=-1,
-                output_text="",
-                error_text=f"archon unreachable at {self._base_url}: {probe.summary}",
-            )
+        capture = self._dispatcher.dispatch(config)
         return ArchonRunResult(
-            outcome="failure",
-            exit_code=-1,
-            output_text="",
-            error_text=(
-                "archon health probe ok but workflow dispatch is not yet "
-                "implemented in HttpArchonAdapter — see backlog item "
-                "'Archon real workflow integration'"
-            ),
+            outcome=capture.outcome,
+            exit_code=capture.exit_code,
+            output_text=capture.output_text,
+            error_text=capture.error_text,
+            workflow_events=list(capture.workflow_events),
         )
 
 

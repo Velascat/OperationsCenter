@@ -67,10 +67,18 @@ class CanonicalBackendRegistry:
                 settings.aider_local,
             ),
         }
-        if archon_adapter is not None:
-            archon_backend = ArchonBackendAdapter(
-                archon_adapter=archon_adapter,
+        if archon_adapter is None and settings.archon.enabled:
+            # Auto-wire the production HTTP adapter from settings when
+            # opted in. Callers who pass archon_adapter explicitly (e.g.
+            # tests) skip this branch.
+            from operations_center.backends.archon.invoke import HttpArchonAdapter
+            archon_adapter = HttpArchonAdapter(
+                base_url=settings.archon.base_url,
+                workflow_names=dict(settings.archon.workflow_names),
+                poll_interval_seconds=settings.archon.poll_interval_seconds,
             )
+        if archon_adapter is not None:
+            archon_backend = ArchonBackendAdapter(archon_adapter=archon_adapter)
             adapters[BackendName.ARCHON] = archon_backend
             adapters[BackendName.ARCHON_THEN_KODO] = archon_backend
         if openclaw_runner is not None:
