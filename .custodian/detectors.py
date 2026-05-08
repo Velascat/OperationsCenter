@@ -218,6 +218,77 @@ def _detect_oc10_kodo_max_concurrent(ctx: AuditContext) -> DetectorResult:
     return DetectorResult(count=0, samples=[])
 
 
+# ── OC11: managed-repo config schema sync ────────────────────────────────────
+
+def _detect_oc11_schema_sync(ctx: AuditContext) -> DetectorResult:
+    """Every Pydantic field in models.py must appear as a YAML key in example_managed_repo.yaml.
+
+    Catches the case where a field is added to ManagedRepoConfig (or any nested
+    model) but the operator-facing example template is not updated to match.
+    """
+    import ast as _ast
+    import yaml as _yaml
+
+    models_path = ctx.src_root / "operations_center" / "managed_repos" / "models.py"
+    example_path = ctx.repo_root / "config" / "managed_repos" / "example_managed_repo.yaml"
+
+    if not models_path.exists() or not example_path.exists():
+        return DetectorResult(count=0, samples=[])
+
+    # Collect all annotated field names from Pydantic model classes.
+    try:
+        tree = _ast.parse(models_path.read_text())
+    except SyntaxError:
+        return DetectorResult(count=0, samples=[])
+
+    pydantic_bases = {"BaseModel"}
+    model_class_names: set[str] = set()
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.ClassDef):
+            if any(
+                (isinstance(b, _ast.Name) and b.id in pydantic_bases) or
+                (isinstance(b, _ast.Attribute) and b.attr in pydantic_bases)
+                for b in node.bases
+            ):
+                model_class_names.add(node.name)
+
+    field_names: set[str] = set()
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.ClassDef) or node.name not in model_class_names:
+            continue
+        for stmt in node.body:
+            if isinstance(stmt, _ast.AnnAssign) and isinstance(stmt.target, _ast.Name):
+                name = stmt.target.id
+                if not name.startswith("_"):
+                    field_names.add(name)
+
+    # Collect all YAML keys recursively (including nested dicts and list items).
+    try:
+        raw = _yaml.safe_load(example_path.read_text())
+    except Exception:
+        return DetectorResult(count=0, samples=[])
+
+    yaml_keys: set[str] = set()
+
+    def _walk_yaml(obj: object) -> None:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                yaml_keys.add(str(k))
+                _walk_yaml(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                _walk_yaml(item)
+
+    _walk_yaml(raw)
+
+    missing = sorted(field_names - yaml_keys)
+    samples = [
+        f"models.py field `{name}` has no matching key in example_managed_repo.yaml"
+        for name in missing
+    ]
+    return DetectorResult(count=len(missing), samples=samples[:10])
+
+
 # ── contributor entry point ───────────────────────────────────────────────────
 
 def build_oc_detectors() -> list[Detector]:
@@ -225,4 +296,5 @@ def build_oc_detectors() -> list[Detector]:
         Detector("OC3",  "orphaned entrypoints",                             "open", _detect_oc3_orphaned_entrypoints,  MEDIUM),
         Detector("OC8",  "docs reference a symbol that doesn't exist",       "open", _detect_oc8_phantom_symbols,       LOW),
         Detector("OC10", "kodo max_concurrent must be 1",                    "open", _detect_oc10_kodo_max_concurrent,  MEDIUM),
+        Detector("OC11", "managed-repo config schema sync",                  "open", _detect_oc11_schema_sync,          MEDIUM),
     ]

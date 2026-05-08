@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RunIdInjection(BaseModel):
@@ -69,6 +69,26 @@ class ManagedRepoConfig(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
     audit: ManagedRepoAuditCapability | None = None
     boundary: BoundaryPolicy = Field(default_factory=BoundaryPolicy)
+
+    @model_validator(mode="after")
+    def _check_semantic_constraints(self) -> "ManagedRepoConfig":
+        if "audit" in self.capabilities and self.audit is None:
+            raise ValueError(
+                "capabilities includes 'audit' but audit field is absent — "
+                "add an audit: block or remove 'audit' from capabilities"
+            )
+        if self.audit is not None and not self.audit.audit_types:
+            raise ValueError(
+                "audit field is present but audit_types is empty — "
+                "add at least one audit_type entry"
+            )
+        if self.audit is None and "audit" not in self.capabilities:
+            pass  # no audit at all — valid
+        if not self.repo_id.strip():
+            raise ValueError("repo_id must not be blank")
+        if not self.repo_name.strip():
+            raise ValueError("repo_name must not be blank")
+        return self
 
     def has_capability(self, name: str) -> bool:
         return name in self.capabilities
