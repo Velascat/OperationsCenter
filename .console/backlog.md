@@ -4,7 +4,26 @@ _Durable work inventory. Update after each meaningful chunk of progress._
 
 ## In Progress
 
-(none — runtime boundary extraction validation arc complete; see "Done" below)
+(none — runtime boundary extraction validation arc complete; Runtime
+Observability Hardening arc complete; next arc proposed in ADR 0002)
+
+## Up Next — Backend Card Axis Expansion arc (proposed)
+
+ADR 0002 at `docs/architecture/adr/0002-backend-card-axis-expansion.md`
+spells out the design + four-rule discipline. Implementation order
+follows G4 in the ADR — vocabulary lives in CxRP first, OC consumes
+it second.
+
+- [ ] **CxRP — `AgentTopology` enum**: `single_agent / sequential_multi_agent / dag_workflow / swarm_parallel`. Mirror the `CapabilitySet` naming-guardrail tests (no degree, no size, no quantifier). Tagged release.
+- [ ] **CxRP — `ShippingForm` enum**: `local_subprocess / long_running_service / managed_cli / hosted_api`. Same guardrail tests. Tagged release in same release window as `AgentTopology`.
+- [ ] **OC — bump CxRP pin** to the release that ships both new enums.
+- [ ] **OC — `OrchestrationProfileCard` + `MechanismProfileCard`** in `executors/_artifacts.py`: dataclass + loader + same `_DISALLOWED` enforcement as `load_capability_card`. Reject unknown enum values, reject subjective fields.
+- [ ] **OC — author cards for kodo + archon** under `src/operations_center/executors/{kodo,archon}/`: `orchestration_profile.yaml` (kodo=`sequential_multi_agent`, archon=`dag_workflow`); `mechanism_profile.yaml` (kodo=`managed_cli`, archon=`long_running_service`).
+- [ ] **OC — `executors/catalog/query.py` extensions**: `backends_with_topology(...)`, `backends_with_shipping_form(...)`, mirroring the existing `backends_supporting_capabilities(...)` shape.
+- [ ] **OC — sweep `recommendations.md` for kodo + archon**: anything now expressible as an enum value gets removed from prose to prevent claim drift between card and prose.
+- [ ] **(Follow-up arc, not this one) — author cards for the remaining backends** (`direct_local`, `aider_local`, `openclaw`, `demo_stub`) so every backend has a card folder under `executors/` and the G2 two-backend test holds for `agent_topology` in steady state.
+- [ ] **(Follow-up arc, not this one) — synthesized siblings**: `orchestration_profile.synthesized.yaml` derived from observed `runtime_invocation_ref` counts per OC run; declared-vs-observed diff becomes the runtime-truth-reconciliation signal.
+- [ ] **(Follow-up arc, not this one) — SwitchBoard rules consuming the new axes**: incoherent-tuple rejection (e.g. `swarm_parallel + managed_cli`); topology-aware lane preferences. Out of scope for the bring-up arc per ADR 0002.
 
 ## Up Next — Runtime Observability Hardening arc
 
