@@ -393,3 +393,21 @@ doc (DC7).
 
 ## 2026-05-08 — Link ADR 0002+0003; common_words for ADR 0002 vocabulary
 
+## OC Platform Watchdog Cycle — 2026-05-08 20:30
+
+- Lock owner: pid=3165098 hostname=dev-virtual-machine
+- Branch / commit: main @ 0364fa0
+- Plane status: containers up (proxy/admin/space/web/api all healthy) — health endpoint transiently unreachable; no triage actions needed (triage-scan: 0 rescore, 0 awaiting)
+- WorkStation / SwitchBoard status: healthy (ok, selector_ready=True)
+- Watchers: 8/8 running | restarts this cycle: goal=143(SIGTERM), test=143(SIGTERM), improve=143(SIGTERM)
+- Audits run: custodian-sweep ghost-audit flow-audit graph-doctor reaudit-check regressions
+- Findings reproduced this cycle: none (custodian=0 repos swept, ghost=0 events, flow=0 open gaps, graph=ok, reaudit=none needed, regressions=0)
+- Plane tasks opened/updated: 0 (none)
+- Direct fixes dispatched: none (execution gate: no findings)
+- Repos touched: none
+- Validation run: pytest er000_phase0_golden (15 passed)
+- Graph status: 11 nodes / 14 edges graph_built=True
+- Regressions checked: 0 findings
+- Watcher restarts / crash classifications: goal=143:benign-SIGTERM, test=143:benign-SIGTERM, improve=143:benign-SIGTERM
+- Follow-ups: none
+
