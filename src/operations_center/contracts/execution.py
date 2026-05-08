@@ -231,6 +231,13 @@ class ExecutionResult(BaseModel):
     # paths that never engaged the loop. See execution/recovery_loop/.
     recovery: Optional["RecoveryMetadataSummary"] = None
 
+    # G-V01 — pointer back to the RxP RuntimeInvocation/RuntimeResult that
+    # powered this run. Adapters that delegate to ExecutorRuntime populate
+    # this so an OC ExecutionResult can be linked to RxP runtime artifacts
+    # (stdout/stderr/artifact_directory). Adapters that do not invoke a
+    # runtime (e.g. demo_stub) leave this None.
+    runtime_invocation_ref: Optional["RuntimeInvocationRef"] = None
+
     # Phase 6 — the BoundExecutionTarget the coordinator used for this
     # run. Recorded for audit/replay so any past run can answer:
     # which lane was requested? which backend executed? which runtime
@@ -306,6 +313,29 @@ class BoundExecutionTargetMirror(BaseModel):
     executor: Optional[str] = None
     runtime_binding: Optional["RuntimeBindingSummary"] = None
     provenance: Optional[BackendProvenanceMirror] = None
+
+    model_config = {"frozen": True}
+
+
+class RuntimeInvocationRef(BaseModel):
+    """Link from an OC ExecutionResult to the RxP RuntimeInvocation/Result that produced it.
+
+    Populated by adapters that delegate execution mechanics to
+    ExecutorRuntime. Carries the identity of the RuntimeInvocation
+    (``invocation_id``) plus the ExecutorRuntime-captured stdout/stderr
+    paths and the per-call artifact directory, so audit/replay can reach
+    the underlying RxP RuntimeResult artifacts from the OC result alone.
+    """
+
+    invocation_id: str = Field(description="RuntimeInvocation.invocation_id (matches RuntimeResult.invocation_id)")
+    runtime_name: str = Field(description="Logical runtime name passed to ExecutorRuntime, e.g. 'direct_local', 'kodo'")
+    runtime_kind: str = Field(description="RxP runtime kind, e.g. 'subprocess', 'http_async', 'manual'")
+    stdout_path: Optional[str] = Field(default=None, description="RuntimeResult.stdout_path, if the runner captured it")
+    stderr_path: Optional[str] = Field(default=None, description="RuntimeResult.stderr_path, if the runner captured it")
+    artifact_directory: Optional[str] = Field(
+        default=None,
+        description="RuntimeInvocation.artifact_directory used for this call, when set by the adapter",
+    )
 
     model_config = {"frozen": True}
 
