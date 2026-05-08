@@ -22,25 +22,25 @@ _CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config" / "managed_r
 
 
 class TestResolverLoadsConfig:
-    def test_loads_videofoundry_config(self) -> None:
+    def test_loads_example_managed_repo_config(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
-        assert req.repo_id == "videofoundry"
+        assert req.repo_id == "example_managed_repo"
 
     def test_raises_for_unknown_repo(self) -> None:
         with pytest.raises(ManagedRepoNotFoundError):
             resolve_invocation_request(
-                "no_such_repo", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+                "no_such_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
             )
 
 
 class TestCapabilityVerification:
-    def test_videofoundry_has_audit_capability(self) -> None:
+    def test_example_managed_repo_has_audit_capability(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
-        assert req.audit_type == "representative"
+        assert req.audit_type == "audit_type_1"
 
     def test_raises_if_capability_missing(self, tmp_path: Path) -> None:
         cfg = tmp_path / "no_audit.yaml"
@@ -55,31 +55,28 @@ class TestCapabilityVerification:
         )
         with pytest.raises(ManagedRepoCapabilityError):
             resolve_invocation_request(
-                "no_audit", "representative", _RUN_ID, config_dir=tmp_path
+                "no_audit", "audit_type_1", _RUN_ID, config_dir=tmp_path
             )
 
 
 class TestAuditTypeVerification:
     def test_accepts_representative(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
-        assert req.audit_type == "representative"
+        assert req.audit_type == "audit_type_1"
 
     def test_raises_for_unsupported_type(self) -> None:
         with pytest.raises(ManagedAuditTypeUnsupportedError):
             resolve_invocation_request(
-                "videofoundry", "nonexistent_type", _RUN_ID, config_dir=_CONFIG_DIR
+                "example_managed_repo", "nonexistent_type", _RUN_ID, config_dir=_CONFIG_DIR
             )
 
     def test_all_six_vf_audit_types_known(self) -> None:
-        expected = {
-            "representative", "enrichment", "ideation",
-            "render", "segmentation", "stack_authoring",
-        }
+        expected = {"audit_type_1", "audit_type_2"}
         for at in expected:
             req = resolve_invocation_request(
-                "videofoundry", at, _RUN_ID, config_dir=_CONFIG_DIR
+                "example_managed_repo", at, _RUN_ID, config_dir=_CONFIG_DIR
             )
             assert req.audit_type == at
 
@@ -88,22 +85,22 @@ class TestCommandStatusPolicy:
     def test_verified_always_allowed(self) -> None:
         # representative is command_status: verified
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
         assert req.command is not None
 
     def test_not_yet_run_allowed_by_default(self) -> None:
-        # enrichment and others are not_yet_run
+        # audit_type_2 is command_status: not_yet_run in the example template
         req = resolve_invocation_request(
-            "videofoundry", "enrichment", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_2", _RUN_ID, config_dir=_CONFIG_DIR
         )
-        assert req.audit_type == "enrichment"
+        assert req.audit_type == "audit_type_2"
 
     def test_not_yet_run_blocked_when_strict(self) -> None:
         with pytest.raises(ManagedAuditCommandUnavailableError, match="not_yet_run"):
             resolve_invocation_request(
-                "videofoundry",
-                "enrichment",
+                "example_managed_repo",
+                "audit_type_2",
                 _RUN_ID,
                 config_dir=_CONFIG_DIR,
                 allow_not_yet_run=False,
@@ -167,21 +164,21 @@ class TestCommandStatusPolicy:
 class TestRunIdInjection:
     def test_audit_run_id_in_env(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
         assert "AUDIT_RUN_ID" in req.env
         assert req.env["AUDIT_RUN_ID"] == _RUN_ID
 
     def test_run_id_matches_env(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
         assert req.run_id == req.env["AUDIT_RUN_ID"]
 
     def test_extra_env_merged(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry",
-            "representative",
+            "example_managed_repo",
+            "audit_type_1",
             _RUN_ID,
             config_dir=_CONFIG_DIR,
             extra_env={"MY_CUSTOM_VAR": "hello"},
@@ -193,34 +190,27 @@ class TestRunIdInjection:
 class TestOutputDir:
     def test_expected_output_dir_set(self) -> None:
         req = resolve_invocation_request(
-            "videofoundry", "representative", _RUN_ID, config_dir=_CONFIG_DIR
+            "example_managed_repo", "audit_type_1", _RUN_ID, config_dir=_CONFIG_DIR
         )
         assert req.expected_output_dir
-        assert "representative" in req.expected_output_dir
-
-    def test_stack_authoring_output_dir_is_authoring(self) -> None:
-        req = resolve_invocation_request(
-            "videofoundry", "stack_authoring", _RUN_ID, config_dir=_CONFIG_DIR
-        )
-        assert "authoring" in req.expected_output_dir
-        assert "stack_authoring" not in req.expected_output_dir
+        assert "audit_type_1" in req.expected_output_dir
 
 
 class TestBoundaryEnforcement:
-    def test_no_videofoundry_imports_in_commands_module(self) -> None:
+    def test_no_managed_repo_imports_in_commands_module(self) -> None:
         src = Path(__file__).parent.parent.parent.parent / "src" / "operations_center" / "audit_toolset"
         for py_file in src.rglob("*.py"):
             tree = ast.parse(py_file.read_text(), filename=str(py_file))
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:
                     assert not node.module.startswith("tools.audit"), (
-                        f"{py_file}: imports VideoFoundry code: {node.module}"
+                        f"{py_file}: imports ExampleManagedRepo code: {node.module}"
                     )
                     assert not node.module.startswith("workflow."), (
-                        f"{py_file}: imports VideoFoundry workflow code: {node.module}"
+                        f"{py_file}: imports ExampleManagedRepo workflow code: {node.module}"
                     )
                 if isinstance(node, ast.Import):
                     for alias in node.names:
                         assert not alias.name.startswith("tools.audit"), (
-                            f"{py_file}: imports VideoFoundry code: {alias.name}"
+                            f"{py_file}: imports ExampleManagedRepo code: {alias.name}"
                         )

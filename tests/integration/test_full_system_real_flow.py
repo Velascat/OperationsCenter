@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Velascat
-"""Integration test: full system real flow (no real VideoFoundry subprocess).
+"""Integration test: full system real flow (no real ExampleManagedRepo subprocess).
 
-Exercises the complete pipeline from a fake VideoFoundry producer through:
+Exercises the complete pipeline from a fake ExampleManagedRepo producer through:
   Phase 5  — Producer output (run_status.json + artifact_manifest.json)
   Phase 6  — Governance approval + dispatch (mocked)
   Phase 7  — Artifact index build
@@ -11,7 +11,7 @@ Exercises the complete pipeline from a fake VideoFoundry producer through:
   Phase 10 — Slice replay (via Phase 11 suite)
   Phase 11 — Mini regression suite execution
 
-No VideoFoundry code is imported. All producer artifacts are written by this test
+No ExampleManagedRepo code is imported. All producer artifacts are written by this test
 using the Phase 2 contract schema so OpsCenter can load them through its own
 discovery chain.
 """
@@ -51,8 +51,8 @@ from operations_center.mini_regression import (
 from operations_center.slice_replay.models import SliceReplayProfile
 
 
-_REPO_ID = "videofoundry"
-_AUDIT_TYPE = "representative"
+_REPO_ID = "example_managed_repo"
+_AUDIT_TYPE = "audit_type_1"
 _RUN_ID = "FullSystemTest_run001"
 _DISPATCH_TARGET = "operations_center.audit_governance.runner.dispatch_managed_audit"
 
@@ -62,7 +62,7 @@ _DISPATCH_TARGET = "operations_center.audit_governance.runner.dispatch_managed_a
 # ---------------------------------------------------------------------------
 
 def _write_fake_producer_outputs(run_dir: Path) -> tuple[Path, Path]:
-    """Simulate a completed VideoFoundry audit run.
+    """Simulate a completed ExampleManagedRepo audit run.
 
     Returns (run_status_path, artifact_manifest_path).
     """
@@ -126,7 +126,7 @@ def _write_fake_producer_outputs(run_dir: Path) -> tuple[Path, Path]:
     manifest_path = run_dir / "artifact_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    # run_status.json — written last, as VideoFoundry finalizer does
+    # run_status.json — written last, as ExampleManagedRepo finalizer does
     run_status = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
@@ -204,7 +204,7 @@ def _make_dispatch_result(run_dir: Path, manifest_path: Path) -> ManagedAuditDis
 
 def test_full_system_real_flow(tmp_path: Path):
     """
-    VideoFoundry fake run → OpsCenter discovery → index → calibration
+    ExampleManagedRepo fake run → OpsCenter discovery → index → calibration
     → fixture harvest → slice replay → regression suite.
 
     Each phase asserts its contract before handing off to the next.
@@ -363,14 +363,14 @@ def test_full_system_denied_request_leaves_audit_unrun(tmp_path: Path):
     """A denied governance request must not trigger dispatch."""
     request = AuditGovernanceRequest(
         repo_id="unknown_repo",
-        audit_type="representative",
+        audit_type="audit_type_1",
         requested_by="integration_test",
         requested_reason="denial test",
         urgency="normal",
     )
     cfg = GovernanceConfig(
         known_repos=[_REPO_ID],
-        known_audit_types={_REPO_ID: ["representative"]},
+        known_audit_types={_REPO_ID: ["audit_type_1"]},
         state_dir=tmp_path / "gov_state",
     )
     dispatch_mock = MagicMock()
@@ -387,7 +387,7 @@ def test_full_system_denied_request_leaves_audit_unrun(tmp_path: Path):
 
 
 def test_full_system_no_videoFoundry_imports():
-    """OpsCenter Phase 5–11 pipeline modules must not import VideoFoundry code."""
+    """OpsCenter Phase 5–11 pipeline modules must not import ExampleManagedRepo code."""
     import ast
     from pathlib import Path as _Path
 
@@ -401,7 +401,7 @@ def test_full_system_no_videoFoundry_imports():
         "mini_regression",
         "audit_governance",
     ]
-    _forbidden = ("videofoundry", "tools.audit", "managed_repo")
+    _forbidden = ("example_managed_repo", "tools.audit", "managed_repo")
     src = _Path(__file__).parents[2] / "src" / "operations_center"
 
     for package in pipeline_packages:

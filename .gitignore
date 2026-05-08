@@ -35,3 +35,8 @@ scripts/tmp_*.py
 
 # Warehouse data (generated artifacts gitignored via .warehouse/yard/*/.gitignore)
 .warehouse/yard/
+
+# Operator-private managed-repo bindings. The public repo ships only the
+# tracked example template; real bindings (which name specific private
+# managed repos) live untracked under config/managed_repos/local/.
+config/managed_repos/local/

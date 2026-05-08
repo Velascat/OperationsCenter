@@ -28,7 +28,7 @@ _MINIMAL_MANIFEST = {
     "producer": "example_managed_repo",
     "repo_id": "example_managed_repo",
     "run_id": "3dead998d4c44e1cb296bef061de50f3",
-    "audit_type": "representative",
+    "audit_type": "audit_type_1",
     "manifest_status": "completed",
     "run_status": "completed",
     "created_at": _NOW.isoformat(),

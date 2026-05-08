@@ -31,8 +31,8 @@ _LOAD_PACK_TARGET = "operations_center.entrypoints.fixtures.main.load_fixture_pa
 
 def _make_mock_index() -> MagicMock:
     index = MagicMock()
-    index.source.repo_id = "videofoundry"
-    index.source.audit_type = "representative"
+    index.source.repo_id = "example_managed_repo"
+    index.source.audit_type = "audit_type_1"
     index.source.run_id = "run_001"
     return index
 
@@ -44,8 +44,8 @@ def _make_mock_pack(
 ) -> MagicMock:
     pack = MagicMock()
     pack.fixture_pack_id = fixture_pack_id
-    pack.source_repo_id = "videofoundry"
-    pack.source_audit_type = "representative"
+    pack.source_repo_id = "example_managed_repo"
+    pack.source_audit_type = "audit_type_1"
     pack.source_run_id = "run_001"
     pack.harvest_profile = HarvestProfile.MINIMAL_FAILURE
     pack.created_at = datetime.now(UTC)

@@ -198,7 +198,7 @@ class TestIndexDispatchResult:
         result = MagicMock()
         result.artifact_manifest_path = str(completed_manifest_file)
         index = index_dispatch_result(result)
-        assert index.source.repo_id == "videofoundry"
+        assert index.source.repo_id == "example_managed_repo"
 
     def test_does_not_scan_directories(
         self, completed_manifest_file: Path, tmp_path: Path

@@ -48,8 +48,8 @@ from operations_center.audit_dispatch.models import DispatchStatus, ManagedAudit
 
 def _make_request(**kwargs) -> AuditGovernanceRequest:
     defaults = dict(
-        repo_id="videofoundry",
-        audit_type="representative",
+        repo_id="example_managed_repo",
+        audit_type="audit_type_1",
         requested_by="alice",
         requested_reason="fixture refresh after pipeline change",
         urgency="normal",
@@ -60,8 +60,8 @@ def _make_request(**kwargs) -> AuditGovernanceRequest:
 
 def _make_config(**kwargs) -> GovernanceConfig:
     defaults = dict(
-        known_repos=["videofoundry"],
-        known_audit_types={"videofoundry": ["representative", "enrichment"]},
+        known_repos=["example_managed_repo"],
+        known_audit_types={"example_managed_repo": ["audit_type_1", "enrichment"]},
     )
     defaults.update(kwargs)
     return GovernanceConfig(**defaults)
@@ -70,8 +70,8 @@ def _make_config(**kwargs) -> GovernanceConfig:
 def _make_dispatch_result(*, succeeded: bool = True) -> ManagedAuditDispatchResult:
     now = datetime.now(UTC)
     return ManagedAuditDispatchResult(
-        repo_id="videofoundry",
-        audit_type="representative",
+        repo_id="example_managed_repo",
+        audit_type="audit_type_1",
         run_id="test_run_001",
         status=DispatchStatus.COMPLETED if succeeded else DispatchStatus.FAILED,
         started_at=now,
@@ -87,8 +87,8 @@ def _make_dispatch_result(*, succeeded: bool = True) -> ManagedAuditDispatchResu
 class TestGovernanceRequest:
     def test_valid_request_creates_successfully(self):
         req = _make_request()
-        assert req.repo_id == "videofoundry"
-        assert req.audit_type == "representative"
+        assert req.repo_id == "example_managed_repo"
+        assert req.audit_type == "audit_type_1"
         assert req.requested_by == "alice"
         assert req.urgency == "normal"
 
@@ -139,8 +139,8 @@ class TestGovernanceDecision:
         req = _make_request()
         policy_results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, policy_results)
         assert decision.decision in ("approved", "denied", "needs_manual_approval", "deferred")
@@ -163,8 +163,8 @@ class TestGovernanceDecision:
         req = _make_request(repo_id="unknown_repo")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.is_denied
@@ -174,7 +174,7 @@ class TestGovernanceDecision:
         req = _make_request(repo_id="unknown_repo")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
+            known_repos=["example_managed_repo"],
             known_audit_types={},
         )
         decision = make_governance_decision(req, results)
@@ -190,8 +190,8 @@ class TestPolicyChecks:
         req = _make_request(related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         by_name = {p.policy_name: p for p in results}
         assert by_name["known_repo_required"].status == "passed"
@@ -200,8 +200,8 @@ class TestPolicyChecks:
         req = _make_request(repo_id="nonexistent_repo")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "denied"
@@ -212,8 +212,8 @@ class TestPolicyChecks:
         req = _make_request(related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         by_name = {p.policy_name: p for p in results}
         assert by_name["known_audit_type_required"].status == "passed"
@@ -222,8 +222,8 @@ class TestPolicyChecks:
         req = _make_request(audit_type="nonexistent_type")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "denied"
@@ -231,15 +231,15 @@ class TestPolicyChecks:
     def test_cooldown_active_defers_low_urgency(self):
         req = _make_request(urgency="normal", related_suite_report_path="/suite.json")
         cooldown_state = AuditCooldownState(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             cooldown_seconds=3600,
             last_run_at=datetime.now(UTC),  # just ran — in cooldown
         )
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
             cooldown_state=cooldown_state,
         )
         decision = make_governance_decision(req, results)
@@ -248,15 +248,15 @@ class TestPolicyChecks:
     def test_cooldown_inactive_passes(self):
         req = _make_request(related_suite_report_path="/suite.json")
         cooldown_state = AuditCooldownState(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             cooldown_seconds=60,
             last_run_at=datetime.now(UTC) - timedelta(seconds=120),  # expired
         )
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
             cooldown_state=cooldown_state,
         )
         by_name = {p.policy_name: p for p in results}
@@ -266,8 +266,8 @@ class TestPolicyChecks:
         now = datetime.now(UTC)
         req = _make_request(urgency="normal", related_suite_report_path="/suite.json")
         budget_state = AuditBudgetState(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             period_start=now - timedelta(days=1),
             period_end=now + timedelta(days=6),
             max_runs=5,
@@ -275,8 +275,8 @@ class TestPolicyChecks:
         )
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
             budget_state=budget_state,
         )
         decision = make_governance_decision(req, results)
@@ -286,8 +286,8 @@ class TestPolicyChecks:
         now = datetime.now(UTC)
         req = _make_request(related_suite_report_path="/suite.json")
         budget_state = AuditBudgetState(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             period_start=now - timedelta(days=1),
             period_end=now + timedelta(days=6),
             max_runs=10,
@@ -295,8 +295,8 @@ class TestPolicyChecks:
         )
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
             budget_state=budget_state,
         )
         by_name = {p.policy_name: p for p in results}
@@ -306,8 +306,8 @@ class TestPolicyChecks:
         req = _make_request(urgency="normal", related_suite_report_path=None)
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
             require_mini_regression_for_urgency=["low", "normal"],
         )
         decision = make_governance_decision(req, results)
@@ -317,8 +317,8 @@ class TestPolicyChecks:
         req = _make_request(related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         by_name = {p.policy_name: p for p in results}
         assert by_name["mini_regression_first_policy"].status == "passed"
@@ -327,8 +327,8 @@ class TestPolicyChecks:
         req = _make_request(urgency="urgent", related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "needs_manual_approval"
@@ -338,8 +338,8 @@ class TestPolicyChecks:
         req = _make_request(urgency="high", related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "needs_manual_approval"
@@ -357,8 +357,8 @@ class TestMiniRegressionFirstRule:
         )
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         by_name = {p.policy_name: p for p in results}
         assert by_name["mini_regression_first_policy"].status == "passed"
@@ -367,8 +367,8 @@ class TestMiniRegressionFirstRule:
         req = _make_request(urgency="low")
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "needs_manual_approval"
@@ -377,8 +377,8 @@ class TestMiniRegressionFirstRule:
         req = _make_request(urgency="urgent", related_suite_report_path=None)
         results = evaluate_governance_policies(
             req,
-            known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         by_name = {p.policy_name: p for p in results}
         # urgent without mini_regression evidence is a warning, not a hard fail
@@ -392,7 +392,7 @@ class TestMiniRegressionFirstRule:
 class TestBudgetState:
     def test_fresh_budget_created_when_no_state(self, tmp_path: Path):
         cfg = BudgetConfig(max_runs=5, period_days=7)
-        state = load_budget_state(tmp_path, "videofoundry", "representative", cfg)
+        state = load_budget_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert state.runs_used == 0
         assert state.max_runs == 5
         assert not state.is_exhausted
@@ -400,15 +400,15 @@ class TestBudgetState:
     def test_budget_increments_after_dispatch(self, tmp_path: Path):
         cfg = BudgetConfig(max_runs=5, period_days=7)
         state = increment_budget_after_dispatch(
-            tmp_path, "videofoundry", "representative", cfg
+            tmp_path, "example_managed_repo", "audit_type_1", cfg
         )
         assert state.runs_used == 1
         assert state.runs_remaining == 4
 
     def test_budget_exhaustion_detected(self, tmp_path: Path):
         cfg = BudgetConfig(max_runs=2, period_days=7)
-        increment_budget_after_dispatch(tmp_path, "videofoundry", "representative", cfg)
-        state = increment_budget_after_dispatch(tmp_path, "videofoundry", "representative", cfg)
+        increment_budget_after_dispatch(tmp_path, "example_managed_repo", "audit_type_1", cfg)
+        state = increment_budget_after_dispatch(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert state.is_exhausted
         assert state.runs_remaining == 0
 
@@ -417,18 +417,18 @@ class TestBudgetState:
         # Manually write an expired state
         now = datetime.now(UTC)
         expired = AuditBudgetState(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             period_start=now - timedelta(days=14),
             period_end=now - timedelta(days=7),  # expired
             max_runs=5,
             runs_used=5,
         )
-        state_path = tmp_path / "videofoundry__representative__budget.json"
+        state_path = tmp_path / "example_managed_repo__audit_type_1__budget.json"
         state_path.write_text(expired.model_dump_json(), encoding="utf-8")
 
         # Load should roll over to fresh period
-        state = load_budget_state(tmp_path, "videofoundry", "representative", cfg)
+        state = load_budget_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert state.runs_used == 0
         assert not state.is_exhausted
 
@@ -440,19 +440,19 @@ class TestBudgetState:
 class TestCooldownState:
     def test_fresh_cooldown_no_restriction(self, tmp_path: Path):
         cfg = CooldownConfig(cooldown_seconds=3600)
-        state = load_cooldown_state(tmp_path, "videofoundry", "representative", cfg)
+        state = load_cooldown_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert not state.is_in_cooldown()
 
     def test_cooldown_active_after_dispatch(self, tmp_path: Path):
         cfg = CooldownConfig(cooldown_seconds=3600)
-        state = update_cooldown_after_dispatch(tmp_path, "videofoundry", "representative", cfg)
+        state = update_cooldown_after_dispatch(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert state.is_in_cooldown()
         assert state.seconds_remaining() > 0
 
     def test_cooldown_expires(self):
         state = AuditCooldownState(
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             cooldown_seconds=60,
             last_run_at=datetime.now(UTC) - timedelta(seconds=120),
         )
@@ -461,8 +461,8 @@ class TestCooldownState:
 
     def test_cooldown_state_persisted(self, tmp_path: Path):
         cfg = CooldownConfig(cooldown_seconds=3600)
-        update_cooldown_after_dispatch(tmp_path, "videofoundry", "representative", cfg)
-        loaded = load_cooldown_state(tmp_path, "videofoundry", "representative", cfg)
+        update_cooldown_after_dispatch(tmp_path, "example_managed_repo", "audit_type_1", cfg)
+        loaded = load_cooldown_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert loaded.last_run_at is not None
         assert loaded.is_in_cooldown()
 
@@ -475,8 +475,8 @@ class TestManualApproval:
     def test_valid_approval_references_decision_and_request(self):
         req = _make_request(urgency="urgent", related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
-            req, known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            req, known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         approval = make_manual_approval(decision, req, approved_by="bob")
@@ -487,8 +487,8 @@ class TestManualApproval:
     def test_mismatched_decision_id_raises(self):
         req = _make_request(urgency="urgent", related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
-            req, known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            req, known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         wrong_approval = AuditManualApproval(
@@ -502,8 +502,8 @@ class TestManualApproval:
     def test_mismatched_request_id_raises(self):
         req = _make_request(urgency="urgent", related_suite_report_path="/suite.json")
         results = evaluate_governance_policies(
-            req, known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            req, known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         wrong_approval = AuditManualApproval(
@@ -517,8 +517,8 @@ class TestManualApproval:
     def test_cannot_approve_denied_decision(self):
         req = _make_request(repo_id="unknown_repo")
         results = evaluate_governance_policies(
-            req, known_repos=["videofoundry"],
-            known_audit_types={"videofoundry": ["representative"]},
+            req, known_repos=["example_managed_repo"],
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "denied"
@@ -571,11 +571,11 @@ class TestGovernedRunner:
         # Put in cooldown
         cooldown_cfg = CooldownConfig(cooldown_seconds=7200)
         update_cooldown_after_dispatch(
-            tmp_path / "state", "videofoundry", "representative", cooldown_cfg
+            tmp_path / "state", "example_managed_repo", "audit_type_1", cooldown_cfg
         )
         cfg = _make_config(
             state_dir=tmp_path / "state",
-            cooldown_config={"videofoundry": {"representative": cooldown_cfg}},
+            cooldown_config={"example_managed_repo": {"audit_type_1": cooldown_cfg}},
         )
         dispatch_mock = MagicMock()
 
@@ -655,13 +655,13 @@ class TestStateUpdatesAfterDispatch:
 
         # No state before dispatch
         budget_cfg = BudgetConfig()
-        state_before = load_budget_state(tmp_path / "state", "videofoundry", "representative", budget_cfg)
+        state_before = load_budget_state(tmp_path / "state", "example_managed_repo", "audit_type_1", budget_cfg)
         assert state_before.runs_used == 0
 
         with patch(_DISPATCH_TARGET, dispatch_mock):
             run_governed_audit(req, governance_config=cfg, output_dir=tmp_path / "out")
 
-        state_after = load_budget_state(tmp_path / "state", "videofoundry", "representative", budget_cfg)
+        state_after = load_budget_state(tmp_path / "state", "example_managed_repo", "audit_type_1", budget_cfg)
         assert state_after.runs_used == 1
 
     def test_budget_not_updated_when_denied(self, tmp_path: Path):
@@ -672,7 +672,7 @@ class TestStateUpdatesAfterDispatch:
             run_governed_audit(req, governance_config=cfg, output_dir=tmp_path / "out")
 
         budget_cfg = BudgetConfig()
-        state = load_budget_state(tmp_path / "state", "unknown_repo", "representative", budget_cfg)
+        state = load_budget_state(tmp_path / "state", "unknown_repo", "audit_type_1", budget_cfg)
         assert state.runs_used == 0
 
 
@@ -737,7 +737,7 @@ class TestImportBoundary:
     )
 
     _FORBIDDEN_PREFIXES = (
-        "videofoundry",
+        "example_managed_repo",
         "managed_repo",
         "kodo",
         "codex",
@@ -809,7 +809,7 @@ class TestEmptyKnownReposDeniesAll:
         results = evaluate_governance_policies(
             req,
             known_repos=[],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         by_name = {p.policy_name: p for p in results}
         assert by_name["known_repo_required"].status == "failed"
@@ -819,7 +819,7 @@ class TestEmptyKnownReposDeniesAll:
         results = evaluate_governance_policies(
             req,
             known_repos=[],
-            known_audit_types={"videofoundry": ["representative"]},
+            known_audit_types={"example_managed_repo": ["audit_type_1"]},
         )
         decision = make_governance_decision(req, results)
         assert decision.decision == "denied"
@@ -856,7 +856,7 @@ class TestFileLocking:
 
         def do_increment():
             try:
-                increment_budget_after_dispatch(tmp_path, "videofoundry", "representative", cfg)
+                increment_budget_after_dispatch(tmp_path, "example_managed_repo", "audit_type_1", cfg)
             except Exception as exc:
                 errors.append(exc)
 
@@ -867,7 +867,7 @@ class TestFileLocking:
             t.join()
 
         assert not errors, f"Errors during concurrent increments: {errors}"
-        final = load_budget_state(tmp_path, "videofoundry", "representative", cfg)
+        final = load_budget_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert final.runs_used == 5
 
     def test_cooldown_concurrent_writes_no_corruption(self, tmp_path: Path):
@@ -877,7 +877,7 @@ class TestFileLocking:
 
         def do_update():
             try:
-                update_cooldown_after_dispatch(tmp_path, "videofoundry", "representative", cfg)
+                update_cooldown_after_dispatch(tmp_path, "example_managed_repo", "audit_type_1", cfg)
             except Exception as exc:
                 errors.append(exc)
 
@@ -889,7 +889,7 @@ class TestFileLocking:
 
         assert not errors
         # File must be valid JSON after concurrent writes
-        final = load_cooldown_state(tmp_path, "videofoundry", "representative", cfg)
+        final = load_cooldown_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
         assert final.last_run_at is not None
 
     def test_lock_released_after_success(self, tmp_path: Path):
@@ -952,8 +952,8 @@ class TestNegativePaths:
         # empty requested_by is caught at model validation, not policy
         with pytest.raises(Exception):
             AuditGovernanceRequest(
-                repo_id="videofoundry",
-                audit_type="representative",
+                repo_id="example_managed_repo",
+                audit_type="audit_type_1",
                 requested_by="",
                 requested_reason="some reason",
             )
@@ -980,29 +980,29 @@ class TestNegativePaths:
         assert result.governance_status in ("denied", "needs_manual_approval")
 
     def test_corrupt_budget_state_file_raises(self, tmp_path: Path):
-        corrupt_path = tmp_path / "videofoundry__representative__budget.json"
+        corrupt_path = tmp_path / "example_managed_repo__audit_type_1__budget.json"
         corrupt_path.write_text("NOT JSON {{{", encoding="utf-8")
         from operations_center.audit_governance.errors import BudgetStateError
         cfg = BudgetConfig(max_runs=5, period_days=7)
         with pytest.raises(BudgetStateError, match="Cannot load budget state"):
-            load_budget_state(tmp_path, "videofoundry", "representative", cfg)
+            load_budget_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
 
     def test_corrupt_cooldown_state_file_raises(self, tmp_path: Path):
-        corrupt_path = tmp_path / "videofoundry__representative__cooldown.json"
+        corrupt_path = tmp_path / "example_managed_repo__audit_type_1__cooldown.json"
         corrupt_path.write_text("NOT JSON {{{", encoding="utf-8")
         from operations_center.audit_governance.errors import CooldownStateError
         cfg = CooldownConfig(cooldown_seconds=3600)
         with pytest.raises(CooldownStateError, match="Cannot load cooldown state"):
-            load_cooldown_state(tmp_path, "videofoundry", "representative", cfg)
+            load_cooldown_state(tmp_path, "example_managed_repo", "audit_type_1", cfg)
 
     def test_budget_exhausted_blocks_dispatch(self, tmp_path: Path):
         cfg = _make_config(
             state_dir=tmp_path / "state",
-            budget_config={"videofoundry": {"representative": BudgetConfig(max_runs=1, period_days=7)}},
+            budget_config={"example_managed_repo": {"audit_type_1": BudgetConfig(max_runs=1, period_days=7)}},
         )
         # Exhaust budget
         increment_budget_after_dispatch(
-            tmp_path / "state", "videofoundry", "representative", BudgetConfig(max_runs=1, period_days=7)
+            tmp_path / "state", "example_managed_repo", "audit_type_1", BudgetConfig(max_runs=1, period_days=7)
         )
         req = _make_request(urgency="normal", related_suite_report_path="/suite.json")
         dispatch_mock = MagicMock()

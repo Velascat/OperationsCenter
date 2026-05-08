@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Run identity generation and ENV injection for managed repo audits.
 
-Phase 4 of the OpsCenter ↔ VideoFoundry audit system.
+Phase 4 of the OpsCenter ↔ ExampleManagedRepo audit system.
 
 Public surface
 --------------

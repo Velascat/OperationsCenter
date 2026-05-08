@@ -42,7 +42,7 @@ _SUBPROCESS_SCRIPT = textwrap.dedent(
     payload = PersistentLockPayload(
         repo_id=repo_id,
         run_id=f"run_{os.getpid()}",
-        audit_type="representative",
+        audit_type="audit_type_1",
         oc_pid=os.getpid(),
         started_at="2026-05-04T00:00:00Z",
         command="x",
@@ -95,11 +95,11 @@ class TestCrossProcessConcurrency:
         oc_src = _oc_src_dir()
 
         # First holds the lock for 1.5s; second tries shortly after.
-        proc_a = _run_competitor(tmp_path, "videofoundry", 1.5, out_a, oc_src)
+        proc_a = _run_competitor(tmp_path, "example_managed_repo", 1.5, out_a, oc_src)
         # Brief spin to ensure A wins the race.
         import time as _t
         _t.sleep(0.3)
-        proc_b = _run_competitor(tmp_path, "videofoundry", 0.1, out_b, oc_src)
+        proc_b = _run_competitor(tmp_path, "example_managed_repo", 0.1, out_b, oc_src)
 
         proc_a.wait(timeout=10)
         proc_b.wait(timeout=10)
@@ -112,7 +112,7 @@ class TestCrossProcessConcurrency:
         # The one that didn't acquire reports a meaningful error.
         loser = result_b if result_a["acquired"] else result_a
         assert loser["error"] is not None
-        assert "videofoundry" in loser["error"]
+        assert "example_managed_repo" in loser["error"]
 
     def test_sequential_acquires_succeed(self, tmp_path: Path) -> None:
         """After A releases, B acquires successfully — no leftover lock files."""
@@ -120,10 +120,10 @@ class TestCrossProcessConcurrency:
         out_b = tmp_path / "b.json"
         oc_src = _oc_src_dir()
 
-        proc_a = _run_competitor(tmp_path, "videofoundry", 0.1, out_a, oc_src)
+        proc_a = _run_competitor(tmp_path, "example_managed_repo", 0.1, out_a, oc_src)
         proc_a.wait(timeout=10)
         # A has fully released by now.
-        proc_b = _run_competitor(tmp_path, "videofoundry", 0.1, out_b, oc_src)
+        proc_b = _run_competitor(tmp_path, "example_managed_repo", 0.1, out_b, oc_src)
         proc_b.wait(timeout=10)
 
         result_a = json.loads(out_a.read_text())

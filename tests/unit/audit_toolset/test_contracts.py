@@ -12,8 +12,8 @@ from operations_center.audit_toolset.contracts import ManagedAuditInvocationRequ
 _RUN_ID = "3dead998d4c44e1cb296bef061de50f3"
 
 _MINIMAL = {
-    "repo_id": "videofoundry",
-    "audit_type": "representative",
+    "repo_id": "example_managed_repo",
+    "audit_type": "audit_type_1",
     "run_id": _RUN_ID,
     "working_directory": ".",
     "command": "python -m tools.audit.cli.run_representative_audit",
@@ -25,8 +25,8 @@ _MINIMAL = {
 class TestManagedAuditInvocationRequest:
     def test_parses_minimal(self) -> None:
         req = ManagedAuditInvocationRequest.model_validate(_MINIMAL)
-        assert req.repo_id == "videofoundry"
-        assert req.audit_type == "representative"
+        assert req.repo_id == "example_managed_repo"
+        assert req.audit_type == "audit_type_1"
         assert req.run_id == _RUN_ID
 
     def test_requires_repo_id(self) -> None:

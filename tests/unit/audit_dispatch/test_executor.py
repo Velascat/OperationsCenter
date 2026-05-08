@@ -17,11 +17,11 @@ from unittest.mock import patch
 from operations_center.audit_dispatch.executor import ManagedAuditExecutor, ProcessResult
 from operations_center.audit_toolset import ManagedAuditInvocationRequest
 
-_RUN_ID = "videofoundry_representative_20260426T120000Z_aabb1122"
+_RUN_ID = "example_managed_repo_audit_type_1_20260426T120000Z_aabb1122"
 
 _MINIMAL_INVOCATION = {
-    "repo_id": "videofoundry",
-    "audit_type": "representative",
+    "repo_id": "example_managed_repo",
+    "audit_type": "audit_type_1",
     "run_id": _RUN_ID,
     "working_directory": ".",
     "command": f"{sys.executable} -c 'import sys; sys.exit(0)'",

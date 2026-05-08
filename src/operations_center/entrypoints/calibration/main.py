@@ -14,7 +14,7 @@ This CLI is read-only. It does not:
   - harvest fixtures
   - run replay tests
   - apply recommendations automatically
-  - import VideoFoundry code
+  - import ExampleManagedRepo code
 """
 
 from __future__ import annotations

@@ -87,8 +87,8 @@ def _make_recommendation(
         priority=RecommendationPriority.MEDIUM,
         summary="do something",
         rationale="because test",
-        affected_repo_id="videofoundry",
-        affected_audit_type="representative",
+        affected_repo_id="example_managed_repo",
+        affected_audit_type="audit_type_1",
         suggested_action="check logs",
         requires_human_review=requires_human_review,
         supporting_finding_ids=finding_ids if finding_ids is not None else [f.finding_id],
@@ -166,7 +166,7 @@ class TestFindingsAreFacts:
             category=FindingCategory.MISSING_FILE,
             summary="file missing",
             source="check_missing_files",
-            artifact_ids=["videofoundry:representative:SomeStage:artifact"],
+            artifact_ids=["example_managed_repo:audit_type_1:SomeStage:artifact"],
         )
         assert len(f.artifact_ids) == 1
 

@@ -136,7 +136,7 @@ class TestCopyPolicy:
 
     def test_skips_binary_artifacts_by_default(self, tmp_path: Path) -> None:
         binary_entry = {
-            "artifact_id": "videofoundry:representative:SomeStage:binary",
+            "artifact_id": "example_managed_repo:audit_type_1:SomeStage:binary",
             "artifact_kind": "binary_blob",
             "path": "tools/audit/report/representative/Bucket_run999/blob.bin",
             "relative_path": "blob.bin",
@@ -171,7 +171,7 @@ class TestCopyPolicy:
 
     def test_binary_artifacts_copied_when_allowed(self, tmp_path: Path) -> None:
         binary_entry = {
-            "artifact_id": "videofoundry:representative:SomeStage:binary",
+            "artifact_id": "example_managed_repo:audit_type_1:SomeStage:binary",
             "artifact_kind": "binary_blob",
             "path": "tools/audit/report/representative/Bucket_run999/blob.bin",
             "relative_path": "blob.bin",
@@ -239,9 +239,9 @@ class TestPackContents:
         pack, _ = _harvest(
             completed_index, HarvestProfile.MINIMAL_FAILURE, tmp_path
         )
-        assert pack.source_repo_id == "videofoundry"
+        assert pack.source_repo_id == "example_managed_repo"
         assert pack.source_run_id == "run999"
-        assert pack.source_audit_type == "representative"
+        assert pack.source_audit_type == "audit_type_1"
 
     def test_pack_fixture_pack_json_is_valid(self, tmp_path: Path, completed_index) -> None:
         pack, pack_dir = _harvest(

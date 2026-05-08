@@ -46,10 +46,10 @@ def _make_manifest(tmp_path: Path) -> Path:
     manifest_payload = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "representative",
+        "producer": "example_managed_repo",
+        "repo_id": "audit_type_1",
         "run_id": "ChainTest_run001",
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "manifest_status": "completed",
         "run_status": "completed",
         "created_at": "2026-04-26T10:00:00Z",
@@ -59,7 +59,7 @@ def _make_manifest(tmp_path: Path) -> Path:
         "run_root": _RUN_ROOT,
         "artifacts": [
             {
-                "artifact_id": "videofoundry:representative:TopicSelectionStage:topic_selection",
+                "artifact_id": "example_managed_repo:audit_type_1:TopicSelectionStage:topic_selection",
                 "artifact_kind": "stage_report",
                 "path": f"{_RUN_ROOT}/topic_selection.json",
                 "relative_path": "topic_selection.json",
@@ -104,7 +104,7 @@ def test_harvest_replay_regression_chain_passes(tmp_path: Path):
     )
     pack, pack_dir = harvest_fixtures(harvest_request, tmp_path / "fixtures")
 
-    assert pack.source_repo_id == "representative"
+    assert pack.source_repo_id == "audit_type_1"
     assert len(pack.artifacts) >= 1
 
     # Phase 10: Slice replay via Phase 11 suite

@@ -143,7 +143,7 @@ class TestQueryArtifacts:
 
     def test_query_by_repo_id(self, index_from_completed) -> None:
         results = query_artifacts(
-            index_from_completed, ArtifactQuery(repo_id="videofoundry")
+            index_from_completed, ArtifactQuery(repo_id="example_managed_repo")
         )
         assert len(results) == len(index_from_completed.artifacts)
 

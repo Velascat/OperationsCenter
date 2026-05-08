@@ -25,9 +25,9 @@ from operations_center.audit_dispatch.lock_store import (
 
 def _payload(
     *,
-    repo_id: str = "videofoundry",
-    run_id: str = "videofoundry_representative_20260504T120000Z_aabb1122",
-    audit_type: str = "representative",
+    repo_id: str = "example_managed_repo",
+    run_id: str = "example_managed_repo_audit_type_1_20260504T120000Z_aabb1122",
+    audit_type: str = "audit_type_1",
     oc_pid: int | None = None,
     audit_pid: int | None = None,
     audit_pgid: int | None = None,
@@ -54,14 +54,14 @@ class TestAcquireRelease:
     def test_acquire_writes_lock_file(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
         store.try_acquire(_payload())
-        assert (tmp_path / "videofoundry.lock").exists()
+        assert (tmp_path / "example_managed_repo.lock").exists()
 
     def test_lock_file_contains_payload_fields(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
         store.try_acquire(_payload(audit_pid=12345, audit_pgid=12345))
-        data = json.loads((tmp_path / "videofoundry.lock").read_text())
-        assert data["repo_id"] == "videofoundry"
-        assert data["audit_type"] == "representative"
+        data = json.loads((tmp_path / "example_managed_repo.lock").read_text())
+        assert data["repo_id"] == "example_managed_repo"
+        assert data["audit_type"] == "audit_type_1"
         assert data["audit_pid"] == 12345
         assert data["audit_pgid"] == 12345
         assert data["lock_schema_version"] == LOCK_SCHEMA_VERSION
@@ -69,12 +69,12 @@ class TestAcquireRelease:
     def test_release_removes_file(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
         store.try_acquire(_payload())
-        assert store.release("videofoundry") is True
-        assert not (tmp_path / "videofoundry.lock").exists()
+        assert store.release("example_managed_repo") is True
+        assert not (tmp_path / "example_managed_repo.lock").exists()
 
     def test_release_idempotent(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
-        assert store.release("videofoundry") is False  # never held
+        assert store.release("example_managed_repo") is False  # never held
 
     def test_double_acquire_raises_when_oc_pid_alive(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
@@ -84,7 +84,7 @@ class TestAcquireRelease:
         # Held payload is attached for diagnostics.
         held = ei.value.held_payload
         assert held is not None
-        assert held.repo_id == "videofoundry"
+        assert held.repo_id == "example_managed_repo"
 
     def test_acquire_succeeds_when_held_lock_is_dead(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
@@ -94,12 +94,12 @@ class TestAcquireRelease:
         dead_pid = proc.pid
         # Manually plant a lock with a dead PID — bypass try_acquire's liveness check.
         store._write_atomic(
-            tmp_path / "videofoundry.lock",
+            tmp_path / "example_managed_repo.lock",
             _payload(oc_pid=dead_pid),
         )
         # Now acquiring should succeed because the held lock's only PID is dead.
         store.try_acquire(_payload())
-        assert (tmp_path / "videofoundry.lock").exists()
+        assert (tmp_path / "example_managed_repo.lock").exists()
 
     def test_acquire_blocked_when_audit_pid_alive_even_if_oc_dead(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
@@ -108,7 +108,7 @@ class TestAcquireRelease:
         dead_pid = proc.pid
         # OC PID dead but audit subprocess alive (= current process).
         store._write_atomic(
-            tmp_path / "videofoundry.lock",
+            tmp_path / "example_managed_repo.lock",
             _payload(oc_pid=dead_pid, audit_pid=os.getpid()),
         )
         with pytest.raises(RepoLockAlreadyHeldError):
@@ -119,16 +119,16 @@ class TestUpdate:
     def test_update_audit_pid_atomically(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
         store.try_acquire(_payload())
-        updated = store.update("videofoundry", audit_pid=4242, audit_pgid=4242)
+        updated = store.update("example_managed_repo", audit_pid=4242, audit_pgid=4242)
         assert updated.audit_pid == 4242
         assert updated.audit_pgid == 4242
-        on_disk = store.read("videofoundry")
+        on_disk = store.read("example_managed_repo")
         assert on_disk is not None and on_disk.audit_pid == 4242
 
     def test_update_missing_lock_raises(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
         with pytest.raises(FileNotFoundError):
-            store.update("videofoundry", audit_pid=99)
+            store.update("example_managed_repo", audit_pid=99)
 
 
 class TestStaleReclaim:
@@ -137,22 +137,22 @@ class TestStaleReclaim:
         proc = _spawn_short_subprocess()
         proc.wait()
         store._write_atomic(
-            tmp_path / "videofoundry.lock",
+            tmp_path / "example_managed_repo.lock",
             _payload(oc_pid=proc.pid),
         )
-        assert store.reclaim_if_stale("videofoundry") is True
-        assert not (tmp_path / "videofoundry.lock").exists()
+        assert store.reclaim_if_stale("example_managed_repo") is True
+        assert not (tmp_path / "example_managed_repo.lock").exists()
 
     def test_reclaim_returns_false_when_alive(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
         store.try_acquire(_payload())  # oc_pid = current = alive
-        assert store.reclaim_if_stale("videofoundry") is False
-        assert (tmp_path / "videofoundry.lock").exists()
+        assert store.reclaim_if_stale("example_managed_repo") is False
+        assert (tmp_path / "example_managed_repo.lock").exists()
 
     def test_reclaim_corrupt_lock_treated_as_stale(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)
-        (tmp_path / "videofoundry.lock").write_text("{not valid json")
-        assert store.reclaim_if_stale("videofoundry") is True
+        (tmp_path / "example_managed_repo.lock").write_text("{not valid json")
+        assert store.reclaim_if_stale("example_managed_repo") is True
 
     def test_sweep_stale_returns_reclaimed_repos(self, tmp_path: Path) -> None:
         store = PersistentLockStore(tmp_path)

@@ -46,7 +46,7 @@ class ManagedRepoAuditLock:
 
     Use as a context manager (preferred) or call release() explicitly:
 
-        lock = acquire_audit_lock("videofoundry", run_id=...)
+        lock = acquire_audit_lock("example_managed_repo", run_id=...)
         try:
             ...
         finally:

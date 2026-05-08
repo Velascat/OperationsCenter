@@ -15,7 +15,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 _BASE_ENTRY = {
-    "artifact_id": "videofoundry:representative:TopicSelectionStage:topic_selection",
+    "artifact_id": "example_managed_repo:audit_type_1:TopicSelectionStage:topic_selection",
     "artifact_kind": "stage_report",
     "path": "tools/audit/report/representative/Bucket_run123/topic_selection.json",
     "relative_path": "topic_selection.json",
@@ -36,7 +36,7 @@ _BASE_ENTRY = {
 }
 
 _SINGLETON_ENTRY = {
-    "artifact_id": "videofoundry:repo_singleton:architecture_invariants:latest",
+    "artifact_id": "example_managed_repo:repo_singleton:architecture_invariants:latest",
     "artifact_kind": "architecture_invariant",
     "path": "tools/audit/report/architecture_invariants/latest.json",
     "relative_path": None,
@@ -57,7 +57,7 @@ _SINGLETON_ENTRY = {
 }
 
 _PARTIAL_ENTRY = {
-    "artifact_id": "videofoundry:representative:VoiceOverStage:asr",
+    "artifact_id": "example_managed_repo:audit_type_1:VoiceOverStage:asr",
     "artifact_kind": "alignment_artifact",
     "path": "tools/audit/report/representative/Bucket_run123/asr.jsonl",
     "relative_path": "asr.jsonl",
@@ -94,16 +94,16 @@ def _make_manifest_payload(
     payload: dict[str, Any] = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": run_id,
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "manifest_status": manifest_status,
         "run_status": run_status,
         "created_at": "2026-04-26T12:00:00Z",
         "updated_at": "2026-04-26T12:00:00Z",
         "finalized_at": "2026-04-26T12:01:00Z",
-        "artifact_root": "../VideoFoundry",
+        "artifact_root": "../ExampleManagedRepo",
         "run_root": run_root,
         "artifacts": artifacts if artifacts is not None else [dict(_BASE_ENTRY)],
         "excluded_paths": excluded_paths if excluded_paths is not None else [],

@@ -386,7 +386,7 @@ class TestImportBoundary:
     )
 
     _FORBIDDEN_PREFIXES = (
-        "videofoundry",
+        "example_managed_repo",
         "managed_repo",
         "kodo",
         "codex",
@@ -478,9 +478,9 @@ def _make_partial_replay_report(fixture_pack_path: str) -> SliceReplayReport:
     return SliceReplayReport(
         fixture_pack_id="pack_001",
         fixture_pack_path=fixture_pack_path,
-        source_repo_id="videofoundry",
+        source_repo_id="example_managed_repo",
         source_run_id="run_001",
-        source_audit_type="representative",
+        source_audit_type="audit_type_1",
         replay_profile=SliceReplayProfile.FIXTURE_INTEGRITY,
         status="partial",
         summary="Stopped early due to fail_fast",
@@ -578,8 +578,8 @@ class TestRepoAuditTypeFields:
         suite = MiniRegressionSuiteDefinition(
             suite_id="typed_suite",
             name="Typed Suite",
-            repo_id="videofoundry",
-            audit_type="representative",
+            repo_id="example_managed_repo",
+            audit_type="audit_type_1",
             entries=[
                 MiniRegressionSuiteEntry(
                     entry_id="e1",
@@ -593,8 +593,8 @@ class TestRepoAuditTypeFields:
             output_dir=tmp_path / "out",
         )
         report = run_mini_regression_suite(request)
-        assert report.repo_id == "videofoundry"
-        assert report.audit_type == "representative"
+        assert report.repo_id == "example_managed_repo"
+        assert report.audit_type == "audit_type_1"
 
     def test_repo_id_and_audit_type_default_none(
         self, simple_suite: MiniRegressionSuiteDefinition, tmp_path: Path
@@ -614,7 +614,7 @@ class TestRepoAuditTypeFields:
         suite = MiniRegressionSuiteDefinition(
             suite_id="json_suite",
             name="JSON Suite",
-            repo_id="videofoundry",
+            repo_id="example_managed_repo",
             audit_type="enrichment",
             entries=[
                 MiniRegressionSuiteEntry(
@@ -630,7 +630,7 @@ class TestRepoAuditTypeFields:
         )
         report = run_mini_regression_suite(request)
         raw = json.loads(report.model_dump_json())
-        assert raw["repo_id"] == "videofoundry"
+        assert raw["repo_id"] == "example_managed_repo"
         assert raw["audit_type"] == "enrichment"
 
     def test_schema_version_is_1_1(self):

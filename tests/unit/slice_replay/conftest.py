@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Velascat
 """Shared fixtures for slice_replay tests.
 
-All fixture packs are created using tmp_path. No VideoFoundry audits run.
+All fixture packs are created using tmp_path. No ExampleManagedRepo audits run.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ _RUN_ROOT = "tools/audit/report/representative/Bucket_run999"
 # ---------------------------------------------------------------------------
 
 def _base_entry(
-    artifact_id: str = "videofoundry:representative:TopicSelectionStage:topic_selection",
+    artifact_id: str = "example_managed_repo:audit_type_1:TopicSelectionStage:topic_selection",
 ) -> dict:
     return {
         "artifact_id": artifact_id,
@@ -53,7 +53,7 @@ def _base_entry(
 
 
 def _missing_entry(
-    artifact_id: str = "videofoundry:representative:VoiceOverStage:asr",
+    artifact_id: str = "example_managed_repo:audit_type_1:VoiceOverStage:asr",
 ) -> dict:
     return {
         "artifact_id": artifact_id,
@@ -90,16 +90,16 @@ def _make_manifest_payload(
     return {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": run_id,
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "manifest_status": manifest_status,
         "run_status": run_status,
         "created_at": "2026-04-26T12:00:00Z",
         "updated_at": "2026-04-26T12:01:00Z",
         "finalized_at": "2026-04-26T12:01:00Z",
-        "artifact_root": "../VideoFoundry",
+        "artifact_root": "../ExampleManagedRepo",
         "run_root": _RUN_ROOT,
         "artifacts": artifacts if artifacts is not None else [_base_entry()],
         "excluded_paths": [],

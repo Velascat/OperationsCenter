@@ -21,7 +21,7 @@ This CLI does not:
   - scan directories
   - index artifacts
   - harvest fixtures
-  - import VideoFoundry code
+  - import ExampleManagedRepo code
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ for _index_cmd in _index_app.registered_commands:
 
 @app.command("run")
 def cmd_run(
-    repo: str = typer.Option(..., "--repo", "-r", help="Managed repo ID (e.g. 'videofoundry')."),
+    repo: str = typer.Option(..., "--repo", "-r", help="Managed repo ID (e.g. 'example_managed_repo')."),
     audit_type: str = typer.Option(
         ..., "--type", "-t", help="Audit type (e.g. 'representative')."
     ),

@@ -43,7 +43,7 @@ def generate_managed_run_identity(
     Parameters
     ----------
     repo_id:
-        Managed repo identifier (e.g. "videofoundry").
+        Managed repo identifier (e.g. "example_managed_repo").
     audit_type:
         The audit type being invoked (e.g. "representative").
     env_var:
@@ -64,7 +64,7 @@ def generate_managed_run_identity(
     Notes
     -----
     run_id format: {repo_id}_{audit_type}_{YYYYMMDDTHHMMSSz}_{8hex}
-    Example:       videofoundry_representative_20260426T164233Z_a1b2c3d4
+    Example:       example_managed_repo_audit_type_1_20260426T164233Z_a1b2c3d4
     """
     now = _now or datetime.now(tz=timezone.utc)
     timestamp = now.strftime("%Y%m%dT%H%M%SZ")

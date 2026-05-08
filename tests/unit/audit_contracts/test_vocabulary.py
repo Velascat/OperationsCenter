@@ -140,34 +140,30 @@ class TestLimitation:
 
 
 class TestExampleManagedRepoProfile:
-    def test_all_six_audit_types_present(self) -> None:
+    def test_audit_types_present(self) -> None:
         values = {m.value for m in ExampleManagedRepoAuditType}
-        expected = {
-            "representative", "enrichment", "ideation",
-            "render", "segmentation", "stack_authoring",
-        }
-        assert values == expected
+        assert values == {"audit_type_1", "audit_type_2"}
 
     def test_audit_types_are_strings(self) -> None:
         for m in ExampleManagedRepoAuditType:
             assert isinstance(m.value, str)
 
-    def test_source_stage_includes_known_stages(self) -> None:
+    def test_source_stage_includes_lifecycle_markers(self) -> None:
         values = {m.value for m in ExampleManagedRepoSourceStage}
         expected_subset = {
-            "TopicSelectionStage",
-            "ScriptWritingStage",
-            "AuthorProsodyStage",
-            "VoiceOverStage",
+            "lifecycle",
+            "post_run",
             "architecture_invariants",
+            "unknown",
         }
         assert expected_subset <= values
 
     def test_artifact_kind_includes_required_kinds(self) -> None:
         values = {m.value for m in ExampleManagedRepoArtifactKind}
         expected_subset = {
-            "run_status", "stage_report", "audit_report",
-            "architecture_invariant", "alignment_artifact",
-            "timing_artifact", "unknown",
+            "run_status",
+            "stage_report",
+            "architecture_invariant",
+            "unknown",
         }
         assert expected_subset <= values

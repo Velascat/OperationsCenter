@@ -13,7 +13,7 @@ _MINIMAL_VALID = {
     "producer": "example_managed_repo",
     "repo_id": "example_managed_repo",
     "run_id": "3dead998d4c44e1cb296bef061de50f3",
-    "audit_type": "representative",
+    "audit_type": "audit_type_1",
     "status": "completed",
     "artifact_manifest_path": "tools/audit/report/representative/bucket/artifact_manifest.json",
 }

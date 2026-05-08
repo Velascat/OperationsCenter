@@ -60,7 +60,7 @@ class TestDiscoverManifestFiles:
     def test_finds_nested_manifests(self, tmp_path: Path, completed_manifest_payload) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        b1 = _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=_make_manifest_payload)
+        b1 = _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r1", payload_factory=_make_manifest_payload)
         b2 = _write_bucket(tmp_path, audit_type="enrichment", run_id="r2", payload_factory=_make_manifest_payload)
         found = discover_manifest_files(tmp_path)
         assert len(found) == 2
@@ -98,7 +98,7 @@ class TestBuildHappyPath:
     def test_indexes_two_completed_runs(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="run_a", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="run_a", payload_factory=_make_manifest_payload)
         _write_bucket(tmp_path, audit_type="enrichment", run_id="run_b", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path)
         assert isinstance(idx, MultiRunArtifactIndex)
@@ -109,29 +109,29 @@ class TestBuildHappyPath:
     def test_run_metadata_populated(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="run_a", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="run_a", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path)
         run = idx.get_run("run_a")
         assert run is not None
-        assert run.repo_id == "videofoundry"
-        assert run.audit_type == "representative"
-        assert run.producer == "videofoundry"
+        assert run.repo_id == "example_managed_repo"
+        assert run.audit_type == "audit_type_1"
+        assert run.producer == "example_managed_repo"
         assert run.artifact_count == 1
         assert run.is_partial is False
 
     def test_filter_by_repo(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="run_a", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="run_a", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path, repo_filter="other_repo")
         assert idx.runs == []
 
     def test_filter_by_audit_type(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="run_a", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="run_a", payload_factory=_make_manifest_payload)
         _write_bucket(tmp_path, audit_type="enrichment", run_id="run_b", payload_factory=_make_manifest_payload)
-        idx = build_multi_run_index(tmp_path, audit_type_filter="representative")
+        idx = build_multi_run_index(tmp_path, audit_type_filter="audit_type_1")
         assert {r.run_id for r in idx.runs} == {"run_a"}
 
 
@@ -144,7 +144,7 @@ class TestFailureHandling:
     def test_corrupt_manifest_recorded_with_load_error(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="ok", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="ok", payload_factory=_make_manifest_payload)
         # Plant a corrupt manifest in another bucket.
         bad = tmp_path / "tools" / "audit" / "report" / "render" / "broken"
         bad.mkdir(parents=True)
@@ -171,7 +171,7 @@ class TestFailureHandling:
                 limitations=["partial_run"],
             )
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="r_partial", payload_factory=partial_factory)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r_partial", payload_factory=partial_factory)
         idx = build_multi_run_index(tmp_path)
         run = idx.get_run("r_partial")
         assert run is not None
@@ -188,7 +188,7 @@ class TestResolve:
     def test_resolve_returns_path_for_existing_artifact(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload, _BASE_ENTRY  # type: ignore
 
-        _bucket = _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=_make_manifest_payload)
+        _bucket = _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r1", payload_factory=_make_manifest_payload)
         # Materialize the artifact file so existence check passes.
         (tmp_path / _BASE_ENTRY["path"]).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / _BASE_ENTRY["path"]).write_text("{}")
@@ -200,7 +200,7 @@ class TestResolve:
     def test_resolve_raises_when_recheck_finds_missing_file(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload, _BASE_ENTRY  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r1", payload_factory=_make_manifest_payload)
         # Don't create the artifact file — recheck should raise.
         idx = build_multi_run_index(tmp_path, repo_root=tmp_path)
         with pytest.raises(ArtifactPathUnresolvableError, match="no longer exists"):
@@ -209,7 +209,7 @@ class TestResolve:
     def test_resolve_skips_recheck_when_disabled(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload, _BASE_ENTRY  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r1", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path, repo_root=tmp_path)
         # Returns a path even though file is missing.
         path = idx.resolve("r1", _BASE_ENTRY["artifact_id"], recheck_exists=False)
@@ -247,8 +247,8 @@ class TestQueryFederation:
                 artifacts=[dict(_BASE_ENTRY), dict(_SINGLETON_ENTRY)],
             )
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=two_artifact_factory)
-        _write_bucket(tmp_path, audit_type="representative", run_id="r2", payload_factory=two_artifact_factory)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r1", payload_factory=two_artifact_factory)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r2", payload_factory=two_artifact_factory)
 
         idx = build_multi_run_index(tmp_path)
         all_artifacts = idx.query()
@@ -265,7 +265,7 @@ class TestQueryFederation:
                 artifacts=[dict(_BASE_ENTRY), dict(_SINGLETON_ENTRY)],
             )
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="r1", payload_factory=fac)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="r1", payload_factory=fac)
         idx = build_multi_run_index(tmp_path)
         from operations_center.audit_contracts.vocabulary import Location
 
@@ -278,7 +278,7 @@ class TestPrefixLookup:
     def test_exact_match(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="abc12345", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="abc12345", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path)
         run = idx.find_run_by_prefix("abc12345")
         assert run.run_id == "abc12345"
@@ -286,16 +286,16 @@ class TestPrefixLookup:
     def test_unique_prefix(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="abc12345", payload_factory=_make_manifest_payload)
-        _write_bucket(tmp_path, audit_type="representative", run_id="def67890", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="abc12345", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="def67890", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path)
         assert idx.find_run_by_prefix("abc").run_id == "abc12345"
 
     def test_ambiguous_prefix_raises(self, tmp_path: Path) -> None:
         from tests.unit.artifact_index.conftest import _make_manifest_payload  # type: ignore
 
-        _write_bucket(tmp_path, audit_type="representative", run_id="abc111", payload_factory=_make_manifest_payload)
-        _write_bucket(tmp_path, audit_type="representative", run_id="abc222", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="abc111", payload_factory=_make_manifest_payload)
+        _write_bucket(tmp_path, audit_type="audit_type_1", run_id="abc222", payload_factory=_make_manifest_payload)
         idx = build_multi_run_index(tmp_path)
         with pytest.raises(ValueError, match="ambiguous"):
             idx.find_run_by_prefix("abc")

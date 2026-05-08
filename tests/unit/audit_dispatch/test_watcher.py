@@ -22,10 +22,10 @@ def _write_status(path: Path, status: str, current_phase: str = "running") -> No
             {
                 "schema_version": "1.0",
                 "contract_name": "managed-repo-audit",
-                "producer": "videofoundry",
-                "repo_id": "videofoundry",
+                "producer": "example_managed_repo",
+                "repo_id": "example_managed_repo",
                 "run_id": "test_run_xyz",
-                "audit_type": "representative",
+                "audit_type": "audit_type_1",
                 "status": status,
                 "current_phase": current_phase,
             }

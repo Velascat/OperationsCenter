@@ -5,7 +5,7 @@
 Includes:
   - Unit tests (monkeypatched subprocess / invocation)
   - Integration test: fake command writes compliant contract files
-  - AST boundary test: no VideoFoundry imports in dispatch package
+  - AST boundary test: no ExampleManagedRepo imports in dispatch package
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from operations_center.audit_dispatch.locks import ManagedRepoAuditLockRegistry
 from operations_center.run_identity.generator import PreparedManagedAuditInvocation
 
 _CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config" / "managed_repos"
-_RUN_ID = "videofoundry_representative_20260426T120000Z_aabb1122"
+_RUN_ID = "example_managed_repo_audit_type_1_20260426T120000Z_aabb1122"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,8 +41,8 @@ _RUN_ID = "videofoundry_representative_20260426T120000Z_aabb1122"
 
 def _make_request(**overrides) -> ManagedAuditDispatchRequest:
     base = {
-        "repo_id": "videofoundry",
-        "audit_type": "representative",
+        "repo_id": "example_managed_repo",
+        "audit_type": "audit_type_1",
         "allow_unverified_command": True,  # allow not_yet_run for tests
     }
     base.update(overrides)
@@ -55,14 +55,14 @@ def _make_fake_invocation(tmp_path: Path, run_id: str = _RUN_ID):
     from operations_center.run_identity.models import ManagedRunIdentity
 
     identity = ManagedRunIdentity(
-        repo_id="videofoundry",
-        audit_type="representative",
+        repo_id="example_managed_repo",
+        audit_type="audit_type_1",
         run_id=run_id,
         created_at=datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC),
     )
     invocation = ManagedAuditInvocationRequest(
-        repo_id="videofoundry",
-        audit_type="representative",
+        repo_id="example_managed_repo",
+        audit_type="audit_type_1",
         run_id=run_id,
         working_directory=str(tmp_path),
         command=f"{sys.executable} -c 'import sys; sys.exit(0)'",
@@ -89,10 +89,10 @@ def _write_compliant_bucket(
         manifest_payload = {
             "schema_version": "1.0",
             "contract_name": "managed-repo-audit",
-            "producer": "videofoundry",
-            "repo_id": "videofoundry",
+            "producer": "example_managed_repo",
+            "repo_id": "example_managed_repo",
             "run_id": run_id,
-            "audit_type": "representative",
+            "audit_type": "audit_type_1",
             "manifest_status": "completed",
             "run_status": "completed",
             "created_at": "2026-04-26T12:00:00Z",
@@ -112,10 +112,10 @@ def _write_compliant_bucket(
     run_status = {
         "schema_version": "1.0",
         "contract_name": "managed-repo-audit",
-        "producer": "videofoundry",
-        "repo_id": "videofoundry",
+        "producer": "example_managed_repo",
+        "repo_id": "example_managed_repo",
         "run_id": run_id,
-        "audit_type": "representative",
+        "audit_type": "audit_type_1",
         "status": "completed" if exit_code == 0 else "failed",
         "artifact_manifest_path": manifest_rel,
         "metadata": {},
@@ -133,7 +133,7 @@ class TestDispatchConfigErrors:
     def test_unknown_repo_raises_config_error(self, tmp_path: Path) -> None:
         req = ManagedAuditDispatchRequest(
             repo_id="no_such_repo",
-            audit_type="representative",
+            audit_type="audit_type_1",
         )
         with pytest.raises(AuditDispatchConfigError, match="no_such_repo"):
             dispatch_managed_audit(req, config_dir=_CONFIG_DIR, log_dir=tmp_path)
@@ -166,11 +166,11 @@ class TestDispatchLocking:
             req = _make_request(cwd_override=str(tmp_path))
             dispatch_managed_audit(req, config_dir=_CONFIG_DIR, log_dir=tmp_path)
 
-        assert not registry.is_held("videofoundry")
+        assert not registry.is_held("example_managed_repo")
 
     def test_lock_held_error_raised_before_execution(self, tmp_path: Path) -> None:
         registry = ManagedRepoAuditLockRegistry()
-        held_lock = registry.acquire("videofoundry")
+        held_lock = registry.acquire("example_managed_repo")
 
         prepared = _make_fake_invocation(tmp_path)
 
@@ -314,10 +314,10 @@ manifest = bucket / "artifact_manifest.json"
 manifest.write_text(json.dumps({{
     "schema_version": "1.0",
     "contract_name": "managed-repo-audit",
-    "producer": "videofoundry",
-    "repo_id": "videofoundry",
+    "producer": "example_managed_repo",
+    "repo_id": "example_managed_repo",
     "run_id": {run_id!r},
-    "audit_type": "representative",
+    "audit_type": "audit_type_1",
     "manifest_status": "completed",
     "run_status": "completed",
     "created_at": "2026-04-26T12:00:00Z",
@@ -332,10 +332,10 @@ manifest.write_text(json.dumps({{
 (bucket / "run_status.json").write_text(json.dumps({{
     "schema_version": "1.0",
     "contract_name": "managed-repo-audit",
-    "producer": "videofoundry",
-    "repo_id": "videofoundry",
+    "producer": "example_managed_repo",
+    "repo_id": "example_managed_repo",
     "run_id": {run_id!r},
-    "audit_type": "representative",
+    "audit_type": "audit_type_1",
     "status": "completed",
     "artifact_manifest_path": {manifest_rel!r},
     "metadata": {{}},
@@ -422,13 +422,13 @@ manifest.write_text(json.dumps({{
 
 
 # ---------------------------------------------------------------------------
-# AST boundary check — no VideoFoundry imports
+# AST boundary check — no ExampleManagedRepo imports
 # ---------------------------------------------------------------------------
 
 
 class TestNoBoundaryViolation:
-    def test_no_videofoundry_imports_in_dispatch_package(self) -> None:
-        """Verify the audit_dispatch package never imports VideoFoundry code."""
+    def test_no_example_managed_repo_imports_in_dispatch_package(self) -> None:
+        """Verify the audit_dispatch package never imports ExampleManagedRepo code."""
         pkg_root = Path(__file__).parents[3] / "src" / "operations_center" / "audit_dispatch"
         assert pkg_root.is_dir(), f"audit_dispatch package not found at {pkg_root}"
 
@@ -438,14 +438,14 @@ class TestNoBoundaryViolation:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
-                        if "videofoundry" in alias.name.lower() or alias.name.startswith("tools.audit"):
+                        if "example_managed_repo" in alias.name.lower() or alias.name.startswith("tools.audit"):
                             violations.append(f"{py_file.name}: import {alias.name}")
                 elif isinstance(node, ast.ImportFrom):
                     mod = node.module or ""
-                    if "videofoundry" in mod.lower() or mod.startswith("tools.audit"):
+                    if "example_managed_repo" in mod.lower() or mod.startswith("tools.audit"):
                         violations.append(f"{py_file.name}: from {mod} import ...")
 
         assert not violations, (
-            "audit_dispatch imports VideoFoundry code — hard boundary violated:\n"
+            "audit_dispatch imports ExampleManagedRepo code — hard boundary violated:\n"
             + "\n".join(f"  {v}" for v in violations)
         )

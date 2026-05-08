@@ -92,7 +92,7 @@ class TestSlugAutoResolve:
     def test_explicit_slug_wins(self, tmp_path: Path) -> None:
         cfg = _write_config(
             tmp_path,
-            "\nself_repo_key: VideoFoundry\n"
+            "\nself_repo_key: ExampleManagedRepo\n"
             "platform_manifest:\n"
             "  project_slug: explicit-override\n",
         )
@@ -102,11 +102,13 @@ class TestSlugAutoResolve:
     def test_auto_slug_from_self_repo_key(self, tmp_path: Path) -> None:
         cfg = _write_config(
             tmp_path,
-            "\nself_repo_key: VideoFoundry\n"
+            "\nself_repo_key: ExampleManagedRepo\n"
             "platform_manifest:\n  enabled: true\n",
         )
         s = load_settings(cfg)
-        assert s.platform_manifest.project_slug == "videofoundry"
+        # The derivation lowercases without inserting separators between
+        # camelCase boundaries — match the actual contract.
+        assert s.platform_manifest.project_slug == "examplemanagedrepo"
 
     def test_auto_slug_translates_underscores(self, tmp_path: Path) -> None:
         cfg = _write_config(
