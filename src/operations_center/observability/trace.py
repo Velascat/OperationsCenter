@@ -78,6 +78,11 @@ class ExecutionTrace(BaseModel):
     # ExecutionRecord.metadata["routing"]. Empty dict when no routing
     # block was recorded.
     routing: dict[str, Any] = Field(default_factory=dict)
+    # Verification Gaps Round 2 — forward SourceRegistry-derived
+    # provenance from ExecutionRecord.metadata["provenance"]. Empty
+    # dict when the registry didn't carry an entry for this backend
+    # (legacy path, registry unavailable, or backend not yet registered).
+    provenance: dict[str, Any] = Field(default_factory=dict)
     generated_at: datetime = Field(default_factory=_utcnow)
 
     model_config = {"frozen": True}
@@ -87,7 +92,9 @@ class RunReportBuilder:
     """Builds an ExecutionTrace from an ExecutionRecord."""
 
     def build_report(self, record: ExecutionRecord) -> ExecutionTrace:
-        routing = record.metadata.get("routing") if isinstance(record.metadata, dict) else None
+        meta = record.metadata if isinstance(record.metadata, dict) else {}
+        routing = meta.get("routing")
+        provenance = meta.get("provenance")
         return ExecutionTrace(
             record_id=record.record_id,
             headline=self._headline(record),
@@ -100,6 +107,7 @@ class RunReportBuilder:
             backend_detail_refs=list(record.backend_detail_refs),
             runtime_invocation_ref=record.result.runtime_invocation_ref,
             routing=dict(routing) if isinstance(routing, dict) else {},
+            provenance=dict(provenance) if isinstance(provenance, dict) else {},
         )
 
     # ------------------------------------------------------------------

@@ -562,6 +562,21 @@ class ExecutionCoordinator:
         if runtime_metadata:
             metadata.update(runtime_metadata)
 
+        # Verification Gaps Round 2 — surface SourceRegistry-derived
+        # provenance in the record metadata so audit consumers can answer
+        # the original validation invariant: "if backend came from
+        # SourceRegistry, source name and SHA are visible." When the
+        # request carries no bound_target (legacy path or registry
+        # unavailable), this block is omitted rather than fabricated.
+        if request is not None and request.bound_target is not None and request.bound_target.provenance is not None:
+            prov = request.bound_target.provenance
+            metadata["provenance"] = {
+                "source": prov.source,
+                "repo": prov.repo,
+                "ref": prov.ref,
+                "patches": list(prov.patches),
+            }
+
         # Drift detection — only runs when the request carried a binding
         # AND the adapter reported what it observed via runtime_metadata.
         if request is not None and request.runtime_binding is not None:
