@@ -17,6 +17,7 @@ dependencies = [
   "source-registry @ git+https://github.com/Velascat/SourceRegistry.git",
   "rxp @ git+https://github.com/Velascat/RxP.git",
   "executor-runtime @ git+https://github.com/Velascat/ExecutorRuntime.git",
+  "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git",
 ]
 
 [project.scripts]
@@ -54,8 +55,8 @@ operations-center-reaudit-check     = "operations_center.entrypoints.reaudit_che
 # Use the `source-registry` CLI directly with
 #   --registry registry/source_registry.yaml
 #   --patches  registry/patches
-# ER-001 — Repo Graph primitive.
-operations-center-repo-graph        = "operations_center.repo_graph.cli:app"
+# ER-001 — Repo Graph primitive extracted to PlatformManifest.
+# Use the `platform-manifest` CLI directly (provided by that package).
 # ER-002 — Run Memory primitive.
 operations-center-run-memory        = "operations_center.run_memory.cli:app"
 # Archon health probe (see WorkStation compose/profiles/archon.yml).
