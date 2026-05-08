@@ -125,55 +125,13 @@ docker compose \
   up -d
 ```
 
-**Smoke status (2026-05-08): ❌ broken — config files missing**
+**Smoke status: ✅ clean (post WorkStation #16)**
 
-The compose mounts (resolved):
-
-```text
-host: /home/dev/Documents/GitHub/config/observability/prometheus.yml
-container: /etc/prometheus/prometheus.yml
-
-host: /home/dev/Documents/GitHub/config/observability/grafana/provisioning
-container: /etc/grafana/provisioning
-```
-
-Note: paths resolve to **sibling-of-WorkStation** under
-`GitHub/config/observability/`, not under WorkStation itself. This is
-intentional layout convention but undocumented.
-
-Neither path exists in the repo today. On first start, Docker
-auto-creates the host paths as empty **directories**, which then
-prevents subsequent starts (Prometheus dies with
-`failed to mount: not a directory: Are you trying to mount a directory
-onto a file (or vice-versa)?`).
-
-#### To unblock the observability profile
-
-Run the one-shot script, which handles cleanup, ownership, and
-skeleton-config authoring:
-
-```bash
-~/Documents/GitHub/OperationsCenter/scripts/observability-first-run.sh
-```
-
-The script:
-1. Removes any auto-created stub directories (uses `sudo` once;
-   prompts for password).
-2. Reclaims `~/Documents/GitHub/config/observability/` for the running
-   user so future writes don't need sudo.
-3. Authors a minimal `prometheus.yml` + Grafana datasource
-   provisioning. Idempotent — won't overwrite existing files.
-
-After it finishes, bring the profile up:
-
-```bash
-cd ~/Documents/GitHub/WorkStation
-docker compose \
-  -f compose/docker-compose.yml \
-  -f compose/profiles/core.yml \
-  -f compose/profiles/observability.yml \
-  up -d
-```
+| Container | Healthy? | Port | Health endpoint |
+|-----------|----------|------|-----------------|
+| `workstation-switchboard` | yes | `:20401` | `/health` |
+| `workstation-prometheus` | yes | `:9090` | `/-/healthy` |
+| `workstation-grafana` | yes | `:3000` | `/api/health` |
 
 Verify:
 
@@ -184,20 +142,27 @@ curl -fsS http://localhost:3000/api/health | jq .database
 # → "ok"
 ```
 
-#### Why this script exists (and why it shouldn't, eventually)
+#### Historical note
 
-Docker bind-mounts auto-create missing host paths as root-owned
-directories. When a compose file references a config file that the
-operator hasn't authored yet, that "directory in place of a file"
-permanently breaks subsequent starts of the container. WorkStation's
-observability profile runs into this on a clean machine because the
-compose file references config paths the WorkStation repo doesn't
-ship.
+Earlier versions of this profile mounted from
+`../../config/observability/` — a sibling-of-WorkStation path
+that no clean clone has authored. Docker auto-created the missing
+host files as root-owned directories on first start, which then
+permanently broke subsequent starts with `failed to mount: not a
+directory`. WorkStation #16 shipped a skeleton inside the repo at
+`config/observability/` and updated the compose mount paths, so a
+fresh clone now boots the observability profile without manual
+setup.
 
-The right long-term fix is in WorkStation: ship the skeleton config in
-the repo so first-run is clean. That's filed in `.console/backlog.md`
-as the WorkStation observability follow-up. This script is the bridge
-until that ships.
+If you have an older machine where the original sibling-config dir
+still has root-owned stub directories from the old layout, clean
+them up once with:
+
+```bash
+sudo rm -rf /home/dev/Documents/GitHub/config/observability
+```
+
+(Pre-#16 workaround scripts have been retired from this repo.)
 
 When the `observability` and `archon` profiles are both desired
 together, **port 3000 collides** — both Grafana and Archon default to
@@ -232,4 +197,4 @@ fast. `down` removes containers but keeps named volumes
 | `core` | None — clean. |
 | `archon` | None — clean. The codebase-registration step lives in its own playbook. |
 | `dev` | None — clean. The commented-out `mitmproxy` block could be removed or wired in; not urgent. |
-| `observability` | **Broken on first run.** Compose references `../../config/observability/{prometheus.yml,grafana/provisioning}` (sibling-of-WorkStation paths) but those files are never authored. Docker silently creates them as empty directories, which prevents the next start. Filed as follow-up: ship a `compose/profiles/observability.config.example/` skeleton in WorkStation so first-run produces a working stack without an undocumented manual step. |
+| `observability` | Now clean (was broken on first-run prior to WorkStation #16). The compose previously mounted from a sibling-of-WorkStation path that no clean clone authored, which Docker silently turned into root-owned empty directories. WorkStation #16 ships an in-repo skeleton at `config/observability/` and updates the mount paths; a fresh clone now boots without manual setup. |
