@@ -4,7 +4,7 @@ _Durable work inventory. Update after each meaningful chunk of progress._
 
 ## In Progress
 
-_(none — system locked at Rev 10)_
+- [x] **Post-extraction runtime architecture validation (2026-05-08, on `validate/post-extraction-runtime-2026-05-08`)**: 5-run validation matrix executed (happy / failure / timeout / Archon mocked / non-Archon direct_local). Architecture validated end-to-end at the contract level; identity invariant holds; boundary cleanliness good. Surfaced 3 traceability gaps (G-V01 HIGH: `ExecutionResult` drops RxP `invocation_id` linkage; G-V02 MEDIUM: routing rationale missing from record metadata; G-V03 LOW: `execution_trace.json` is status-only) plus G-V04 G-005 unaddressed and G-V05 live-Archon deferred (container not running). Report at `.console/validation/post_extraction_runtime_2026-05-08.md`. Verdict: **architecture mostly valid; fix G-V01 before broader use**.
 
 ## Up Next
 

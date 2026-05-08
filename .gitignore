@@ -3,6 +3,8 @@
 !.console/backlog.md
 !.console/guidelines.md
 !.console/log.md
+!.console/validation/
+!.console/validation/**
 __pycache__/
 *.pyc
 *.pyo
