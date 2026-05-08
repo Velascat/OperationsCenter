@@ -140,3 +140,35 @@ repos:
 # Artifact storage root
 # ---------------------------------------------------------------------------
 report_root: tools/report/kodo_plane
+
+# ---------------------------------------------------------------------------
+# Platform Manifest 3-layer composition (PlatformManifest v0.3+)
+# ---------------------------------------------------------------------------
+# OC consumes a merged EffectiveRepoGraph from PlatformManifest's
+# `load_effective_graph(base, project, local)`. The platform base is
+# always the bundled `platform_manifest.yaml` (9 public repos). A
+# project layer adds private/public project repos + edges to the
+# platform; a local layer annotates existing nodes with allowlisted
+# fields (local_path, local_port, env_file, endpoint_override,
+# cache_path, gpu_required, runtime_hints).
+#
+# When configured, OC's coordinator logs structured contract-impact
+# warnings pre-dispatch (e.g.
+#   "contract change in CxRP affects 4 consumer(s) [public=3 private=1]: …")
+# and attaches a `contract_impact` block to the observability record.
+#
+# Defaults: enabled=true, all paths None → platform-only graph.
+# Set false to skip composition entirely.
+#
+# v0.3 supports ONE project per OC instance — to switch projects,
+# update the paths or run OC from inside that project's repo (cwd
+# convention picks up `<repo_root>/topology/project_manifest.yaml`).
+#
+# See docs/operator/manifest_wiring.md for the full operator runbook
+# and docs/operator/manifest_authoring.md for project-manifest authoring.
+#
+# platform_manifest:
+#   enabled: true
+#   project_slug: video-foundry        # for WorkStation LocalManifest discovery
+#   project_manifest_path: /home/dev/Documents/GitHub/VideoFoundry/topology/project_manifest.yaml
+#   local_manifest_path:   /home/dev/Documents/GitHub/VideoFoundry/topology/local_manifest.yaml
