@@ -18,8 +18,10 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
+from typing import Any, Optional
+
 from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
-from operations_center.contracts.execution import ExecutionArtifact
+from operations_center.contracts.execution import ExecutionArtifact, RuntimeInvocationRef
 
 from .changed_files import ChangedFilesStatus
 from .models import BackendDetailRef, ExecutionRecord
@@ -57,6 +59,14 @@ class ExecutionTrace(BaseModel):
     validation_summary: ValidationEvidence
     warnings: list[str] = Field(default_factory=list)
     backend_detail_refs: list[BackendDetailRef] = Field(default_factory=list)
+    # G-V03 — forward the OC ↔ RxP linkage so a single trace has the full
+    # provenance chain. None for adapters that do not invoke ExecutorRuntime
+    # (e.g. demo_stub).
+    runtime_invocation_ref: Optional[RuntimeInvocationRef] = None
+    # G-V03 — forward SwitchBoard routing provenance from
+    # ExecutionRecord.metadata["routing"]. Empty dict when no routing
+    # block was recorded.
+    routing: dict[str, Any] = Field(default_factory=dict)
     generated_at: datetime = Field(default_factory=_utcnow)
 
     model_config = {"frozen": True}
@@ -66,6 +76,7 @@ class RunReportBuilder:
     """Builds an ExecutionTrace from an ExecutionRecord."""
 
     def build_report(self, record: ExecutionRecord) -> ExecutionTrace:
+        routing = record.metadata.get("routing") if isinstance(record.metadata, dict) else None
         return ExecutionTrace(
             record_id=record.record_id,
             headline=self._headline(record),
@@ -76,6 +87,8 @@ class RunReportBuilder:
             validation_summary=record.validation_evidence,
             warnings=self._warnings(record),
             backend_detail_refs=list(record.backend_detail_refs),
+            runtime_invocation_ref=record.result.runtime_invocation_ref,
+            routing=dict(routing) if isinstance(routing, dict) else {},
         )
 
     # ------------------------------------------------------------------
