@@ -542,6 +542,22 @@ class ExecutionCoordinator:
             "policy": policy_decision.model_dump(mode="json"),
             "task_type": bundle.proposal.task_type.value,
             "risk_level": bundle.proposal.risk_level.value,
+            # G-V02 — surface SwitchBoard routing provenance in the
+            # execution record metadata so audit consumers can answer
+            # "which rule fired? why? from which switchboard version?"
+            # without re-reading decision.json.
+            "routing": {
+                "decision_id": bundle.decision.decision_id,
+                "selected_lane": bundle.decision.selected_lane.value,
+                "selected_backend": bundle.decision.selected_backend.value,
+                "policy_rule_matched": bundle.decision.policy_rule_matched,
+                "rationale": bundle.decision.rationale,
+                "switchboard_version": bundle.decision.switchboard_version,
+                "confidence": bundle.decision.confidence,
+                "alternatives_considered": [
+                    lane.value for lane in bundle.decision.alternatives_considered
+                ],
+            },
         }
         if runtime_metadata:
             metadata.update(runtime_metadata)
