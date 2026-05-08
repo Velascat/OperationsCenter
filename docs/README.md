@@ -41,11 +41,21 @@ This directory holds OC-specific material.
 - [architecture/contracts/execution-handoff-cutover.md](architecture/contracts/execution-handoff-cutover.md)
 - [architecture/contracts/execution_target.md](architecture/contracts/execution_target.md)
 - [architecture/contracts/lifecycle_labels.md](architecture/contracts/lifecycle_labels.md)
+- [architecture/contracts/upstream-patch-evaluation.md](architecture/contracts/upstream-patch-evaluation.md) —
+  Upstream-patch evaluation policy + decision shape.
+- [architecture/contracts/upstream-patch-evaluation-examples.md](architecture/contracts/upstream-patch-evaluation-examples.md) —
+  Worked examples for the upstream-patch policy.
 - [architecture/recovery/phantom_helper_waves.md](architecture/recovery/phantom_helper_waves.md)
 - [architecture/policy/policy-pre-execution-gate.md](architecture/policy/policy-pre-execution-gate.md)
 - [architecture/recovery/recovery_loop_design.md](architecture/recovery/recovery_loop_design.md)
 - [architecture/routing/routing-contract-fidelity.md](architecture/routing/routing-contract-fidelity.md)
+- [architecture/routing/routing-tuning.md](architecture/routing/routing-tuning.md) —
+  Routing knobs and how to tune them per workload.
+- [architecture/routing/routing-tuning-examples.md](architecture/routing/routing-tuning-examples.md) —
+  Worked tuning examples.
 - [architecture/adr/](architecture/adr/) — OC architecture decision records.
+  - [architecture/adr/0001-execution-boundary-operationscenter.md](architecture/adr/0001-execution-boundary-operationscenter.md) —
+    Decision to make OperationsCenter the execution boundary.
 
 ### Managed-repo audit contracts
 

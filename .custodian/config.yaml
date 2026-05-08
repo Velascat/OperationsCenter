@@ -33,6 +33,7 @@ audit:
     - "src/operations_center/execution/**"
     - "src/operations_center/backends/**"
     - "src/operations_center/routing/**"
+    - "src/operations_center/executors/**"
     - "tests/**"
 
   exclude_paths:
@@ -64,6 +65,28 @@ audit:
       - "src/operations_center/propagation/**"
       - "src/operations_center/artifact_index/**"
       - "src/operations_center/audit_contracts/**"
+      - "src/operations_center/audit_dispatch/**"
+      - "src/operations_center/audit_governance/**"
+      - "src/operations_center/audit_toolset/**"
+      - "src/operations_center/autonomy_tiers/**"
+      - "src/operations_center/behavior_calibration/**"
+      - "src/operations_center/repo_graph/**"
+      - "src/operations_center/routing/**"
+      - "src/operations_center/decision/**"
+      - "src/operations_center/drift/**"
+      - "src/operations_center/fixture_harvesting/**"
+      - "src/operations_center/mini_regression/**"
+      - "src/operations_center/planning/**"
+      - "src/operations_center/policy/**"
+      - "src/operations_center/proposer/**"
+      - "src/operations_center/slice_replay/**"
+      - "src/operations_center/tuning/**"
+      - "src/operations_center/spec_director/**"
+      - "src/operations_center/contracts/**"
+      - "src/operations_center/application/**"
+      - "src/operations_center/execution/**"
+      - "src/operations_center/domain/**"
+      - "src/operations_center/config/**"
     T7:
       # Same rationale as T6. Listed per-layer (not src/**) so a NEW
       # top-level package without parallel tests still gets flagged.
@@ -117,6 +140,25 @@ audit:
       - src/operations_center/quality_alerts.py
       - src/operations_center/reconcile_running.py
       - src/operations_center/repo_graph_factory.py
+    T2:
+      # Schema-validation tests use jsonschema.validate() / pydantic.model_validate()
+      # which raise on failure — "shouldn't raise" is the assertion.
+      # Startup-wiring tests verify env_var_unset / env_var_set side effects via
+      # mocks; the test is the side-effect check.
+      - tests/unit/er000_phase0_golden/test_golden.py
+      - tests/unit/executors/test_normalizers.py
+      - tests/unit/executors/test_startup_wiring.py
+    C29:
+      # settings.py is the canonical settings registry — all OC config lives in
+      # one Pydantic settings module by design.
+      # coordinator.py is OC's execution coordinator (the central dispatcher).
+      # Splitting either would fracture an interrelated registry.
+      - src/operations_center/config/settings.py
+      - src/operations_center/execution/coordinator.py
+    C41:
+      # http_workflow.py emits Archon API payloads; ASCII-safe is correct
+      # for HTTP wire format here (operator names + IDs are ASCII).
+      - src/operations_center/backends/archon/http_workflow.py
     T8:
       # Architecture-guard + lock-store-concurrency tests don't import the
       # code under audit — they probe via subprocess + filesystem.
@@ -426,6 +468,13 @@ audit:
     - evidence_id
     - ref_id
     - workdir_name
+    # Autonomy-gap design doc references internal helper symbols that were
+    # renamed/removed; the doc is a design retrospective, not an API spec.
+    - _is_quota_exhausted_result
+    - _run_subprocess
+    - _run_with_claude_fallback
+    - is_quota_exhausted
+    - visibility
 
   # Plugin-defined audit config keys — suppresses unknown-key warnings in doctor.
   plugin_audit_keys:
@@ -441,6 +490,8 @@ audit:
     - test_campaign
     - improve_campaign
     - execute_representative_workflow
+    - audit_report
+    - kodo_version
     - requires_human_approval
 
   # OC1 backends that have raise NotImplementedError intentionally —
