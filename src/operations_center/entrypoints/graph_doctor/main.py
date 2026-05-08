@@ -142,6 +142,14 @@ def main(argv: list[str] | None = None) -> int:
             per_edge_source[e.source.value] = per_edge_source.get(e.source.value, 0) + 1
         report["edges_by_source"] = per_edge_source
 
+        # In work-scope mode, attribute nodes/edges to each include by
+        # composing each include's project manifest standalone against
+        # the platform base and counting the delta.
+        if mode == "work_scope" and pm.work_scope_manifest_path is not None:
+            report["includes"] = _compute_per_include_breakdown(
+                pm.work_scope_manifest_path
+            )
+
     # Decide pass/fail.
     if not pm.enabled:
         report["status"] = "ok_disabled"
@@ -184,11 +192,94 @@ def _print_human(report: dict[str, object], exit_code: int) -> None:
             print(f"  nodes_by_source:        {nbs}")
         if ebs:
             print(f"  edges_by_source:        {ebs}")
+    includes = report.get("includes")
+    if isinstance(includes, list) and includes:
+        print(f"  includes ({len(includes)}):")
+        for raw_entry in includes:
+            if not isinstance(raw_entry, dict):
+                continue
+            entry: dict[str, object] = raw_entry  # ty:ignore[invalid-assignment]
+            if "error" in entry:
+                print(f"    - {entry.get('name', '?')}: ERROR {entry['error']}")
+                continue
+            print(
+                f"    - {entry.get('name')}: "
+                f"+{entry.get('nodes_contributed')} nodes / "
+                f"+{entry.get('edges_contributed')} edges  "
+                f"({entry.get('path')})"
+            )
     warnings = report.get("warnings")
     if isinstance(warnings, list) and warnings:
         print(f"  warnings ({len(warnings)}):")
         for w in warnings:
             print(f"    - {w}")
+
+
+def _compute_per_include_breakdown(
+    work_scope_path: Path,
+) -> list[dict[str, object]]:
+    """For each include in a work-scope manifest, compose it standalone
+    against the platform base and report nodes_contributed/edges_contributed.
+
+    Errors for any single include are captured per-entry — one bad include
+    doesn't blank out the whole report. Designed for the doctor command,
+    not a hot path; one extra `load_effective_graph` call per include.
+    """
+    import yaml as _yaml
+
+    from platform_manifest import (
+        RepoGraphConfigError,
+        default_config_path,
+        load_effective_graph,
+        load_repo_graph,
+    )
+    from platform_manifest.models import ManifestKind
+
+    out: list[dict[str, object]] = []
+    try:
+        raw = _yaml.safe_load(work_scope_path.read_text(encoding="utf-8")) or {}
+    except (OSError, _yaml.YAMLError) as exc:
+        return [{"error": f"failed to read work-scope manifest: {exc}"}]
+    if not isinstance(raw, dict):
+        return [{"error": "work-scope manifest root is not a mapping"}]
+    includes = raw.get("includes") or []
+    if not isinstance(includes, list):
+        return [{"error": "work-scope manifest 'includes' is not a list"}]
+
+    base_path = default_config_path()
+    try:
+        platform_graph = load_repo_graph(base_path, expected_kind=ManifestKind.PLATFORM)
+    except RepoGraphConfigError as exc:
+        return [{"error": f"platform base load failed: {exc}"}]
+    platform_node_count = len(platform_graph.list_nodes())
+    platform_edge_count = len(platform_graph.edges)
+
+    for idx, inc in enumerate(includes):
+        if not isinstance(inc, dict):
+            out.append({"index": idx, "error": "include entry is not a mapping"})
+            continue
+        name = inc.get("name") or f"include[{idx}]"
+        path_raw = inc.get("project_manifest_path")
+        if not isinstance(path_raw, str):
+            out.append({
+                "name": name,
+                "error": "missing or non-string 'project_manifest_path'",
+            })
+            continue
+        # Resolve include path relative to the work-scope manifest's directory
+        inc_path = (work_scope_path.parent / Path(path_raw)).resolve()
+        try:
+            g = load_effective_graph(base_path, project=inc_path)
+        except (RepoGraphConfigError, OSError) as exc:
+            out.append({"name": name, "path": str(inc_path), "error": str(exc)})
+            continue
+        out.append({
+            "name": name,
+            "path": str(inc_path),
+            "nodes_contributed": len(g.list_nodes()) - platform_node_count,
+            "edges_contributed": len(g.edges) - platform_edge_count,
+        })
+    return out
 
 
 def _emit_error(

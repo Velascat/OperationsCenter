@@ -261,3 +261,101 @@ class TestMode:
         assert rc == 0
         report = json.loads(capsys.readouterr().out)
         assert report["platform_manifest"]["mode"] == "disabled"
+
+
+# ---------------------------------------------------------------------------
+# Per-include breakdown (work-scope mode)
+# ---------------------------------------------------------------------------
+
+
+_PROJECT_A_YAML = (
+    'manifest_kind: project\n'
+    'manifest_version: "1.0.0"\n'
+    'repos:\n'
+    '  proj_a_api:\n'
+    '    canonical_name: ProjectAAPI\n'
+    '    visibility: private\n'
+    'edges:\n'
+    '  - {from: ProjectAAPI, to: OperationsCenter, type: dispatches_to}\n'
+)
+_PROJECT_B_YAML = (
+    'manifest_kind: project\n'
+    'manifest_version: "1.0.0"\n'
+    'repos:\n'
+    '  proj_b_api:\n'
+    '    canonical_name: ProjectBAPI\n'
+    '    visibility: private\n'
+    '  proj_b_worker:\n'
+    '    canonical_name: ProjectBWorker\n'
+    '    visibility: private\n'
+)
+
+
+class TestPerIncludeBreakdown:
+    def test_work_scope_mode_reports_per_include_counts(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        a = tmp_path / "a.yaml"
+        a.write_text(_PROJECT_A_YAML, encoding="utf-8")
+        b = tmp_path / "b.yaml"
+        b.write_text(_PROJECT_B_YAML, encoding="utf-8")
+        ws = tmp_path / "work_scope.yaml"
+        ws.write_text(
+            'manifest_kind: work_scope\n'
+            'manifest_version: "1.0.0"\n'
+            'includes:\n'
+            f'  - {{name: A, project_manifest_path: {a}}}\n'
+            f'  - {{name: B, project_manifest_path: {b}}}\n',
+            encoding="utf-8",
+        )
+        cfg = _write_config(
+            tmp_path, f"\nplatform_manifest:\n  work_scope_manifest_path: {ws}\n"
+        )
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        includes = report["includes"]
+        assert len(includes) == 2
+        names = {e["name"] for e in includes}
+        assert names == {"A", "B"}
+        a_entry = next(e for e in includes if e["name"] == "A")
+        b_entry = next(e for e in includes if e["name"] == "B")
+        # A contributes 1 node + 1 edge; B contributes 2 nodes, 0 edges
+        assert a_entry["nodes_contributed"] == 1
+        assert a_entry["edges_contributed"] == 1
+        assert b_entry["nodes_contributed"] == 2
+        assert b_entry["edges_contributed"] == 0
+
+    def test_project_mode_has_no_includes_field(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        proj = tmp_path / "p.yaml"
+        proj.write_text(_PROJECT_A_YAML, encoding="utf-8")
+        cfg = _write_config(
+            tmp_path, f"\nplatform_manifest:\n  project_manifest_path: {proj}\n"
+        )
+        rc = main(["--config", str(cfg), "--json"])
+        assert rc == 0
+        report = json.loads(capsys.readouterr().out)
+        assert "includes" not in report
+
+    def test_human_output_lists_includes(self, tmp_path: Path, capsys) -> None:
+        a = tmp_path / "a.yaml"
+        a.write_text(_PROJECT_A_YAML, encoding="utf-8")
+        ws = tmp_path / "work_scope.yaml"
+        ws.write_text(
+            'manifest_kind: work_scope\n'
+            'manifest_version: "1.0.0"\n'
+            'includes:\n'
+            f'  - {{name: ProjectA, project_manifest_path: {a}}}\n',
+            encoding="utf-8",
+        )
+        cfg = _write_config(
+            tmp_path, f"\nplatform_manifest:\n  work_scope_manifest_path: {ws}\n"
+        )
+        rc = main(["--config", str(cfg)])
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "includes (1):" in out
+        assert "ProjectA" in out
+        assert "+1 nodes" in out
