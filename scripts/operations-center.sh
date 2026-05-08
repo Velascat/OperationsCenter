@@ -342,24 +342,27 @@ start_watch_role() {
       source '${ENV_PATH}'
       set +a
       _child_pid=''
-      trap 'kill \$_child_pid 2>/dev/null; exit 0' TERM INT
-      while true; do
+      _hb_pid=''
+      trap 'kill \$_hb_pid 2>/dev/null; kill \$_child_pid 2>/dev/null; exit 0' TERM INT
+      while [[ -f '${pid_file}' ]]; do
         printf '{\"role\":\"propose\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
           \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
           > '${WATCH_DIR}/heartbeat_propose.json'
+        sleep 60
+      done &
+      _hb_pid=\$!
+      while true; do
         '${VENV_DIR}/bin/python' -m operations_center.entrypoints.pipeline_trigger.main \
           --config '${CONFIG_PATH}' \
           --execute &
         _child_pid=\$!
         wait \$_child_pid
         _exit=\$?
-        printf '{\"role\":\"propose\",\"at\":\"%s\",\"status\":\"idle\"}\n' \
-          \$(date -u +%Y-%m-%dT%H:%M:%S+00:00) \
-          > '${WATCH_DIR}/heartbeat_propose.json'
-        [[ ! -f '${pid_file}' ]] && exit 0
+        [[ ! -f '${pid_file}' ]] && break
         echo \"{\\\"event\\\":\\\"watcher_restart\\\",\\\"role\\\":\\\"propose\\\",\\\"exit_code\\\":\$_exit}\"
         sleep 30
       done
+      kill \$_hb_pid 2>/dev/null
     " >>"${log_file}" 2>&1 < /dev/null &
   else
     # goal, test, improve — Plane-polling board workers

@@ -16,6 +16,12 @@ Cadence: HEALTHY → 3600s (starvation flag is not yet confirmed across 2 cycles
 
 Added `audit.plumbing` block with three artifact contracts: heartbeat (role/at/status → OperatorConsole mtime check), usage.json (top-level + event sub-keys → budget/rate display), active.json (campaigns → campaign pane). P2 ignore_keys suppress TUI state dict false positives. All three P1/P2/P3 = 0 findings.
 
+## 2026-05-08 — Propose heartbeat moved to background subprocess
+
+pipeline_trigger is an infinite watch loop — wait never returns, so the propose bash
+wrapper never re-iterated and the heartbeat never refreshed. Replaced with a background
+subprocess writing every 60s independent of the child, plus a clean trap to kill it on exit.
+
 ## 2026-05-08 — Watchdog heartbeat every 5 min; propose heartbeat after child exits
 
 Watchdog slept 3600s between heartbeats — replaced single sleep with 12×300s loop, writing each iteration.
