@@ -149,61 +149,55 @@ onto a file (or vice-versa)?`).
 
 #### To unblock the observability profile
 
-This is filed as a follow-up backlog item; documenting the manual
-unblock here for operators who need it now:
+Run the one-shot script, which handles cleanup, ownership, and
+skeleton-config authoring:
 
 ```bash
-# 1. Stop + remove the partial container
-docker compose \
-  -f compose/docker-compose.yml \
-  -f compose/profiles/core.yml \
-  -f compose/profiles/observability.yml \
-  rm -f -s prometheus grafana
+~/Documents/GitHub/OperationsCenter/scripts/observability-first-run.sh
+```
 
-# 2. Remove the auto-created stub directories
-sudo rm -rf /home/dev/Documents/GitHub/config/observability/prometheus.yml
-sudo rm -rf /home/dev/Documents/GitHub/config/observability/grafana
+The script:
+1. Removes any auto-created stub directories (uses `sudo` once;
+   prompts for password).
+2. Reclaims `~/Documents/GitHub/config/observability/` for the running
+   user so future writes don't need sudo.
+3. Authors a minimal `prometheus.yml` + Grafana datasource
+   provisioning. Idempotent — won't overwrite existing files.
 
-# 3. Author config files at the expected locations
-mkdir -p /home/dev/Documents/GitHub/config/observability
-cat > /home/dev/Documents/GitHub/config/observability/prometheus.yml <<'EOF'
-# Minimal Prometheus config — scrapes itself + WorkStation services.
-global:
-  scrape_interval: 15s
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-  # Add WorkStation services as they expose /metrics:
-  # - job_name: 'switchboard'
-  #   static_configs:
-  #     - targets: ['workstation-switchboard:20401']
-EOF
+After it finishes, bring the profile up:
 
-mkdir -p /home/dev/Documents/GitHub/config/observability/grafana/provisioning/datasources
-cat > /home/dev/Documents/GitHub/config/observability/grafana/provisioning/datasources/prometheus.yaml <<'EOF'
-apiVersion: 1
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://workstation-prometheus:9090
-    isDefault: true
-EOF
-
-# 4. Now bring it up
+```bash
+cd ~/Documents/GitHub/WorkStation
 docker compose \
   -f compose/docker-compose.yml \
   -f compose/profiles/core.yml \
   -f compose/profiles/observability.yml \
   up -d
+```
 
-# 5. Verify
+Verify:
+
+```bash
 curl -fsS http://localhost:9090/-/healthy
 # → "Prometheus Server is Healthy."
 curl -fsS http://localhost:3000/api/health | jq .database
 # → "ok"
 ```
+
+#### Why this script exists (and why it shouldn't, eventually)
+
+Docker bind-mounts auto-create missing host paths as root-owned
+directories. When a compose file references a config file that the
+operator hasn't authored yet, that "directory in place of a file"
+permanently breaks subsequent starts of the container. WorkStation's
+observability profile runs into this on a clean machine because the
+compose file references config paths the WorkStation repo doesn't
+ship.
+
+The right long-term fix is in WorkStation: ship the skeleton config in
+the repo so first-run is clean. That's filed in `.console/backlog.md`
+as the WorkStation observability follow-up. This script is the bridge
+until that ships.
 
 When the `observability` and `archon` profiles are both desired
 together, **port 3000 collides** — both Grafana and Archon default to
