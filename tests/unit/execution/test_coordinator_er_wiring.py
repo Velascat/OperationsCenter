@@ -22,7 +22,7 @@ from operations_center.lifecycle import LifecycleMetadata, TaskLifecycleStage
 from operations_center.planning.models import PlanningContext, ProposalDecisionBundle
 from operations_center.planning.proposal_builder import build_proposal
 from operations_center.policy.models import PolicyDecision, PolicyStatus
-from operations_center.repo_graph import (
+from platform_manifest import (
     RepoGraph,
     RepoNode,
     load_default_repo_graph,
