@@ -287,7 +287,7 @@ def _render(repo_filter: list[str] | None, width: int = 78) -> str:
 
 
 def _render_rich(repo_filter: list[str] | None, console) -> None:
-    """Render using Rich panels — mirrors VideoFoundry audit status style."""
+    """Render using Rich panels — managed-repo audit status style."""
     from rich import box
     from rich.columns import Columns
     from rich.console import Group

@@ -34,7 +34,7 @@ small high-value first.
 Total: **27 new helpers, 73 new tests, C8 reduced 149 → 33** (78% drop).
 All 2954 pass, ruff clean.
 
-**The remaining 33 C8 findings are detector noise** — status / enum / config-key strings in specialised architecture docs (`managed_repo_*`, videofoundry artifact contract, etc.) that follow a different convention from `autonomy_gaps.md`. Adding them to the skip list as we encounter them is fine; the audit is at a healthy steady-state.
+**The remaining 33 C8 findings are detector noise** — status / enum / config-key strings in specialised architecture docs (`managed_repo_*`, the managed-repo artifact contract, etc.) that follow a different convention from `autonomy_gaps.md`. Adding them to the skip list as we encounter them is fine; the audit is at a healthy steady-state.
 
 ---
 

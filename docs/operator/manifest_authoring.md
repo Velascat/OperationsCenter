@@ -95,7 +95,7 @@ pip install "platform-manifest @ git+https://github.com/Velascat/PlatformManifes
 platform-manifest validate topology/project_manifest.yaml --expected project
 ```
 
-Two-stage check (JSON Schema + Python loader); exit `0` clean, `1` validation failed. Set up a `manifest-validate.yml` GitHub Actions workflow per the pattern in [VideoFoundry](https://github.com/Velascat/VideoFoundry/blob/main/.github/workflows/manifest-validate.yml) so PRs catch drift before merge.
+Two-stage check (JSON Schema + Python loader); exit `0` clean, `1` validation failed. Set up a `manifest-validate.yml` GitHub Actions workflow that runs the same command on every PR so drift is caught before merge.
 
 ## Multi-repo project — shell pattern (PM v0.8+)
 
@@ -103,7 +103,7 @@ When several repos together form one logical project, use a **shell manifest rep
 
 ### When to use a shell repo
 
-- ✅ Two or more repos collaborate as one product (e.g. `VideoFoundryAPI` + `VideoFoundryWorker` + `VideoFoundryAssets`)
+- ✅ Two or more repos collaborate as one product (e.g. `MediaProductAPI` + `MediaProductWorker` + `MediaProductAssets`)
 - ✅ You want OperationsCenter to see all of them in one merged graph
 - ✅ Cross-repo edges (`repo A bundles_assets_from repo B`) span the suite
 - ❌ Two repos happen to coexist but aren't logically one project (each gets its own standalone manifest)
@@ -111,17 +111,17 @@ When several repos together form one logical project, use a **shell manifest rep
 ### Shape
 
 ```
-VideoFoundrySuite/                          # the dedicated shell repo
+MediaProductSuite/                          # the dedicated shell repo
   topology/
     project_manifest.yaml                   # references all sub-projects
     local_manifest.example.yaml             # per-machine wiring for the whole suite
     local_manifest.yaml                     # gitignored
 
-VideoFoundry/                               # constituent repos keep their own manifests
+MediaProductCore/                           # constituent repos keep their own manifests
   topology/
     project_manifest.yaml
 
-Warehouse/
+MediaProductAssets/
   topology/
     project_manifest.yaml
 ```
@@ -139,17 +139,17 @@ platform_manifest:
 # Order matters: included manifests apply in sequence. Earlier includes
 # may be referenced by later ones via canonical name.
 includes:
-  - name: VideoFoundry
-    project_manifest_path: ../VideoFoundry/topology/project_manifest.yaml
-  - name: Warehouse
-    project_manifest_path: ../Warehouse/topology/project_manifest.yaml
+  - name: MediaProductCore
+    project_manifest_path: ../MediaProductCore/topology/project_manifest.yaml
+  - name: MediaProductAssets
+    project_manifest_path: ../MediaProductAssets/topology/project_manifest.yaml
 
 # The shell may also declare its own repos (rare — usually empty).
 repos: {}
 
 # Cross-suite edges that don't belong in any constituent's manifest
 # go here. Example: a deployment-pipeline repo that orchestrates both
-# VFA and Warehouse.
+# constituents above.
 edges: []
 ```
 
@@ -171,9 +171,9 @@ The loader enforces, in addition to the single-project rules:
 ```yaml
 # config/operations_center.local.yaml
 platform_manifest:
-  project_slug: video-foundry-suite
-  project_manifest_path: ../VideoFoundrySuite/topology/project_manifest.yaml
-  local_manifest_path:   ../VideoFoundrySuite/topology/local_manifest.yaml
+  project_slug: media-product-suite
+  project_manifest_path: ../MediaProductSuite/topology/project_manifest.yaml
+  local_manifest_path:   ../MediaProductSuite/topology/local_manifest.yaml
 ```
 
 The merged graph contains all constituent repos' nodes, all their edges, plus the shell's own additions. OC's contract-impact analysis spans the whole suite.
@@ -182,14 +182,13 @@ The merged graph contains all constituent repos' nodes, all their edges, plus th
 
 - **Auditable architecture**: each constituent repo has its own manifest under its own version control. The shell expresses *composition*, not duplication.
 - **Visibility never widens**: a private node from sub-project A stays private after the shell merges it.
-- **Independent evolution**: VF can update its own manifest without touching Warehouse's; the shell picks up the latest of each on next compose.
+- **Independent evolution**: each constituent updates its own manifest without touching the others; the shell picks up the latest of each on next compose.
 
 ## Worked examples
 
-- **Single-repo private project:** [VideoFoundry/topology/project_manifest.yaml](https://github.com/Velascat/VideoFoundry/blob/main/topology/project_manifest.yaml)
-- **Single-repo private tool:** [Warehouse/topology/project_manifest.yaml](https://github.com/Velascat/Warehouse/blob/main/topology/project_manifest.yaml)
+- **Single-repo private project:** see your operator-private overlay at `config/managed_repos/local/<repo_id>.yaml` for the binding shape; the topology manifest in the bound repo follows the same canonical layout.
 
-Both follow the same shape: one repo node, `runtime_role: managed_repo`, one `OperationsCenter dispatches_to <repo>` edge for the audit/maintenance pattern.
+The standard shape is: one repo node, `runtime_role: managed_repo`, one `OperationsCenter dispatches_to <repo>` edge for the audit/maintenance pattern.
 
 ## Common mistakes
 

@@ -1,20 +1,20 @@
-# VideoFoundry Managed Repo Contract
+# the managed repo Managed Repo Contract
 
 **Phase**: 1 — Managed Repo Contract
-**Config**: `config/managed_repos/videofoundry.yaml`
+**Config**: `config/managed_repos/<repo_id>.yaml`
 **Models**: `src/operations_center/managed_repos/`
-**Tests**: `tests/unit/managed_repos/test_videofoundry_config.py`
-**Ground truth**: `docs/architecture/videofoundry/videofoundry_audit_ground_truth.md`
+**Tests**: `tests/unit/managed_repos/test_<repo_id>_config.py`
+**Ground truth**: `docs/architecture/<repo_id>/<repo_id>_audit_ground_truth.md`
 
 ---
 
 ## Purpose
 
-VideoFoundry runs multi-phase audit pipelines that produce structured artifact outputs.
+the managed repo runs multi-phase audit pipelines that produce structured artifact outputs.
 OperationsCenter needs to invoke those audits, inject run identity, and later read the outputs.
 
-This contract makes VideoFoundry visible to OpsCenter as a managed external repository
-without coupling OpsCenter to VideoFoundry's Python internals.
+This contract makes the managed repo visible to OpsCenter as a managed external repository
+without coupling OpsCenter to the managed repo's Python internals.
 
 ---
 
@@ -22,32 +22,32 @@ without coupling OpsCenter to VideoFoundry's Python internals.
 
 ```
 OperationsCenter = contract owner + orchestrator
-VideoFoundry     = audit runner + artifact producer
+the managed repo     = audit runner + artifact producer
 ```
 
 **OpsCenter may:**
-- invoke VideoFoundry commands via subprocess
-- read files produced by VideoFoundry (`run_status.json`, `artifact_manifest.json`)
-- set environment variables for VideoFoundry processes (`AUDIT_RUN_ID`)
+- invoke the managed repo commands via subprocess
+- read files produced by the managed repo (`run_status.json`, `artifact_manifest.json`)
+- set environment variables for the managed repo processes (`AUDIT_RUN_ID`)
 
 **OpsCenter must never:**
-- import any VideoFoundry Python module
-- depend on VideoFoundry Python package internals
+- import any the managed repo Python module
+- depend on the managed repo Python package internals
 - scan arbitrary directories to discover artifacts — use the `run_status.json → artifact_manifest_path` discovery chain only (once Phase 2+5 are complete)
-- call VideoFoundry functions directly
-- read VideoFoundry source code at runtime
+- call the managed repo functions directly
+- read the managed repo source code at runtime
 
 ---
 
 ## Config Location
 
 ```
-config/managed_repos/videofoundry.yaml
+config/managed_repos/<repo_id>.yaml
 ```
 
 This is a standalone YAML file, separate from `config/operations_center.yaml`.
 
-Reason: VideoFoundry is not a kodo execution target (no PRs, no validation pipeline).
+Reason: the managed repo is not a kodo execution target (no PRs, no validation pipeline).
 It is an external service that OpsCenter invokes and reads from. The managed repo
 contract is a different concept from the existing `repos:` block.
 
@@ -55,7 +55,7 @@ contract is a different concept from the existing `repos:` block.
 
 ## Audit Capability
 
-VideoFoundry exposes one capability: `audit`.
+the managed repo exposes one capability: `audit`.
 
 The audit capability lets OpsCenter:
 1. generate a `run_id` (UUID hex)
@@ -77,7 +77,7 @@ The audit capability lets OpsCenter:
 | `segmentation` | `python -m tools.audit.run_segmentation_audit` | `tools/audit/report/segmentation/` | Source only — no real run |
 | `stack_authoring` | `python -m tools.audit.run_stack_authoring_audit` | `tools/audit/report/authoring/` | Source only — no real run |
 
-All commands run from the VideoFoundry repo root (`../VideoFoundry` relative to OpsCenter).
+All commands run from the the managed repo repo root (`../the managed repo` relative to OpsCenter).
 
 **Naming note**: the `stack_authoring` audit type writes to `tools/audit/report/authoring/` — the directory name is `authoring`, not `stack_authoring`.
 
@@ -90,12 +90,12 @@ OpsCenter is the source of truth for `run_id`.
 ```
 1. OpsCenter generates: run_id = uuid4().hex  (32 hex chars, no dashes)
 2. OpsCenter sets:      AUDIT_RUN_ID={run_id} in the audit subprocess env
-3. VideoFoundry reads:  AUDIT_RUN_ID at startup and uses it as the run identity
-4. VideoFoundry writes: run_id into run_status.json
+3. the managed repo reads:  AUDIT_RUN_ID at startup and uses it as the run identity
+4. the managed repo writes: run_id into run_status.json
 5. OpsCenter reads:     run_id back from run_status.json to confirm identity
 ```
 
-VideoFoundry has a local/dev fallback (generates its own run_id if `AUDIT_RUN_ID` is absent),
+the managed repo has a local/dev fallback (generates its own run_id if `AUDIT_RUN_ID` is absent),
 but OpsCenter must not depend on that fallback. Managed runs always inject `AUDIT_RUN_ID`.
 
 ---
@@ -114,10 +114,10 @@ but OpsCenter must not depend on that fallback. Managed runs always inject `AUDI
 
 `artifact_manifest_path` does **not** exist in `run_status.json` today.
 
-`artifact_manifest.json` does **not** exist anywhere in VideoFoundry today.
+`artifact_manifest.json` does **not** exist anywhere in the managed repo today.
 
 Do not attempt manifest discovery until Phase 2 defines the schema and Phase 5
-adds the implementation to VideoFoundry.
+adds the implementation to the managed repo.
 
 ### run_status.json — current shape
 
@@ -174,7 +174,7 @@ from a complete run.
 ### No artifact manifest
 
 `artifact_manifest.json` does not exist. `artifact_manifest_path` is not in `run_status.json`.
-Both require Phase 2 (schema contract) + Phase 5 (VideoFoundry implementation).
+Both require Phase 2 (schema contract) + Phase 5 (the managed repo implementation).
 
 ---
 
@@ -183,10 +183,10 @@ Both require Phase 2 (schema contract) + Phase 5 (VideoFoundry implementation).
 Phase 1 does **not**:
 
 - define the artifact manifest schema (Phase 2)
-- add `artifact_manifest_path` to VideoFoundry's `run_status.json` (Phase 5)
+- add `artifact_manifest_path` to the managed repo's `run_status.json` (Phase 5)
 - fix the run_status.json finalization gap for non-representative audits (Phase 5)
 - implement artifact reading or indexing (Phase 7)
 - implement dispatch orchestration (Phase 6)
 - define controlled vocabulary enums (Phase 2)
 - create fixture packs or slice replay tests (Phases 9–10)
-- change any VideoFoundry behavior
+- change any the managed repo behavior
