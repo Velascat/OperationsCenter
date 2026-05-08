@@ -53,7 +53,10 @@ from .usage_store import UsageStore
 from .workspace import WorkspaceManager
 
 if TYPE_CHECKING:
-    from operations_center.config.settings import BackendCapSettings
+    from operations_center.config.settings import (
+        BackendCapSettings,
+        ResourceGateSettings,
+    )
     from operations_center.execution.models import BudgetDecision
 
 logger = logging.getLogger(__name__)
@@ -99,6 +102,7 @@ class ExecutionCoordinator:
         repo_graph: object | None = None,
         usage_store: UsageStore | None = None,
         backend_caps: dict[str, "BackendCapSettings"] | None = None,
+        resource_gate: "ResourceGateSettings | None" = None,
     ) -> None:
         self._registry = adapter_registry
         self._policy = policy_engine or PolicyEngine.from_defaults()
@@ -127,6 +131,9 @@ class ExecutionCoordinator:
         # check itself is a no-op for backends without an entry in the map.
         self._usage_store = usage_store
         self._backend_caps: dict[str, "BackendCapSettings"] = dict(backend_caps or {})
+        # Global resource gate — runs before per-backend caps and reserves
+        # host headroom for co-tenant workloads sharing the box.
+        self._resource_gate: "ResourceGateSettings | None" = resource_gate
 
     def execute(
         self,
@@ -179,10 +186,28 @@ class ExecutionCoordinator:
                     executed=False,
                 )
 
+        backend_name = bundle.decision.selected_backend.value
+
+        # Global resource gate — evaluated before per-backend caps so a
+        # mix of small dispatches across many backends still can't drain
+        # the headroom reserved for co-tenant workloads on the same host.
+        gate_decision = self._evaluate_resource_gate()
+        if gate_decision is not None and not gate_decision.allowed:
+            result = _resource_gate_blocked_result(request, gate_decision)
+            record, trace = self._observe(bundle, result, policy_decision)
+            self._record_run_memory(request=request, result=result, bundle=bundle)
+            return ExecutionRunOutcome(
+                request=request,
+                policy_decision=policy_decision,
+                result=result,
+                record=record,
+                trace=trace,
+                executed=False,
+            )
+
         # Pre-dispatch backend cap enforcement (rate / concurrency / RAM).
         # Returns (decision, allowed). When not allowed we surface a
         # canonical "skipped due to backend cap" result and don't dispatch.
-        backend_name = bundle.decision.selected_backend.value
         cap_decision = self._evaluate_backend_caps(backend_name)
         if cap_decision is not None and not cap_decision.allowed:
             result = _backend_capped_result(request, cap_decision, backend_name)
@@ -371,6 +396,36 @@ class ExecutionCoordinator:
             logger.warning(
                 "Run memory indexing failed for run %s: %s", request.run_id, exc,
             )
+
+    def _evaluate_resource_gate(self) -> "BudgetDecision | None":
+        """Return the first failing global gate, or None when all pass.
+
+        Chain: total concurrency → free RAM. Returns None when no
+        ``usage_store`` is configured or the gate is unset (preserves
+        existing test fixtures that wire the coordinator without a
+        gate). The gate exists to reserve headroom for co-tenant workloads
+        audits running on the same host — when it fires, the dispatch
+        is skipped with ``BUDGET_EXHAUSTED`` and the reason carries
+        either ``global_concurrency_exceeded`` or
+        ``global_memory_insufficient``.
+        """
+        if self._usage_store is None or self._resource_gate is None:
+            return None
+        gate = self._resource_gate
+        now = datetime.now(UTC)
+        if gate.max_concurrent is not None:
+            d = self._usage_store.global_concurrency_decision(
+                max_concurrent=gate.max_concurrent, now=now,
+            )
+            if not d.allowed:
+                return d
+        if gate.min_available_memory_mb is not None:
+            d = self._usage_store.global_memory_decision(
+                min_available_memory_mb=gate.min_available_memory_mb,
+            )
+            if not d.allowed:
+                return d
+        return None
 
     def _evaluate_backend_caps(
         self,
@@ -706,6 +761,35 @@ def _policy_engine_crash_result(request, exc: Exception) -> ExecutionResult:
         validation=ValidationSummary(status=ValidationStatus.SKIPPED),
         failure_category=FailureReasonCategory.POLICY_BLOCKED,
         failure_reason=f"PolicyEngine.evaluate raised mid-loop: {exc}",
+    )
+
+
+def _resource_gate_blocked_result(
+    request,
+    decision: "BudgetDecision",
+) -> ExecutionResult:
+    """Build a SKIPPED result when the global resource gate blocks dispatch.
+
+    The gate reserves host headroom for co-tenant workloads — when it
+    fires, the dispatch isn't actually broken; the host just doesn't
+    have the resources to safely take it on right now. Reason mirrors
+    the BudgetDecision so observability + status panes can surface
+    *which* gate fired (concurrency / RAM).
+    """
+    parts = [f"dispatch skipped — global resource gate {decision.reason}"]
+    if decision.window:
+        parts.append(f"window={decision.window}")
+    if decision.current is not None and decision.limit is not None:
+        parts.append(f"current={decision.current} limit={decision.limit}")
+    return ExecutionResult(
+        run_id=request.run_id,
+        proposal_id=request.proposal_id,
+        decision_id=request.decision_id,
+        status=ExecutionStatus.SKIPPED,
+        success=False,
+        validation=ValidationSummary(status=ValidationStatus.SKIPPED),
+        failure_category=FailureReasonCategory.BUDGET_EXHAUSTED,
+        failure_reason="; ".join(parts),
     )
 
 
