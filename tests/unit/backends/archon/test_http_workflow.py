@@ -221,7 +221,7 @@ class TestHappyPath:
         paths = [p for _, p in recorder.calls]
         assert "/api/health" in paths
         assert "/api/conversations" in paths
-        assert "/api/workflows/archon-goal-default/run" in paths
+        assert "/api/workflows/archon-assist/run" in paths
         assert "/api/workflows/runs/by-worker/cv-abc" in paths
         assert "/api/workflows/runs/run-xyz" in paths
         assert "/api/workflows/runs/run-xyz/abandon" in paths
@@ -244,7 +244,7 @@ class TestHappyPath:
         assert capture.outcome == "success"
         paths = [p for _, p in recorder.calls]
         assert any(
-            p == "/api/workflows/archon-fix-github-issue-dag/run" for p in paths
+            p == "/api/workflows/archon-fix-github-issue/run" for p in paths
         )
 
 
