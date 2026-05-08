@@ -229,10 +229,10 @@ Filter for `"kind": "scope_violation"` in `tools/report/operations_center/execut
 
 Hard quota exhaustion from the Kodo orchestrator (e.g. Anthropic API quota exceeded) is detected separately from rate limiting. When detected:
 
-- a `kodo_quota_event` is written to the usage store (does **not** feed the circuit breaker)
+- a `quota_event` is written to the usage store (does **not** feed the circuit breaker)
 - the task is moved to `Blocked` with `blocked_classification: quota_exhausted`
 
-Filter for `"kind": "kodo_quota_event"` to track frequency. Unlike transient rate limits, quota exhaustion typically requires manual intervention (quota increase or wait for reset).
+Filter for `"kind": "quota_event"` to track frequency. Unlike transient rate limits, quota exhaustion typically requires manual intervention (quota increase or wait for reset).
 
 ## Disk Space Check
 
@@ -374,7 +374,7 @@ The root cause of stray verdicts is either an old kodo run that predates the abs
 9. workspace health: look for `workspace_health_*` events in improve watcher log
 10. circuit breaker: look for `reason: circuit_breaker_open` in watcher log; check for `circuit_breaker_escalation_sent`
 11. connection backoff: look for `watch_error` with `consecutive_errors > 1` in watcher log
-12. quota exhaustion: look for `"kind": "kodo_quota_event"` in usage store
+12. quota exhaustion: look for `"kind": "quota_event"` in usage store
 13. quality erosion: look for `"kind": "kodo_quality_warning"` in usage store
 14. scope violations: look for `"kind": "scope_violation"` in usage store
 15. board saturation: look for `"event": "propose_skipped_board_saturated"` in propose watcher log

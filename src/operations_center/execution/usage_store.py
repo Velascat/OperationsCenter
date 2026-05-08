@@ -17,7 +17,8 @@ from operations_center.execution.models import BudgetDecision, ExecutionControlS
 # ---------------------------------------------------------------------------
 # Module-level path-keyed threading locks.
 # All UsageStore instances that share the same on-disk path share a lock so
-# that load-modify-save triples are atomic even when parallel_slots > 1.
+# that load-modify-save triples are atomic even when concurrent dispatchers
+# write to the same usage.json.
 # ---------------------------------------------------------------------------
 _path_locks: dict[str, threading.RLock] = {}
 _meta_lock = threading.Lock()
@@ -148,9 +149,9 @@ class UsageStore:
         # "Fresh" means within the last _CB_STALENESS_HOURS — stale failures age
         # out of the window naturally rather than blocking indefinitely.
         # Requires at least 3 fresh samples to avoid false positives at startup.
-        # S6-8: If the kodo binary was updated during the window (multiple versions
-        # present), skip the circuit breaker — failures from the old version should
-        # not block the newly deployed version.
+        # If a backend binary was upgraded during the window (multiple versions
+        # in the window), skip the circuit breaker — failures from the old
+        # version should not block the newly deployed version.
         stale_cutoff = now - timedelta(hours=_CB_STALENESS_HOURS)
         outcomes = [
             e for e in reversed(events)
@@ -159,7 +160,7 @@ class UsageStore:
         ][:_CB_WINDOW]
         if len(outcomes) >= 3:
             versions_in_window = {
-                str(e["kodo_version"]) for e in outcomes if e.get("kodo_version")
+                str(e["backend_version"]) for e in outcomes if e.get("backend_version")
             }
             if len(versions_in_window) <= 1:  # only block if all outcomes same version
                 failures = sum(1 for e in outcomes if not e.get("succeeded"))
@@ -294,15 +295,19 @@ class UsageStore:
         role: str,
         succeeded: bool,
         now: datetime,
-        kodo_version: str | None = None,
+        backend: str | None = None,
+        backend_version: str | None = None,
     ) -> None:
         """Record whether a goal/test execution produced a successful result.
 
-        These events feed the circuit breaker in ``budget_decision``.  Record
+        These events feed the circuit breaker in ``budget_decision``. Record
         after the task handler has determined the final outcome — not before.
-        ``kodo_version`` (S6-8) is stored alongside the outcome so the circuit
-        breaker can exclude version-transition windows from failure-rate
-        calculations.
+
+        ``backend`` (e.g. ``"kodo"``, ``"archon"``) tags which backend ran
+        the work. ``backend_version`` is the binary/image version; the
+        circuit breaker uses it to skip version-transition windows from
+        failure-rate calculations (failures from the old version don't
+        block the newly deployed one).
         """
         with self._exclusive():
             data = self.load()
@@ -313,8 +318,10 @@ class UsageStore:
                 "succeeded": succeeded,
                 "timestamp": now.isoformat(),
             }
-            if kodo_version:
-                event["kodo_version"] = kodo_version
+            if backend:
+                event["backend"] = backend
+            if backend_version:
+                event["backend_version"] = backend_version
             self._append_event(data, event, now=now)
 
     def record_quality_warning(
@@ -377,21 +384,34 @@ class UsageStore:
                 now=now,
             )
 
-    def record_kodo_quota_event(self, *, task_id: str, role: str, now: datetime) -> None:
-        """Record a hard quota exhaustion event from a kodo execution.
+    def record_quota_event(
+        self,
+        *,
+        task_id: str,
+        role: str,
+        backend: str,
+        now: datetime,
+    ) -> None:
+        """Record a hard quota-exhaustion event from a backend.
 
-        Unlike execution_outcome failures, quota events do NOT feed the circuit
-        breaker — they are an infrastructure problem, not a task-quality signal.
-        The operator must top up credits or wait for a monthly reset.
+        Unlike ``execution_outcome`` failures, quota events do NOT feed the
+        circuit breaker — they are an infrastructure problem (rate-limited
+        API key, monthly cap exhausted, billing issue), not a task-quality
+        signal. The operator must top up credits or wait for a reset.
+
+        ``backend`` (e.g. ``"kodo"``, ``"archon"``) is required so
+        ``audit_export`` and per-backend reporting can attribute the quota
+        hit; quota exhaustion is meaningless without knowing which backend.
         """
         with self._exclusive():
             data = self.load()
             self._append_event(
                 data,
                 {
-                    "kind": "kodo_quota_event",
+                    "kind": "quota_event",
                     "task_id": task_id,
                     "role": role,
+                    "backend": backend,
                     "timestamp": now.isoformat(),
                 },
                 now=now,
@@ -654,16 +674,18 @@ class UsageStore:
                     "outcome": "succeeded" if e.get("succeeded") else "failed",
                     "repo_key": e.get("repo_key", ""),
                     "duration_seconds": durations.get(str(e.get("task_id", "")), None),
-                    "kodo_version": e.get("kodo_version", None),
+                    "backend": e.get("backend", ""),
+                    "backend_version": e.get("backend_version", None),
                     "timestamp": e["timestamp"],
                 })
-            elif kind == "kodo_quota_event":
+            elif kind == "quota_event":
                 audit_rows.append({
                     "kind": "execution",
                     "task_id": e.get("task_id", ""),
                     "role": e.get("role", ""),
                     "outcome": "quota_exhausted",
                     "repo_key": "",
+                    "backend": e.get("backend", ""),
                     "duration_seconds": None,
                     "timestamp": e["timestamp"],
                 })

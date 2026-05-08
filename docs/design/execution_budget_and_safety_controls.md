@@ -62,7 +62,7 @@ When a Kodo run modifies files outside `allowed_paths`, the violations are enfor
 
 Hard quota exhaustion (`is_quota_exhausted(result)` is true) is treated differently from ordinary failures:
 
-- calls `usage_store.record_kodo_quota_event()` instead of `record_execution_outcome()`
+- calls `usage_store.record_quota_event(backend=...)` instead of `record_execution_outcome()`
 - does **not** feed the circuit breaker window (quota exhaustion is an infrastructure event, not a code quality signal)
 - task is moved to `Blocked` with `blocked_classification: quota_exhausted`
 
@@ -88,7 +88,7 @@ Hard quota exhaustion (`is_quota_exhausted(result)` is true) is treated differen
 
 Usage store event kinds:
 - `execution_outcome` — normal success/failure (feeds circuit breaker)
-- `kodo_quota_event` — hard quota exhaustion (does not feed circuit breaker)
+- `quota_event` — hard quota exhaustion (does not feed circuit breaker)
 - `kodo_quality_warning` — quality suppression count above threshold
 - `scope_violation` — changed files outside `allowed_paths`
 
