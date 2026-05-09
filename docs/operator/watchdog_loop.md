@@ -18,6 +18,62 @@ with a system scheduler.
 
 ---
 
+## Convergence promotion
+
+The watchdog loop is a **temporary operator scaffold**, not the permanent brain of the platform.
+
+When the loop repeatedly performs the same judgment, classification, unblock action, or
+escalation, that behavior should be promoted into the responsible watcher or guardrail.
+The goal is not for the `/loop` to become smarter forever. The goal is for the platform
+to need the `/loop` less over time.
+
+| Repeated loop behavior | Promotion target |
+|------------------------|-----------------|
+| Duplicate propose churn detection | propose watcher |
+| Blocked approved task detection | triage / intake watcher |
+| Ready-for-AI starvation detection | goal / propose / watchdog coordination |
+| Dead-remediation detection | improve / review watcher |
+| Repeated executor failure detection | internal watchdog role |
+| Graph drift detection | graph / audit watcher |
+| Queue starvation detection | triage / goal watcher |
+| Stale Plane task detection | intake / triage watcher |
+| Semantic duplicate remediation detection | propose / review watcher |
+| Remediation lineage tracking | improve / review watcher |
+| Automation self-deception detection | watchdog + audit watchers |
+| Cadence pressure / degraded health | internal watchdog role |
+
+**Promotion rule:** if the `/loop` performs the same operational judgment in two or more
+cycles, create or update a Plane task to move that judgment into the appropriate watcher,
+guardrail, or telemetry source. Do not redesign immediately — capture evidence and ownership.
+
+**Over-promotion guardrail:** Promotion candidates require at least one of:
+- Repeated occurrence (2+ cycles)
+- High-severity failure
+- Missing structured evidence that blocked diagnosis
+- Handoff gap that leaves work unowned
+- Automation self-deception risk
+
+Do not create watcher redesign tasks for one-off failures unless they reveal a missing
+invariant or repeated pattern.
+
+---
+
+## Scaffold removal direction
+
+The watchdog loop is allowed to coordinate temporarily, but repeated coordination should
+become watcher-owned behavior. Over time, the loop should shrink from active operator
+to oversight layer.
+
+Healthy direction:
+- Less manual inference
+- More structured watcher evidence
+- Fewer loop-only decisions
+- Fewer repeated stuck states
+- Clearer watcher handoffs
+- Less need for short cadence
+
+---
+
 ## Prerequisites
 
 Before starting the loop, confirm:
@@ -179,6 +235,15 @@ QUEUE-UNBLOCKING INVESTIGATION — when starvation or closed-loop stagnation is 
   - Determine whether tasks should safely move: Blocked→Backlog or Blocked→Ready-for-AI
   - Do not blindly mutate queue state — but investigate the unblock path and escalate immediately
 
+WATCHER HANDOFF INVESTIGATION — for each blocked/stalled item:
+  - Which watcher produced this state?
+  - Which watcher should consume this state next?
+  - Did the producing watcher emit enough structured evidence for the consumer to act?
+  - Did a handoff contract fail? (producer emitted; consumer ignored or errored)
+  - Did the queue state become non-consumable by any watcher?
+  - Is this a missing watcher behavior or a broken watcher behavior?
+If the answer required manual log inference, that inference is a promotion candidate.
+
 BEHAVIORAL CONVERGENCE CHECK — after stagnation/starvation classification:
 Read the last 3 cycle summaries and classify automation behavior:
   CONVERGENT: retries materially evolve platform state toward resolution
@@ -253,7 +318,29 @@ FORWARD PROGRESS CHECK — before classifying as temporarily-blocked, confirm at
   - Remediation strategy demonstrably adapted (not just re-ran)
 If none apply and remediation is actively running, classify as stagnation, not temporary delay.
 
-STEP 4 — EXECUTION GATE:
+STEP 4 — CONVERGENCE PROMOTION CHECK:
+For each blocked/stalled/non-convergent behavior found in STEP 3, ask:
+  - Did the /loop perform this same judgment in a prior cycle?
+  - Which watcher should eventually own this detection or transition?
+  - Did the responsible watcher emit enough structured evidence?
+    (duplicate candidate count, skipped candidate reason, blocked task reason,
+     last attempted remediation id, prior remediation lineage, retry strategy changed,
+     queue transition attempted, handoff target watcher, why task is not executable,
+     why task is safe/unsafe to re-queue)
+  - Is there a watcher handoff gap?
+    (Which watcher produced this state? Which watcher should consume it?
+     Did the producing watcher emit enough evidence for the next watcher?
+     Did a handoff contract fail? Is the queue state non-consumable by any watcher?
+     Is this missing watcher behavior or broken watcher behavior?)
+  - Should this become a Plane task for watcher improvement, guardrail enforcement,
+    or telemetry improvement?
+If the same loop-only judgment occurred in 2+ cycles: create/update a Plane task to
+promote that behavior into the responsible watcher or guardrail.
+Do NOT redesign immediately. Capture evidence and ownership.
+Do NOT create watcher redesign tasks for one-off failures unless they reveal a missing
+invariant or repeated pattern.
+
+STEP 5 — EXECUTION GATE:
 For each finding, decide: Plane task only vs direct fix.
 Direct fix is allowed ONLY when ALL of these hold:
   (a) finding reproduced in the current cycle
@@ -265,17 +352,17 @@ Direct fix is allowed ONLY when ALL of these hold:
   (g) not classified as dead-remediation, starvation, or closed-loop stagnation in STEP 3
 If any condition fails → create/update Plane task, skip direct fix.
 
-STEP 5 — DIRECT FIXES (only if loop owns the lock):
+STEP 6 — DIRECT FIXES (only if loop owns the lock):
 For each affected repo that passes the execution gate, run one at a time:
   scripts/operations-center.sh autonomy-cycle --config config/operations_center.local.yaml --execute --repo <path>
 Respect kodo max_concurrent=1 — do not dispatch two repos simultaneously.
 
-STEP 6 — INVARIANT ENFORCEMENT:
+STEP 7 — INVARIANT ENFORCEMENT:
   .venv/bin/pytest tests/unit/er000_phase0_golden/ -q --tb=short
-Also run targeted tests for any repo touched in STEP 5.
+Also run targeted tests for any repo touched in STEP 6.
 If any test fails and cannot be fixed safely in this cycle → create/update Plane task.
 
-STEP 7 — WATCHER HEALTH + RESTART INVESTIGATION:
+STEP 8 — WATCHER HEALTH + RESTART INVESTIGATION:
   scripts/operations-center.sh watch-all-status
   grep -h "watcher_restart\|exit_code\|ERROR\|Traceback" logs/local/watch-all/*.log | tail -50
 Classify restarts:
@@ -288,15 +375,20 @@ is healthy if a watcher cannot be restarted cleanly.
 Restart a stopped watcher (only after root-cause is understood):
   scripts/operations-center.sh watch --role <role>
 
-STEP 8 — LOG + COMMIT HYGIENE:
+STEP 9 — LOG + COMMIT HYGIENE:
 Append the structured cycle summary (see template in runbook) to .console/log.md.
-The summary MUST include behavioral convergence fields:
+The summary MUST include behavioral convergence fields AND convergence promotion fields:
   - Behavioral convergence: <convergent|weakly-convergent|non-convergent|divergent>
   - Executor adaptation observed: <yes/no + reason>
   - Semantic duplicate remediation suspected: <yes/no>
   - Automation self-deception detected: <yes/no>
   - Retry quality: <adaptive|repetitive|degenerate>
   - Queue evolution quality: <healthy|stalled|cycling>
+  - Convergence promotion candidates: <watcher=behavior,...> or "none"
+  - Loop-only judgments repeated: <judgment=N cycles,...> or "none"
+  - Watcher handoff gaps: <producer→consumer: gap,...> or "none"
+  - Missing watcher evidence: <watcher=evidence needed,...> or "none"
+  - Behavior to move out of /loop: <details or "none">
 Update .console/backlog.md for any new/closed gaps.
 IMPORTANT: Run git diff --staged before committing to ensure only loop-owned files are staged.
 Commit only after validation passes. Do not commit to main unless the operator has
@@ -305,7 +397,7 @@ explicitly allowed it for the current task/session. If not allowed, create a bra
 One logical commit per repo per cycle. Commit message must name: root cause, affected repo,
 gate/check fixed. Never force-push, amend old loop commits, or commit generated noise.
 
-STEP 9 — ADAPTIVE SCHEDULEWAKEUP:
+STEP 10 — ADAPTIVE SCHEDULEWAKEUP:
 Assess platform health state and choose ScheduleWakeup delay accordingly:
 
   CRITICAL  — crash loops / graph broken / autonomy failing repeatedly:        180s
@@ -322,6 +414,7 @@ FORBIDDEN: Do not choose HEALTHY cadence if any of these are true:
   - blocked count unchanged from prior cycle while remediation ran
   - behavioral convergence classified as non-convergent or divergent
   - automation self-deception detected
+  - kodo SIGKILL open issue unresolved AND new OC improve tasks appear in Ready-for-AI
   - 2+ consecutive cycles with semantically equivalent failed remediation and no adaptation
 
 Non-convergent automation: STALLED minimum cadence.
@@ -485,6 +578,46 @@ If any pattern is detected:
 
 Semantic duplication is evidence of planner non-convergence, not bad luck. The watchdog
 must surface it rather than treating each retry as an independent fresh attempt.
+
+---
+
+## Watcher handoff investigation
+
+When a task is blocked or stalled, the loop must ask not only "what is blocked?" but also:
+
+- Which watcher produced this state?
+- Which watcher should consume this state?
+- Did the producing watcher emit enough evidence for the next watcher?
+- Did a handoff contract fail?
+- Did the queue state become non-consumable by any watcher?
+- Is this a missing watcher behavior or a broken watcher behavior?
+
+If the answer to any of these is "unknown" and the loop had to infer the answer manually,
+that inference is a promotion candidate — the producing watcher should emit it as structured
+evidence.
+
+---
+
+## Watcher-owned evidence
+
+When the watchdog has to infer behavior from logs manually, the responsible watcher should
+emit structured evidence instead. Examples of evidence that should be watcher-emitted:
+
+| Evidence | Producing watcher |
+|----------|------------------|
+| Duplicate candidate count + reason | propose |
+| Skipped candidate reason | propose |
+| Blocked task reason | triage / intake |
+| Last attempted remediation id | improve / review |
+| Prior remediation lineage | improve / review |
+| Retry strategy changed yes/no | improve |
+| Queue transition attempted yes/no | goal / triage |
+| Handoff target watcher | any transition |
+| Why task is not executable | triage / goal |
+| Why task is safe/unsafe to re-queue | triage / intake |
+
+If this evidence is missing and caused watchdog guesswork in the current cycle, create or
+update a Plane task for telemetry improvement targeting the responsible watcher.
 
 ---
 
@@ -783,6 +916,11 @@ Append one block per completed cycle to `.console/log.md`:
 - Automation self-deception detected: <yes — detail | no>
 - Retry quality: <adaptive|repetitive|degenerate>
 - Queue evolution quality: <healthy|stalled|cycling>
+- Convergence promotion candidates: <watcher=behavior,...> or "none"
+- Loop-only judgments repeated: <judgment=N cycles,...> or "none"
+- Watcher handoff gaps: <producer→consumer: gap,...> or "none"
+- Missing watcher evidence: <watcher=evidence needed,...> or "none"
+- Behavior to move out of /loop: <details or "none">
 - Follow-ups: <Plane task IDs or "none">
 ```
 
@@ -798,11 +936,12 @@ Append one block per completed cycle to `.console/log.md`:
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
 | Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
+| **Convergence promotion** | Loop history + watcher mapping | Identify repeated loop-only judgments; create Plane tasks for watcher ownership |
 | Execution gate | Criteria check + stagnation/convergence check | Gate direct fixes; route rest to Plane |
 | Direct fixes | `autonomy-cycle --execute` per repo | One repo at a time; kodo max_concurrent=1 |
 | Invariants | `pytest er000_phase0_golden` + targeted | Plane task on failure |
 | Watcher health | `watch-all-status` + log grep | Anti-flap classification; restart if safe |
-| Log | `.console/log.md` structured block | One summary per cycle with all stagnation fields |
+| Log | `.console/log.md` structured block | One summary per cycle with all stagnation + promotion fields |
 | Commit | `git commit` after validation | Per-repo; branch hygiene respected |
 | Schedule | `ScheduleWakeup` adaptive delay | 180–3600s; STALLED minimum during starvation |
 
@@ -830,6 +969,10 @@ Additional invariants maintained by runbook convention (not currently code-enfor
 - **Automation self-deception (activity without state evolution) forbids HEALTHY cadence**
 - **Semantic duplicate remediation across 2+ cycles requires lineage investigation before retry**
 - **"Automation ran" is not evidence of quality — adaptation after failure must be demonstrated**
+- **The watchdog loop is a temporary scaffold — repeated loop-only judgment is technical debt**
+- **Same loop judgment in 2+ cycles requires a Plane task promoting it to the responsible watcher**
+- **Watcher handoff gaps (producing watcher didn't emit enough evidence) are promotion candidates**
+- **Promotion is evidence-driven — do not create redesign tasks for one-off failures**
 
 ---
 

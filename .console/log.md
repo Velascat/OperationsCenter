@@ -3,6 +3,66 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## OC Platform Watchdog Cycle — 2026-05-09 04:50
+
+- Lock owner: pid=2985461 hostname=dev
+- Branch / commit: main @ 037fc1b
+- Health state: STALLED
+- Next cadence: 600s — kodo SIGKILL open (9c7f4bb9), ShippingForm blocked, campaign stalled
+- Plane status: Ready-for-AI=2 / Running=0 / Blocked=6 / In-Review=4
+- WorkStation / SwitchBoard status: healthy
+- Watchers: 8/8 running | restarts this cycle: none
+- Audits run: custodian-sweep ghost-audit flow-audit graph-doctor reaudit-check regressions
+- Findings reproduced this cycle: none — all 6 audits clean
+- Blocked work: 6 items | classes: structurally-blocked=6 (kodo SIGKILL + campaign phase gate)
+- Repeated findings (vs prior cycles): none
+- Forward progress observed: no — board frozen; kodo SIGKILL unresolved
+- Queue movement: none
+- Closed-loop stagnation detected: yes — campaign stalled; kodo SIGKILL prevents ShippingForm execution
+- Duplicate remediation churn: no
+- Blocked queue deadlock suspected: no (phase gate, not dedup deadlock)
+- Stagnation detected: yes — ShippingForm + 5 OC tasks blocked pending operator kodo fix
+- Plane tasks opened/updated: 0 (no new findings; 5d8bd236 already open for SIGKILL)
+- Direct fixes dispatched: none
+- Repos touched: OperationsCenter (docs/operator/watchdog_loop.md runbook update)
+- Repos skipped (gate failed): all — no direct-fix eligible findings
+- Validation run: pytest er000_phase0_golden (15 passed)
+- Graph status: 11 nodes / 14 edges graph_built=True
+- Regressions checked: 0 findings
+- Watcher restarts / crash classifications: none
+- Anti-flap escalations: none
+- Autonomy-cycle outcomes: none dispatched
+- Behavioral convergence: weakly-convergent — platform stable; campaign track stalled pending operator
+- Executor adaptation observed: no — no execution this cycle
+- Semantic duplicate remediation suspected: no
+- Remediation lineage investigated: no new findings to check
+- Automation self-deception detected: no
+- Retry quality: n/a (no retries this cycle)
+- Queue evolution quality: stalled
+- Convergence promotion candidates: none this cycle (first cycle with promotion step)
+- Loop-only judgments repeated: kodo-SIGKILL-detection=3+ cycles (9c7f4bb9 open; no new promotion task needed — 5d8bd236 covers it)
+- Watcher handoff gaps: improve→review: no structured evidence of why kodo exits -9 (no SIGKILL telemetry emitted)
+- Missing watcher evidence: improve watcher — needs to emit executor exit code + signal as structured event; triage watcher — no blocked-reason field on tasks
+- Behavior to move out of /loop: kodo SIGKILL detection — improve/watchdog watcher should emit SIGKILL events as structured failures, not require manual log grep
+- Follow-ups: 5d8bd236 (kodo SIGKILL), 2b5ff37e (ShippingForm blocked)
+
+## 2026-05-09T04:55Z — Runbook update: convergence promotion as first-class concept
+
+Updated docs/operator/watchdog_loop.md with 10-item convergence promotion layer:
+- "Convergence promotion" section + scaffold removal direction added near top
+- Watcher responsibility mapping table (12 behaviors → future watcher owners)
+- Promotion rule: same judgment 2+ cycles → Plane task for watcher ownership
+- STEP 4 CONVERGENCE PROMOTION CHECK added to loop prompt (old STEPs 4–9 → 5–10)
+- WATCHER HANDOFF INVESTIGATION added to STEP 3 blocked work investigation
+- Watcher-owned evidence table (10 evidence types → producing watcher)
+- Watcher handoff investigation section added to runbook body
+- Convergence promotion fields added to structured cycle summary template
+- Over-promotion guardrail: evidence-driven, not one-off failures
+- Custodian invariants section updated with 4 new scaffold/promotion invariants
+- "What each cycle does" table updated with convergence promotion row
+
+First cycle to emit convergence-promotion fields in summary (above).
+
 ## 2026-05-09T04:45Z — Review watcher: spec-awareness + Custodian + /lgtm fix
 
 Three bugs fixed in src/operations_center/entrypoints/pr_review_watcher/main.py:
