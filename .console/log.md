@@ -3,6 +3,39 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-09T04:30Z — Loop cycle (STALLED — AgentTopology merged, review gaps identified)
+
+Health: STALLED (kodo SIGKILL unresolved, ShippingForm blocked, review watcher gaps identified).
+Board entering: Ready-for-AI=2 Blocked=6 InReview=5 Done=5. Board after: Done=6 InReview=4.
+
+CAMPAIGN 10c50210 — AgentTopology Impl MERGED (CxRP main cf33e8a):
+  PR #14 /lgtm approved at 00:25Z. Merge succeeded; review watcher received 405 on merge API
+  call (race condition — PR already merged when second attempt landed). Watcher errored without
+  transitioning Plane task. Operator loop manually transitioned efe0d3f9 → Done.
+  CxRP is now at v0.3.0 with agent_topology.py shipped. 9 naming-guardrail tests on main.
+
+Campaign status after: 1/2 Impl done (AgentTopology). ShippingForm (2b5ff37e) still Blocked
+(SIGKILL'd). Test/Improve Backlog tasks remain phase-gated until ShippingForm resolves.
+
+REVIEW WATCHER GAPS (operator investigation, user-raised):
+  1. Self-correction never fired: review watcher ran 34 self-review passes and found kodo
+     artifacts but did NOT catch spec violations (wrong filename, wrong members, 5 vs 4 members,
+     missing tests/version/CHANGELOG). Root cause: self-review uses kodo to assess code quality
+     vs. local conventions, not vs. campaign spec file. Spec-awareness is absent.
+  2. Custodian not invoked by agents: kodo does not run Custodian as part of execution or
+     self-review. Custodian could have caught structural violations at commit time.
+  3. /lgtm exact-match trap: multi-line /lgtm comment (with trailing explanation) triggers
+     revision pass instead of merge. Only body.strip().lower() == "/lgtm" merges.
+
+Known issues carried: 9c7f4bb9 kodo SIGKILL, 2b5ff37e ShippingForm blocked.
+
+Behavioral convergence: WEAKLY-CONVERGENT — forward progress on campaign (1 task merged).
+Executor adaptation: YES — operator corrected spec violations that kodo + review bot both missed.
+Semantic duplicate: NO. Automation self-deception: NO.
+Retry quality: ADAPTIVE (operator intervention). Queue evolution: STALLED for campaign track.
+Audits: all 6 clean. Tests: 15/15. Watchers: 8/8 alive.
+Cadence: STALLED (600s) — kodo SIGKILL open, ShippingForm blocked, review gaps unfixed.
+
 ## 2026-05-09T04:20Z — Loop cycle (ACTIVE — PR spec-compliance fix pushed to CxRP)
 
 Health: ACTIVE. Board: Ready-for-AI=2 Blocked=6 InReview=5 Done=5 Cancelled=7 (unchanged — board
