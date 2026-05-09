@@ -3,6 +3,37 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-09T04:45Z — Review watcher: spec-awareness + Custodian + /lgtm fix
+
+Three bugs fixed in src/operations_center/entrypoints/pr_review_watcher/main.py:
+
+1. /lgtm exact-match trap (was body.strip().lower() == "/lgtm"):
+   Changed to regex ^/lgtm(\s|$) on first line only. Multi-line /lgtm comments
+   and /lgtm with trailing explanation now trigger merge. /lgtm-something still rejected.
+   Test: test_is_lgtm_comment_with_trailing_text (3 new assertions).
+
+2. Spec-awareness in self-review (_load_campaign_spec helper):
+   Phase 1 self-review now fetches the campaign spec via Plane task label (campaign-id:),
+   loads it from state/campaigns/active.json → spec_file path, and prepends it to the
+   kodo review prompt as "Campaign spec (review against this — violations are CONCERNS)".
+   kodo reviewer can now catch wrong filenames, wrong member names, missing tests/version/CHANGELOG.
+
+3. Custodian enforcement in self-review (_custodian_findings helper):
+   Phase 1 self-review now runs .venv/bin/custodian-multi --repos <local_path> --json
+   on the repo's configured local_path (if set). Findings are injected into the kodo
+   review prompt as "Custodian static analysis" section. Reviewer must address each
+   finding or include it in CONCERNS. Gracefully skips if local_path unset or custodian
+   unavailable (no hard dependency).
+
+Review checklist in goal_text now explicitly requires:
+  - Spec compliance (all filenames, members, counts, exports, tests, version per spec)
+  - All Custodian findings addressed
+  - Standard code quality
+  - No kodo tooling artifacts in diff
+
+Tests: 38/38 review watcher + 15/15 golden = 53 total pass.
+Review watcher restarted with new code (pid 2960481).
+
 ## 2026-05-09T04:30Z — Loop cycle (STALLED — AgentTopology merged, review gaps identified)
 
 Health: STALLED (kodo SIGKILL unresolved, ShippingForm blocked, review watcher gaps identified).
