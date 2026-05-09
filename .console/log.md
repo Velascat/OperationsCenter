@@ -3,6 +3,43 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-09T04:20Z — Loop cycle (ACTIVE — PR spec-compliance fix pushed to CxRP)
+
+Health: ACTIVE. Board: Ready-for-AI=2 Blocked=6 InReview=5 Done=5 Cancelled=7 (unchanged — board
+state not changed this cycle; fix was applied to the CxRP PR branch directly).
+
+DIRECT FIX — CxRP PR #14 (goal/efe0d3f9 AgentTopology):
+Review bot ran 34 self-review passes, escalated to human. Bot flagged .kodo/ artifacts but missed
+spec violations. Operator loop intervened with spec-compliance fix (commit ac0fcd5):
+
+  Violations found (kodo vs spec):
+    - Filename: agent.py → agent_topology.py (wrong)
+    - Members: SINGLE/PAIR/SWARM/HIERARCHICAL/PIPELINE (5) → SINGLE_AGENT/SEQUENTIAL_MULTI_AGENT/
+      DAG_WORKFLOW/SWARM_PARALLEL (4) — violated ADR 0002 G1 (max 4 at launch)
+    - Missing: test_agent_topology.py (spec requires ≥4 naming-guardrail tests)
+    - Missing: version bump 0.2.0→0.3.0, CHANGELOG [0.3.0] entry
+    - Extra: .kodo/config.json, .kodo/run-status.md, .baseline-validation.json
+
+  Fix applied (commit ac0fcd5 pushed to goal/efe0d3f9):
+    + cxrp/vocabulary/agent_topology.py — 4 members, correct values, _BANNED_* guardrails
+    + tests/test_agent_topology.py — 9 tests (9/9 pass), naming-guardrail pattern
+    + pyproject.toml — version 0.3.0
+    + CHANGELOG.md — [0.3.0] section
+    - Removed: agent.py, .kodo/, .baseline-validation.json
+
+  PR comment posted (id 4411403707) explaining all violations and fixes.
+  Review bot will re-evaluate on next poll cycle.
+
+Behavioral convergence: ACTIVE — direct operator intervention resolved spec divergence.
+Executor adaptation: YES (operator corrected kodo's misinterpretation of goal).
+Semantic duplicate remediation: NO.
+Automation self-deception: NO.
+Retry quality: N/A (direct fix, not retry).
+Queue evolution quality: ACTIVE — PR fix in flight, review watcher will re-process.
+Audits: all 6 clean. Tests (OC): 15/15. Tests (CxRP fix): 9/9. Watchers: 8/8 alive.
+kodo SIGKILL (9c7f4bb9): unchanged. ShippingForm Blocked — do not re-queue.
+Cadence: ACTIVE (900s) — review watcher re-processing PR, awaiting review outcome.
+
 ## 2026-05-09T04:07Z — Loop cycle (DEGRADED — ShippingForm SIGKILL, campaign DIVERGENT)
 
 Health: DEGRADED. Platform restarted from dev-down-safe. Board: Ready-for-AI=2 Blocked=6 InReview=5 Done=5 Cancelled=7.
