@@ -3,6 +3,49 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## OC Platform Watchdog Cycle — 2026-05-09 05:05
+
+- Lock owner: pid=3034084 hostname=dev
+- Branch / commit: main @ 870c443
+- Health state: STALLED
+- Next cadence: 600s — kodo SIGKILL open (9c7f4bb9); board frozen pending operator
+- Plane status: Ready-for-AI=2 / Running=0 / Blocked=6 / In-Review=4
+- WorkStation / SwitchBoard status: healthy
+- Watchers: 8/8 running | restarts this cycle: test=143 improve=143 goal=143 (benign SIGTERM)
+- Audits run: custodian-sweep ghost-audit flow-audit graph-doctor reaudit-check regressions
+- Findings reproduced this cycle: none — all 6 audits clean
+- Blocked work: 6 items | classes: structurally-blocked=6 (kodo SIGKILL × 5 OC + 1 CxRP ShippingForm)
+- Repeated findings (vs prior cycles): none from audit tools
+- Forward progress observed: no — board identical to prior cycle
+- Queue movement: none
+- Closed-loop stagnation detected: no — automation correctly abstaining (structural gate, not replay)
+- Duplicate remediation churn: no
+- Blocked queue deadlock suspected: no — structural block, not dedup deadlock
+- Stagnation detected: yes — 2+ cycles frozen; operator must resolve kodo SIGKILL (9c7f4bb9)
+- Plane tasks opened/updated: 0 (5d8bd236 already open; new triage-watcher telemetry Plane task deferred to STEP 4 below)
+- Direct fixes dispatched: none
+- Repos touched: none
+- Repos skipped (gate failed): all — no audit findings to gate
+- Validation run: pytest er000_phase0_golden (15 passed)
+- Graph status: 11 nodes / 14 edges graph_built=True
+- Regressions checked: 0 findings
+- Watcher restarts / crash classifications: test=143:benign improve=143:benign goal=143:benign
+- Anti-flap escalations: none (all exits are SIGTERM)
+- Autonomy-cycle outcomes: none dispatched
+- Behavioral convergence: weakly-convergent — correctly gated; no equivalent remediation replayed
+- Executor adaptation observed: no — no execution attempted this cycle
+- Semantic duplicate remediation suspected: no
+- Remediation lineage investigated: no new findings; 5d8bd236 covers kodo SIGKILL lineage
+- Automation self-deception detected: no
+- Retry quality: n/a (no retries)
+- Queue evolution quality: stalled (2nd consecutive cycle with zero board movement)
+- Convergence promotion candidates: triage-watcher=blocked-reason-field-missing (2nd cycle); improve-watcher=kodo-SIGKILL-telemetry (3rd+ cycle, covered by 5d8bd236)
+- Loop-only judgments repeated: kodo-SIGKILL-detection=4 cycles; board-frozen-detection=2 cycles; ShippingForm-structurally-blocked=3 cycles
+- Watcher handoff gaps: improve→triage: triage watcher has no way to know *why* a task is blocked (missing blocked-reason field on task metadata) — loop must infer from log grep
+- Missing watcher evidence: triage watcher — no structured blocked-reason emitted; improve watcher — no executor signal (exit code/signal) emitted as structured event
+- Behavior to move out of /loop: (1) kodo SIGKILL detection → improve watcher structured telemetry [promotion task: 5d8bd236 partially covers]; (2) blocked-reason emission → triage watcher [NEW — 2nd cycle, warrants Plane task next cycle if unresolved]
+- Follow-ups: 5d8bd236 (kodo SIGKILL + SIGKILL telemetry gap)
+
 ## OC Platform Watchdog Cycle — 2026-05-09 04:50
 
 - Lock owner: pid=2985461 hostname=dev
