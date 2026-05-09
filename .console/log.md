@@ -3,6 +3,37 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-09T04:07Z — Loop cycle (DEGRADED — ShippingForm SIGKILL, campaign DIVERGENT)
+
+Health: DEGRADED. Platform restarted from dev-down-safe. Board: Ready-for-AI=2 Blocked=6 InReview=5 Done=5 Cancelled=7.
+
+PREFLIGHT: dev-up executed (Plane + all 8 watchers restarted). Plane 200, WorkStation 200.
+
+Audits: all 6 clean — custodian 0 repos swept, ghost 0 events, flow 0 gaps, graph ok (11n/14e),
+reaudit clean, regressions 0. Triage: 0 rescore, 0 awaiting.
+
+CAMPAIGN TRACK UPDATE (campaign 10c50210 — DIVERGENT):
+  efe0d3f9 (AgentTopology): SUCCEEDED cycle 8 → In Review (persists) ✓
+  2b5ff37e (ShippingForm): SIGKILL'd at 23:46-23:52Z (previous session, before dev-down).
+    Pattern: kodo exited -9 at "Analyzing project and creating plan" — same as 9c7f4bb9 OC improve issue.
+    NEW FINDING: SIGKILL now confirmed for bounded CxRP task, not only complex OC improve goals.
+    AgentTopology (bounded) succeeded; ShippingForm (bounded) SIGKILL'd. Root cause unclear.
+    Hypothesis: time-of-day resource exhaustion (23:46Z vs 20:22Z for AgentTopology).
+
+ACTION: Plane task 5d8bd236 updated with DIVERGENT finding and updated root-cause analysis.
+2b5ff37e remains Blocked. Do NOT re-queue until 9c7f4bb9 root cause resolved.
+Campaign 10c50210 stalled at ShippingForm Impl. Test/Improve Backlog tasks remain phase-gated.
+
+Behavioral convergence: DIVERGENT — same SIGKILL mechanism spreading to bounded CxRP tasks.
+Executor adaptation: NO — kodo produces identical failure at identical phase for different task scope.
+Semantic duplicate remediation suspected: NO (different task, same infra failure).
+Automation self-deception: NO — failure is real, board state accurately reflects stalled state.
+Retry quality: DEGENERATE (kodo SIGKILL unresolved, new instance same outcome).
+Queue evolution quality: STALLED — campaign track frozen, no forward path without infra fix.
+Tests: 15/15 golden pass. Watchers: 8/8 alive (fresh start), no errors in new session logs.
+Plane tasks updated: 5d8bd236 (DIVERGENT finding).
+Cadence: DEGRADED (300s) — SIGKILL spreading, campaign divergent, forbidden from HEALTHY.
+
 ## 2026-05-09T03:47Z — Loop cycle (ACTIVE — AgentTopology succeeded, ShippingForm re-queued)
 
 Health: ACTIVE. Board entering: Ready-for-AI=2 Blocked=6 InReview=5 Done=5 Cancelled=7.
