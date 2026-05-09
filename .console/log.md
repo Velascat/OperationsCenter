@@ -3,6 +3,40 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-09T03:47Z — Loop cycle (ACTIVE — AgentTopology succeeded, ShippingForm re-queued)
+
+Health: ACTIVE. Board entering: Ready-for-AI=2 Blocked=6 InReview=5 Done=5 Cancelled=7.
+Board after fix: Ready-for-AI=3 Blocked=5 InReview=5.
+
+CxRP impl task execution (monitoring from cycle 7):
+  efe0d3f9 (AgentTopology Impl): SUCCEEDED at 20:25:46 → In Review ✓ (3.25 min kodo run)
+  2b5ff37e (ShippingForm Impl): SKIPPED at 20:26:24 — kodo backend_concurrency_exceeded (1 limit,
+    AgentTopology was in flight). Bounced Blocked → description also cleared.
+
+Direct fix (gate: ✓ transient concurrency bump not dead-remediation, ✓ CxRP, ✓ data-level):
+  Re-applied description to 2b5ff37e from spec file (docs/specs/cxrp-backend-card-vocabulary.md)
+  Transitioned 2b5ff37e Blocked → Ready for AI
+  Board after: Ready-for-AI=3 Blocked=5
+
+Key finding: CxRP impl tasks are NOT subject to kodo SIGKILL (unlike complex OC improve goals).
+AgentTopology ran 3.25 min successfully. Root cause confirmed: SIGKILL only affects large/vague OC
+improve goals at plan generation. Bounded enum implementation in CxRP is safe to execute.
+
+Campaign 10c50210 progress: 1/2 impl tasks complete (AgentTopology In Review). ShippingForm
+next. If it succeeds next cycle, campaign advances: Test phase tasks can ungate from Backlog.
+
+kodo SIGKILL (9c7f4bb9): unchanged. 5 OC Blocked tasks still must NOT be re-queued.
+
+Behavioral convergence: CONVERGENT for campaign track. AgentTopology succeeded; ShippingForm
+delay is structural (concurrency limit), not a failure pattern.
+Executor adaptation: YES — prior cycle described root cause correctly; kodo is task-scope-sensitive.
+Semantic duplicate: YES (test_signal ×3 OC Blocked) — persisting, but held behind gate 9c7f4bb9.
+Automation self-deception: NO — real execution occurred (AgentTopology In Review = concrete output).
+Retry quality: ADAPTIVE. Queue evolution quality: HEALTHY for campaign track.
+Audits: all 6 clean. Tests: 15/15. Watchers: 8/8 alive, heartbeats fresh (03:46Z).
+Plane tasks: none new. Plane tasks updated: none.
+Cadence: ACTIVE (900s) — ShippingForm in Ready-for-AI, goal watcher has work pending.
+
 ## 2026-05-09T00:20Z — Loop cycle (ACTIVE — campaign freeze resolved)
 
 Health: ACTIVE. Board entering: Ready-for-AI=2 Running=0 Blocked=7 Backlog=5 InReview=4 Done=5 Cancelled=7.
