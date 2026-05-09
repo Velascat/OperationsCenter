@@ -3,6 +3,27 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-09T06:35Z — Loop cycle (STALLED — board frozen 6 consecutive cycles)
+
+Health: STALLED (kodo SIGKILL 9c7f4bb9 unresolved, execution gate closed).
+Board: Ready-for-AI=2 Blocked=6 InReview=4 Done=6 Cancelled=7 — UNCHANGED (6 consecutive cycles).
+Plane:200, WS:200. Watchers: 8/8 (goal/test/improve exit-143 benign).
+Audits: sweep=0, ghost=0, flow=0, graph=ok (11n/14e), reaudit=clean, regressions=0.
+Triage: 0. Golden tests: 15/15.
+
+WATCHER LOGS: 3 Traceback entries across 3 old propose log files (20260508T150103, 20260508T150234,
+20260509T000622). Third file newly visible due to tail window. All historical prior-session instances.
+Current propose watcher (pid 2741419) clean. No anti-flap trigger (single occurrence per instance).
+
+CONVERGENCE PROMOTION: none new. EXECUTION GATE: CLOSED.
+
+Behavioral convergence: WEAKLY-CONVERGENT. Executor adaptation: NO.
+Semantic duplicate: NO. Automation self-deception: NO. Retry quality: N/A. Queue evolution: STALLED.
+Convergence promotion candidates: none.
+Loop-only judgments repeated: triage-blocked-reason=9+ cycles (a5dbf034), SIGKILL-telemetry=9+ cycles (5d8bd236).
+Watcher handoff gaps: improve→review: no executor_signal=-9 (5d8bd236). Missing evidence: improve=executor_signal.
+Behavior to move out of /loop: none. Cadence: STALLED (600s).
+
 ## 2026-05-09T06:20Z — Loop cycle (STALLED — board frozen 5 consecutive cycles)
 
 Health: STALLED (kodo SIGKILL 9c7f4bb9 unresolved, execution gate closed).
