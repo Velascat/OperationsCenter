@@ -3,6 +3,33 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-10 — docs(watchdog_loop): add PARKED_OPERATOR_BLOCKED state + convergence exit logic
+
+Added PARKED_OPERATOR_BLOCKED health state (1800s cadence) to the watchdog loop runbook and
+embedded /loop prompt. Addresses the root inefficiency from the 179-cycle STALLED run: once
+the blocker is known, escalated, and evidence-frozen, the loop should park rather than continue
+running full investigation cycles.
+
+Changes applied to docs/operator/watchdog_loop.md:
+- STEP 3 (loop prompt): OPERATOR-BLOCKED classification criteria, NEW EVIDENCE EVALUATION
+  (11 categories; timestamp differences explicitly excluded), PARK TRANSITION conditions,
+  UNPARK CONDITIONS (9 triggers returning to STALLED/DEGRADED/ACTIVE)
+- STEP 9 (loop prompt): 8 new structured parked summary fields (Operator-blocked state,
+  Parked state active, Park reason, New evidence detected, Safe retry condition,
+  Last evidence-changing cycle, Repeated unchanged cycles, Active remediation suspended)
+- STEP 10 (loop prompt): PARKED_OPERATOR_BLOCKED row in cadence table; PARK TRANSITION
+  DECISION block; UNPARK TRANSITION DECISION block; FORBIDDEN note against lingering at STALLED
+- Adaptive cadence table: PARKED_OPERATOR_BLOCKED row (1800s)
+- Forbidden cadence widening: note that STALLED is also forbidden when park criteria are met
+- Stagnation distinction table: PARKED_OPERATOR_BLOCKED row
+- Blocked work classification table: operator-blocked row
+- Structured cycle summary template: 8 new parked fields
+- What each cycle does table: Park evaluation row
+- Custodian enforcement: 6 new invariants (no indefinite STALLED, park requires Plane task,
+  unpark check required, timestamp ≠ evidence, operational convergence definition)
+- New sections: Operator-blocked lifecycle, Operational convergence exit,
+  Canonical example: kodo SIGKILL (9c7f4bb9)
+
 ## 2026-05-09T18:05Z — Loop cycle 179 (STALLED — board frozen 179 consecutive cycles)
 
 Health: STALLED (kodo SIGKILL 9c7f4bb9 unresolved). Board: R4AI=2 Blocked=6 InReview=4 Done=6 (179 cycles).
