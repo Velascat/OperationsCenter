@@ -18,14 +18,220 @@ with a system scheduler.
 
 ---
 
+## Self-Healing Convergence Model
+
+The watchdog loop is not the final architecture. It is transitional
+operational scaffolding that exists to help the platform evolve from
+loop-centric operational intelligence toward watcher-owned healing,
+runtime-owned recovery, queue-owned recovery semantics, and a passive oversight
+loop.
+
+The convergence roadmap is explicit:
+
+```text
+loop-centric operational intelligence
+  -> watcher-owned telemetry
+  -> assisted recovery
+  -> watcher-owned recovery
+  -> runtime-owned healing
+  -> oversight loop
+  -> operational convergence
+```
+
+The purpose of the loop changes by phase. Early phases need investigation and
+classification. Later phases should push recovery ownership downward into
+watchers, queue policies, and runtime recovery engines. The loop should shrink
+over time, not grow into a permanent orchestration brain.
+
+### Ownership Placement
+
+| Owner | Belongs there | Does not belong there |
+|-------|---------------|-----------------------|
+| Loop | Invariant audit, convergence phase estimate, escalation, architecture drift, operator reporting | Common retry paths, queue mutation rules, backend health inference, hidden policy decisions |
+| Watchers | Local recovery, structured telemetry, handoff evidence, retry-safe queue recommendations | Global policy overrides, destructive recovery, opaque state mutation |
+| Runtime recovery systems | Backend health state, cooldowns, retry budgets, evidence fingerprints, recovery state machines | Prompt-only decisions, unbounded retries, runtime policy widening |
+| Queue semantics | Retry lineage, duplicate deadlock handling, stale blocked recovery, replay protection | Silent unsafe unblock, duplicate storms, human approval bypass |
+
+### Phase 1 — Observational Loop
+
+```text
+Loop notices failures
+Loop performs deep investigation
+Loop manually infers recovery state
+Loop classifies stagnation and convergence
+```
+
+Characteristics:
+- Heavy log inspection
+- Repeated inference
+- Low structured telemetry
+- Loop-centric intelligence
+- Reactive operation
+
+This is the historical bootstrap phase. It is useful for discovering missing
+platform behavior, but it is not a target state.
+
+### Phase 2 — Classification Loop
+
+```text
+Loop classifies operational patterns deterministically
+Watchers begin emitting structured evidence
+Convergence/stagnation become machine-readable
+```
+
+Characteristics:
+- `blocked_reason`
+- Executor signals
+- Remediation lineage
+- Duplicate suppression evidence
+- Structured convergence fields
+
+Goal: reduce raw log inference.
+
+### Phase 3 — Assisted Recovery
+
+```text
+Loop orchestrates bounded self-healing
+Recovery policies become machine-enforced
+```
+
+Examples:
+- Backend cooldowns
+- Retry budgets
+- Queue healing
+- Stale blocked recovery
+- Duplicate deadlock breaking
+- Parked-state persistence
+
+Goal: stop replaying unsafe or pointless retries.
+
+### Phase 4 — Watcher-Owned Recovery
+
+```text
+Watchers perform local recovery autonomously
+Loop stops coordinating common remediation paths
+```
+
+Examples:
+- `propose` detects starvation directly
+- `triage` heals retry-safe blocked tasks
+- `improve` handles bounded retries
+- `watchdog` applies backend cooldowns automatically
+
+Goal: recovery ownership moves downward into the platform.
+
+### Phase 5 — Runtime-Owned Healing
+
+```text
+Recovery engine and runtime state machines own operational healing
+```
+
+Examples:
+- Backend health registry
+- Recovery state machine
+- Evidence fingerprints
+- Automatic park/unpark transitions
+- Recovery adaptation tracking
+
+Goal: the platform becomes operationally self-healing.
+
+### Phase 6 — Oversight Loop
+
+```text
+Loop becomes mostly passive
+```
+
+Loop responsibilities become:
+- Invariant enforcement
+- Convergence auditing
+- Escalation
+- Architecture drift detection
+- Operator reporting
+
+The loop no longer:
+- Manually heals queues
+- Repeatedly investigates frozen states
+- Infers backend instability from logs
+- Coordinates common retry paths
+
+### Phase 7 — Operational Convergence
+
+```text
+Platform converges operationally without loop-driven healing
+```
+
+Definition:
+- Watchers recover locally
+- Runtime healing converges automatically
+- Queue deadlocks self-resolve safely
+- Retries adapt automatically
+- Parked states wake automatically on evidence change
+- Loop primarily validates and escalates
+
+Operator involvement becomes limited to:
+- Infrastructure failures
+- Architecture decisions
+- Policy changes
+- Destructive recovery approval
+
+### Convergence Maturity Metrics
+
+The loop summary should expose whether the platform is actually moving through
+these phases:
+- `loop_only_judgments_per_cycle`
+- `manual_inference_events`
+- `watcher_owned_recovery_rate`
+- `automatic_queue_heal_rate`
+- `parked_transition_accuracy`
+- `recovery_adaptation_rate`
+- `operator_escalation_rate`
+
+These metrics are not vanity counters. They answer whether the platform is
+becoming more self-healing or merely centralizing more intelligence inside the
+loop.
+
+---
+
+## Anti-God-Object Guardrail
+
+The watchdog loop must not evolve into:
+- A permanent orchestration intelligence layer
+- A hidden policy engine
+- A universal recovery controller
+- An opaque automation authority
+
+The intended architecture is:
+- Bounded
+- Distributed
+- Watcher-owned
+- Runtime-owned
+- Auditable
+- Convergence-driven
+
+The loop exists to help the platform evolve toward self-healing, not to
+centralize all intelligence forever. Repeated loop-only reasoning is
+convergence debt and should become watcher-owned, queue-owned, or
+runtime-owned behavior.
+
+---
+
 ## Convergence promotion
 
 The watchdog loop is a **temporary operator scaffold**, not the permanent brain of the platform.
+
+Convergence promotion is the mechanism by which the platform transitions from
+earlier convergence phases toward later phases. A loop-only judgment in Phase 1
+or Phase 2 should become structured telemetry, watcher behavior, queue policy,
+or recovery-engine logic in later phases.
 
 When the loop repeatedly performs the same judgment, classification, unblock action, or
 escalation, that behavior should be promoted into the responsible watcher or guardrail.
 The goal is not for the `/loop` to become smarter forever. The goal is for the platform
 to need the `/loop` less over time.
+
+Repeated loop intelligence is technical debt. Every repeated loop-only judgment
+should become platform-owned behavior unless there is a clear safety reason to
+keep it operator-mediated.
 
 | Repeated loop behavior | Promotion target |
 |------------------------|-----------------|
@@ -118,6 +324,11 @@ watchers = healer + coordinator
 loop = oversight + escalation + audit
 ```
 
+This boundary is the transition from Phase 3 to Phase 4 in the self-healing
+convergence model. Early phases allow the loop to coordinate recovery while
+the platform learns; later phases require watchers to own common local recovery
+paths directly.
+
 Watcher telemetry must include enough structured evidence for the next watcher
 or policy layer to act without prompt-side inference.
 
@@ -147,6 +358,11 @@ Autonomous recovery is bounded and auditable. The platform may attempt:
 - Runtime pressure mitigation: pause backend temporarily, reroute lightweight tasks,
   defer expensive remediation
 - Cooldown enforcement: wait until `safe_retry_after` before retrying the same lineage
+
+Recovery strategies begin as Phase 3 assisted recovery, where the loop may
+orchestrate bounded actions. They should migrate toward Phase 4 watcher-owned
+recovery and Phase 5 runtime-owned healing as soon as the safety conditions,
+budgets, and telemetry are machine-enforced.
 
 Guardrails:
 - Do not widen runtime policy automatically
@@ -179,6 +395,10 @@ UNSTABLE
 
 The loop orchestrates and audits transitions. Watchers own the local recovery
 attempts and must emit transition events.
+
+State-machine ownership belongs to later convergence phases. The loop may audit
+and explain transitions, but recovery state machines should gradually replace
+prompt-driven recovery decisions.
 
 ---
 
@@ -265,6 +485,10 @@ not new evidence.
 ## Formal parked behavior
 
 `PARKED_OPERATOR_BLOCKED` is a persisted system state, not just loop prose.
+PARKED is not failure. It represents successful convergence of the loop's role
+for a known blocker: the loop determined that no safe retry exists, escalation
+already exists, no new evidence is present, and monitoring-only behavior is
+required until evidence changes.
 
 Parked metadata must include:
 
@@ -284,6 +508,9 @@ parked_state:
 
 When parked, skip repeated deep investigation. Check only unpark conditions and
 semantic evidence hash changes.
+This is Phase 5/6 behavior: runtime and evidence state decide whether to wake;
+the loop audits the decision instead of repeatedly re-investigating frozen
+facts.
 
 ---
 
@@ -305,6 +532,13 @@ Loop summaries should report metrics derived from these records:
 - queue evolution quality
 - backend stability state
 - unchanged evidence cycles
+- convergence phase estimate
+- loop-only judgments per cycle
+- manual inference events
+- watcher-owned recovery rate
+- automatic queue heal rate
+- parked transition accuracy
+- operator escalation rate
 
 ---
 
@@ -665,6 +899,12 @@ Restart a stopped watcher (only after root-cause is understood):
 STEP 9 — LOG + COMMIT HYGIENE:
 Append the structured cycle summary (see template in runbook) to .console/log.md.
 The summary MUST include behavioral convergence fields AND convergence promotion fields:
+  - Convergence phase estimate: <1-7>
+  - Loop-owned recovery decisions this cycle: <N>
+  - Watcher-owned recoveries this cycle: <N>
+  - Automatic recovery actions executed: <list or "none">
+  - Manual inference required: <yes/no + reason>
+  - Recovery ownership migration candidates: <details or "none">
   - Behavioral convergence: <convergent|weakly-convergent|non-convergent|divergent>
   - Executor adaptation observed: <yes/no + reason>
   - Semantic duplicate remediation suspected: <yes/no>
@@ -676,6 +916,10 @@ The summary MUST include behavioral convergence fields AND convergence promotion
   - Watcher handoff gaps: <producer→consumer: gap,...> or "none"
   - Missing watcher evidence: <watcher=evidence needed,...> or "none"
   - Behavior to move out of /loop: <details or "none">
+  - Convergence maturity metrics: loop_only_judgments_per_cycle=<N>,
+    manual_inference_events=<N>, watcher_owned_recovery_rate=<0-1>,
+    automatic_queue_heal_rate=<0-1>, parked_transition_accuracy=<0-1>,
+    recovery_adaptation_rate=<0-1>, operator_escalation_rate=<0-1>
   - Operator-blocked state: <yes/no>
   - Parked state active: <yes — since cycle N | no>
   - Park reason: <blocker summary or "none">
@@ -1243,6 +1487,12 @@ Append one block per completed cycle to `.console/log.md`:
 - Watcher restarts / crash classifications: <role=exit_code:classification,...> or "none"
 - Anti-flap escalations: <role=reason,...> or "none"
 - Autonomy-cycle outcomes: <repo=success|fail,...> or "none"
+- Convergence phase estimate: <1-7>
+- Loop-owned recovery decisions this cycle: <N>
+- Watcher-owned recoveries this cycle: <N>
+- Automatic recovery actions executed: <list or "none">
+- Manual inference required: <yes/no — reason>
+- Recovery ownership migration candidates: <details or "none">
 - Behavioral convergence: <convergent|weakly-convergent|non-convergent|divergent>
 - Executor adaptation observed: <yes — reason | no — reason>
 - Semantic duplicate remediation suspected: <yes — N cycles / no>
@@ -1255,6 +1505,10 @@ Append one block per completed cycle to `.console/log.md`:
 - Watcher handoff gaps: <producer→consumer: gap,...> or "none"
 - Missing watcher evidence: <watcher=evidence needed,...> or "none"
 - Behavior to move out of /loop: <details or "none">
+- Convergence maturity metrics: loop_only_judgments_per_cycle=<N>,
+  manual_inference_events=<N>, watcher_owned_recovery_rate=<0-1>,
+  automatic_queue_heal_rate=<0-1>, parked_transition_accuracy=<0-1>,
+  recovery_adaptation_rate=<0-1>, operator_escalation_rate=<0-1>
 - Operator-blocked state: <yes/no>
 - Parked state active: <yes — since cycle N | no>
 - Park reason: <blocker summary or "none">
@@ -1278,6 +1532,7 @@ Append one block per completed cycle to `.console/log.md`:
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
 | Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
+| Phase estimate | Structured telemetry + recovery actions | Estimate self-healing phase 1–7; identify ownership migration candidates |
 | **Park evaluation** | STALLED classification + evidence check | Evaluate STALLED→PARKED transition; check unpark conditions if already parked |
 | **Convergence promotion** | Loop history + watcher mapping | Identify repeated loop-only judgments; create Plane tasks for watcher ownership |
 | Execution gate | Criteria check + stagnation/convergence check | Gate direct fixes; route rest to Plane |
@@ -1299,6 +1554,12 @@ The following invariants are enforced by Custodian detectors on every sweep:
   Silently passes on fresh clones (local config absent).
 
 Additional invariants maintained by runbook convention (not currently code-enforced):
+- **The loop is temporary operational scaffolding, not the permanent execution brain**
+- **Repeated loop-only reasoning is convergence debt**
+- **Common recovery paths must migrate into watchers or recovery engines**
+- **The platform should become more autonomous without becoming opaque**
+- **Recovery ownership should move downward toward runtime and watcher layers**
+- **The loop should shrink over time, not grow indefinitely**
 - No cron/systemd/daemon replacement for this loop
 - No ADR modification from watchdog/autonomy loop paths
 - No destructive git operations in loop helpers
@@ -1385,6 +1646,11 @@ Any of these triggers a return to full investigation:
 is still unhealthy — if the loop has correctly identified the blocker, escalated via Plane,
 safely abstained from unsafe retry, and transitioned to PARKED state.
 
+Operational convergence is Phase 7 in the self-healing convergence model. It
+means the loop is no longer needed for common recovery paths because watchers,
+queue semantics, and runtime recovery engines converge without prompt-driven
+healing.
+
 ### The convergence exit definition
 
 The watchdog loop has reached **operational convergence** when:
@@ -1409,6 +1675,13 @@ something changes. Nothing has changed." This is more actionable than repeated S
 with identical summaries.
 
 ### Behavioral convergence vs operational convergence
+
+Short distinction:
+
+| Concept | Meaning |
+|---------|---------|
+| Behavioral convergence | retries evolve toward resolution |
+| Operational convergence | loop no longer needed for common recovery paths |
 
 | | Behavioral convergence | Operational convergence |
 |---|---|---|
