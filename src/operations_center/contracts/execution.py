@@ -273,6 +273,13 @@ class RecoveryActionSummary(BaseModel):
     handler_name: Optional[str] = None
     modified_fields: list[str] = Field(default_factory=list)
     delay_seconds: Optional[float] = None
+    executor_exit_code: Optional[int] = None
+    executor_signal: Optional[str] = None
+    retry_strategy_used: Optional[str] = None
+    retry_strategy_changed: Optional[bool] = None
+    remediation_attempt_number: Optional[int] = None
+    remediation_lineage_id: Optional[str] = None
+    prior_failure_signature: Optional[str] = None
 
     model_config = {"frozen": True}
 

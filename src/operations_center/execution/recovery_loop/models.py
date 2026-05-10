@@ -77,6 +77,7 @@ class RecoveryDecision(str, Enum):
     STOP_COST_BUDGET_EXHAUSTED = "stop_cost_budget_exhausted"
     STOP_IDEMPOTENCY_REQUIRED = "stop_idempotency_required"
     STOP_BACKOFF_REQUIRED = "stop_backoff_required"
+    STOP_COOLDOWN_REQUIRED = "stop_cooldown_required"
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,13 @@ class RecoveryAction:
     handler_name: str | None = None
     modified_fields: tuple[str, ...] = ()
     delay_seconds: float | None = None
+    executor_exit_code: int | None = None
+    executor_signal: str | None = None
+    retry_strategy_used: str | None = None
+    retry_strategy_changed: bool | None = None
+    remediation_attempt_number: int | None = None
+    remediation_lineage_id: str | None = None
+    prior_failure_signature: str | None = None
 
 
 @dataclass(frozen=True)

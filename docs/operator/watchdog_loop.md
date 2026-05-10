@@ -74,6 +74,240 @@ Healthy direction:
 
 ---
 
+## Runtime health model
+
+Backend stability is first-class platform state, not a conclusion the loop
+reconstructs from log tails. Watchers and runtime services should write or
+surface structured health records equivalent to:
+
+```yaml
+backend_health:
+  kodo:
+    state: unstable
+    failure_count: 2
+    last_success_at: null
+    last_failure:
+      signature: signal:SIGKILL
+      signal: SIGKILL
+      exit_code: null
+    cooldown_until: "..."
+    safe_retry_after: "..."
+    recovery_strategy: reduce_pressure
+```
+
+Allowed states are `unknown`, `healthy`, `degraded`, `unstable`,
+`unavailable`, `recovering`, and `operator_blocked`.
+
+Runtime watchers own these transitions:
+- Success resets backend health to `healthy`
+- `SIGKILL` transitions to `unstable`, applies cooldown, and forbids immediate replay
+- Repeated backend failures transition toward `unavailable` and escalation
+- Exhausted recovery marks `operator_blocked` with an explicit reason
+
+The loop should consume this state before reading raw logs. Raw logs are fallback
+evidence only when structured health records are missing or contradictory.
+
+---
+
+## Recovery ownership boundaries
+
+The permanent target is:
+
+```text
+watchers = healer + coordinator
+loop = oversight + escalation + audit
+```
+
+Watcher telemetry must include enough structured evidence for the next watcher
+or policy layer to act without prompt-side inference.
+
+Required telemetry by owner:
+- `improve`: `executor_exit_code`, `executor_signal`, `retry_strategy_used`,
+  `retry_strategy_changed`, `remediation_attempt_number`,
+  `remediation_lineage_id`, `prior_failure_signature`
+- `triage`: `blocked_reason`, `blocked_by_backend`, `retry_safe`,
+  `queue_transition_recommendation`
+- `goal` / `propose`: `duplicate_reason`, `suppression_reason`,
+  `starvation_detected`, `queue_deadlock_detected`
+- `watchdog` / runtime supervisor: `backend_health_transition`,
+  `cooldown_applied`, `recovery_attempt_started`, `recovery_attempt_result`
+- `review`: remediation lineage and retry adaptation fields matching `improve`
+
+When these fields exist, the loop should validate and audit them. It should not
+repeat the same log analysis unless the structured telemetry is absent,
+incomplete, or semantically changed.
+
+---
+
+## Recovery strategies
+
+Autonomous recovery is bounded and auditable. The platform may attempt:
+- Executor restart: restart backend process, restart watcher, reinitialize runtime
+- Queue healing: `Blocked -> Backlog`, `Blocked -> Ready for AI`, stale lock cleanup
+- Runtime pressure mitigation: pause backend temporarily, reroute lightweight tasks,
+  defer expensive remediation
+- Cooldown enforcement: wait until `safe_retry_after` before retrying the same lineage
+
+Guardrails:
+- Do not widen runtime policy automatically
+- Do not increase `kodo` concurrency automatically
+- Do not bypass execution gates silently
+- Do not replay unsafe retries
+- Do not mutate queue state without structured evidence
+
+---
+
+## Self-healing state machine
+
+The platform state machine is:
+
+```text
+HEALTHY
+  -> DEGRADED
+  -> RECOVERING
+  -> HEALTHY
+
+RECOVERING
+  -> UNSTABLE
+  -> COOLDOWN
+  -> RECOVERING
+
+UNSTABLE
+  -> OPERATOR_BLOCKED
+  -> PARKED_OPERATOR_BLOCKED
+```
+
+The loop orchestrates and audits transitions. Watchers own the local recovery
+attempts and must emit transition events.
+
+---
+
+## Queue healing rules
+
+Queue healing is allowed only when structured metadata proves the transition is
+safe.
+
+Automatic duplicate-deadlock breaker:
+
+```text
+IF duplicate exists in Blocked
+AND no consumer can execute it
+AND retry_safe = true
+AND retry budget remains
+THEN transition Blocked -> Ready for AI
+```
+
+Stale blocked recovery:
+
+```text
+IF task is Blocked beyond stale threshold
+AND retry_safe = true
+AND replay budget remains
+THEN transition Blocked -> Backlog
+```
+
+Required queue metadata:
+- `retry_lineage_id`
+- `retry_safe`
+- `backend_dependency`
+- `recovery_attempt_count`
+- `blocked_reason`
+- `duplicate_key`
+
+Required invariants:
+- No infinite replay
+- No duplicate storms
+- No unsafe unblock
+- No queue freeze caused by duplicate suppression
+
+---
+
+## Recovery budgets
+
+Investigation and recovery are bounded by machine-enforced budgets:
+
+```yaml
+recovery_budget:
+  max_cycles_before_escalation: 3
+  max_equivalent_retries: 2
+  max_recovery_attempts: 5
+```
+
+After exhaustion, the system must escalate, park when appropriate, and wait for
+semantic evidence change. The loop should not perform fresh deep investigation
+for an unchanged, budget-exhausted root cause.
+
+---
+
+## Evidence fingerprinting
+
+Use canonical evidence hashes to distinguish real change from timestamp churn.
+
+Hash inputs:
+- exit code and signal
+- normalized stacktrace or failure category
+- queue state
+- watcher state
+- regression IDs
+- backend health state
+
+Ignore:
+- timestamps
+- cycle IDs
+- run IDs
+- log ordering noise
+
+Parked and stalled decisions should use these hashes. Timestamp-only changes are
+not new evidence.
+
+---
+
+## Formal parked behavior
+
+`PARKED_OPERATOR_BLOCKED` is a persisted system state, not just loop prose.
+
+Parked metadata must include:
+
+```yaml
+parked_state:
+  root_cause_signature: kodo_sigkill_plan_phase
+  parked_reason: backend cooldown exhausted without safe retry
+  unchanged_cycles: 14
+  last_evidence_hash: abc123
+  unpark_conditions:
+    - backend_health_change
+    - queue_change
+    - runtime_config_change
+    - watcher_state_change
+    - execution_outcome_change
+```
+
+When parked, skip repeated deep investigation. Check only unpark conditions and
+semantic evidence hash changes.
+
+---
+
+## Recovery telemetry
+
+Recovery events should be emitted as structured records:
+- `recovery_attempt_started`
+- `recovery_attempt_result`
+- `cooldown_applied`
+- `backend_health_transition`
+- `queue_healing_decision`
+- `recovery_budget_exhausted`
+- `parked_state_entered`
+- `parked_state_unparked`
+
+Loop summaries should report metrics derived from these records:
+- recovery success rate
+- retry adaptation rate
+- queue evolution quality
+- backend stability state
+- unchanged evidence cycles
+
+---
+
 ## Prerequisites
 
 Before starting the loop, confirm:
@@ -198,6 +432,10 @@ Collect exit codes and finding counts. Determine affected repos only from tool o
 
 STEP 2 — TRIAGE:
   .venv/bin/operations-center-triage-scan --config config/operations_center.local.yaml --apply
+This scan now includes queue self-healing when tasks carry structured evidence labels:
+  retry_safe, queue_deadlock/no_consumer, dedup:<key>, retry-lineage:<id>.
+It may transition Blocked→Ready-for-AI or Blocked→Backlog only when retry budgets
+and safety evidence allow it; otherwise it comments an escalation.
 
 STEP 3 — BLOCKED/STALLED WORK INVESTIGATION:
 Read the last 3 cycle summaries from .console/log.md to identify repeated patterns.

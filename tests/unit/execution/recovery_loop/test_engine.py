@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 from operations_center.contracts.enums import ExecutionStatus, FailureReasonCategory
+from operations_center.contracts.execution import RuntimeBindingSummary
+from operations_center.backend_health import BackendHealthRegistry, BackendHealthState
 from operations_center.execution.recovery_loop import (
     DefaultFailureClassifier,
     ExecutionFailureKind,
@@ -82,6 +84,37 @@ class TestEngineRetry:
         res = make_result(request=req, status=ExecutionStatus.TIMED_OUT)
         out = eng.evaluate(res, _ctx(req, attempt=2))
         assert out.decision == RecoveryDecision.STOP_ATTEMPT_BUDGET_EXHAUSTED
+
+    def test_sigkill_records_backend_cooldown_and_stops_retry(self, make_request, make_result):
+        registry = BackendHealthRegistry(cooldown_seconds=1800)
+        policy = RecoveryPolicy(max_attempts=3)
+        eng = RecoveryEngine(
+            classifier=DefaultFailureClassifier(),
+            policy=policy,
+            handlers=[
+                RetrySameRequestHandler(policy.retryable_kinds),
+                RejectUnrecoverableHandler(policy.non_retryable_kinds),
+            ],
+            backend_health_registry=registry,
+        )
+        req = make_request(
+            idempotent=True,
+            runtime_binding=RuntimeBindingSummary(
+                kind="kodo",
+                selection_mode="fixed",
+            ),
+        )
+        res = make_result(
+            request=req,
+            status=ExecutionStatus.FAILED,
+            failure_category=FailureReasonCategory.BACKEND_ERROR,
+            failure_reason="adapter_error_code=executor_error: signal=SIGKILL",
+        )
+
+        out = eng.evaluate(res, _ctx(req))
+
+        assert out.decision == RecoveryDecision.STOP_COOLDOWN_REQUIRED
+        assert registry.get("kodo").state == BackendHealthState.UNSTABLE
 
 
 class TestEngineReject:
