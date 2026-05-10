@@ -305,8 +305,57 @@ Classify each blocked item:
   - closed-loop stagnation: activity without measurable queue or execution progress
   - non-convergent: retries reproducing equivalent outcomes with no evolution
   - divergent: automation making platform health measurably worse
+  - operator-blocked: root cause known, direct remediation impossible, requires operator/infrastructure action
 
 For starvation, dead-remediation, closed-loop stagnation, non-convergent, divergent, or structurally-blocked: create/update Plane task immediately. Do not use "monitor for recurrence" language. Do not retry identical failing remediation paths.
+
+OPERATOR-BLOCKED CLASSIFICATION — classify as operator-blocked when ALL hold:
+  - Root cause is already known and has not changed across ≥3 cycles
+  - A Plane escalation task exists and covers the blocker
+  - No queue evolution has occurred across those cycles
+  - No safe retry path exists (unsafe, pointless, or infrastructure-gated)
+  - No new evidence has emerged (see NEW EVIDENCE EVALUATION below)
+Required metadata: blocker_summary, first_detected_cycle, affected_tasks, related_plane_tasks,
+  safe_retry_condition, last_new_evidence_cycle, retry_forbidden_reason.
+
+NEW EVIDENCE EVALUATION — evaluate each cycle when in STALLED or PARKED state.
+NEW_EVIDENCE_DETECTED = yes ONLY if at least one of these changed since the prior cycle:
+  - watcher state (new crash, new PID, new exit code or signal)
+  - queue state (Blocked/R4AI/InReview counts changed)
+  - remediation outcome (different result for same task)
+  - exit signature (new signal, exit code, or failure message)
+  - stacktrace or error detail (changed content, not just timestamp)
+  - regression profile (new or resolved regression)
+  - task transitions (any Plane task moved state)
+  - runtime behavior (config changed, new watcher behavior)
+  - graph state (node/edge counts changed)
+  - telemetry detail (new structured field emitted by a watcher)
+  - execution path (new code path reached or blocked)
+Repeated identical observations are NOT new evidence. Timestamp differences alone are NOT new evidence.
+
+PARK TRANSITION — evaluate STALLED → PARKED_OPERATOR_BLOCKED when ALL hold:
+  - operator-blocked classification is active this cycle
+  - Same root cause for ≥3 consecutive cycles (no root-cause change)
+  - Same affected tasks across those cycles
+  - Plane escalation exists and is current
+  - No queue evolution across those cycles
+  - No remediation adaptation across those cycles
+  - NEW_EVIDENCE_DETECTED = no for 2+ consecutive cycles
+  - No safe retry path
+When parked: do NOT rerun deep investigation each cycle. Check only for evidence change (unpark conditions).
+Do NOT remain in STALLED indefinitely once park criteria are met.
+
+UNPARK CONDITIONS — check each parked cycle. If ANY hold, transition back to STALLED/DEGRADED/ACTIVE:
+  - Queue state changed (any count difference)
+  - Watcher crashed or restarted unexpectedly (non-143)
+  - New telemetry appeared (exit signal, stacktrace, or error message changed)
+  - Plane task status changed (escalated, commented on, closed, or resolved)
+  - Operator took action on the blocker
+  - Safe retry condition became true
+  - Runtime config changed
+  - New affected repos appeared in tool output
+  - Execution outcome changed from prior identical attempts
+If no unpark condition holds: remain parked, schedule at PARKED_OPERATOR_BLOCKED cadence (1800s).
 
 FORWARD PROGRESS CHECK — before classifying as temporarily-blocked, confirm at least one of:
   - Blocked count decreased vs prior cycle
@@ -389,6 +438,14 @@ The summary MUST include behavioral convergence fields AND convergence promotion
   - Watcher handoff gaps: <producer→consumer: gap,...> or "none"
   - Missing watcher evidence: <watcher=evidence needed,...> or "none"
   - Behavior to move out of /loop: <details or "none">
+  - Operator-blocked state: <yes/no>
+  - Parked state active: <yes — since cycle N | no>
+  - Park reason: <blocker summary or "none">
+  - New evidence detected: <yes — detail | no>
+  - Safe retry condition: <condition or "none">
+  - Last evidence-changing cycle: <cycle id or "N/A">
+  - Repeated unchanged cycles: <N>
+  - Active remediation suspended: <yes — reason | no>
 Update .console/backlog.md for any new/closed gaps.
 IMPORTANT: Run git diff --staged before committing to ensure only loop-owned files are staged.
 Commit only after validation passes. Do not commit to main unless the operator has
@@ -400,11 +457,38 @@ gate/check fixed. Never force-push, amend old loop commits, or commit generated 
 STEP 10 — ADAPTIVE SCHEDULEWAKEUP:
 Assess platform health state and choose ScheduleWakeup delay accordingly:
 
-  CRITICAL  — crash loops / graph broken / autonomy failing repeatedly:        180s
-  DEGRADED  — watcher crashes (non-143) / blocked queue unchanged / flow gaps: 300s
-  STALLED   — starvation active / closed-loop stagnation / no forward progress: 600s
-  ACTIVE    — direct fixes dispatched this cycle / remediation in flight:       900s
-  HEALTHY   — all audits clean, no starvation signals, all watchers up:        3600s
+  CRITICAL                — crash loops / graph broken / autonomy failing repeatedly:              180s
+  DEGRADED                — watcher crashes (non-143) / blocked queue unchanged / flow gaps:       300s
+  STALLED                 — starvation active / closed-loop stagnation / no forward progress:      600s
+  ACTIVE                  — direct fixes dispatched this cycle / remediation in flight:            900s
+  PARKED_OPERATOR_BLOCKED — root cause known, Plane escalation exists, no new evidence:           1800s
+  HEALTHY                 — all audits clean, no starvation signals, all watchers up:             3600s
+
+PARK TRANSITION DECISION — evaluate STALLED → PARKED_OPERATOR_BLOCKED at end of each STALLED cycle:
+  If ALL of the following hold, transition to PARKED (skip deep investigation next cycle):
+    - operator-blocked classification active this cycle
+    - Same root cause for ≥3 consecutive cycles (no root-cause change)
+    - Same affected tasks across those cycles
+    - Plane escalation exists and is current
+    - No queue evolution across those cycles
+    - No remediation adaptation across those cycles
+    - NEW_EVIDENCE_DETECTED = no for 2+ consecutive cycles
+    - No safe retry path
+  If parked: set delaySeconds=1800, check only unpark conditions next cycle.
+  Do NOT remain STALLED indefinitely once park criteria are met.
+
+UNPARK TRANSITION DECISION — evaluate each parked cycle before scheduling:
+  If ANY hold, transition back to STALLED/DEGRADED/ACTIVE (run full cycle):
+    - Queue state changed (any count difference)
+    - Watcher crashed or restarted unexpectedly (non-143)
+    - New telemetry appeared (exit signal, stacktrace, or error message changed)
+    - Plane task status changed (escalated, commented on, closed, or resolved)
+    - Operator took action on the blocker
+    - Safe retry condition became true
+    - Runtime config changed
+    - New affected repos appeared in tool output
+    - Execution outcome changed from prior identical attempts
+  If no unpark condition holds: remain parked at 1800s.
 
 FORBIDDEN: Do not choose HEALTHY cadence if any of these are true:
   - starvation classified this cycle
@@ -416,6 +500,10 @@ FORBIDDEN: Do not choose HEALTHY cadence if any of these are true:
   - automation self-deception detected
   - kodo SIGKILL open issue unresolved AND new OC improve tasks appear in Ready-for-AI
   - 2+ consecutive cycles with semantically equivalent failed remediation and no adaptation
+
+FORBIDDEN: Do not choose STALLED cadence when PARKED_OPERATOR_BLOCKED criteria are met.
+  PARKED is not a downgrade — it is the correct state when the blocker is known, escalated,
+  and no new evidence is available. Remaining at STALLED when park criteria are met wastes cycles.
 
 Non-convergent automation: STALLED minimum cadence.
 Divergent automation: DEGRADED minimum cadence.
@@ -441,6 +529,7 @@ resumes. Do not stay at 1h cadence when the platform is actively broken.
 | DEGRADED | 300s (~5m) | non-143 watcher crashes; blocked queue unchanged; open flow gaps |
 | STALLED | 600s (~10m) | starvation active; closed-loop stagnation; no forward progress |
 | ACTIVE | 900s (~15m) | direct fixes dispatched; remediation in flight |
+| PARKED_OPERATOR_BLOCKED | 1800s (~30m) | root cause known; Plane escalation exists; no new evidence across 2+ cycles |
 | HEALTHY | 3600s (~60m) | all clean; no starvation signals; all watchers up |
 
 **Forbidden cadence widening:** HEALTHY cadence is forbidden while any of these signals are active:
@@ -452,6 +541,10 @@ resumes. Do not stay at 1h cadence when the platform is actively broken.
 - Behavioral convergence classified as non-convergent or divergent
 - Automation self-deception detected (activity without state evolution)
 - 2+ consecutive cycles of semantically equivalent failed remediation with no strategy adaptation
+
+**STALLED cadence is also forbidden** when PARKED_OPERATOR_BLOCKED criteria are fully met.
+Staying at 600s when the blocker is known, escalated, and evidence-frozen wastes cycles without
+producing new information. Transition to PARKED (1800s) is required in that case.
 
 A single demonstrated starvation/stagnation/non-convergence cycle drops cadence immediately.
 It does not require two consecutive cycles of evidence.
@@ -502,6 +595,7 @@ Examples:
 | Divergent automation | Platform health worsening under active remediation | DEGRADED minimum |
 | Automation self-deception | Activity logs but state never evolves | DEGRADED minimum |
 | Blocked queue deadlock | Work trapped in non-executable state | DEGRADED |
+| Operator-blocked (parked) | Root cause known, Plane exists, no new evidence for 2+ cycles | PARKED_OPERATOR_BLOCKED (1800s) |
 
 ### Forbidden language
 
@@ -766,11 +860,13 @@ before classifying blocked items.
 | `closed-loop stagnation` | activity without measurable progress | Plane task + STALLED + investigate loop |
 | `non-convergent` | retries reproducing equivalent outcomes with no evolution | Plane task + STALLED + convergence analysis |
 | `divergent` | automation measurably worsening platform health | Plane task + DEGRADED + executor investigation |
+| `operator-blocked` | root cause known and unchanged; Plane escalation exists; no safe retry; no new evidence for 2+ cycles | Remain parked at PARKED_OPERATOR_BLOCKED (1800s); check unpark conditions only |
 
 `structurally-blocked`, `dead-remediation`, `starvation`, `closed-loop stagnation`,
 `non-convergent`, and `divergent` must be escalated with a Plane task immediately.
 Do not retry them in the same cycle.
 Do not use "monitor for recurrence" language once the pattern is demonstrated.
+`operator-blocked` requires no further Plane escalation if one already exists — transition to PARKED.
 
 ---
 
@@ -921,6 +1017,14 @@ Append one block per completed cycle to `.console/log.md`:
 - Watcher handoff gaps: <producer→consumer: gap,...> or "none"
 - Missing watcher evidence: <watcher=evidence needed,...> or "none"
 - Behavior to move out of /loop: <details or "none">
+- Operator-blocked state: <yes/no>
+- Parked state active: <yes — since cycle N | no>
+- Park reason: <blocker summary or "none">
+- New evidence detected: <yes — detail | no>
+- Safe retry condition: <condition or "none">
+- Last evidence-changing cycle: <cycle id or "N/A">
+- Repeated unchanged cycles: <N>
+- Active remediation suspended: <yes — reason | no>
 - Follow-ups: <Plane task IDs or "none">
 ```
 
@@ -936,6 +1040,7 @@ Append one block per completed cycle to `.console/log.md`:
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
 | Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
+| **Park evaluation** | STALLED classification + evidence check | Evaluate STALLED→PARKED transition; check unpark conditions if already parked |
 | **Convergence promotion** | Loop history + watcher mapping | Identify repeated loop-only judgments; create Plane tasks for watcher ownership |
 | Execution gate | Criteria check + stagnation/convergence check | Gate direct fixes; route rest to Plane |
 | Direct fixes | `autonomy-cycle --execute` per repo | One repo at a time; kodo max_concurrent=1 |
@@ -973,6 +1078,151 @@ Additional invariants maintained by runbook convention (not currently code-enfor
 - **Same loop judgment in 2+ cycles requires a Plane task promoting it to the responsible watcher**
 - **Watcher handoff gaps (producing watcher didn't emit enough evidence) are promotion candidates**
 - **Promotion is evidence-driven — do not create redesign tasks for one-off failures**
+- **Do NOT remain STALLED indefinitely when park criteria are met — transition to PARKED_OPERATOR_BLOCKED**
+- **PARKED state requires a Plane escalation task; if none exists, remain STALLED and create one**
+- **Parked cycle must check unpark conditions before scheduling — do not skip the check**
+- **Timestamp differences alone do not qualify as new evidence — evidence requires changed state**
+- **Operational convergence ≠ recovery — correct abstention from unsafe retry is a valid convergent outcome**
+- **A loop that correctly parks (identifies blocker, creates escalation, abstains from replay) has converged**
+
+---
+
+## Operator-blocked lifecycle
+
+When the platform is blocked on an infrastructure or operator dependency that cannot be resolved
+by automation alone, the loop should transition to a **passive evidence-monitoring posture** rather
+than continuing to run deep investigation each cycle.
+
+### Lifecycle stages
+
+```
+New finding → STALLED (active investigation, 600s cadence)
+                ↓ (if park criteria met — see below)
+           PARKED_OPERATOR_BLOCKED (passive evidence watch, 1800s cadence)
+                ↓ (if unpark condition triggers)
+           STALLED/DEGRADED/ACTIVE (resume active investigation)
+```
+
+### Park criteria (all must hold)
+
+1. Root cause is known and has not changed across ≥3 consecutive cycles
+2. A Plane escalation task exists and covers the blocker
+3. No queue evolution has occurred across those cycles
+4. No safe retry path exists (unsafe, pointless, or infrastructure-gated)
+5. No new evidence has emerged for 2+ consecutive cycles
+
+When ALL five hold, do NOT continue running full deep-investigation cycles. Switch to:
+- Read `.console/log.md` for the last cycle's parked-state fields only
+- Check each unpark condition (9 conditions listed in STEP 3 and STEP 10)
+- If no unpark condition: schedule 1800s, emit minimal parked-cycle summary
+- If any unpark condition: run full cycle at STALLED/DEGRADED/ACTIVE cadence
+
+### Required metadata when parking
+
+The cycle that triggers the transition must record in its summary:
+- `Park reason:` — one-sentence blocker summary
+- `Last evidence-changing cycle:` — cycle ID where something last changed
+- `Repeated unchanged cycles:` — how many consecutive cycles showed no change
+- `Safe retry condition:` — what must be true before retrying (operator action, infra fix, etc.)
+- `Active remediation suspended:` — yes, and why
+
+### Unpark conditions
+
+Any of these triggers a return to full investigation:
+- Queue state changed (any Blocked/R4AI/InReview count difference)
+- Watcher crashed or restarted unexpectedly (non-143)
+- New telemetry appeared (exit signal, stacktrace, or error message changed content)
+- Plane task status changed (escalated, commented on, closed, or resolved)
+- Operator took visible action on the blocker
+- Safe retry condition became true
+- Runtime config changed
+- New affected repos appeared in tool output
+- Execution outcome changed from prior identical attempts
+
+---
+
+## Operational convergence exit
+
+**Convergence does not mean recovery.** A loop can converge correctly even when the platform
+is still unhealthy — if the loop has correctly identified the blocker, escalated via Plane,
+safely abstained from unsafe retry, and transitioned to PARKED state.
+
+### The convergence exit definition
+
+The watchdog loop has reached **operational convergence** when:
+
+1. The root cause of the block is identified and documented
+2. A Plane escalation task exists, is current, and covers the blocker
+3. No safe automation path exists to progress further
+4. The loop has transitioned to PARKED_OPERATOR_BLOCKED (not looping at STALLED)
+5. The loop is actively monitoring for new evidence (checking unpark conditions each cycle)
+
+At this point, **the loop's job is done until the operator acts**. The loop is not failing;
+it is correctly waiting. Remaining at STALLED cadence past this point is waste, not diligence.
+
+### Why "operational convergence" matters
+
+A loop that correctly abstained from 179 equivalent retries while maintaining a Plane escalation
+behaved correctly — but inefficiently because it never transitioned to PARKED. The cost was
+100+ wasted cycles at 600s intervals that produced no new information.
+
+Operational convergence gives the operator a clear signal: "I am parked. I will wake when
+something changes. Nothing has changed." This is more actionable than repeated STALLED cycles
+with identical summaries.
+
+### Behavioral convergence vs operational convergence
+
+| | Behavioral convergence | Operational convergence |
+|---|---|---|
+| Definition | Retries materially evolve platform state toward resolution | Loop correctly identifies blocker, escalates, abstains from unsafe retry, parks |
+| Platform needs to recover? | Yes — convergent means it's making progress | No — convergent means the loop's role is complete until operator acts |
+| Outcome when correct | CONVERGENT or WEAKLY-CONVERGENT | PARKED_OPERATOR_BLOCKED |
+| Outcome when incorrect | NON-CONVERGENT | STALLED indefinitely (loop running but not converging) |
+
+---
+
+## Canonical example: kodo SIGKILL (9c7f4bb9)
+
+This section documents the SIGKILL block that ran for ~179 cycles (2026-05 session) as a
+reference for future operator-blocked situations.
+
+### What happened
+
+- kodo exited -9 (SIGKILL) at "Analyzing project and creating plan" regardless of task scope
+- Both OC improve tasks and bounded CxRP tasks (ShippingForm) reproduced the pattern
+- Root cause hypothesis: time-of-day resource exhaustion (confirmed by AgentTopology succeeding
+  at 20:22Z, ShippingForm SIGKILL'd at 23:46Z)
+- Plane task 5d8bd236 escalated with DIVERGENT finding
+
+### How the loop should have behaved (retroactive)
+
+| Cycle range | Correct behavior | Actual behavior |
+|-------------|-----------------|-----------------|
+| 1–3 (discovery) | Classify operator-blocked; create Plane task; run full investigation | ✓ Correct |
+| 4–5 (confirmation) | Verify same root cause, same tasks; park criteria met | Continued STALLED — missed park transition |
+| 6–179 (frozen) | PARKED_OPERATOR_BLOCKED (1800s); check unpark conditions only | Ran full 600s cycles with no new information |
+
+### What should have triggered the park transition
+
+After cycle 5 (≥3 cycles, same root cause, same tasks, Plane task 5d8bd236 exists, no queue
+evolution, NEW_EVIDENCE_DETECTED=no for 2 consecutive cycles):
+
+- Transition: STALLED → PARKED_OPERATOR_BLOCKED
+- Cadence: 600s → 1800s
+- Behavior: skip deep investigation; check 9 unpark conditions only
+- Summary: minimal parked-cycle entry with park metadata fields
+
+### Unpark conditions that would have triggered (had they occurred)
+
+- Plane task 5d8bd236 status changed (operator commented, resolved, or escalated further)
+- kodo config changed (max_concurrent, timeout, model)
+- New exit signal different from -9
+- Queue counts changed
+
+### Safe retry condition for this case
+
+`kodo SIGKILL resolved` — operator must diagnose and fix kodo resource exhaustion before
+any blocked improve tasks or ShippingForm can be re-queued.
 
 ---
 
