@@ -3,6 +3,15 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-10 — docs(watchdog): add self-healing convergence phases
+
+Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution explicit:
+- Added a 7-phase convergence model from observational loop to operational convergence
+- Added ownership placement guidance for loop, watchers, runtime recovery, and queue semantics
+- Added anti-god-object guardrail language
+- Added convergence maturity metrics and cycle-summary fields
+- Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
+
 ## 2026-05-10 — docs(watchdog_loop): add PARKED_OPERATOR_BLOCKED state + convergence exit logic
 
 Added PARKED_OPERATOR_BLOCKED health state (1800s cadence) to the watchdog loop runbook and
