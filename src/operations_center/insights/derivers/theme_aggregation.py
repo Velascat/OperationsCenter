@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """ThemeAggregationDeriver — groups repeated per-file violations into architectural themes.
 
 When the same source file appears in the top lint violations across ≥3 consecutive

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """
 backends/archon/models.py — Archon-specific internal models.
 
@@ -61,7 +61,7 @@ class ArchonWorkflowConfig:
     # ArchonBackendAdapter from the binder's translation of RuntimeBinding
     # → Archon's provider/model literals (see executors/archon/binder.py).
     # Sent on the kickoff body to POST /api/workflows/{name}/run; Archon's
-    # patched route (Velascat/Archon feat/per-request-runtime-override)
+    # patched route (ProtocolWarden/Archon feat/per-request-runtime-override)
     # threads them through HandleMessageContext.runtimeOverride and applies
     # them above the workflow YAML's top-level provider/model.
     provider: Optional[str] = None

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Per-backend audit artifact loaders + validators.
 
 Loads + validates the four declarative YAML artifacts each backend

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Post-execution contract discovery for managed audit runs.
 
 After the audit subprocess exits (with any exit code), this module:

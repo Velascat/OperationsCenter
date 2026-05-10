@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """R5 — end-to-end smoke for the spec's Special Use Case.
 
     SwitchBoard selects architecture_design (modeled here as coding_agent

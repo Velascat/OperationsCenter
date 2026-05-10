@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """PR Review Watcher — two-phase state machine for PRs created by the goal lane.
 
 Phase 1 (self-review): kodo reviews the diff and emits LGTM or CONCERNS.

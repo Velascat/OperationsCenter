@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """G-V03 — ExecutionTrace forwards runtime_invocation_ref + routing metadata.
 
 A trace consumer should be able to answer "which RxP invocation? which

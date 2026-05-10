@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Slice replay runner — run_slice_replay().
 
 Loads a fixture pack, builds checks from the replay profile, executes checks

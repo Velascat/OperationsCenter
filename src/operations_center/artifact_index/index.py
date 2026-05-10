@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """build_artifact_index() — builds a ManagedArtifactIndex from a validated manifest."""
 
 from __future__ import annotations

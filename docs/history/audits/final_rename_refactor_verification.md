@@ -73,7 +73,7 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | File | Legacy Term | Action |
 |------|-------------|--------|
 | `.gitignore:99` | `# FOB operator state` comment | Fixed → `# OperatorConsole state` |
-| `uv.lock` | `control-plane` package, `Velascat/ControlPlane.git` URL | Fixed — regenerated lock file (`uv lock`); pyproject.toml already had correct `operations-center` dependency |
+| `uv.lock` | `control-plane` package, `ProtocolWarden/ControlPlane.git` URL | Fixed — regenerated lock file (`uv lock`); pyproject.toml already had correct `operations-center` dependency |
 
 ### WorkStation
 

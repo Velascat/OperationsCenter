@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Contract-change impact analysis over the EffectiveRepoGraph.
 
 When a planned task targets a contract-owning repo (CxRP, RxP,

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Post-merge regression detection + revert helpers.
 
 Cited by `docs/design/autonomy/autonomy_gaps.md` Wave 3 entries (4+6 Post-Merge

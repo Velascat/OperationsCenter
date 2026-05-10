@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 import os
 from pathlib import Path
 
@@ -295,7 +295,7 @@ def test_render_task_template_uses_default_repo() -> None:
 
 
 def test_github_https_to_ssh_converts_github_remote() -> None:
-    assert github_https_to_ssh("https://github.com/Velascat/OperationsCenter.git") == "git@github.com:Velascat/OperationsCenter.git"
+    assert github_https_to_ssh("https://github.com/ProtocolWarden/OperationsCenter.git") == "git@github.com:ProtocolWarden/OperationsCenter.git"
 
 
 def test_github_https_to_ssh_ignores_non_github_remote() -> None:
@@ -314,7 +314,7 @@ def test_parse_remote_branches_extracts_head_names() -> None:
 
 
 def test_infer_repo_key_from_clone_url_prefers_repo_name() -> None:
-    assert infer_repo_key_from_clone_url("git@github.com:Velascat/OperationsCenter.git") == "OperationsCenter"
+    assert infer_repo_key_from_clone_url("git@github.com:ProtocolWarden/OperationsCenter.git") == "OperationsCenter"
 
 
 def test_prepend_local_bin_to_path_adds_home_local_bin(monkeypatch) -> None:

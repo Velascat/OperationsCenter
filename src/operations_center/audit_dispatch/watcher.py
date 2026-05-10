@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """In-flight ``run_status.json`` polling for managed audit dispatch (Phase 6, Slice F).
 
 Used by the ``operations-center-audit watch`` CLI to observe an in-progress

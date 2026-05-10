@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Coordinator → UsageStore wiring: per-backend cap enforcement at dispatch.
 
 Covers task #31. Tests assert that:

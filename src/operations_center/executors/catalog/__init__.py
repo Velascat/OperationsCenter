@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Executor catalog v1 — in-memory truth source for SwitchBoard + OC.
 
 Loads all per-backend artifacts (capability_card, runtime_support,

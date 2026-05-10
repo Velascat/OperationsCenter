@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """CLI tests for operations-center-replay commands.
 
 Covers run / inspect using typer.testing.CliRunner.

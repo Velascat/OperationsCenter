@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Phase 12 audit governance models.
 
 Pydantic frozen models for durable artifacts (request, decision, approval, report).

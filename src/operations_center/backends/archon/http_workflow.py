@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """ArchonHttpWorkflowDispatcher — Phase-A invoker for the real Archon API.
 
 Implements the design in
@@ -61,7 +61,7 @@ from .models import ArchonArtifactCapture, ArchonRunCapture, ArchonWorkflowConfi
 logger = logging.getLogger(__name__)
 
 # Default workflow_type → Archon workflow name. Mapped to workflows that
-# actually ship as bundled defaults in Velascat/Archon main (verified
+# actually ship as bundled defaults in ProtocolWarden/Archon main (verified
 # against a live container 2026-05-07 — see project_archon_api_quirks
 # memory + WS design doc). Operators override via
 # ArchonSettings.workflow_names when they ship custom YAML workflows.

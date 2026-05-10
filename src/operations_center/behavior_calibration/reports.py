@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Calibration report serialization and file writing.
 
 Reports are written to OperationsCenter-owned paths. They are derived

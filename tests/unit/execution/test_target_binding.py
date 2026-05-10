@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Phase 4 + 7 — bind_execution_target tests."""
 from __future__ import annotations
 
@@ -140,7 +140,7 @@ class TestCatalog:
 
 class TestProvenance:
     def test_provenance_resolved_for_kodo_from_real_registry(self):
-        """The shipped Velascat/kodo registry entry should resolve.
+        """The shipped ProtocolWarden/kodo registry entry should resolve.
 
         After PR #49 merged upstream and PATCH-001 was dropped (2026-05-06),
         the fork carries zero local patches. Provenance still resolves but
@@ -149,7 +149,7 @@ class TestProvenance:
         target = bind_execution_target(_envelope(backend="kodo"))
         assert target.provenance is not None
         assert target.provenance.source == "registry"
-        assert target.provenance.repo == "Velascat/kodo"
+        assert target.provenance.repo == "ProtocolWarden/kodo"
         # PATCH-001 dropped after upstream merge — fork now mirrors upstream
         assert isinstance(target.provenance.patches, list)
 
@@ -191,4 +191,4 @@ class TestContractMirror:
         d = mirror.model_dump()
         restored = BoundExecutionTargetMirror.model_validate(d)
         assert restored.backend == "kodo"
-        assert restored.provenance.repo == "Velascat/kodo"
+        assert restored.provenance.repo == "ProtocolWarden/kodo"

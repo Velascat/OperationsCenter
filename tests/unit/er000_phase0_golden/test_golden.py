@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """ER-000 — Phase 0 golden-tests freeze.
 
 Pin current behavior before the four-primitives epic (ER-001 repo graph,

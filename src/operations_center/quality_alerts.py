@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Helpers for surfacing kodo run quality issues + escalation events.
 
 Cited by `docs/design/autonomy/autonomy_gaps.md` Wave 5 (S5-10 Quality Erosion,

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Command resolution — produce a ManagedAuditInvocationRequest from config.
 
 Given a repo_id, audit_type, and run_id, this module:

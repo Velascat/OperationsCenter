@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """operations-center-propagation-links — inspect parent-child chains (R5.5).
 
 Reads PropagationRecord artifacts from the configured record_dir and

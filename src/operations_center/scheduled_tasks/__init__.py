@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Scheduled task seeder — periodically injects Plane work items.
 
 What this is: a generator. Each propose cycle, we check every entry in

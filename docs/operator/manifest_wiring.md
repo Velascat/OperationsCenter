@@ -185,4 +185,4 @@ Every `propagate()` run writes a `PropagationRecord` artifact to `state/propagat
 
 - [Manifest Authoring](manifest_authoring.md) — what to put in `topology/project_manifest.yaml`
 - [Runtime Settings](runtime.md) — broader OC config reference
-- PlatformManifest [v0.4.0 release](https://github.com/Velascat/PlatformManifest/releases/tag/v0.4.0)
+- PlatformManifest [v0.4.0 release](https://github.com/ProtocolWarden/PlatformManifest/releases/tag/v0.4.0)

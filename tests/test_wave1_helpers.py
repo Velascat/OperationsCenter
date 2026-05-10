@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Tests for the Wave 1 helpers introduced from autonomy_gaps.md phantoms.
 
 Each function is small and pure (or a thin shim around an existing call)

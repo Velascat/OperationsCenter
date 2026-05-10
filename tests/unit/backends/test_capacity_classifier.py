@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """G-V04 / G-005 — capacity-exhaustion classifier tests.
 
 Confirms the shared classifier matches observed-in-the-wild phrases and

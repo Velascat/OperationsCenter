@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Phase 7 — historical artifact index CLI.
 
 Mounted into ``operations-center-audit`` as flat top-level commands:

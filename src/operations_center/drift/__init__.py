@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Drift detection layer — system-wide, not per-backend.
 
 Backend drift is when an executor's observed behavior differs from what

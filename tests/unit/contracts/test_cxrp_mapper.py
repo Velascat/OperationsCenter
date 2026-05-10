@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Phase 3: OC's contracts produce wire payloads conforming to CxRP v0.2.
 
 Tests assert each OC→CxRP mapper emits a shape that validates against the
@@ -82,7 +82,7 @@ def _serialize_result(result: CxrpExecutionResult) -> dict:
 def _make_target() -> TaskTarget:
     return TaskTarget(
         repo_key="velascat/api-service",
-        clone_url="https://github.com/Velascat/api-service.git",
+        clone_url="https://github.com/ProtocolWarden/api-service.git",
         base_branch="main",
     )
 
@@ -125,7 +125,7 @@ def _make_request(proposal_id: str, decision_id: str) -> ExecutionRequest:
         goal_text="Guard User.email access.",
         constraints_text="do not modify migrations",
         repo_key="velascat/api-service",
-        clone_url="https://github.com/Velascat/api-service.git",
+        clone_url="https://github.com/ProtocolWarden/api-service.git",
         base_branch="main",
         task_branch="fix/user-serializer-null-email",
         workspace_path=Path("/var/oc/workspaces/run-001"),
@@ -148,7 +148,7 @@ def _make_result(request: ExecutionRequest) -> ExecutionResult:
         validation=ValidationSummary(status=ValidationStatus.PASSED, commands_run=1, commands_passed=1),
         branch_pushed=True,
         branch_name="fix/user-serializer-null-email",
-        pull_request_url="https://github.com/Velascat/api-service/pull/482",
+        pull_request_url="https://github.com/ProtocolWarden/api-service/pull/482",
         artifacts=[
             ExecutionArtifact(
                 artifact_type=ArtifactType.DIFF,
@@ -159,7 +159,7 @@ def _make_result(request: ExecutionRequest) -> ExecutionResult:
             ExecutionArtifact(
                 artifact_type=ArtifactType.PR_URL,
                 label="opened PR",
-                uri="https://github.com/Velascat/api-service/pull/482",
+                uri="https://github.com/ProtocolWarden/api-service/pull/482",
             ),
         ],
         completed_at=datetime.now(tz=timezone.utc),

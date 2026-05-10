@@ -36,7 +36,7 @@
   discovered_at: "2026-05-05"
   backend_version: "0.4.272"
   impact: "Internal Kodo bug crashes the orchestrator on the first cycle when using claude-code backend. OrchestratorBase.run() unconditionally passes coach=coach; ClaudeCodeOrchestrator.cycle() and KimiCodeOrchestrator.cycle() didn't accept it."
-  workaround: "RESOLVED 2026-05-06: upstream PR #49 (syamai) MERGED into ikamensh/kodo dev as commit c01d39f at 2026-05-06T10:04Z. Velascat/kodo dev reset to upstream HEAD (9758a0a); patch branch fix/coach-kwarg-orchestrator-subclasses deleted; PATCH-001 yaml dropped. Fork now mirrors upstream (zero local patches). Reinstalled via uv tool install. Daily poll fired DROP_PATCH suggestion correctly — framework lifecycle worked end-to-end."
+  workaround: "RESOLVED 2026-05-06: upstream PR #49 (syamai) MERGED into ikamensh/kodo dev as commit c01d39f at 2026-05-06T10:04Z. ProtocolWarden/kodo dev reset to upstream HEAD (9758a0a); patch branch fix/coach-kwarg-orchestrator-subclasses deleted; PATCH-001 yaml dropped. Fork now mirrors upstream (zero local patches). Reinstalled via uv tool install. Daily poll fired DROP_PATCH suggestion correctly — framework lifecycle worked end-to-end."
   fork_threshold: "no longer applies — upstream merged the equivalent fix"
   status: upstream_merged
   patch_deadline: null

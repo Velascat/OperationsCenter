@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """CLI entry point: ``operations-center-run-show``.
 
 Reads a single run's ``execution_trace.json`` and prints the full

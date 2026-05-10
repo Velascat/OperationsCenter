@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Run identity generation and ENV injection for managed repo audits.
 
 Phase 4 of the OpsCenter ↔ ExampleManagedRepo audit system.

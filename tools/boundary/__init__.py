@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Boundary audit utilities (ER-000 Phase 0 freeze).
 
 Lightweight, dependency-free checks that pin cross-repo boundaries before

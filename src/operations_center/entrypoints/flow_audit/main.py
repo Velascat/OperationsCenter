@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Flow-audit scanner.
 
 The complement to ghost_audit. Each detector measures whether a *flow gap*

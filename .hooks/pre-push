@@ -9,7 +9,7 @@ set -e
 
 if ! command -v custodian-multi >/dev/null 2>&1; then
     echo "[custodian-pre-push] custodian-multi not on PATH — skipping audit guard"
-    echo "    install with: pip install git+https://github.com/Velascat/Custodian.git@main"
+    echo "    install with: pip install git+https://github.com/ProtocolWarden/Custodian.git@main"
     exit 0
 fi
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Archon normalizer — Phase 2.
 
 Maps a raw Archon workflow capture into the normalized CxRP ExecutionResult

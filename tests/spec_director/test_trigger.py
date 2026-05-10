@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 # tests/spec_director/test_trigger.py
 from __future__ import annotations
 from pathlib import Path

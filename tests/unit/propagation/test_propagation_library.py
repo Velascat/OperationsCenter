@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Tests for the propagation library (R5.1).
 
 Covers each module independently + end-to-end propagator orchestration.

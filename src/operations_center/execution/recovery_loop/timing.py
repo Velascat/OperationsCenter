@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Bounded synchronous sleep helper.
 
 Used by ``ExecutionCoordinator`` to enforce ``RecoveryOutcome.delay_seconds``

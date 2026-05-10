@@ -33,7 +33,7 @@
 - id: G-004
   gap: "Archon binder produced wrong provider/model values (would have written a config Archon's loader rejects)"
   discovered_at: "2026-05-05"
-  backend_version: "0.3.6 (Velascat/Archon @ fa6fc46f)"
+  backend_version: "0.3.6 (ProtocolWarden/Archon @ fa6fc46f)"
   impact: "Pre-fix binder wrote `{provider: anthropic, model: claude-opus-4}` to .archon/config.yaml. Real Archon expects `{provider: claude, model: opus}` — verified against `packages/core/src/config/config-types.ts` (provider: 'claude' | 'codex') and 14 shipped workflow YAMLs in `.archon/workflows/defaults/`. Any real Archon dispatch from OC would have failed at config-load time. Discovered 2026-05-06 during while-away source-spike — bun not installed locally so couldn't invoke Archon directly; read source instead."
   workaround: "MITIGATED 2026-05-06: binder fix landed (commit pending). _PROVIDER_TO_ARCHON maps anthropic→claude, openai→codex; model passes verbatim (no '-4' aliasing). 9 binder tests revalidated. Real-run validation still pending against G-003."
   fork_threshold: "no fork — local binder fix"
@@ -43,7 +43,7 @@
 - id: G-005
   gap: "stock Archon's POST /api/workflows/:name/run accepts only {conversationId, message} — no per-request runtime channel for HTTP-mode dispatch"
   discovered_at: "2026-05-07"
-  backend_version: "0.3.10 (Velascat/Archon @ fd6d75e7)"
+  backend_version: "0.3.10 (ProtocolWarden/Archon @ fd6d75e7)"
   impact: |
     G-001 was originally mitigated via .archon/config.yaml in the worktree
     (CLI mode). But the new HTTP-mode dispatcher (OperationsCenter#85) runs
@@ -54,7 +54,7 @@
     RuntimeBinding's per-request guarantee.
   workaround: |
     FORKED 2026-05-07: branch feat/per-request-runtime-override on
-    Velascat/Archon adds optional `provider`/`model` fields to
+    ProtocolWarden/Archon adds optional `provider`/`model` fields to
     runWorkflowBodySchema. Threaded through HandleMessageContext.runtimeOverride
     into dispatchOrchestratorWorkflow; applied by mutating the in-memory
     workflow object's provider/model before any executeWorkflow call. OC's

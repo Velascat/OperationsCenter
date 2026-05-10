@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Repo graph construction helper for OperationsCenter.
 
 Thin wrapper around ``platform_manifest.load_effective_graph`` that

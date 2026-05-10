@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """S10-4: Campaign/project tracking store.
 
 A *campaign* is a named multi-step execution plan created by

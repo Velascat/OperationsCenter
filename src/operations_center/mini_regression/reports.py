@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Suite report persistence.
 
 write_suite_report() writes a MiniRegressionSuiteReport to a stable path.

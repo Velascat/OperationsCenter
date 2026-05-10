@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """S10-8: Real-time CI webhook receiver.
 
 Listens for GitHub ``check_run`` webhook events and triggers an immediate

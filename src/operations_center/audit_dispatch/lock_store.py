@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Crash-safe on-disk lock store for managed-repo audit dispatch.
 
 Each held lock is one JSON file at ``state/audit_dispatch/locks/{repo_id}.lock``

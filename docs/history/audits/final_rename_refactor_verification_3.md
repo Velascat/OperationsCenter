@@ -25,7 +25,7 @@ OperationsCenter operator docs) were fixed during this audit. All test suites pa
 ### Primary search (exact/pattern)
 ```
 FOB|ControlPlane|control[-_]plane|\.fob|9router|nine[-_]router|
-Velascat/ControlPlane|Velascat/FOB|cp-status|cp-task|cp_task|
+ProtocolWarden/ControlPlane|ProtocolWarden/FOB|cp-status|cp-task|cp_task|
 active-task\.md|active-mission\.md|directives\.md|standing-orders\.md|
 mission-log\.md|\.briefing|templates/mission
 ```
@@ -138,6 +138,6 @@ The canonical names across all four repositories are:
 | **SwitchBoard** | Lane routing service; `LaneSelector` + backend adapters |
 | **WorkStation** | Infrastructure host; Docker Compose, env config, provider creds |
 
-No legacy names (FOB, ControlPlane, control-plane, 9router, nine-router, Velascat/FOB,
-Velascat/ControlPlane) appear in any active source, config, template, script, or
+No legacy names (FOB, ControlPlane, control-plane, 9router, nine-router, ProtocolWarden/FOB,
+ProtocolWarden/ControlPlane) appear in any active source, config, template, script, or
 operator-facing documentation as of this audit.

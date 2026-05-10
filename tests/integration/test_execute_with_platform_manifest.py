@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Integration test: operations-center-execute reads the platform_manifest block.
 
 R4.2 of the manifest-primitive operational rollout. Exercises the full

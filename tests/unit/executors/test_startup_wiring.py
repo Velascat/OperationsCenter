@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Verify the OC_VALIDATE_CATALOG_AT_STARTUP env var actually wires
 the catalog validator into the audit CLI's app callback.
 """

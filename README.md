@@ -130,7 +130,7 @@ For full architecture and examples see:
 
 ### Canonical contract types
 
-OperationsCenter consumes canonical contracts from [CxRP](https://github.com/Velascat/CxRP) (orchestration) and [RxP](https://github.com/Velascat/RxP) (runtime), and maps them to/from internal Pydantic models defined in `src/operations_center/contracts/` (mapper: `contracts/cxrp_mapper.py`):
+OperationsCenter consumes canonical contracts from [CxRP](https://github.com/ProtocolWarden/CxRP) (orchestration) and [RxP](https://github.com/ProtocolWarden/RxP) (runtime), and maps them to/from internal Pydantic models defined in `src/operations_center/contracts/` (mapper: `contracts/cxrp_mapper.py`):
 
 | Module | Types |
 |---|---|
@@ -371,7 +371,7 @@ report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisR
 2. Observed historical evidence (retained ExecutionRecords)
 3. Proposed strategy changes (tuning proposals, subject to review)
 
-See [WorkStation/docs/architecture/routing/routing-tuning.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/routing/routing-tuning-examples.md) for examples.
+See [WorkStation/docs/architecture/routing/routing-tuning.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/routing/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/routing/routing-tuning-examples.md) for examples.
 
 ### Upstream Patch Evaluation (Phase 14)
 
@@ -395,7 +395,7 @@ Design rules:
 - Patch proposals are reviewable recommendations, not silent commitments
 - Maintenance burden and divergence risk are part of every serious recommendation
 
-See [WorkStation/docs/architecture/contracts/upstream-patch-evaluation.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/Velascat/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation-examples.md).
+See [WorkStation/docs/architecture/contracts/upstream-patch-evaluation.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation-examples.md).
 
 ---
 
@@ -939,7 +939,7 @@ Notes:
 
 OperationsCenter owns everything about how autonomous agents reason, act, and interact with platform services: the autonomy loop, proposal/decision logic, executor adapters (Aider, Kodo), and client adapters for Plane and SwitchBoard (`PlaneClient`, `SwitchBoardClient`).
 
-OperationsCenter does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/Velascat/WorkStation). OperationsCenter's `.env.operations-center.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
+OperationsCenter does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/ProtocolWarden/WorkStation). OperationsCenter's `.env.operations-center.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
 
 **Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `WorkStation/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. WorkStation must be cloned as a sibling directory (or `OPERATIONS_CENTER_WORKSTATION_DIR` must be set).
 

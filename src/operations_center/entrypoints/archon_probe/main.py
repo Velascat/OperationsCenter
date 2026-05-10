@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """``operations-center-archon-probe`` — health-probe a running Archon.
 
 Standalone CLI for ops/monitoring. Wraps

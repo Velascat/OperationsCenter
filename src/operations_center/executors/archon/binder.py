@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """R3 — RuntimeBinding → .archon/config.yaml templater (closes G-001 in code).
 
 Per the spike (2026-05-05): Archon's per-workflow LLM provider/model can
@@ -30,7 +30,7 @@ import yaml
 
 from operations_center.contracts.execution import RuntimeBindingSummary
 
-# Verified against real Archon source 2026-05-05 (Velascat/Archon @ fa6fc46f):
+# Verified against real Archon source 2026-05-05 (ProtocolWarden/Archon @ fa6fc46f):
 #   - provider literals on the wire: 'claude' | 'codex' (NOT 'anthropic'/'openai')
 #   - claude models: 'opus' | 'sonnet' | 'haiku' | 'claude-*' | 'inherit' (verbatim)
 #   - workflow YAML uses bare model names directly — no '-4' aliasing needed

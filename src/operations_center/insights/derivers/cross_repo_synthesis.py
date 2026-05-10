@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """S10-9: Cross-repo synthesis deriver.
 
 Reads the most recently generated insight artifact for each monitored repo and

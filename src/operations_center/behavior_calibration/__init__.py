@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Phase 8 — Behavior Calibration for Managed Repo Audit Artifacts.
 
 Provides advisory analysis over Phase 7 artifact indexes.

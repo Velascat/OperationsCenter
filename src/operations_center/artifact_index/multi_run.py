@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Multi-run artifact index — Phase 7 historical query layer.
 
 Walks a directory of past managed-audit runs, loads every

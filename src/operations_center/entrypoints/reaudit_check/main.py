@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """R5 — Phase 13 re-audit trigger CLI.
 
 Iterates every backend in the catalog, calls ``needs_reaudit()`` with

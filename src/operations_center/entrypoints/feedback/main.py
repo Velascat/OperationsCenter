@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Record proposal feedback outcomes for the autonomy feedback loop.
 
 Also updates the Phase 6 confidence calibration store when the feedback record
