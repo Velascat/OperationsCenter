@@ -53,6 +53,13 @@ def metadata_to_summary(metadata: RecoveryMetadata):
                 handler_name=a.handler_name,
                 modified_fields=list(a.modified_fields),
                 delay_seconds=a.delay_seconds,
+                executor_exit_code=a.executor_exit_code,
+                executor_signal=a.executor_signal,
+                retry_strategy_used=a.retry_strategy_used,
+                retry_strategy_changed=a.retry_strategy_changed,
+                remediation_attempt_number=a.remediation_attempt_number,
+                remediation_lineage_id=a.remediation_lineage_id,
+                prior_failure_signature=a.prior_failure_signature,
             )
             for a in metadata.actions
         ],
@@ -78,6 +85,7 @@ def attach_recovery_metadata(result, actions: tuple[RecoveryAction, ...]):
         RecoveryDecision.STOP_COST_BUDGET_EXHAUSTED: "cost budget exhausted",
         RecoveryDecision.STOP_IDEMPOTENCY_REQUIRED: "non-idempotent request, retry refused",
         RecoveryDecision.STOP_BACKOFF_REQUIRED: "rate-limit retry requires bounded backoff",
+        RecoveryDecision.STOP_COOLDOWN_REQUIRED: "backend cooldown active",
         RecoveryDecision.REJECT_UNRECOVERABLE: "non-retryable failure",
     }
     retry_refused_reason = refused_reasons.get(final_decision)

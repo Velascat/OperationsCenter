@@ -22,8 +22,10 @@ Evaluation rules (in order):
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from operations_center.contracts.execution import ExecutionResult
+from operations_center.backend_health import BackendHealthRegistry, BackendHealthState
 
 from .classifier import FailureClassifier
 from .handlers import RecoveryHandler
@@ -99,11 +101,13 @@ class RecoveryEngine:
         policy: RecoveryPolicy,
         handlers: Sequence[RecoveryHandler],
         budget_checker: RetryBudgetChecker | None = None,
+        backend_health_registry: BackendHealthRegistry | None = None,
     ) -> None:
         self._classifier = classifier
         self._policy = policy
         self._handlers = tuple(handlers)
         self._budget_checker = budget_checker
+        self._backend_health_registry = backend_health_registry
 
     def evaluate(
         self,
@@ -124,6 +128,32 @@ class RecoveryEngine:
 
         # Rule 2: classify
         failure_kind = self._classifier.classify(result, context)
+
+        backend_id = _backend_id(context)
+        if self._backend_health_registry is not None and backend_id is not None:
+            _record, transition = self._backend_health_registry.record_failure(
+                backend_id,
+                result,
+                now=datetime.now(UTC),
+            )
+            if (
+                transition.current
+                in {BackendHealthState.UNSTABLE, BackendHealthState.UNAVAILABLE}
+                and transition.cooldown_applied
+            ):
+                return RecoveryOutcome(
+                    decision=RecoveryDecision.STOP_COOLDOWN_REQUIRED,
+                    action=_build_action(
+                        attempt=context.attempt,
+                        failure_kind=failure_kind,
+                        decision=RecoveryDecision.STOP_COOLDOWN_REQUIRED,
+                        reason=(
+                            "backend health registry applied cooldown after "
+                            f"{transition.reason}"
+                        ),
+                        handler_name="backend_health_registry",
+                    ),
+                )
 
         # Rule 3: UNKNOWN reject (unless policy opts in)
         if failure_kind == ExecutionFailureKind.UNKNOWN:
@@ -280,6 +310,16 @@ class RecoveryEngine:
                 reason="no handler returned an outcome",
             ),
         )
+
+
+def _backend_id(context: RecoveryContext) -> str | None:
+    target = context.current_request.bound_target
+    if target is not None and target.backend:
+        return target.backend
+    binding = context.current_request.runtime_binding
+    if binding is not None and binding.kind:
+        return binding.kind
+    return None
 
 
 # Adapter error code is unused here directly; re-exported from models.py via __init__.
