@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Settings load — platform_manifest path resolution + slug auto-resolve."""
 from __future__ import annotations
 

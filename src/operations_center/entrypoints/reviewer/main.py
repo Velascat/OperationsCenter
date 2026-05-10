@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Reviewer entrypoint — delegates to pr_review_watcher.main.
 
 This shim exists so operations-center.sh can continue to address the review

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """SwitchBoard ExecutorCatalog port adapter.
 
 OC's catalog is the truth source. SB defines a port (3 query methods)

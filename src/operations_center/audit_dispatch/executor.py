@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Execute managed audit commands as external subprocesses.
 
 Captures stdout and stderr to log files. Never uses shell=True.

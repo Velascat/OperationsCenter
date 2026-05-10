@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """G-V02 — SwitchBoard routing provenance must reach ExecutionRecord.metadata.
 
 The execution_record.json artifact must surface the routing decision so an

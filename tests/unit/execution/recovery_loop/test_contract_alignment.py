@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Contract / schema alignment tests for recovery-loop additions.
 
 Execution contracts are Pydantic-only (no separate JSON schema files), so

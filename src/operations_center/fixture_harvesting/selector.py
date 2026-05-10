@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Artifact selection for fixture harvesting.
 
 select_fixture_artifacts() applies profile-driven rules to a ManagedArtifactIndex

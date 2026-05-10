@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Tests for Session 10 autonomy gap implementations.
 
 S10-4  Campaign/project tracking (CampaignStore + campaign-status CLI)

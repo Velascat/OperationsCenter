@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Tests for the multi-run artifact index (Phase 7 Steps 1-5)."""
 
 from __future__ import annotations

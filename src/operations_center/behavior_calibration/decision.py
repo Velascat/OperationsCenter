@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """CalibrationDecision — the promotion artifact between recommendations and changes.
 
 A CalibrationDecision records that a human has reviewed one or more

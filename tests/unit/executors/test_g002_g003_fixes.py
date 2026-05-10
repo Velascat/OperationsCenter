@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Regression tests for the G-002 and G-003 fixes from the real R6 run."""
 from __future__ import annotations
 

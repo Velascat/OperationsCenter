@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Tests for worker/main.py SwitchBoard failure handling.
 
 When SwitchBoardUnavailableError is raised during route_proposal(), the worker

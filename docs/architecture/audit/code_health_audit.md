@@ -23,7 +23,7 @@ consumers, untagged TODO debt, and so on.
 
 ## Encoded check
 
-This audit is now run by [Custodian](https://github.com/Velascat/Custodian),
+This audit is now run by [Custodian](https://github.com/ProtocolWarden/Custodian),
 the cross-repo audit toolkit. OC's nine OC-specific detectors live in
 `_custodian/detectors.py` and are registered via `.custodian/config.yaml`;
 Custodian's own generic `C1`-`C8` (TODO / print / bare-except / etc.) run

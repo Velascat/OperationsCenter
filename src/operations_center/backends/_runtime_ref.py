@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Helper for building ``ExecutionResult.runtime_invocation_ref``.
 
 Adapters that delegate execution mechanics to ExecutorRuntime call

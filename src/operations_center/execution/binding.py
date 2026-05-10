@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """bind_execution_target — convert CxRP envelope → OC bound target.
 
 Schema 0.3 (closed-system simplification): envelope.backend and

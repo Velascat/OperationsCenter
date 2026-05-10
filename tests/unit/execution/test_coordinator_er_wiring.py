@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Wiring tests for ER-001/ER-002/ER-003 inside ExecutionCoordinator."""
 
 from __future__ import annotations

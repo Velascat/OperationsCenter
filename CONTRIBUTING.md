@@ -11,7 +11,7 @@ OperationsCenter is the planning, orchestration, and execution boundary for the 
 ## Development Setup
 
 ```bash
-git clone https://github.com/Velascat/OperationsCenter.git
+git clone https://github.com/ProtocolWarden/OperationsCenter.git
 cd OperationsCenter
 python3 -m venv .venv
 source .venv/bin/activate

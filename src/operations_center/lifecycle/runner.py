@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Lifecycle runner — drives plan/execute/verify stages with deterministic policy.
 
 The runner is backend-agnostic and never calls a real LLM. Stage handlers

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Round-3 wiring: build_effective_repo_graph + ExecutionCoordinator.
 
 Confirms OC consumes the merged EffectiveRepoGraph (platform + project

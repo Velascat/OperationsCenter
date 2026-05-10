@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """
 backends/demo_stub/adapter.py — deterministic stub backend for demo and integration tests.
 

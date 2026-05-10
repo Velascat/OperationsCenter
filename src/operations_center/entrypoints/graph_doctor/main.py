@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """operations-center-graph-doctor — diagnose EffectiveRepoGraph wiring.
 
 Runs the same `build_effective_repo_graph_from_settings` factory that

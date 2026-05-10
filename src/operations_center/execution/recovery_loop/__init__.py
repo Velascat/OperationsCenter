@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Bounded recovery loop wrapping ``ExecutionCoordinator``'s adapter call.
 
 See ``docs/architecture/recovery/recovery_loop_design.md``.

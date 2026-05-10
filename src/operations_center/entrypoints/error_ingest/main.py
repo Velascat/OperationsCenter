@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Runtime error ingestion service (S8-8).
 
 Ingests runtime errors from two sources and converts them to Plane tasks:

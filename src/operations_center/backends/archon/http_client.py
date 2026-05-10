@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """HTTP client helpers for talking to a running Archon instance.
 
 Connectivity-level helpers: health probe, conversation create, run

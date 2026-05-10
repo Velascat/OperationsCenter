@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Normalizer tests — Phase 2 enforcement: no shape leaks past this layer."""
 from __future__ import annotations
 

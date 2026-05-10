@@ -6,35 +6,35 @@ The hardening work is complete. The system is running with two active repos (Ope
 
 ### tuning — Run analyze-artifacts loop and document threshold adjustments
 Run `analyze-artifacts` weekly, identify suppression patterns, tune per-family thresholds, document changes.
-Tracked: [#17](https://github.com/Velascat/OperationsCenter/issues/17)
+Tracked: [#17](https://github.com/ProtocolWarden/OperationsCenter/issues/17)
 **Status**: in progress (`docs/operator/tuning.md` created; first tuning run pending)
 
 ---
 
 ### tuning — Candidate-family heuristics review
 Review emit/suppress rates for observation_coverage, test_visibility, dependency_drift. Define promotion criteria for hotspot_concentration and todo_accumulation.
-Tracked: [#18](https://github.com/Velascat/OperationsCenter/issues/18)
+Tracked: [#18](https://github.com/ProtocolWarden/OperationsCenter/issues/18)
 **Status**: open
 
 ---
 
 ### trust — Validate PR review loop end-to-end
 Run the two-phase review loop against a real or controlled test PR. Verify audit trail, guardrail checklist, and escalation path.
-Tracked: [#19](https://github.com/Velascat/OperationsCenter/issues/19)
+Tracked: [#19](https://github.com/ProtocolWarden/OperationsCenter/issues/19)
 **Status**: open (`docs/operator/pr_review.md` created; live validation pending)
 
 ---
 
 ### docs — Promote golden-path demo as ongoing validation ritual
 README and demo.md updated to position the demo as a post-change ritual. Ensure demo stays runnable as config and thresholds change.
-Tracked: [#20](https://github.com/Velascat/OperationsCenter/issues/20)
+Tracked: [#20](https://github.com/ProtocolWarden/OperationsCenter/issues/20)
 **Status**: done (demo.md updated with Autonomy-Cycle Ritual section; README updated)
 
 ---
 
 ### docs — Polish public docs packaging
 Operator docs suite: tuning.md, pr_review.md, runtime.md (dry-run-first), README cross-links, backlog update.
-Tracked: [#21](https://github.com/Velascat/OperationsCenter/issues/21)
+Tracked: [#21](https://github.com/ProtocolWarden/OperationsCenter/issues/21)
 **Status**: done (all operator docs created/updated)
 
 ---

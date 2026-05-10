@@ -4,7 +4,7 @@ How to author a `topology/project_manifest.yaml` for a project repo.
 
 PlatformManifest's 3-layer design separates public platform repos from private project repos from machine-local wiring. This page covers the **project layer**: how a single project (private or public) declares itself and attaches to the platform.
 
-For the design rationale, see PlatformManifest's [README](https://github.com/Velascat/PlatformManifest/blob/main/README.md).
+For the design rationale, see PlatformManifest's [README](https://github.com/ProtocolWarden/PlatformManifest/blob/main/README.md).
 
 ---
 
@@ -90,7 +90,7 @@ Private nodes never leak into PlatformManifest's bundled YAML — the loader rej
 ## Validate before committing
 
 ```bash
-pip install "platform-manifest @ git+https://github.com/Velascat/PlatformManifest.git@v0.9.0"
+pip install "platform-manifest @ git+https://github.com/ProtocolWarden/PlatformManifest.git@v0.9.0"
 
 platform-manifest validate topology/project_manifest.yaml   --expected project
 platform-manifest validate topology/work_scope_manifest.yaml --expected work_scope
@@ -241,4 +241,4 @@ All caught by `platform-manifest validate` at PR time.
 ## Related
 
 - [Manifest Wiring](manifest_wiring.md) — how OperationsCenter picks up your project manifest at runtime
-- [PlatformManifest design doc](https://github.com/Velascat/PlatformManifest/blob/main/README.md)
+- [PlatformManifest design doc](https://github.com/ProtocolWarden/PlatformManifest/blob/main/README.md)

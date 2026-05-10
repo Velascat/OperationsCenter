@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """LintClusterRule — propose systematic refactor for persistently-dirty files.
 
 Fires on theme/lint_cluster and theme/type_cluster insights from ThemeAggregationDeriver.

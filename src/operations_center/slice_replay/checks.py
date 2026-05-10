@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Individual slice replay check implementations.
 
 Each check is a pure, local, deterministic function over fixture pack data.

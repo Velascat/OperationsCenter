@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Verification Gaps Round 2 — SourceRegistry wired for real (Option B).
 
 Closes the four-revs-of-ducking from the post-extraction validation
@@ -47,7 +47,7 @@ from operations_center.planning.proposal_builder import build_proposal
 
 def test_provenance_from_registry_resolves_real_kodo_entry(monkeypatch, tmp_path: Path) -> None:
     """The shipped registry/source_registry.yaml must resolve `kodo` to
-    its Velascat fork with a populated expected_sha.
+    its ProtocolWarden fork with a populated expected_sha.
 
     Pinned because the validation revs flagged "SourceRegistry not
     exercised on live execute paths"; this is the smallest end-to-end
@@ -60,7 +60,7 @@ def test_provenance_from_registry_resolves_real_kodo_entry(monkeypatch, tmp_path
 
     assert provenance is not None, "kodo entry must resolve from registry/source_registry.yaml"
     assert provenance.source == "registry"
-    assert provenance.repo == "Velascat/kodo"
+    assert provenance.repo == "ProtocolWarden/kodo"
     assert provenance.ref  # non-empty SHA — pinned per registry
     assert isinstance(provenance.patches, list)
 
@@ -98,7 +98,7 @@ def test_bound_target_carries_registry_provenance_when_resolvable(monkeypatch) -
     assert bound.backend == "kodo"
     assert bound.provenance is not None
     assert bound.provenance.source == "registry"
-    assert bound.provenance.repo == "Velascat/kodo"
+    assert bound.provenance.repo == "ProtocolWarden/kodo"
     assert bound.provenance.ref
 
 
@@ -137,7 +137,7 @@ def test_request_builder_attaches_bound_target_with_provenance(monkeypatch, tmp_
     assert request.bound_target is not None
     assert request.bound_target.provenance is not None
     assert request.bound_target.provenance.source == "registry"
-    assert request.bound_target.provenance.repo == "Velascat/kodo"
+    assert request.bound_target.provenance.repo == "ProtocolWarden/kodo"
     assert request.bound_target.provenance.ref
 
 
@@ -204,7 +204,7 @@ def test_provenance_appears_on_execution_record_metadata_and_trace(monkeypatch) 
     prov_meta = outcome.record.metadata.get("provenance")
     assert prov_meta is not None, "provenance must surface on record.metadata"
     assert prov_meta["source"] == "registry"
-    assert prov_meta["repo"] == "Velascat/kodo"
+    assert prov_meta["repo"] == "ProtocolWarden/kodo"
     assert prov_meta["ref"]
 
     # Trace forwards the same block.

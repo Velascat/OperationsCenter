@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """R2 — RuntimeBinding → Kodo team-config binder.
 
 Closes Kodo's G-001 from the OC side: until Kodo accepts a per-invocation

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 from __future__ import annotations
 
 import subprocess
@@ -24,7 +24,7 @@ def _write_config(tmp_path: Path) -> Path:
                 "kodo: {}",
                 "repos:",
                 "  operations-center:",
-                "    clone_url: git@github.com:Velascat/OperationsCenter.git",
+                "    clone_url: git@github.com:ProtocolWarden/OperationsCenter.git",
                 "    default_branch: main",
                 f"report_root: {tmp_path / 'reports'}",
             ]

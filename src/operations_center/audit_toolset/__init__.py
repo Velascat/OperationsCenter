@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Audit toolset contract layer for managed repo audits.
 
 Phase 3 of the OpsCenter ↔ ExampleManagedRepo audit system.

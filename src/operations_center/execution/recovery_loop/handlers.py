@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Recovery handlers — strategy objects for recovery decisions.
 
 The handler protocol uses a single ``recover()`` method. Returning ``None``

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Clean up stale per-task state files.
 
 `state/proposal_feedback/`, `state/pr_reviews/`, `state/improve_insights/`,

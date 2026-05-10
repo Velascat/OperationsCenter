@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """
 contracts — OperationsCenter's internal subtype of the CxRP envelope.
 
@@ -15,7 +15,7 @@ OperatorConsole, run artifacts) these models are translated to CxRP shape
 via ``operations_center.contracts.cxrp_mapper``. The wire format is CxRP;
 this module is the OC-internal subtype.
 
-Canonical wire format:  CxRP v0.2 (https://github.com/Velascat/CxRP)
+Canonical wire format:  CxRP v0.2 (https://github.com/ProtocolWarden/CxRP)
 Internal owner:         OperationsCenter (Pydantic; this package)
 """
 

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Track record for the per-request runtime override patch on the Archon fork.
-# Format mirrors the kodo PATCH precedent (Velascat/kodo PATCH-001 referenced
+# Format mirrors the kodo PATCH precedent (ProtocolWarden/kodo PATCH-001 referenced
 # in OC log 2026-05-05/06).
 
 patch_id: PATCH-001
@@ -47,7 +47,7 @@ notes: |
   Why fork rather than upstream-first: per the "managed forks first" pattern
   (SourceRegistry: "Adapters first; fork when invariants can't be enforced
   externally"). The OC integration needed this channel to ship; we apply the
-  fix on the Velascat/Archon fork now and file an upstream PR later when the
+  fix on the ProtocolWarden/Archon fork now and file an upstream PR later when the
   integration has matured enough to advocate for the API change.
 
 metadata:

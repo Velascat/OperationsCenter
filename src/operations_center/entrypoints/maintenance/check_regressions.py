@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Detect post-merge regressions and (optionally) open revert PRs.
 
 Wraps `operations_center.post_merge_regression.detect_post_merge_regressions`

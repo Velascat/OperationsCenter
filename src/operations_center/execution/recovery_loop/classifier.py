@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """ExecutionResult → ExecutionFailureKind classification.
 
 The default classifier uses structured fields on ``ExecutionResult``

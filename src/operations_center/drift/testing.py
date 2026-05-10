@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """DriftInjectionFixture — shared fixture for per-backend drift verification.
 
 Per the spec (System Phase): every backend must include synthetic drift

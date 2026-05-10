@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Tests that lint and type collectors compute true distinct_file_count from full output.
 
 The collectors cap top_violations / top_errors at _MAX_ERRORS (20), but distinct_file_count

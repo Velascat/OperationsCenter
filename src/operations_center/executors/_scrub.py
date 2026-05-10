@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Sample scrubber — strip secrets/PII before committing backend samples.
 
 Real adapter runs capture stdout/stderr/logs/env that may contain API

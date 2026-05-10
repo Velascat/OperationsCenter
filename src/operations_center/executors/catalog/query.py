@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """V1 catalog queries — three only.
 
 No ranking, no scoring, no DSL. Each query takes the catalog + a filter

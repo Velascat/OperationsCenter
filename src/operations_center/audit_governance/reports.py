@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Governance report persistence.
 
 write_governance_report() writes an AuditGovernanceReport to a durable path.

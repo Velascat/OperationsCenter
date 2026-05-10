@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """SwitchBoard denylist: orchestration symbols forbidden inside the SB package.
 
 SwitchBoard owns lane/backend selection only. Orchestration, lifecycle,

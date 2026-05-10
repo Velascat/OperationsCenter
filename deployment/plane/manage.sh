@@ -34,7 +34,7 @@ if [[ ! -f "${WORKSTATION_DIR}/scripts/plane.sh" ]]; then
   echo "  Plane infrastructure is canonically owned by WorkStation."
   echo "  Clone WorkStation alongside OperationsCenter:"
   echo ""
-  echo "    git clone https://github.com/Velascat/WorkStation ${WORKSTATION_DIR}"
+  echo "    git clone https://github.com/ProtocolWarden/WorkStation ${WORKSTATION_DIR}"
   echo ""
   echo "  Or set OPERATIONS_CENTER_WORKSTATION_DIR to the WorkStation repo root:"
   echo ""

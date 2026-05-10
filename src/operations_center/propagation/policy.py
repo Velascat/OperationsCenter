@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Propagation policy — when does a contract change auto-fire downstream tasks?
 
 Operators express intent at three layers:

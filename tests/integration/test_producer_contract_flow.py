@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Integration test: Phase 5 fake-producer contract flow.
 
 Simulates what a ExampleManagedRepo audit would produce (run_status.json +

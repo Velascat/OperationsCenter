@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Multi-step planning helpers — split complex goals into a chain of subtasks.
 
 Cited by `docs/design/autonomy/autonomy_gaps.md` §8 (Multi-Step Dependency Planning)

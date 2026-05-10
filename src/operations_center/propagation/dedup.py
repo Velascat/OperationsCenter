@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Idempotency for propagation — JSON sidecar in state/.
 
 Dedup key: ``(target_repo_id, consumer_repo_id, target_version_or_sha)``.

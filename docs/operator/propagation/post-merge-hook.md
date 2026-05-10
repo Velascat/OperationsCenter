@@ -25,7 +25,7 @@ jobs:
       - name: Checkout OperationsCenter
         uses: actions/checkout@v4
         with:
-          repository: Velascat/OperationsCenter
+          repository: ProtocolWarden/OperationsCenter
           token: ${{ secrets.OC_REPO_TOKEN }}    # PAT with repo read
           path: oc
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """OperationsCenter plugin detectors for Custodian.
 
 Remaining OC-specific detectors (cannot be expressed by native Custodian config):

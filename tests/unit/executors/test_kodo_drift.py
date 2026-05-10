@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Per-backend drift verification for Kodo.
 
 Per the spec, ``audit_verdict.yaml::drift_detection: PASS`` is only

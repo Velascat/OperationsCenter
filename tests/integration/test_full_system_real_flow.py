@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Integration test: full system real flow (no real ExampleManagedRepo subprocess).
 
 Exercises the complete pipeline from a fake ExampleManagedRepo producer through:

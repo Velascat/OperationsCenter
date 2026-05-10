@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Cross-process concurrency proof for the persistent lock store (Phase 6, Slice E).
 
 Spawns two real Python subprocesses competing for the same repo lock and

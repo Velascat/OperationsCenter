@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """File-level locking for governance state files (Linux/macOS only).
 
 Wraps fcntl.flock (POSIX) to provide exclusive, auto-released locks on state

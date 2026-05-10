@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 Velascat
+# Copyright (C) 2026 ProtocolWarden
 """Invariant lockdown tests for the recovery loop.
 
 These tests prevent recovery-policy logic from leaking across architectural
