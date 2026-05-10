@@ -7,11 +7,31 @@
 # Bypass intentionally: git push --no-verify
 set -e
 
-if ! command -v custodian-multi >/dev/null 2>&1; then
-    echo "[custodian-pre-push] custodian-multi not on PATH — skipping audit guard"
-    echo "    install with: pip install git+https://github.com/ProtocolWarden/Custodian.git@main"
+repo_root="$(git rev-parse --show-toplevel)"
+workspace_root="$(cd "$repo_root/.." && pwd)"
+
+custodian_multi=""
+if command -v custodian-multi >/dev/null 2>&1; then
+    custodian_multi="$(command -v custodian-multi)"
+fi
+
+for candidate in \
+    "$custodian_multi" \
+    "$repo_root/.venv/bin/custodian-multi" \
+    "$repo_root/.warehouse-venv/bin/custodian-multi" \
+    "$workspace_root/Custodian/.venv/bin/custodian-multi"
+do
+    if [ -x "$candidate" ]; then
+        custodian_multi="$candidate"
+        break
+    fi
+done
+
+if [ -z "$custodian_multi" ]; then
+    echo "[custodian-pre-push] custodian-multi not found — skipping audit guard"
+    echo "    install with: python -m pip install -e /home/dev/Documents/GitHub/Custodian"
     exit 0
 fi
 
 echo "[custodian-pre-push] running audit guard..."
-custodian-multi --repos . --fail-on-findings --no-color
+"$custodian_multi" --repos "$repo_root" --fail-on-findings --no-color
