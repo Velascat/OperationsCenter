@@ -4355,3 +4355,7 @@ Cadence: HEALTHY → 3600s next wakeup.
 
 - Updated repo-owned references from the previous GitHub username to `ProtocolWarden` after the account rename.
 - Scope: license headers, GitHub URLs, workflow install commands, manifests, dependency URLs, examples, and local owner defaults where present.
+
+## 2026-05-10 — Custodian pre-push command resolution
+
+- Updated the pre-push guard to prefer system `custodian-multi`, with repo venv and sibling Custodian venv fallbacks.
