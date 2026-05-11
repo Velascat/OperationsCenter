@@ -4,7 +4,7 @@
 planning/models.py — OperationsCenter planning input and output models.
 
 These are OperationsCenter-internal types that carry context before a
-TaskProposal is built. They do not replace canonical contracts; they
+planning proposal is built. They do not replace canonical contracts; they
 are the raw material the proposal builder consumes.
 """
 
@@ -15,8 +15,8 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from operations_center.contracts.proposal import TaskProposal
-    from operations_center.contracts.routing import LaneDecision
+    from operations_center.contracts.proposal import OcPlanningProposal
+    from operations_center.contracts.routing import OcRoutingDecision
 
 
 def _utcnow() -> datetime:
@@ -25,7 +25,7 @@ def _utcnow() -> datetime:
 
 @dataclass(frozen=True)
 class PlanningContext:
-    """Raw context from which a TaskProposal will be shaped.
+    """Raw context from which an OC planning proposal will be shaped.
 
     OperationsCenter derives this from its analysis pipeline (decision rules,
     candidate evaluation, Plane board tasks, etc.). It carries task intent
@@ -68,9 +68,9 @@ class PlanningContext:
 
 @dataclass(frozen=True)
 class ProposalBuildResult:
-    """Outcome of building a TaskProposal from a PlanningContext."""
+    """Outcome of building an OC planning proposal from a PlanningContext."""
 
-    proposal: "TaskProposal"
+    proposal: "OcPlanningProposal"
     context: PlanningContext
     built_at: datetime = field(default_factory=_utcnow)
     notes: str = ""
@@ -78,14 +78,14 @@ class ProposalBuildResult:
 
 @dataclass
 class ProposalDecisionBundle:
-    """A TaskProposal paired with the LaneDecision that routes it.
+    """An OC planning proposal paired with the routing decision that routes it.
 
     Downstream execution phases use this bundle to construct ExecutionRequest
     without needing to re-derive context or re-query SwitchBoard.
     """
 
-    proposal: "TaskProposal"
-    decision: "LaneDecision"
+    proposal: "OcPlanningProposal"
+    decision: "OcRoutingDecision"
     context: Optional[PlanningContext] = None
     bundled_at: datetime = field(default_factory=_utcnow)
     trace_notes: str = ""

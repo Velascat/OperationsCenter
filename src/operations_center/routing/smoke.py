@@ -2,7 +2,7 @@
 # Copyright (C) 2026 ProtocolWarden
 """Hardening arc item 5 — routing rationale completeness smoke check.
 
-A non-stub ``LaneDecision`` should always carry ``policy_rule_matched``
+A non-stub OC routing decision should always carry ``policy_rule_matched``
 and ``switchboard_version``. ``rationale`` is enforced by current code.
 This module exposes a small helper used by tests / operator tooling
 to flag partial decisions before they reach ``execution_record.json``.
@@ -14,14 +14,14 @@ omit ``switchboard_version`` because no real switchboard was involved
 
 from __future__ import annotations
 
-from operations_center.contracts.routing import LaneDecision
+from operations_center.contracts.routing import OcRoutingDecision
 
 
 class IncompleteRoutingDecisionError(ValueError):
-    """Raised when a LaneDecision is missing fields an audit consumer needs."""
+    """Raised when an OC routing decision is missing fields an audit consumer needs."""
 
 
-def assert_decision_complete(decision: LaneDecision, *, allow_stub: bool = False) -> None:
+def assert_decision_complete(decision: OcRoutingDecision, *, allow_stub: bool = False) -> None:
     """Assert ``decision`` carries the routing-provenance fields auditors expect.
 
     Required fields (always):
@@ -46,7 +46,7 @@ def assert_decision_complete(decision: LaneDecision, *, allow_stub: bool = False
 
     if missing:
         raise IncompleteRoutingDecisionError(
-            "LaneDecision is missing required routing-provenance fields: "
+            "OcRoutingDecision is missing required routing-provenance fields: "
             + ", ".join(missing)
             + f" (decision_id={decision.decision_id})"
         )

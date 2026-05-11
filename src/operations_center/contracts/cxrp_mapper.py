@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 ProtocolWarden
-"""Bidirectional mappers between OperationsCenter's internal Pydantic
-contracts and the canonical CxRP v0.2 envelope.
+"""Bidirectional mappers between OperationsCenter's internal orchestration
+models and the canonical CxRP v0.2 envelope.
 
 OC's internal types (Pydantic) carry richer constraints than CxRP's wire
 envelope: typed enums, structured ``TaskTarget``/``BranchPolicy``/
@@ -45,8 +45,8 @@ from cxrp.vocabulary.status import ExecutionStatus as CxrpExecutionStatus
 
 from .enums import BackendName, LaneName
 from .execution import ExecutionRequest, ExecutionResult, RuntimeBindingSummary
-from .proposal import TaskProposal
-from .routing import LaneDecision
+from .proposal import OcPlanningProposal
+from .routing import OcRoutingDecision
 
 CODING_AGENT_INPUT_SCHEMA_ID = "coding_agent_input/v0.2"
 CODING_AGENT_TARGET_SCHEMA_ID = "coding_agent_target/v0.2"
@@ -62,8 +62,8 @@ def _category_for(oc_lane_value: str) -> LaneType:
     return _OC_LANE_TO_ECP_CATEGORY.get(oc_lane_value, LaneType.CODING_AGENT)
 
 
-def to_cxrp_task_proposal(oc: TaskProposal) -> CxrpTaskProposal:
-    """Translate an OC TaskProposal into the CxRP v0.2 envelope."""
+def to_cxrp_task_proposal(oc: OcPlanningProposal) -> CxrpTaskProposal:
+    """Translate an OC planning proposal into the CxRP v0.2 envelope."""
     target_payload: dict[str, Any] = {
         "$payload_schema": CODING_AGENT_TARGET_SCHEMA_ID,
         "repo_key": oc.target.repo_key,
@@ -91,9 +91,9 @@ def to_cxrp_task_proposal(oc: TaskProposal) -> CxrpTaskProposal:
 
 
 def to_cxrp_lane_decision(
-    oc: LaneDecision, *, extra_metadata: dict[str, Any] | None = None
+    oc: OcRoutingDecision, *, extra_metadata: dict[str, Any] | None = None
 ) -> CxrpLaneDecision:
-    """Translate an OC LaneDecision into CxRP envelope shape.
+    """Translate an OC routing decision into CxRP envelope shape.
 
     Mirrors switchboard.adapters.cxrp_mapper but lives here so OC's own
     audit/observability code can emit the same wire shape.
@@ -129,8 +129,8 @@ def to_cxrp_lane_decision(
     )
 
 
-def from_cxrp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
-    """Reconstruct an OC ``LaneDecision`` from an CxRP wire payload.
+def from_cxrp_lane_decision(payload: dict[str, Any]) -> OcRoutingDecision:
+    """Reconstruct an OC routing decision from a CxRP wire payload.
 
     Used at the OC consume boundary (``HttpLaneRoutingClient``) to accept
     SwitchBoard's CxRP-shaped ``/route`` response. Narrows CxRP's
@@ -146,7 +146,7 @@ def from_cxrp_lane_decision(payload: dict[str, Any]) -> LaneDecision:
             "OC requires both to narrow into LaneName/BackendName."
         )
     metadata = payload.get("metadata") or {}
-    return LaneDecision(
+    return OcRoutingDecision(
         decision_id=payload["decision_id"],
         proposal_id=payload["proposal_id"],
         selected_lane=LaneName(executor),

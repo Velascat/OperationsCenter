@@ -1,120 +1,79 @@
 # Contract Map
 
-Single source of truth for what each canonical contract is, where it lives,
-who produces it, and who consumes it.
+Single source of truth for which contracts are canonical cross-repo wire
+contracts, which models are OperationsCenter-internal orchestration models,
+and where mapping happens.
 
 ---
 
-## Canonical Contracts
+## Ownership
 
-| Contract | File | Line | Description |
+| Contract / Model | Owner | Role |
+|---|---|---|
+| `cxrp.contracts.TaskProposal` | CxRP | Canonical cross-repo task proposal wire contract |
+| `cxrp.contracts.LaneDecision` | CxRP | Canonical cross-repo routing decision wire contract |
+| `operations_center.contracts.proposal.OcPlanningProposal` | OperationsCenter | Internal planning/orchestration model |
+| `operations_center.contracts.routing.OcRoutingDecision` | OperationsCenter | Internal routing/orchestration model |
+| `operations_center.contracts.execution.ExecutionRequest` | OperationsCenter | Internal execution-boundary request model |
+| `operations_center.contracts.execution.ExecutionResult` | OperationsCenter | Internal execution-boundary result model |
+
+Compatibility aliases kept for migration stability:
+
+- `operations_center.contracts.proposal.TaskProposal`
+  -> `OcPlanningProposal`
+- `operations_center.contracts.routing.LaneDecision`
+  -> `OcRoutingDecision`
+
+Those aliases are not the canonical wire contract definitions.
+
+---
+
+## Flow
+
+```text
+PlanningContext
+    -> OcPlanningProposal
+    -> to_cxrp_task_proposal(...)
+    -> CxRP TaskProposal  --------- HTTP ---------> SwitchBoard
+    <- CxRP LaneDecision  <-------- HTTP ----------
+    <- from_cxrp_lane_decision(...)
+    <- OcRoutingDecision
+    -> ProposalDecisionBundle
+    -> ExecutionRequest
+    -> adapter
+    -> ExecutionResult
+```
+
+---
+
+## Mapping Points
+
+| Boundary | Mapper | Input | Output |
 |---|---|---|---|
-| `TaskProposal` | `src/operations_center/contracts/proposal.py` | 31 | What needs to be done, where, and under what constraints |
-| `LaneDecision` | `src/operations_center/contracts/routing.py` | 28 | Selected lane/backend and routing rationale from SwitchBoard |
-| `ExecutionRequest` | `src/operations_center/contracts/execution.py` | 38 | Everything a backend adapter needs to carry out the work |
-| `ExecutionResult` | `src/operations_center/contracts/execution.py` | 146 | Backend-agnostic outcome of one execution run |
-
-All four are Pydantic v2 `BaseModel` with `model_config = {"frozen": True}`.
-All four are fully serializable via `.model_dump(mode="json")` / `.model_validate()`.
-All four are re-exported from `operations_center.contracts` (the public API surface).
-
----
-
-## Supporting Types
-
-| Type | File | Role |
-|---|---|---|
-| `TaskTarget` | `contracts/common.py` | Repo coordinates (key, clone URL, base branch, allowed paths) |
-| `ExecutionConstraints` | `contracts/common.py` | Execution limits (timeout, max files, path restriction) |
-| `ValidationProfile` | `contracts/common.py` | Validation commands and fail-fast policy |
-| `BranchPolicy` | `contracts/common.py` | Branch prefix, push-on-success, PR policy |
-| `ExecutionArtifact` | `contracts/execution.py` | Discrete artifact produced during execution (diff, log, report) |
-| `RunTelemetry` | `contracts/execution.py` | Timing and token counts for one run |
-| `LaneName`, `BackendName`, `TaskType`, etc. | `contracts/enums.py` | Closed enum sets for all typed fields |
-
----
-
-## Contract Flow
-
-```
-PlanningContext          internal OperationsCenter type; pre-validation raw input
-    │
-    │  planning/proposal_builder.py :: build_proposal()
-    │  (enum validation, field mapping, branch/validation policy construction)
-    ▼
-TaskProposal             frozen Pydantic model; backend-agnostic
-    │
-    │  routing/client.py :: HttpLaneRoutingClient.select_lane()
-    │  (HTTP POST /route → SwitchBoard; deserializes response)
-    ▼
-LaneDecision             frozen Pydantic model; produced exclusively by SwitchBoard
-    │
-    │  [bundled as ProposalDecisionBundle in planning/models.py]
-    │
-    │  execution/handoff.py :: ExecutionRequestBuilder.build()
-    │  (merges proposal + decision + runtime context)
-    ▼
-ExecutionRequest         frozen Pydantic model; adapter input
-    │
-    │  backends/{kodo,archon,openclaw,direct_local}/adapter.py :: execute()
-    ▼
-ExecutionResult          frozen Pydantic model; backend-agnostic outcome
-    │
-    │  observability/service.py :: ExecutionObservabilityService.observe()
-    ▼
-ExecutionRecord + ExecutionTrace   internal observability types (not part of the public contract chain)
-```
-
----
-
-## Producer / Consumer Table
-
-| Contract | Producer | Consumers |
-|---|---|---|
-| `TaskProposal` | `planning/proposal_builder.py::build_proposal()` | `HttpLaneRoutingClient` (→ SwitchBoard), `PolicyEngine`, `ExecutionRequestBuilder` |
-| `LaneDecision` | SwitchBoard (external service, via `routing/client.py`) | `ExecutionCoordinator`, `PolicyEngine`, `ExecutionRequestBuilder` |
-| `ExecutionRequest` | `execution/handoff.py::ExecutionRequestBuilder.build()` | All backend adapters (`kodo`, `archon`, `openclaw`, `direct_local`) |
-| `ExecutionResult` | Backend adapters | `ExecutionCoordinator`, `ExecutionObservabilityService` |
+| OC -> SwitchBoard | `contracts.cxrp_mapper.to_cxrp_task_proposal` | `OcPlanningProposal` | `cxrp.contracts.TaskProposal` |
+| SwitchBoard -> OC | `contracts.cxrp_mapper.from_cxrp_lane_decision` | CxRP lane decision payload | `OcRoutingDecision` |
+| OC -> CxRP execution | `contracts.cxrp_mapper.to_cxrp_execution_request` | `ExecutionRequest` | `cxrp.contracts.ExecutionRequest` |
+| CxRP -> OC execution result | `contracts.cxrp_mapper.from_cxrp_execution_result` | CxRP execution payload | `ExecutionResult` |
 
 ---
 
 ## Invariants
 
-1. **One definition per contract.** Each of the four contracts is defined in exactly
-   one file. No aliases, re-implementations, or competing definitions exist.
-
-2. **SwitchBoard owns `LaneDecision`.** OperationsCenter never constructs a `LaneDecision`
-   in the live execution path. The only live producer is `HttpLaneRoutingClient`, which
-   deserializes the SwitchBoard HTTP response.
-
-3. **`TaskProposal` is produced once per task.** Only `proposal_builder.py::build_proposal()`
-   constructs `TaskProposal` in the live path. No adapter, coordinator, or policy engine
-   creates one.
-
-4. **No raw dicts cross contract boundaries.** `ExecutionRequest` and `ExecutionResult`
-   are always Pydantic models at the adapter boundary. Dicts appear only in serialization
-   output (`.model_dump(mode="json")`) and in observability metadata annotations.
-
-5. **Policy gates validate, not re-route.** `PolicyEngine._check_routing_constraints()`
-   blocks proposals whose labels conflict with SwitchBoard's decision — it does not
-   override or replace the routing decision with a different lane.
-
-6. **`ExecutionCoordinator` constructs `ExecutionResult` only on policy block.**
-   In the policy-blocked case, no adapter runs; the coordinator synthesizes a
-   `SKIPPED` result. This is the one exception to "adapters produce `ExecutionResult`"
-   and is intentional — no execution occurred.
+1. CxRP owns canonical cross-repo proposal and routing semantics.
+2. OperationsCenter may own stricter internal orchestration models.
+3. OC internal proposal/routing models must map explicitly through CxRP at repo boundaries.
+4. OC internal proposal/routing models must not be documented as canonical protocol contracts.
+5. Compatibility aliases may remain temporarily, but they do not change ownership.
 
 ---
 
-## Internal Boundary Types (Not Contracts)
-
-These types carry context within OperationsCenter but are not part of the public contract chain:
+## Internal Boundary Types
 
 | Type | File | Purpose |
 |---|---|---|
-| `PlanningContext` | `planning/models.py` | Raw planning input; pre-validation; converted to `TaskProposal` by `proposal_builder.py` |
-| `ProposalBuildResult` | `planning/models.py` | Wraps `TaskProposal` + original context for traceability |
-| `ProposalDecisionBundle` | `planning/models.py` | Pairs `TaskProposal` + `LaneDecision` for handoff to execution |
-| `ExecutionRuntimeContext` | `execution/handoff.py` | Runtime-resolved paths (workspace, branch) not present in the proposal |
-| `PolicyDecision` | `policy/models.py` | Policy gate outcome; consumed by `ExecutionCoordinator` only |
-| `ExecutionRecord`, `ExecutionTrace` | `observability/models.py` | Audit log entries; not returned to callers |
+| `PlanningContext` | `planning/models.py` | Raw planning input before OC proposal construction |
+| `ProposalBuildResult` | `planning/models.py` | Wraps `OcPlanningProposal` + original context |
+| `ProposalDecisionBundle` | `planning/models.py` | Pairs `OcPlanningProposal` + `OcRoutingDecision` |
+| `ExecutionRuntimeContext` | `execution/handoff.py` | Runtime-resolved paths not present in the proposal |
+| `PolicyDecision` | `policy/models.py` | Policy gate outcome consumed by `ExecutionCoordinator` |
+| `ExecutionRecord`, `ExecutionTrace` | `observability/models.py` | Audit/trace types outside the wire boundary |

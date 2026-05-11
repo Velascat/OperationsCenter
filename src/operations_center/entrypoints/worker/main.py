@@ -5,7 +5,7 @@
 This entrypoint exists to prove the split between OperationsCenter's planning
 surface and its execution surface:
 
-    PlanningContext -> TaskProposal -> LaneDecision -> ProposalDecisionBundle
+    PlanningContext -> OcPlanningProposal -> OcRoutingDecision -> ProposalDecisionBundle
 
 It intentionally does not construct backend adapters, create workspaces, or run
 execution backends. Live execution remains a separate OperationsCenter boundary
@@ -32,7 +32,7 @@ from operations_center.routing.service import PlanningService
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Build a canonical TaskProposal and route it through SwitchBoard."
+        description="Build an OC planning proposal and route it through SwitchBoard via CxRP."
     )
     parser.add_argument("--input", type=Path, help="Path to a JSON file describing a PlanningContext.")
     parser.add_argument("--output", type=Path, help="Optional output path for the proposal/decision bundle JSON.")

@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 ProtocolWarden
 """
-routing.py — LaneDecision: the canonical routing decision emitted by SwitchBoard.
+routing.py — OC-native routing decision model.
 
-A LaneDecision is SwitchBoard's answer to a TaskProposal. It names the selected
-lane and backend, carries the rationale, and stamps the decision time. It does
-not modify the proposal — it references it by ID.
+``OcRoutingDecision`` is OperationsCenter's stricter internal routing model.
+It is not the canonical cross-repo wire contract; that role belongs to
+``cxrp.contracts.LaneDecision``. OC maps this richer internal model to and
+from the canonical CxRP envelope at repository boundaries.
 """
 
 from __future__ import annotations
@@ -27,9 +28,9 @@ def _new_id() -> str:
     return str(uuid.uuid4())
 
 
-class LaneDecision(BaseModel):
+class OcRoutingDecision(BaseModel):
     """
-    SwitchBoard's routing decision for a TaskProposal.
+    SwitchBoard's routing decision for an OC planning proposal.
 
     Consumed by OperationsCenter's execution boundary to know which backend to
     invoke and with which configuration. SwitchBoard does not embed execution
@@ -69,3 +70,7 @@ class LaneDecision(BaseModel):
     switchboard_version: Optional[str] = Field(default=None)
 
     model_config = {"frozen": True}
+
+
+# Backward-compatible alias. Prefer ``OcRoutingDecision`` in OC-owned code.
+LaneDecision = OcRoutingDecision

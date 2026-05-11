@@ -4,10 +4,10 @@
 planning/ — Context shaping and proposal construction.
 
 Public API:
-    PlanningContext      — raw context from which a TaskProposal is built
+    PlanningContext      — raw context from which an OC planning proposal is built
     ProposalBuildResult  — proposal + context, returned from build_proposal_with_result
-    ProposalDecisionBundle — proposal + LaneDecision, ready for execution
-    build_proposal       — PlanningContext → TaskProposal
+    ProposalDecisionBundle — proposal + routing decision, ready for execution
+    build_proposal       — PlanningContext → OcPlanningProposal
     build_proposal_with_result — PlanningContext → ProposalBuildResult
 """
 

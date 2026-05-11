@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 ProtocolWarden
 """
-planning/proposal_builder.py — maps PlanningContext → canonical TaskProposal.
+planning/proposal_builder.py — maps PlanningContext → OC planning proposal.
 
 The proposal builder is a pure function. It does not call SwitchBoard, invoke
 backends, or access external state. It translates OperationsCenter context into
-a canonical TaskProposal that remains backend-agnostic.
+an OC-native planning proposal that remains backend-agnostic until the CxRP
+boundary mapper runs.
 
 Preferred lane/backend hints (if provided via labels) are preserved as labels
 on the proposal — they remain non-authoritative hints that SwitchBoard may or
@@ -26,7 +27,7 @@ from operations_center.contracts.enums import (
     RiskLevel,
     TaskType,
 )
-from operations_center.contracts.proposal import TaskProposal
+from operations_center.contracts.proposal import OcPlanningProposal
 
 from .models import PlanningContext, ProposalBuildResult
 
@@ -35,11 +36,11 @@ from .models import PlanningContext, ProposalBuildResult
 # Public API
 # ---------------------------------------------------------------------------
 
-def build_proposal(context: PlanningContext) -> TaskProposal:
-    """Map a PlanningContext into a canonical TaskProposal.
+def build_proposal(context: PlanningContext) -> OcPlanningProposal:
+    """Map a PlanningContext into an OC planning proposal.
 
     This function is the only place where OperationsCenter internal context is
-    translated into canonical contract types. All canonical field values come
+    translated into OC routing/execution input. All field values come
     from the context; none come from backend-specific knowledge.
 
     Raises:
@@ -76,7 +77,7 @@ def build_proposal(context: PlanningContext) -> TaskProposal:
         open_pr=context.open_pr,
     )
 
-    return TaskProposal(
+    return OcPlanningProposal(
         task_id=context.task_id or _derive_task_id(context),
         project_id=context.project_id,
         task_type=task_type,
@@ -95,7 +96,7 @@ def build_proposal(context: PlanningContext) -> TaskProposal:
 
 
 def build_proposal_with_result(context: PlanningContext) -> ProposalBuildResult:
-    """Build a TaskProposal and return it wrapped in a ProposalBuildResult."""
+    """Build an OC planning proposal and return it wrapped in a ProposalBuildResult."""
     proposal = build_proposal(context)
     return ProposalBuildResult(proposal=proposal, context=context)
 

@@ -3,8 +3,9 @@
 """
 common.py — shared value objects used across multiple contract models.
 
-These are nested types embedded inside TaskProposal, ExecutionRequest,
-ExecutionResult, etc. They carry structured domain data that would
+These are nested types embedded inside OC internal models such as
+``OcPlanningProposal``, ``ExecutionRequest``, and ``ExecutionResult``.
+They carry structured domain data that would
 otherwise be encoded in untyped dicts or strings.
 """
 
