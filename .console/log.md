@@ -3,6 +3,15 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-11 — cross-repo quarantine branch normalization
+
+- Confirmed hard cross-repo OperationsCenter provenance only in CxRP (`6db7663` -> `8e43e07` -> `ac0fcd5` / merged `cf33e8a`).
+- Rewrote `CxRP main` to retain non-quarantine follow-up commits while removing the OC-originated `AgentTopology` lineage from `main`.
+- Promoted `operations-center-testing-branch` as the temporary cross-repo quarantine/staging branch name.
+- Created or pushed `operations-center-testing-branch` in all managed repos; for CxRP it remains the quarantined lineage at `ac0fcd5`.
+- Updated local OC repo settings to target `sandbox_base_branch: operations-center-testing-branch` for all managed repos.
+- Added backlog follow-up to review/refine quarantined `ShippingForm` / related CxRP work before any deliberate merge back to `main`.
+
 ## 2026-05-10 — docs(watchdog): add self-healing convergence phases
 
 Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution explicit:
