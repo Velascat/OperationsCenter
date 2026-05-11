@@ -42,8 +42,8 @@ from .common import (
     ValidationProfile,
     ValidationSummary,
 )
-from .proposal import TaskProposal
-from .routing import LaneDecision
+from .proposal import OcPlanningProposal, TaskProposal
+from .routing import LaneDecision, OcRoutingDecision
 from .execution import ExecutionArtifact, ExecutionRequest, ExecutionResult, RunTelemetry
 
 __all__ = [
@@ -66,6 +66,8 @@ __all__ = [
     "ValidationProfile",
     "ValidationSummary",
     # top-level models
+    "OcPlanningProposal",
+    "OcRoutingDecision",
     "TaskProposal",
     "LaneDecision",
     "ExecutionArtifact",

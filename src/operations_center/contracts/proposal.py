@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 ProtocolWarden
 """
-proposal.py — TaskProposal: the canonical proposal emitted by OperationsCenter.
+proposal.py — OC-native planning proposal model.
 
-A TaskProposal is the decision that a task is worth attempting. It carries
-everything needed to route the task (via SwitchBoard) and execute it through
-OperationsCenter's execution boundary. It does not contain execution-layer
-internals (workspace paths, branch names) — those are resolved at execution
-time.
+``OcPlanningProposal`` is OperationsCenter's stricter internal planning model.
+It is not the canonical cross-repo wire contract; that role belongs to
+``cxrp.contracts.TaskProposal``. OC maps this richer internal model to the
+canonical CxRP envelope at repository boundaries.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ def _new_id() -> str:
     return str(uuid.uuid4())
 
 
-class TaskProposal(BaseModel):
+class OcPlanningProposal(BaseModel):
     """
     A task proposed by OperationsCenter for execution.
 
@@ -81,3 +80,7 @@ class TaskProposal(BaseModel):
     labels: list[str] = Field(default_factory=list)
 
     model_config = {"frozen": True}
+
+
+# Backward-compatible alias. Prefer ``OcPlanningProposal`` in OC-owned code.
+TaskProposal = OcPlanningProposal

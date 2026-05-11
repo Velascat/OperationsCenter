@@ -1,6 +1,6 @@
 # Operations Center
 
-Local planning, execution, policy, and evidence service for the coding platform. OperationsCenter turns work context into canonical proposals, routes them through SwitchBoard, executes routed work through bounded adapters, and retains evidence around what happened later.
+Local planning, execution, policy, and evidence service for the coding platform. CxRP owns the wire contracts. OperationsCenter turns work context into internal orchestration proposals, maps them through SwitchBoard via CxRP, executes routed work through bounded adapters, and retains evidence around what happened later.
 
 ## What this repo is
 
@@ -24,8 +24,8 @@ Local planning, execution, policy, and evidence service for the coding platform.
 OperationsCenter is operated through a **planning -> routing -> execution** flow:
 
 1. Gather or derive work intent.
-2. Build a canonical `TaskProposal`.
-3. Route it through SwitchBoard to get a `LaneDecision`.
+2. Build an internal `OcPlanningProposal`.
+3. Map and route it through SwitchBoard to get an internal `OcRoutingDecision`.
 4. Hand the proposal/decision bundle to OperationsCenter's canonical execution boundary.
 5. `ExecutionCoordinator` builds `ExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
 
@@ -87,24 +87,25 @@ Then:
 - **Not the operator shell.** OpenClaw (optional) provides the human-facing operator
   experience. OperationsCenter is the autonomous engine that runs beneath it.
 
-## Canonical Contracts and Planning Pipeline (Phase 3–6)
+## CxRP Boundary and Planning Pipeline (Phase 3–6)
 
 OperationsCenter integrates with a canonical cross-repo contract layer that
-makes task proposals and routing decisions backend-agnostic.
+makes task proposals and routing decisions backend-agnostic. CxRP owns the
+wire contracts; OperationsCenter owns stricter internal orchestration models.
 
 ### Planning pipeline
 
 ```
-PlanningContext  →  TaskProposal  →  LaneDecision  →  ProposalDecisionBundle
-   (internal)        (canonical)       (SwitchBoard)       (execution ready)
+PlanningContext  →  OcPlanningProposal  →  OcRoutingDecision  →  ProposalDecisionBundle
+   (internal)          (internal)            (decoded from CxRP)      (execution ready)
 ```
 
 1. **`PlanningContext`** — frozen dataclass with raw task intent (goal text,
    task type, repo coordinates, risk level, labels).
 2. **`build_proposal(ctx)`** — pure function in `planning/proposal_builder.py`;
-   translates context into a canonical `TaskProposal` with no backend knowledge.
+   translates context into an internal `OcPlanningProposal` with no backend knowledge.
 3. **`PlanningService.plan(ctx)`** — calls `build_proposal`, then routes through
-   `LaneRoutingClient` (SwitchBoard) to get a `LaneDecision`, then bundles both
+   `LaneRoutingClient` (SwitchBoard) to get an `OcRoutingDecision`, then bundles both
    into a `ProposalDecisionBundle`.
 
 ```python
@@ -119,8 +120,8 @@ bundle = service.plan(PlanningContext(
     clone_url="https://github.com/org/api-service.git",
     risk_level="low",
 ))
-# bundle.proposal  → TaskProposal
-# bundle.decision  → LaneDecision (from SwitchBoard)
+# bundle.proposal  → OcPlanningProposal
+# bundle.decision  → OcRoutingDecision (decoded from SwitchBoard's CxRP response)
 # bundle.run_summary → "proposal=... task=... lane=aider_local backend=direct_local rule=..."
 ```
 
@@ -132,11 +133,14 @@ For full architecture and examples see:
 
 OperationsCenter consumes canonical contracts from [CxRP](https://github.com/ProtocolWarden/CxRP) (orchestration) and [RxP](https://github.com/ProtocolWarden/RxP) (runtime), and maps them to/from internal Pydantic models defined in `src/operations_center/contracts/` (mapper: `contracts/cxrp_mapper.py`):
 
+- `cxrp.contracts.TaskProposal` / `cxrp.contracts.LaneDecision` are the canonical wire contracts.
+- `OcPlanningProposal` / `OcRoutingDecision` are OperationsCenter-internal orchestration models.
+
 | Module | Types |
 |---|---|
 | `enums.py` | `TaskType`, `LaneName`, `BackendName`, `ExecutionMode`, `Priority`, `RiskLevel` |
-| `proposal.py` | `TaskProposal` |
-| `routing.py` | `LaneDecision` |
+| `proposal.py` | `OcPlanningProposal` (`TaskProposal` compatibility alias) |
+| `routing.py` | `OcRoutingDecision` (`LaneDecision` compatibility alias) |
 | `execution.py` | `ExecutionRequest`, `ExecutionResult`, `ExecutionArtifact`, `RunTelemetry` |
 | `common.py` | `TaskTarget`, `ExecutionConstraints`, `ValidationProfile`, `BranchPolicy` |
 
@@ -147,7 +151,7 @@ See `WorkStation/docs/architecture/contracts/contracts.md` for full documentatio
 The supported live execution path is:
 
 ```text
-TaskProposal -> LaneDecision -> ExecutionRequest -> adapter -> ExecutionResult
+OcPlanningProposal -> OcRoutingDecision -> ExecutionRequest -> adapter -> ExecutionResult
 ```
 
 `ExecutionCoordinator` is the supported execution boundary. It builds the canonical

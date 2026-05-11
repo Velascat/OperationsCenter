@@ -14,8 +14,8 @@ the resulting RuntimeBinding. The first matching rule wins; the optional
 
 Rules produce a ``cxrp.contracts.RuntimeBinding`` (the canonical type),
 which CxRP validates on construction against its kind × selection_mode
-validity table. The coordinator then mirrors it into a
-``RuntimeBindingSummary`` for the ExecutionRequest.
+validity table. The coordinator then carries that canonical type through
+OC's compatibility import surface on ``ExecutionRequest.runtime_binding``.
 
 The default policy bundled with OC reflects the team's current cost/quality
 defaults: opus for refactor/feature, sonnet for tests, haiku for lint
@@ -33,7 +33,7 @@ import yaml
 from cxrp.contracts.runtime_binding import RuntimeBinding
 from cxrp.vocabulary.runtime import RuntimeKind, SelectionMode
 
-from operations_center.contracts import LaneDecision, TaskProposal
+from operations_center.contracts import OcPlanningProposal, OcRoutingDecision
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,8 @@ class RuntimeBindingPolicy:
 
     def select(
         self,
-        proposal: TaskProposal,
-        decision: LaneDecision,
+        proposal: OcPlanningProposal,
+        decision: OcRoutingDecision,
     ) -> RuntimeBinding | None:
         """Return the first-matching rule's binding, or the default's, or None.
 

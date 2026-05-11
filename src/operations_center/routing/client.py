@@ -15,8 +15,8 @@ from typing import Protocol, runtime_checkable
 import httpx
 
 from operations_center.contracts.cxrp_mapper import from_cxrp_lane_decision
-from operations_center.contracts.proposal import TaskProposal
-from operations_center.contracts.routing import LaneDecision
+from operations_center.contracts.proposal import OcPlanningProposal
+from operations_center.contracts.routing import OcRoutingDecision
 
 DEFAULT_SWITCHBOARD_URL = "http://localhost:20401"
 
@@ -30,13 +30,13 @@ class SwitchBoardUnavailableError(RuntimeError):
 
 @runtime_checkable
 class LaneRoutingClient(Protocol):
-    """Boundary: TaskProposal in, LaneDecision out.
+    """Boundary: OC planning proposal in, OC routing decision out.
 
     Implementations may call SwitchBoard over HTTP or apply a test stub.
     The rest of OperationsCenter sees only this interface.
     """
 
-    def select_lane(self, proposal: TaskProposal) -> LaneDecision:
+    def select_lane(self, proposal: OcPlanningProposal) -> OcRoutingDecision:
         ...
 
 
@@ -61,7 +61,7 @@ class HttpLaneRoutingClient:
             headers={"Content-Type": "application/json"},
         )
 
-    def select_lane(self, proposal: TaskProposal) -> LaneDecision:
+    def select_lane(self, proposal: OcPlanningProposal) -> OcRoutingDecision:
         try:
             response = self._client.post("/route", json=proposal.model_dump(mode="json"))
             response.raise_for_status()
@@ -88,21 +88,21 @@ class HttpLaneRoutingClient:
 
 
 class StubLaneRoutingClient:
-    """Always returns a fixed LaneDecision. For unit tests only.
+    """Always returns a fixed OC routing decision. For unit tests only.
 
-    Construct with a pre-built LaneDecision to inject deterministic routing
+    Construct with a pre-built routing decision to inject deterministic routing
     without touching SwitchBoard at all.
     """
 
-    def __init__(self, decision: LaneDecision) -> None:
+    def __init__(self, decision: OcRoutingDecision) -> None:
         self._decision = decision
 
-    def select_lane(self, proposal: TaskProposal) -> LaneDecision:  # noqa: ARG002 - stub ignores arg
+    def select_lane(self, proposal: OcPlanningProposal) -> OcRoutingDecision:  # noqa: ARG002 - stub ignores arg
         return self._decision
 
 
-def _decode_route_response(payload: dict) -> LaneDecision:
-    """Decode SwitchBoard's /route response into an OC LaneDecision.
+def _decode_route_response(payload: dict) -> OcRoutingDecision:
+    """Decode SwitchBoard's /route response into an OC routing decision.
 
     SwitchBoard emits the CxRP v0.2 envelope (``contract_kind ==
     "lane_decision"``, ``schema_version`` starting with ``"0."``). The

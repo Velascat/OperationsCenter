@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 ProtocolWarden
-"""Canonical execute entrypoint.
+"""Execution entrypoint for routed OC orchestration bundles.
 
-Consumes a proposal/decision bundle, constructs a canonical ExecutionRequest,
-runs the mandatory policy gate, and then invokes the selected canonical
+Consumes a proposal/decision bundle, constructs an ExecutionRequest,
+runs the mandatory policy gate, and then invokes the selected
 backend adapter when execution is allowed.
 
 Failure handling:
@@ -20,8 +20,8 @@ from pathlib import Path
 
 from operations_center.backends.factory import CanonicalBackendRegistry
 from operations_center.config.settings import load_settings
-from operations_center.contracts.proposal import TaskProposal
-from operations_center.contracts.routing import LaneDecision
+from operations_center.contracts.proposal import OcPlanningProposal
+from operations_center.contracts.routing import OcRoutingDecision
 from operations_center.execution.artifact_writer import RunArtifactWriter
 from operations_center.execution.coordinator import ExecutionCoordinator
 from operations_center.execution.handoff import ExecutionRuntimeContext
@@ -51,8 +51,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def _load_bundle(path: Path) -> ProposalDecisionBundle:
     payload = json.loads(path.read_text(encoding="utf-8"))
     return ProposalDecisionBundle(
-        proposal=TaskProposal.model_validate(payload["proposal"]),
-        decision=LaneDecision.model_validate(payload["decision"]),
+        proposal=OcPlanningProposal.model_validate(payload["proposal"]),
+        decision=OcRoutingDecision.model_validate(payload["decision"]),
     )
 
 

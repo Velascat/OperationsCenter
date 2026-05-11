@@ -6,7 +6,7 @@ routing/service.py — explicit proposal-build and routing surfaces.
 PlanningService exposes the two real stages in OperationsCenter's planning and
 routing pipeline:
 
-  1. build_proposal(context) -> TaskProposal
+  1. build_proposal(context) -> OcPlanningProposal
   2. route_proposal(proposal) -> ProposalDecisionBundle
 
 plan() remains as a thin convenience wrapper for callers that want both steps
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from operations_center.contracts.proposal import TaskProposal
+from operations_center.contracts.proposal import OcPlanningProposal
 from operations_center.planning.models import (
     PlanningContext,
     ProposalDecisionBundle,
@@ -36,26 +36,26 @@ class PlanningService:
         service = PlanningService.default()
         proposal = service.build_proposal(context)
         bundle = service.route_proposal(proposal, context=context)
-        # bundle.proposal  → TaskProposal
-        # bundle.decision  → LaneDecision
+        # bundle.proposal  → OcPlanningProposal
+        # bundle.decision  → OcRoutingDecision
         # bundle.run_summary → trace string
     """
 
     def __init__(self, routing_client: LaneRoutingClient) -> None:
         self._client = routing_client
 
-    def build_proposal(self, context: PlanningContext) -> TaskProposal:
-        """Build a canonical TaskProposal from PlanningContext."""
+    def build_proposal(self, context: PlanningContext) -> OcPlanningProposal:
+        """Build an OC planning proposal from PlanningContext."""
         return build_proposal(context)
 
     def route_proposal(
         self,
-        proposal: TaskProposal,
+        proposal: OcPlanningProposal,
         *,
         context: Optional[PlanningContext] = None,
         trace_notes: str = "",
     ) -> ProposalDecisionBundle:
-        """Route a TaskProposal across the SwitchBoard service boundary."""
+        """Route an OC planning proposal across the SwitchBoard service boundary."""
         decision = self._client.select_lane(proposal)
         return ProposalDecisionBundle(
             proposal=proposal,

@@ -3,6 +3,16 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-11 — Proposal/routing ownership clarification
+
+- Renamed the OC-native proposal and routing model definitions to `OcPlanningProposal` and
+  `OcRoutingDecision`, while keeping `TaskProposal` / `LaneDecision` as compatibility aliases.
+- Updated live OC docs and imports to make the boundary explicit: CxRP owns the canonical wire
+  proposal/routing contracts, OC owns stricter internal orchestration-domain models, and
+  `contracts.cxrp_mapper` is the explicit boundary translator.
+- Added invariant tests to prevent docs from calling OC internal models canonical protocol
+  contracts and to prove proposal/routing boundary serialization stays in CxRP.
+
 ## 2026-05-11 — RuntimeBinding mirror reduction
 
 - Replaced the local `RuntimeBindingSummary` model body with a compatibility alias to canonical

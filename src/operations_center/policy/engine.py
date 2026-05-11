@@ -3,8 +3,8 @@
 """
 policy/engine.py — PolicyEngine: evaluate guardrails for planned/routed work.
 
-The engine accepts a canonical TaskProposal + LaneDecision (+ optional
-ExecutionRequest) and returns an inspectable PolicyDecision.
+The engine accepts an OC planning proposal + OC routing decision
+(+ optional ExecutionRequest) and returns an inspectable PolicyDecision.
 
 Evaluation logic (in order):
   1. Repo enabled check
@@ -24,7 +24,8 @@ PolicyStatus is determined as:
   ALLOW              otherwise
 
 The engine never collapses into backend-specific logic. It works from
-canonical contract types and explicit PolicyConfig.
+OC-internal orchestration models and explicit PolicyConfig, while the
+cross-repo wire boundary stays in CxRP.
 """
 
 from __future__ import annotations
@@ -35,8 +36,8 @@ from typing import Optional
 
 from operations_center.contracts.enums import LaneName
 from operations_center.contracts.execution import ExecutionRequest
-from operations_center.contracts.proposal import TaskProposal
-from operations_center.contracts.routing import LaneDecision
+from operations_center.contracts.proposal import OcPlanningProposal
+from operations_center.contracts.routing import OcRoutingDecision
 
 from .models import (
     PathPolicy,
@@ -80,14 +81,14 @@ class PolicyEngine:
 
     def evaluate(
         self,
-        proposal: TaskProposal,
-        decision: LaneDecision,
+        proposal: OcPlanningProposal,
+        decision: OcRoutingDecision,
         request: Optional[ExecutionRequest] = None,
     ) -> PolicyDecision:
         """Evaluate the proposal+decision against configured guardrails.
 
         Args:
-            proposal: The canonical TaskProposal to evaluate.
+            proposal: The OC planning proposal to evaluate.
             decision: The routing decision from SwitchBoard.
             request:  Optional ExecutionRequest for additional context
                       (allowed_paths, validation_commands, etc.)
@@ -157,7 +158,7 @@ def _check_repo_enabled(policy: RepoPolicy, violations: list[PolicyViolation]) -
 
 
 def _check_task_type(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     policy: RepoPolicy,
     violations: list[PolicyViolation],
 ) -> None:
@@ -186,8 +187,8 @@ def _check_task_type(
 
 
 def _check_routing_constraints(
-    proposal: TaskProposal,
-    decision: LaneDecision,
+    proposal: OcPlanningProposal,
+    decision: OcRoutingDecision,
     violations: list[PolicyViolation],
 ) -> None:
     """Block remote lane selection when proposal labels require local execution."""
@@ -210,7 +211,7 @@ def _check_routing_constraints(
 
 
 def _check_path_restrictions(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     policy: RepoPolicy,
     request: Optional[ExecutionRequest],
     violations: list[PolicyViolation],
@@ -304,7 +305,7 @@ def _match_path_rule(
 
 
 def _check_branch_guardrail(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     policy: RepoPolicy,
     violations: list[PolicyViolation],
     warnings: list[PolicyWarning],
@@ -346,8 +347,8 @@ def _check_branch_guardrail(
 
 
 def _check_tool_guardrail(
-    proposal: TaskProposal,
-    decision: LaneDecision,
+    proposal: OcPlanningProposal,
+    decision: OcRoutingDecision,
     policy: RepoPolicy,
     violations: list[PolicyViolation],
 ) -> None:
@@ -390,7 +391,7 @@ def _check_tool_guardrail(
 
 
 def _check_validation_requirements(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     policy: RepoPolicy,
     request: Optional[ExecutionRequest],
     violations: list[PolicyViolation],
@@ -449,7 +450,7 @@ _TRUSTED_SOURCE_LABELS = frozenset({
 
 
 def _check_review_requirements(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     policy: RepoPolicy,
     violations: list[PolicyViolation],
 ) -> None:
@@ -507,7 +508,7 @@ def _build_decision(
     violations: list[PolicyViolation],
     warnings: list[PolicyWarning],
     policy: RepoPolicy,
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     request: Optional[ExecutionRequest],
 ) -> PolicyDecision:
     """Aggregate violations/warnings into a final PolicyDecision."""
@@ -544,7 +545,7 @@ def _determine_status(
 
 
 def _effective_validation_profile(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     policy: RepoPolicy,
     _request: Optional[ExecutionRequest],
 ) -> str:
@@ -557,7 +558,7 @@ def _effective_validation_profile(
 
 
 def _effective_review_requirement(
-    _proposal: TaskProposal,
+    _proposal: OcPlanningProposal,
     policy: RepoPolicy,
     violations: list[PolicyViolation],
 ) -> str:
@@ -570,7 +571,7 @@ def _effective_review_requirement(
 
 
 def _effective_scope(
-    proposal: TaskProposal,
+    proposal: OcPlanningProposal,
     request: Optional[ExecutionRequest],
 ) -> list[str]:
     if request is not None and request.allowed_paths:
