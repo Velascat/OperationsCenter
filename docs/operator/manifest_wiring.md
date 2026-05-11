@@ -3,6 +3,7 @@
 How OperationsCenter picks up project + local manifests at runtime, what shows up in operator output, and how to point OC at a specific project.
 
 For authoring the manifests themselves, see [Manifest Authoring](manifest_authoring.md).
+For the ownership boundary, see [PlatformManifest Consumption](../architecture/contracts/platform_manifest_consumption.md).
 
 ---
 
@@ -33,6 +34,10 @@ platform_manifest:
 Setting both `project_manifest_path` and `work_scope_manifest_path` is a configuration error — `load_settings()` raises at OC startup. Run `operations-center-graph-doctor` to confirm the selected mode (`project | work_scope | platform_only | disabled`).
 
 **Defaults are operator-friendly:** `enabled=true`, all paths None. With nothing configured OC uses the bundled platform-only graph (9 public repos), which still drives contract-impact logging for any platform-targeted dispatch.
+
+OC is only a consumer here: it selects the second and third composition
+layers, but the platform base itself remains the bundled PlatformManifest
+owned by the `platform-manifest` package.
 
 ## Resolution order
 

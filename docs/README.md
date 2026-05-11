@@ -40,6 +40,9 @@ This directory holds OC-specific material.
 - [architecture/ci/ci_integration_guide.md](architecture/ci/ci_integration_guide.md)
 - [architecture/audit/code_health_audit.md](architecture/audit/code_health_audit.md)
 - [architecture/contracts/contract-map.md](architecture/contracts/contract-map.md)
+- [architecture/contracts/platform_manifest_consumption.md](architecture/contracts/platform_manifest_consumption.md) —
+  How OC consumes PlatformManifest as topology/visibility metadata without
+  owning the ontology, CxRP, or RxP.
 - [architecture/contracts/execution-handoff-cutover.md](architecture/contracts/execution-handoff-cutover.md)
 - [architecture/contracts/execution_target.md](architecture/contracts/execution_target.md)
 - [architecture/contracts/lifecycle_labels.md](architecture/contracts/lifecycle_labels.md)
