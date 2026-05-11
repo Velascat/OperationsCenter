@@ -3,6 +3,15 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-11 — PlatformManifest consumption boundary notes
+
+- Documented OperationsCenter as a consumer of PlatformManifest topology and visibility metadata,
+  not the ontology owner.
+- Added a contract note clarifying that CxRP and RxP remain separate protocol owners, while
+  ExecutorRuntime and WorkStation remain distinct runtime and hosting layers.
+- Added tests around repo-graph factory layering so OC keeps using the bundled platform manifest
+  base with project/work-scope/local overlays only.
+
 ## 2026-05-11 — cross-repo quarantine branch normalization
 
 - Confirmed hard cross-repo OperationsCenter provenance only in CxRP (`6db7663` -> `8e43e07` -> `ac0fcd5` / merged `cf33e8a`).

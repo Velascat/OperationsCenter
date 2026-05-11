@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
+import operations_center.repo_graph_factory as repo_graph_factory
 from operations_center.repo_graph_factory import (
     build_effective_repo_graph_from_settings,
 )
@@ -85,6 +86,43 @@ class TestProjectExplicit:
         g = build_effective_repo_graph_from_settings(s)  # type: ignore[arg-type]
         assert g is not None
         assert g.resolve("MyProjAPI") is not None
+
+
+class TestBaseOwnership:
+    def test_factory_always_uses_bundled_platform_manifest_base(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj = tmp_path / "project.yaml"
+        proj.write_text(_PROJECT_YAML, encoding="utf-8")
+        local = tmp_path / "local.yaml"
+        local.write_text(_LOCAL_YAML, encoding="utf-8")
+        recorded: dict[str, object] = {}
+
+        def _fake_default_config_path() -> Path:
+            return tmp_path / "bundled-platform.yaml"
+
+        def _fake_load_effective_graph(base, *, project=None, work_scope=None, local=None):
+            recorded["base"] = base
+            recorded["project"] = project
+            recorded["work_scope"] = work_scope
+            recorded["local"] = local
+            return "graph"
+
+        monkeypatch.setattr(repo_graph_factory, "default_config_path", _fake_default_config_path)
+        monkeypatch.setattr(repo_graph_factory, "load_effective_graph", _fake_load_effective_graph)
+
+        graph = repo_graph_factory.build_effective_repo_graph(
+            project_manifest_path=proj,
+            local_manifest_path=local,
+        )
+
+        assert graph == "graph"
+        assert recorded == {
+            "base": tmp_path / "bundled-platform.yaml",
+            "project": proj,
+            "work_scope": None,
+            "local": local,
+        }
 
 
 class TestProjectByRepoRootConvention:
