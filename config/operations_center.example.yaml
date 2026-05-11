@@ -52,11 +52,13 @@ repos:
   MyRepo:
     clone_url: git@github.com:owner/MyRepo.git
     default_branch: main
+    sandbox_base_branch: operations-center-testing-branch  # optional staging target for autonomous runs
     validation_commands:               # all must exit 0 for a push to be allowed
       - .venv/bin/pytest -q
       - .venv/bin/ruff check .
     allowed_base_branches:             # only these branches may be used as PR base
       - main
+      - operations-center-testing-branch
     bootstrap_enabled: true            # create venv + install deps before each run
     python_binary: python3
     venv_dir: .venv
