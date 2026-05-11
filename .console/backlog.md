@@ -4,8 +4,7 @@ _Durable work inventory. Update after each meaningful chunk of progress._
 
 ## In Progress
 
-(none — runtime boundary extraction validation arc complete; Runtime
-Observability Hardening arc complete; next arc proposed in ADR 0002)
+- [ ] **CxRP — review and refine quarantined `ShippingForm` + related OC branch work on `operations-center-testing-branch` (2026-05-11)**: Treat `operations-center-testing-branch` as the temporary quarantine/staging lane for OC-authored cross-repo work. Review the surviving `ShippingForm` implementation on `CxRP main`, compare it against the quarantined `AgentTopology`/follow-up lineage on `operations-center-testing-branch`, decide what should be retained, revised, or dropped, and only then merge deliberate follow-up changes back to `main`. Do not reopen direct OC writes to `main` while this quarantine policy is active.
 
 ## Up Next — Verification Gaps arc
 
