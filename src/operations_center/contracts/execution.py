@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 ProtocolWarden
 """
-execution.py — ExecutionRequest, ExecutionArtifact, RunTelemetry, ExecutionResult.
+execution.py — OC-native execution-boundary models.
 
-These are the contracts passed between the routing layer and OperationsCenter's
-execution boundary, and returned from the backend to the platform.
+``OcExecutionRequest`` and ``OcExecutionResult`` are OperationsCenter's
+internal execution-boundary models. They are not the canonical cross-repo wire
+contracts; those roles belong to ``cxrp.contracts.ExecutionRequest`` and
+``cxrp.contracts.ExecutionResult``. OC maps these richer internal models to and
+from the canonical CxRP envelope at repository boundaries.
 
 Flow:
   TaskProposal → (SwitchBoard) → LaneDecision
-  TaskProposal + LaneDecision → (ExecutionCoordinator boundary) → ExecutionRequest
-  ExecutionRequest → (backend adapter) → ExecutionResult + RunTelemetry
+  TaskProposal + LaneDecision → (ExecutionCoordinator boundary) → OcExecutionRequest
+  OcExecutionRequest → (backend adapter) → OcExecutionResult + RunTelemetry
 """
 
 from __future__ import annotations
@@ -35,10 +38,10 @@ def _new_id() -> str:
 
 
 # ---------------------------------------------------------------------------
-# ExecutionRequest
+# OcExecutionRequest
 # ---------------------------------------------------------------------------
 
-class ExecutionRequest(BaseModel):
+class OcExecutionRequest(BaseModel):
     """
     Everything a backend adapter needs to carry out the work.
 
@@ -165,10 +168,10 @@ class RunTelemetry(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# ExecutionResult
+# OcExecutionResult
 # ---------------------------------------------------------------------------
 
-class ExecutionResult(BaseModel):
+class OcExecutionResult(BaseModel):
     """
     The canonical outcome of an execution run.
 
@@ -287,7 +290,7 @@ class RecoveryActionSummary(BaseModel):
 
 
 class RecoveryMetadataSummary(BaseModel):
-    """Recovery audit trail attached to ``ExecutionResult.recovery``."""
+    """Recovery audit trail attached to ``OcExecutionResult.recovery``."""
 
     attempts: int = Field(ge=1)
     actions: list[RecoveryActionSummary] = Field(default_factory=list)
@@ -327,7 +330,7 @@ class BoundExecutionTargetMirror(BaseModel):
 
 
 class RuntimeInvocationRef(BaseModel):
-    """Link from an OC ExecutionResult to the RxP RuntimeInvocation/Result that produced it.
+    """Link from an OC execution result to the RxP RuntimeInvocation/Result that produced it.
 
     Populated by adapters that delegate execution mechanics to
     ExecutorRuntime. Carries the identity of the RuntimeInvocation
@@ -354,6 +357,11 @@ class RuntimeInvocationRef(BaseModel):
 # the canonical CxRP RuntimeBinding rather than a local contract mirror.
 RuntimeBindingSummary = CxrpRuntimeBinding
 
+# Backward-compatible aliases. Prefer ``OcExecutionRequest`` and
+# ``OcExecutionResult`` in OC-owned code.
+ExecutionRequest = OcExecutionRequest
+ExecutionResult = OcExecutionResult
+
 
 # ER-003 — pull lifecycle types into local scope so the forward refs on
 # ExecutionRequest.lifecycle and ExecutionResult.lifecycle_outcome resolve.
@@ -363,6 +371,6 @@ from operations_center.lifecycle.models import (  # noqa: E402,F401
 )
 
 # Resolve forward references now that the summary types are defined.
-ExecutionResult.model_rebuild()
-ExecutionRequest.model_rebuild()
+OcExecutionResult.model_rebuild()
+OcExecutionRequest.model_rebuild()
 BoundExecutionTargetMirror.model_rebuild()

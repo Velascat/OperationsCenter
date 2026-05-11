@@ -44,7 +44,7 @@ from cxrp.vocabulary.runtime import RuntimeKind, SelectionMode
 from cxrp.vocabulary.status import ExecutionStatus as CxrpExecutionStatus
 
 from .enums import BackendName, LaneName
-from .execution import ExecutionRequest, ExecutionResult, RuntimeBindingSummary
+from .execution import OcExecutionRequest, OcExecutionResult, RuntimeBindingSummary
 from .proposal import OcPlanningProposal
 from .routing import OcRoutingDecision
 
@@ -165,7 +165,9 @@ def from_cxrp_lane_decision(payload: dict[str, Any]) -> OcRoutingDecision:
     )
 
 
-def to_cxrp_execution_request(oc: ExecutionRequest, *, executor: str, backend: str) -> CxrpExecutionRequest:
+def to_cxrp_execution_request(
+    oc: OcExecutionRequest, *, executor: str, backend: str
+) -> CxrpExecutionRequest:
     """Translate an OC ExecutionRequest into CxRP shape.
 
     OC's request is rich (workspace paths, branches, validation commands).
@@ -218,7 +220,7 @@ def _ecp_status_for(oc_status_value: str) -> CxrpExecutionStatus:
     return CxrpExecutionStatus(oc_status_value)
 
 
-def to_cxrp_execution_result(oc: ExecutionResult) -> CxrpExecutionResult:
+def to_cxrp_execution_result(oc: OcExecutionResult) -> CxrpExecutionResult:
     """Translate an OC ExecutionResult into CxRP shape.
 
     OC's rich ``ExecutionArtifact`` collapses to CxRP ``Artifact``. Heavy

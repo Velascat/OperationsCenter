@@ -122,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             "mode": mode,
             "version": _resolve_platform_manifest_version(),
             "project_slug": pm.project_slug,
+            "private_manifest_path": str(pm.private_manifest_path) if pm.private_manifest_path else None,
             "project_manifest_path": str(pm.project_manifest_path) if pm.project_manifest_path else None,
             "work_scope_manifest_path": str(pm.work_scope_manifest_path) if pm.work_scope_manifest_path else None,
             "local_manifest_path": str(pm.local_manifest_path) if pm.local_manifest_path else None,
@@ -183,6 +184,7 @@ def _print_human(report: dict[str, object], exit_code: int) -> None:
     print(f"  mode:                     {pm.get('mode')}")
     print(f"  platform_manifest_version: {pm.get('version') or '(unknown)'}")
     print(f"  project_slug:             {pm.get('project_slug') or '(none)'}")
+    print(f"  private_manifest_path:    {pm.get('private_manifest_path') or '(none)'}")
     print(f"  project_manifest_path:    {pm.get('project_manifest_path') or '(none)'}")
     print(f"  work_scope_manifest_path: {pm.get('work_scope_manifest_path') or '(none)'}")
     print(f"  local_manifest_path:      {pm.get('local_manifest_path') or '(none)'}")
