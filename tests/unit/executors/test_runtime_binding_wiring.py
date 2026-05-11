@@ -62,12 +62,13 @@ class TestSummaryCxrpRoundTrip:
         assert rb.model == "opus"
 
     def test_summary_to_cxrp_rejects_inconsistent_shape(self):
-        # human + model is forbidden; CxRP validation must catch it.
-        bad = RuntimeBindingSummary(
-            kind="human", selection_mode="explicit_request", model="opus",
-        )
+        # human + model is forbidden; the canonical CxRP RuntimeBinding now
+        # rejects it at construction time instead of letting an OC mirror
+        # carry the invalid shape further downstream.
         with pytest.raises(ValueError, match="model"):
-            runtime_binding_from_summary(bad)
+            RuntimeBindingSummary(
+                kind="human", selection_mode="explicit_request", model="opus",
+            )
 
     def test_cxrp_to_summary_preserves_fields(self):
         rb = CxrpRuntimeBinding(

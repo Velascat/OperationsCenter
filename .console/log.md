@@ -3,6 +3,16 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-11 — RuntimeBinding mirror reduction
+
+- Replaced the local `RuntimeBindingSummary` model body with a compatibility alias to canonical
+  `cxrp.contracts.RuntimeBinding` so OperationsCenter stops owning a duplicate runtime-binding
+  contract shape.
+- Kept the legacy OC import surface and string-normalized construction path so existing binders,
+  adapters, and tests continue to work without widening the refactor into proposal/routing types.
+- Updated runtime-binding documentation and tests to treat invalid bindings as rejected at
+  canonical CxRP construction time instead of later in an OC-only mapper step.
+
 ## 2026-05-11 — PlatformManifest consumption boundary notes
 
 - Documented OperationsCenter as a consumer of PlatformManifest topology and visibility metadata,

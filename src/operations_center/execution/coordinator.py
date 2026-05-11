@@ -15,7 +15,7 @@ This module makes the live supported execution path explicit:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -372,9 +372,11 @@ class ExecutionCoordinator:
         if cxrp_binding is None:
             return runtime
 
-        # Mirror the canonical CxRP RuntimeBinding into the OC summary type
-        # carried on ExecutionRequest.
-        from dataclasses import replace
+        # Normalize the canonical CxRP RuntimeBinding into OC's legacy
+        # import surface. We intentionally construct it with string values
+        # so existing binders and tests that compare against literal
+        # runtime kind names keep working while the concrete type stays
+        # the canonical CxRP dataclass.
         from operations_center.contracts.execution import RuntimeBindingSummary
 
         summary = RuntimeBindingSummary(
