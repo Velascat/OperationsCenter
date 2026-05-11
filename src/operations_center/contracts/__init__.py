@@ -8,7 +8,10 @@ The canonical cross-repo wire contract is **CxRP**
 Pydantic representation: they layer narrower types (``LaneName``,
 ``BackendName``, structured ``TaskTarget``/``BranchPolicy``/
 ``ValidationProfile``) on top of CxRP's open envelope so adapters and
-policy can rely on stricter shapes within OC.
+policy can rely on stricter shapes within OC. Where OC previously kept
+local compatibility mirrors, prefer the canonical CxRP types directly;
+``contracts.execution.RuntimeBindingSummary`` is now a compatibility
+alias to ``cxrp.contracts.RuntimeBinding``.
 
 At repo boundaries (HTTP between OC ↔ SwitchBoard, JSON written for
 OperatorConsole, run artifacts) these models are translated to CxRP shape

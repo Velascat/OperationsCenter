@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from cxrp.contracts.runtime_binding import RuntimeBinding as CxrpRuntimeBinding
 from pydantic import BaseModel, Field
 
 from .enums import ArtifactType, ExecutionStatus, FailureReasonCategory, ValidationStatus
@@ -80,8 +81,9 @@ class ExecutionRequest(BaseModel):
     idempotent: bool = False
 
     # Runtime binding — what powers the executor for this request.
-    # Mirror of cxrp.contracts.RuntimeBinding to avoid an import-cycle at
-    # the contract layer (same pattern as RecoveryMetadataSummary).
+    # ``RuntimeBindingSummary`` remains the OC-facing import name for
+    # compatibility, but the concrete type is the canonical CxRP
+    # RuntimeBinding rather than a local mirror.
     runtime_binding: Optional["RuntimeBindingSummary"] = None
 
     # Phase 6 — the strict, validated execution target this request was
@@ -347,24 +349,10 @@ class RuntimeInvocationRef(BaseModel):
     model_config = {"frozen": True}
 
 
-class RuntimeBindingSummary(BaseModel):
-    """Mirror of cxrp.contracts.RuntimeBinding at OC's contract layer.
-
-    Carried on ``ExecutionRequest.runtime_binding`` so adapters know what
-    runtime OC bound for this call. Construction goes through CxRP's
-    validating dataclass — by the time it lands here, kind/selection_mode
-    have already been validated against the validity table and
-    optional-field allow-list.
-    """
-
-    kind: str
-    selection_mode: str
-    model: Optional[str] = None
-    provider: Optional[str] = None
-    endpoint: Optional[str] = None
-    config_ref: Optional[str] = None
-
-    model_config = {"frozen": True}
+# Backward-compatible import surface: most OC code still imports
+# ``RuntimeBindingSummary`` from this module, but the concrete type is
+# the canonical CxRP RuntimeBinding rather than a local contract mirror.
+RuntimeBindingSummary = CxrpRuntimeBinding
 
 
 # ER-003 — pull lifecycle types into local scope so the forward refs on
