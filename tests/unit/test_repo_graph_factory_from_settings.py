@@ -28,6 +28,7 @@ from operations_center.repo_graph_factory import (
 class _PlatformManifestSettingsLike(BaseModel):
     enabled: bool = True
     project_slug: str | None = None
+    private_manifest_path: Path | None = None
     project_manifest_path: Path | None = None
     work_scope_manifest_path: Path | None = None
     local_manifest_path: Path | None = None
@@ -62,6 +63,16 @@ _LOCAL_YAML = (
     '    local_path: /opt/oc\n'
 )
 
+_PRIVATE_YAML = (
+    'manifest_kind: private\n'
+    'manifest_version: "1.0.0"\n'
+    'repos:\n'
+    '  private_docs:\n'
+    '    canonical_name: PrivateDocs\n'
+    '    visibility: private\n'
+    '    projection_behavior: drop_from_public\n'
+)
+
 
 class TestDisabled:
     def test_disabled_returns_none(self) -> None:
@@ -88,6 +99,16 @@ class TestProjectExplicit:
         assert g.resolve("MyProjAPI") is not None
 
 
+class TestPrivateExplicit:
+    def test_explicit_private_manifest_path_loads(self, tmp_path: Path) -> None:
+        private = tmp_path / "private.yaml"
+        private.write_text(_PRIVATE_YAML, encoding="utf-8")
+        s = _settings(private_manifest_path=private)
+        g = build_effective_repo_graph_from_settings(s)  # type: ignore[arg-type]
+        assert g is not None
+        assert g.resolve("PrivateDocs") is not None
+
+
 class TestBaseOwnership:
     def test_factory_always_uses_bundled_platform_manifest_base(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -101,8 +122,9 @@ class TestBaseOwnership:
         def _fake_default_config_path() -> Path:
             return tmp_path / "bundled-platform.yaml"
 
-        def _fake_load_effective_graph(base, *, project=None, work_scope=None, local=None):
+        def _fake_load_effective_graph(base, *, private=None, project=None, work_scope=None, local=None):
             recorded["base"] = base
+            recorded["private"] = private
             recorded["project"] = project
             recorded["work_scope"] = work_scope
             recorded["local"] = local
@@ -119,9 +141,42 @@ class TestBaseOwnership:
         assert graph == "graph"
         assert recorded == {
             "base": tmp_path / "bundled-platform.yaml",
+            "private": None,
             "project": proj,
             "work_scope": None,
             "local": local,
+        }
+
+    def test_factory_passes_private_manifest_layer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        private = tmp_path / "private.yaml"
+        private.write_text(_PRIVATE_YAML, encoding="utf-8")
+        recorded: dict[str, object] = {}
+
+        def _fake_default_config_path() -> Path:
+            return tmp_path / "bundled-platform.yaml"
+
+        def _fake_load_effective_graph(base, *, private=None, project=None, work_scope=None, local=None):
+            recorded["base"] = base
+            recorded["private"] = private
+            recorded["project"] = project
+            recorded["work_scope"] = work_scope
+            recorded["local"] = local
+            return "graph"
+
+        monkeypatch.setattr(repo_graph_factory, "default_config_path", _fake_default_config_path)
+        monkeypatch.setattr(repo_graph_factory, "load_effective_graph", _fake_load_effective_graph)
+
+        graph = repo_graph_factory.build_effective_repo_graph(private_manifest_path=private)
+
+        assert graph == "graph"
+        assert recorded == {
+            "base": tmp_path / "bundled-platform.yaml",
+            "private": private,
+            "project": None,
+            "work_scope": None,
+            "local": None,
         }
 
 
@@ -145,6 +200,23 @@ class TestProjectByRepoRootConvention:
         assert g is not None
         assert g.resolve("MyProjAPI") is None
         assert g.resolve("OperationsCenter") is not None
+
+
+class TestPrivateBySlugConvention:
+    def test_private_manifest_discovered_from_private_manifest_repo(
+        self, tmp_path: Path
+    ) -> None:
+        private_dir = tmp_path / "PrivateManifest" / "manifests" / "videofoundry"
+        private_dir.mkdir(parents=True)
+        (private_dir / "private_manifest.yaml").write_text(_PRIVATE_YAML, encoding="utf-8")
+        repo_root = tmp_path / "VideoFoundry"
+        repo_root.mkdir()
+
+        s = _settings(project_slug="videofoundry")
+        g = build_effective_repo_graph_from_settings(s, repo_root=repo_root)  # type: ignore[arg-type]
+
+        assert g is not None
+        assert g.resolve("PrivateDocs") is not None
 
 
 class TestLocalExplicit:

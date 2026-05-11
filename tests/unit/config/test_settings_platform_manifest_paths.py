@@ -41,10 +41,12 @@ class TestPathResolution:
         cfg = _write_config(
             tmp_path,
             "\nplatform_manifest:\n"
+            "  private_manifest_path: /etc/private.yaml\n"
             "  project_manifest_path: /etc/proj.yaml\n"
             "  local_manifest_path:   /etc/local.yaml\n",
         )
         s = load_settings(cfg)
+        assert s.platform_manifest.private_manifest_path == Path("/etc/private.yaml")
         assert s.platform_manifest.project_manifest_path == Path("/etc/proj.yaml")
         assert s.platform_manifest.local_manifest_path == Path("/etc/local.yaml")
 
@@ -55,15 +57,18 @@ class TestPathResolution:
         cfg.write_text(
             _BASE_YAML
             + "\nplatform_manifest:\n"
+              "  private_manifest_path: ../private.yaml\n"
               "  project_manifest_path: ../project.yaml\n"
               "  local_manifest_path: local/here.yaml\n",
             encoding="utf-8",
         )
+        (tmp_path / "private.yaml").touch()
         (tmp_path / "project.yaml").touch()
         (config_dir / "local").mkdir()
         (config_dir / "local" / "here.yaml").touch()
 
         s = load_settings(cfg)
+        assert s.platform_manifest.private_manifest_path == (tmp_path / "private.yaml").resolve()
         assert s.platform_manifest.project_manifest_path == (tmp_path / "project.yaml").resolve()
         assert s.platform_manifest.local_manifest_path == (
             config_dir / "local" / "here.yaml"
@@ -76,14 +81,17 @@ class TestPathResolution:
         cfg = _write_config(
             tmp_path,
             "\nplatform_manifest:\n"
+            "  private_manifest_path: ~/private.yaml\n"
             "  project_manifest_path: ~/project.yaml\n",
         )
         s = load_settings(cfg)
+        assert s.platform_manifest.private_manifest_path == tmp_path / "private.yaml"
         assert s.platform_manifest.project_manifest_path == tmp_path / "project.yaml"
 
     def test_none_paths_pass_through(self, tmp_path: Path) -> None:
         cfg = _write_config(tmp_path, "")
         s = load_settings(cfg)
+        assert s.platform_manifest.private_manifest_path is None
         assert s.platform_manifest.project_manifest_path is None
         assert s.platform_manifest.local_manifest_path is None
 

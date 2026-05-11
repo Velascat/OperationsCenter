@@ -144,13 +144,13 @@ repos:
 report_root: tools/report/kodo_plane
 
 # ---------------------------------------------------------------------------
-# Platform Manifest 3-layer composition (PlatformManifest v0.3+)
+# Platform Manifest 4-layer composition (PlatformManifest v1.0+)
 # ---------------------------------------------------------------------------
 # OC consumes a merged EffectiveRepoGraph from PlatformManifest's
-# `load_effective_graph(base, project, local)`. The platform base is
-# always the bundled `platform_manifest.yaml` (9 public repos). A
-# project layer adds private/public project repos + edges to the
-# platform; a local layer annotates existing nodes with allowlisted
+# `load_effective_graph(base, private, project/work_scope, local)`. The
+# platform base is always the bundled `platform_manifest.yaml` (public
+# topology). A PrivateManifest layer adds private platform truth; a
+# project/work-scope layer adds project-scoped overlays; a local layer annotates existing nodes with allowlisted
 # fields (local_path, local_port, env_file, endpoint_override,
 # cache_path, gpu_required, runtime_hints).
 #
@@ -162,9 +162,14 @@ report_root: tools/report/kodo_plane
 # Defaults: enabled=true, all paths None → platform-only graph.
 # Set false to skip composition entirely.
 #
-# v0.3 supports ONE project per OC instance — to switch projects,
+# PrivateManifest discovery: when `private_manifest_path` is unset and
+# `project_slug` is known, OC looks for
+# `/home/dev/Documents/GitHub/PrivateManifest/manifests/<project_slug>/private_manifest.yaml`
+# (or sibling `PrivateManifest/` from the provided repo_root).
+#
+# v0.3+ supports ONE project manifest per OC instance — to switch projects,
 # update the paths or run OC from inside that project's repo (cwd
-# convention picks up `<repo_root>/topology/project_manifest.yaml`).
+# convention may pick up `<repo_root>/topology/project_manifest.yaml`).
 #
 # See docs/operator/manifest_wiring.md for the full operator runbook
 # and docs/operator/manifest_authoring.md for project-manifest authoring.
@@ -172,6 +177,7 @@ report_root: tools/report/kodo_plane
 # platform_manifest:
 #   enabled: true
 #   project_slug: <managed-repo>              # for WorkStation LocalManifest discovery
+#   private_manifest_path: /home/dev/Documents/GitHub/PrivateManifest/manifests/<project-slug>/private_manifest.yaml
 #   project_manifest_path: /home/dev/Documents/GitHub/<managed-repo>/topology/project_manifest.yaml
 #   local_manifest_path:   /home/dev/Documents/GitHub/<managed-repo>/topology/local_manifest.yaml
 

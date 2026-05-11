@@ -44,7 +44,14 @@ from .common import (
 )
 from .proposal import OcPlanningProposal, TaskProposal
 from .routing import LaneDecision, OcRoutingDecision
-from .execution import ExecutionArtifact, ExecutionRequest, ExecutionResult, RunTelemetry
+from .execution import (
+    ExecutionArtifact,
+    ExecutionRequest,
+    ExecutionResult,
+    OcExecutionRequest,
+    OcExecutionResult,
+    RunTelemetry,
+)
 
 __all__ = [
     # enums
@@ -71,6 +78,8 @@ __all__ = [
     "TaskProposal",
     "LaneDecision",
     "ExecutionArtifact",
+    "OcExecutionRequest",
+    "OcExecutionResult",
     "ExecutionRequest",
     "ExecutionResult",
     "RunTelemetry",

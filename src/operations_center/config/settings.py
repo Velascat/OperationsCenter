@@ -319,10 +319,14 @@ class RepoSettings(BaseModel):
 class PlatformManifestSettings(BaseModel):
     """Configuration for the EffectiveRepoGraph composition pipeline.
 
-    Composition order is platform → (project XOR work_scope) → local. The
+    Composition order is platform → private → (project XOR work_scope) → local. The
     platform base is always the bundled ``platform_manifest.yaml`` shipped
-    by the ``platform-manifest`` package. The second layer is exactly one
-    of:
+    by the ``platform-manifest`` package. The optional second layer is:
+
+    - ``private_manifest_path``: a PrivateManifest private topology superset
+      owned outside the public PlatformManifest repo.
+
+    The next layer is exactly one of:
 
     - ``project_manifest_path``: a single ProjectManifest describing one
       project unit.
@@ -330,7 +334,7 @@ class PlatformManifestSettings(BaseModel):
       ProjectManifests via explicit ``includes:`` (PM v0.9.0+).
 
     Setting both is a configuration error. ``local_manifest_path`` layers
-    on top of either.
+    on top of the chosen stack.
 
     All fields default to None; the loader returns the platform-only graph
     when nothing is configured. Set ``enabled=False`` to skip graph
@@ -339,6 +343,7 @@ class PlatformManifestSettings(BaseModel):
 
     enabled: bool = True
     project_slug: str | None = None
+    private_manifest_path: Path | None = None
     project_manifest_path: Path | None = None
     work_scope_manifest_path: Path | None = None
     local_manifest_path: Path | None = None
@@ -511,6 +516,7 @@ def load_settings(path: str | Path) -> Settings:
     # operators can write `project_manifest_path: ../ExampleManagedRepo/topology/...`
     # without hardcoding absolute paths.
     pm = settings.platform_manifest
+    pm.private_manifest_path = _resolve_manifest_path(pm.private_manifest_path, config_dir)
     pm.project_manifest_path = _resolve_manifest_path(pm.project_manifest_path, config_dir)
     pm.work_scope_manifest_path = _resolve_manifest_path(pm.work_scope_manifest_path, config_dir)
     pm.local_manifest_path = _resolve_manifest_path(pm.local_manifest_path, config_dir)

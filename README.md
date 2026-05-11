@@ -27,7 +27,7 @@ OperationsCenter is operated through a **planning -> routing -> execution** flow
 2. Build an internal `OcPlanningProposal`.
 3. Map and route it through SwitchBoard to get an internal `OcRoutingDecision`.
 4. Hand the proposal/decision bundle to OperationsCenter's canonical execution boundary.
-5. `ExecutionCoordinator` builds `ExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
+5. `ExecutionCoordinator` builds an internal `OcExecutionRequest`, runs the mandatory policy gate, invokes the selected adapter, and records observability evidence.
 
 For a full reproducible walkthrough see **[docs/demo.md](docs/demo.md)**. Run it as a validation ritual after any significant config or threshold change.
 
@@ -141,7 +141,7 @@ OperationsCenter consumes canonical contracts from [CxRP](https://github.com/Pro
 | `enums.py` | `TaskType`, `LaneName`, `BackendName`, `ExecutionMode`, `Priority`, `RiskLevel` |
 | `proposal.py` | `OcPlanningProposal` (`TaskProposal` compatibility alias) |
 | `routing.py` | `OcRoutingDecision` (`LaneDecision` compatibility alias) |
-| `execution.py` | `ExecutionRequest`, `ExecutionResult`, `ExecutionArtifact`, `RunTelemetry` |
+| `execution.py` | `OcExecutionRequest` (`ExecutionRequest` compatibility alias), `OcExecutionResult` (`ExecutionResult` compatibility alias), `ExecutionArtifact`, `RunTelemetry` |
 | `common.py` | `TaskTarget`, `ExecutionConstraints`, `ValidationProfile`, `BranchPolicy` |
 
 See `WorkStation/docs/architecture/contracts/contracts.md` for full documentation.
@@ -151,11 +151,11 @@ See `WorkStation/docs/architecture/contracts/contracts.md` for full documentatio
 The supported live execution path is:
 
 ```text
-OcPlanningProposal -> OcRoutingDecision -> ExecutionRequest -> adapter -> ExecutionResult
+OcPlanningProposal -> OcRoutingDecision -> OcExecutionRequest -> adapter -> OcExecutionResult
 ```
 
-`ExecutionCoordinator` is the supported execution boundary. It builds the canonical
-`ExecutionRequest`, evaluates policy before execution, invokes the selected adapter,
+`ExecutionCoordinator` is the supported execution boundary. It builds the internal
+`OcExecutionRequest`, maps through CxRP when it crosses a repo boundary, evaluates policy before execution, invokes the selected adapter,
 and records the resulting `ExecutionRecord` / `ExecutionTrace`.
 
 When an adapter supports `execute_and_capture()`, the coordinator also retains
@@ -182,9 +182,9 @@ outcome = coordinator.execute(
         task_branch="auto/task-123",
     ),
 )
-# outcome.request         -> canonical ExecutionRequest
+# outcome.request         -> internal OcExecutionRequest
 # outcome.policy_decision -> mandatory gate result
-# outcome.result          -> canonical ExecutionResult
+# outcome.result          -> internal OcExecutionResult
 # outcome.record/trace    -> retained observability view
 ```
 
@@ -294,7 +294,7 @@ Key model distinctions:
 
 | Model | Purpose |
 |---|---|
-| `ExecutionResult` | Canonical outcome contract (unchanged) |
+| `OcExecutionResult` | Internal execution-boundary outcome contract (`ExecutionResult` compatibility alias) |
 | `ExecutionRecord` | Retained normalized record; wraps result + observability metadata |
 | `ExecutionTrace` | Inspectable report; generated from record on demand |
 | `BackendDetailRef` | Reference to raw backend output; kept separate from canonical data |
