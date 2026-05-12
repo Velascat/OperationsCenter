@@ -2,7 +2,7 @@
 
 **Phase:** 4  
 **Module:** `operations_center.run_identity`  
-**Related:** [Managed Repo Contract (Phase 1)](../../architecture/videofoundry/videofoundry_managed_repo_contract.md) · [Audit Toolset Contract (Phase 3)](managed_repo_audit_toolset_contract.md)
+**Related:** [Managed Repo Contract (Phase 1)](../../architecture/managed-private-project/managed-private-project_managed_repo_contract.md) · [Audit Toolset Contract (Phase 3)](managed_repo_audit_toolset_contract.md)
 
 ---
 
@@ -16,7 +16,7 @@ This phase does not execute commands. It does not write manifests. It makes mana
 
 ## Relationship to Phase 1 Managed Repo Config
 
-The managed repo config (`config/managed_repos/videofoundry.yaml`) declares:
+The managed repo config (`config/managed_repos/managed-private-project.yaml`) declares:
 
 ```yaml
 run_id:
@@ -54,7 +54,7 @@ Phase 6: dispatch (reads PreparedManagedAuditInvocation, executes command)
 OperationsCenter is the sole authority for managed run_id.
 ```
 
-VideoFoundry has a local fallback that generates its own id when `AUDIT_RUN_ID` is not set (for dev/local runs). OpsCenter must never rely on that fallback. Every OpsCenter-initiated managed run injects `AUDIT_RUN_ID` before the command starts.
+managed private project has a local fallback that generates its own id when `AUDIT_RUN_ID` is not set (for dev/local runs). OpsCenter must never rely on that fallback. Every OpsCenter-initiated managed run injects `AUDIT_RUN_ID` before the command starts.
 
 ---
 
@@ -67,9 +67,9 @@ VideoFoundry has a local fallback that generates its own id when `AUDIT_RUN_ID` 
 Examples:
 
 ```
-videofoundry_representative_20260426T164233Z_a1b2c3d4
-videofoundry_stack_authoring_20260426T164233Z_b5c6d7e8
-videofoundry_enrichment_20260426T164233Z_c9d0e1f2
+managed-private-project_representative_20260426T164233Z_a1b2c3d4
+managed-private-project_stack_authoring_20260426T164233Z_b5c6d7e8
+managed-private-project_enrichment_20260426T164233Z_c9d0e1f2
 ```
 
 | Property | Value |
@@ -113,7 +113,7 @@ Validators enforce:
 
 ```python
 env = apply_run_identity_env({}, identity)
-# → {"AUDIT_RUN_ID": "videofoundry_representative_20260426T164233Z_a1b2c3d4"}
+# → {"AUDIT_RUN_ID": "managed-private-project_representative_20260426T164233Z_a1b2c3d4"}
 ```
 
 Rules:
@@ -144,7 +144,7 @@ When `AUDIT_RUN_ID` is already present in the env with a different value, OpsCen
 from operations_center.run_identity import prepare_managed_audit_invocation
 
 prepared = prepare_managed_audit_invocation(
-    "videofoundry",
+    "managed-private-project",
     "representative",
     metadata={"channel_slug": "Connective_Contours"},
 )
@@ -180,7 +180,7 @@ If a caller supplies a run_id (not using `generate_managed_run_identity`), `Mana
 
 ## Local Producer Fallback Rule
 
-VideoFoundry generates a fallback run_id when `AUDIT_RUN_ID` is not set in the environment (for local/dev runs). OpsCenter must never rely on this fallback:
+managed private project generates a fallback run_id when `AUDIT_RUN_ID` is not set in the environment (for local/dev runs). OpsCenter must never rely on this fallback:
 
 ```
 For managed runs initiated by OpsCenter:
@@ -202,5 +202,5 @@ For local/dev runs outside OpsCenter:
 - Phase 4 does not write `run_status.json` or `artifact_manifest.json`.
 - Phase 4 does not implement repo locking or one-audit-at-a-time enforcement.
 - Phase 4 does not implement artifact indexing.
-- Phase 4 does not import VideoFoundry Python code.
+- Phase 4 does not import managed private project Python code.
 - Phase 4 does not implement collision detection against the filesystem.

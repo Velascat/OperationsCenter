@@ -91,8 +91,8 @@ field. Pydantic will use the field's default if one exists, or raise a
 
 ### 6. Private repo name appears in a tracked OC file (B1 alert)
 
-Custodian B1 blocks any tracked OC file that mentions a private repo name
-(e.g. "VideoFoundry"). Never put private repo details in:
+Custodian B1 blocks any tracked OC file that mentions a private repo name.
+Never put private repo details in:
 
 - `src/` Python source files
 - `docs/` markdown files

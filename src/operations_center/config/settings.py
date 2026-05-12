@@ -323,7 +323,7 @@ class PlatformManifestSettings(BaseModel):
     platform base is always the bundled ``platform_manifest.yaml`` shipped
     by the ``platform-manifest`` package. The optional second layer is:
 
-    - ``private_manifest_path``: a PrivateManifest private topology superset
+    - ``private_manifest_path``: a private topology superset manifest
       owned outside the public PlatformManifest repo.
 
     The next layer is exactly one of:

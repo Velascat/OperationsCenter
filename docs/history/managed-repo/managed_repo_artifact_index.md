@@ -12,7 +12,7 @@ Phase 7 makes managed audit artifacts queryable from within OperationsCenter.
 
 The goal is to load a contract-compliant `artifact_manifest.json`, build a normalized in-memory index of artifact entries, and retrieve artifacts by stable criteria.
 
-Phase 7 does **not** harvest fixtures, implement slice replay testing, change VideoFoundry output behavior, or scan directories to discover artifacts. The manifest is the only source of truth.
+Phase 7 does **not** harvest fixtures, implement slice replay testing, change managed private project output behavior, or scan directories to discover artifacts. The manifest is the only source of truth.
 
 ---
 
@@ -221,7 +221,7 @@ Phase 7 explicitly does not implement:
 - **Regression suites** — no test generation.
 - **Directory scanning** — the only file reads are the manifest and optionally artifact content (via explicit `read_*` calls).
 - **Persistent index storage** — the index is in-memory only.
-- **VideoFoundry code imports** — hard boundary is enforced and verified by AST test.
+- **managed private project code imports** — hard boundary is enforced and verified by AST test.
 - **Index invalidation or caching** — callers rebuild the index from the manifest each time.
 
 ---
@@ -242,7 +242,7 @@ Phase 7 explicitly does not implement:
 [x] Optional text/JSON artifact reading is safe and guarded.
 [x] Dispatch result integration can index from artifact_manifest_path.
 [x] No directory scanning is introduced.
-[x] No VideoFoundry code is imported.
+[x] No managed private project code is imported.
 [x] Tests cover completed and failed manifests.
 [x] Docs explain manifest-as-source-of-truth behavior.
 ```

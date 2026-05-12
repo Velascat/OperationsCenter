@@ -2,7 +2,7 @@
 
 **Phase:** 3  
 **Module:** `operations_center.audit_toolset`  
-**Related:** [Managed Repo Contract (Phase 1)](../../architecture/videofoundry/videofoundry_managed_repo_contract.md) · [Artifact Contract (Phase 2)](../../architecture/videofoundry/videofoundry_audit_artifact_contract.md)
+**Related:** [Managed Repo Contract (Phase 1)](../../architecture/managed-private-project/managed-private-project_managed_repo_contract.md) · [Artifact Contract (Phase 2)](../../architecture/managed-private-project/managed-private-project_audit_artifact_contract.md)
 
 ---
 
@@ -16,7 +16,7 @@ Phase 3 does not execute commands. It does not write manifests. It does not inde
 
 ## Relationship to Phase 1 Managed Repo Config
 
-Phase 1 (`config/managed_repos/videofoundry.yaml`) declares:
+Phase 1 (`config/managed_repos/managed-private-project.yaml`) declares:
 - Which commands exist and their `command_status` evidence
 - Which audit types are supported
 - Where outputs appear (`output_dir`, `status_file`)
@@ -84,7 +84,7 @@ The model validator enforces that `AUDIT_RUN_ID` is present in `env` and equals 
 
 `not_yet_run` is allowed by default to support dry contract generation and pre-Phase-5 testing. Pass `allow_not_yet_run=False` when only verified commands should generate invocation requests.
 
-For VideoFoundry: `representative` is `verified` (confirmed working in Phase 0). The other five types are `not_yet_run` (commands exist but have not been run through OpsCenter yet).
+For managed private project: `representative` is `verified` (confirmed working in Phase 0). The other five types are `not_yet_run` (commands exist but have not been run through OpsCenter yet).
 
 ---
 
@@ -146,7 +146,7 @@ manifest_path = resolve_artifact_manifest_path(rs, base_dir="/path/to/vf/repo")
 - For absolute paths: returns as-is
 - Returns an absolute `Path` — the file is not read or validated at this stage
 
-The `artifact_manifest_path` in VideoFoundry run_status files is relative to the VF repo root (e.g. `tools/audit/report/representative/{bucket}/artifact_manifest.json`).
+The `artifact_manifest_path` in managed private project run_status files is relative to the VF repo root (e.g. `tools/audit/report/representative/{bucket}/artifact_manifest.json`).
 
 ---
 
@@ -194,7 +194,7 @@ Phase 3 does not implement CLI commands. The expected future shape (Phase 6+):
 
 ```
 operations-center audit prepare \
-    --repo videofoundry \
+    --repo managed-private-project \
     --type representative \
     [--run-id <hex>]
     # → prints the ManagedAuditInvocationRequest (does not run)
@@ -205,11 +205,11 @@ operations-center audit inspect-run-status \
 
 operations-center audit resolve-manifest \
     --path tools/audit/report/representative/bucket/run_status.json \
-    --base-dir ../VideoFoundry
+    --base-dir ../managed private project
     # → prints resolved artifact_manifest.json path
 ```
 
-Thin read-only CLI wrappers may be added if consistent with the existing `entrypoints/` pattern. They must not execute audits, index artifacts, scan directories, or import VideoFoundry.
+Thin read-only CLI wrappers may be added if consistent with the existing `entrypoints/` pattern. They must not execute audits, index artifacts, scan directories, or import managed private project.
 
 ---
 
@@ -220,5 +220,5 @@ Thin read-only CLI wrappers may be added if consistent with the existing `entryp
 - Phase 3 does not index artifacts or build artifact registries.
 - Phase 3 does not implement dispatch orchestration (Phase 6).
 - Phase 3 does not scan directories or infer paths from bucket naming.
-- Phase 3 does not import VideoFoundry Python code.
+- Phase 3 does not import managed private project Python code.
 - Phase 3 does not add `artifact_manifest_path` to VF (Phase 5 job).

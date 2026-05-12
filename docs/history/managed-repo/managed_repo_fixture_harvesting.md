@@ -248,7 +248,7 @@ operations-center-fixtures harvest \
 operations-center-fixtures harvest \
     --manifest path/to/artifact_manifest.json \
     --profile manual_selection \
-    --artifact-id "videofoundry:representative:TopicSelectionStage:topic_selection"
+    --artifact-id "managed-private-project:representative:TopicSelectionStage:topic_selection"
 
 # Inspect a fixture pack
 operations-center-fixtures inspect \

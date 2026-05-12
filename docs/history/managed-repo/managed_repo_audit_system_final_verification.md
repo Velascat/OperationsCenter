@@ -58,7 +58,7 @@ None.
 
 ### Suggested Follow-Up Tasks (Non-Implementation)
 
-1. **First live VideoFoundry audit run** — Phase 5 code is wired but has never been executed against a live VF audit. Run `operations-center-governance run` against a live VF instance to validate Phase 5 outputs conform to the contract.
+1. **First live managed private project audit run** — Phase 5 code is wired but has never been executed against a live VF audit. Run `operations-center-governance run` against a live VF instance to validate Phase 5 outputs conform to the contract.
 
 2. ~~**CI integration guide**~~ — **Done (Rev 12).** `docs/architecture/ci/ci_integration_guide.md` covers the full governance flow, exit codes, urgency/approval matrix, cooldown/budget configuration, and the state directory persistence requirement for ephemeral CI environments.
 
@@ -103,7 +103,7 @@ None.
 
 | ID | Description | Closure |
 |----|-------------|---------|
-| gap_r2_001 | Phase 5 VideoFoundry producer not delivered | All 6 audit CLIs wired (`ManagedRunFinalizer` / `_RunStatusFinalizer`) |
+| gap_r2_001 | Phase 5 managed private project producer not delivered | All 6 audit CLIs wired (`ManagedRunFinalizer` / `_RunStatusFinalizer`) |
 | gap_r2_002 | Empty `known_audit_types` → warning (permissive) | Changed to `status="failed"` |
 | gap_r2_003 | `AuditGovernanceReport` lacks `governance_status` | Field added; runner populates all 4 code paths |
 | gap_r2_004 | `file_locks.py` Linux/macOS requirement undocumented | Module docstring updated |
@@ -143,7 +143,7 @@ None.
 | Phase 2 | Artifact Contract Definition | ✅ Complete | incl. Phase 1+3 |
 | Phase 3 | Audit Toolset Contract | ✅ Complete | 47 |
 | Phase 4 | Run Identity / ENV Injection | ✅ Complete | 52 |
-| Phase 5 | VideoFoundry Producer Contract | ✅ Complete | 6 (integration) |
+| Phase 5 | managed private project Producer Contract | ✅ Complete | 6 (integration) |
 | Phase 6 | Dispatch-Orchestrated Run Control | ✅ Complete | 94 |
 | Phase 7 | Artifact Index + Retrieval | ✅ Complete | 78 |
 | Phase 8 | Behavior Calibration | ✅ Complete | 102 |
@@ -161,7 +161,7 @@ None.
 ## System Boundary Summary
 
 ```
-VideoFoundry (managed repo)              OperationsCenter
+managed private project (managed repo)              OperationsCenter
 ─────────────────────────────────────   ────────────────────────────────────────────────
 Executes audits                          Defines all contracts and schemas
 Produces artifacts                       Configures managed repos (YAML)
@@ -178,9 +178,9 @@ Writes artifact_manifest.json  ──────►   Reads + validates manifes
                                          Governs full audits (Phase 12)
 ```
 
-**Boundary rule:** OpsCenter never imports VideoFoundry code. All coordination is through files and subprocess invocation only.
+**Boundary rule:** OpsCenter never imports managed private project code. All coordination is through files and subprocess invocation only.
 
-**Note on `VideoFoundry*` names in OpsCenter vocabulary:** `VideoFoundryArtifactKind`, `VideoFoundryAuditType`, `VideoFoundrySourceStage` are OpsCenter-owned contract types defined in `audit_contracts/vocabulary.py` and `audit_contracts/profiles/videofoundry.py`. These are not imports of the VideoFoundry Python package — they are OpsCenter's own definitions of vocabulary for the VF producer profile.
+**Note on `managed private project*` names in OpsCenter vocabulary:** `managed private projectArtifactKind`, `managed private projectAuditType`, `managed private projectSourceStage` are OpsCenter-owned contract types defined in `audit_contracts/vocabulary.py` and `audit_contracts/profiles/managed-private-project.py`. These are not imports of the managed private project Python package — they are OpsCenter's own definitions of vocabulary for the VF producer profile.
 
 ---
 
@@ -352,15 +352,15 @@ Verified by: 102 behavior calibration tests (includes 35 anti-collapse tests).
 ### Forbidden Imports (0 matches)
 
 ```
-^from videofoundry   → 0 matches in src/operations_center/
-^import videofoundry → 0 matches in src/operations_center/
+^from managed-private-project   → 0 matches in src/operations_center/
+^import managed-private-project → 0 matches in src/operations_center/
 ```
 
-Checked with exact line-start anchors to distinguish the VideoFoundry external package from OpsCenter's own `VideoFoundry*` vocabulary types.
+Checked with exact line-start anchors to distinguish the managed private project external package from OpsCenter's own `managed private project*` vocabulary types.
 
-### `VideoFoundry*` Vocabulary in OpsCenter
+### `managed private project*` Vocabulary in OpsCenter
 
-`VideoFoundryArtifactKind`, `VideoFoundryAuditType`, `VideoFoundrySourceStage` are OpsCenter-defined enums in `audit_contracts/vocabulary.py` and `audit_contracts/profiles/videofoundry.py`. They are referenced by OpsCenter modules at import time. This is not a boundary violation — these are OpsCenter's own canonical definitions for the VF producer contract, not imports of the VideoFoundry Python package.
+`managed private projectArtifactKind`, `managed private projectAuditType`, `managed private projectSourceStage` are OpsCenter-defined enums in `audit_contracts/vocabulary.py` and `audit_contracts/profiles/managed-private-project.py`. They are referenced by OpsCenter modules at import time. This is not a boundary violation — these are OpsCenter's own canonical definitions for the VF producer contract, not imports of the managed private project Python package.
 
 ### Unidirectional Import Graph
 
@@ -421,7 +421,7 @@ Verified by: 78 harvesting tests (Invariant 9 coverage).
 
 | # | Invariant | Status | Evidence |
 |---|-----------|--------|----------|
-| 1 | No managed repo imports | ✅ PASS | 0 `^from videofoundry` / `^import videofoundry` matches; AST checks in 15 modules; `VideoFoundry*` enums are OpsCenter-owned types |
+| 1 | No managed repo imports | ✅ PASS | 0 `^from managed-private-project` / `^import managed-private-project` matches; AST checks in 15 modules; `managed private project*` enums are OpsCenter-owned types |
 | 2 | Contract ownership | ✅ PASS | All schemas and models in `src/operations_center/`; 7 schema files across 6 subdirectories |
 | 3 | Discovery chain | ✅ PASS | `audit_toolset/discovery.py`; no scanning; 47+10 tests |
 | 4 | Manifest as source of truth | ✅ PASS | `load_artifact_manifest()` sole entry point |
@@ -456,7 +456,7 @@ Verified by: 78 harvesting tests (Invariant 9 coverage).
 
 ## Remaining Risks
 
-1. **First live VideoFoundry run (low)** — Phase 5 code is wired but has never executed against a real live audit. Fake-producer integration tests validate the contract. Format differences remain a theoretical risk until first live run completes.
+1. **First live managed private project run (low)** — Phase 5 code is wired but has never executed against a real live audit. Fake-producer integration tests validate the contract. Format differences remain a theoretical risk until first live run completes.
 
 2. **fcntl Linux-only (low)** — Documented; not a current deployment risk.
 
@@ -501,4 +501,4 @@ The managed repo audit system across Phases 0–12 is declared **locked** as of 
 - CI integration guide published at `docs/architecture/ci/ci_integration_guide.md`
 - Follow-up tasks 2 and 3 completed; only first live VF run remains open
 
-**The system is architecturally complete and gap-free.** Twelve verification passes across this codebase have found and closed 23 gaps; Rev 7 through Rev 12 all found zero new gaps (six consecutive clean passes). The two non-correctness follow-up enhancements are now complete. The one remaining open item (first live VideoFoundry run) is operational, not architectural.
+**The system is architecturally complete and gap-free.** Twelve verification passes across this codebase have found and closed 23 gaps; Rev 7 through Rev 12 all found zero new gaps (six consecutive clean passes). The two non-correctness follow-up enhancements are now complete. The one remaining open item (first live managed private project run) is operational, not architectural.

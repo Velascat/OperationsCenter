@@ -19,7 +19,7 @@ The dispatcher:
 6. Resolves `artifact_manifest_path` through the Phase 3 discovery chain.
 7. Returns a structured `ManagedAuditDispatchResult`.
 
-Phase 6 does **not** index artifacts, harvest fixtures, implement slice replay testing, or import VideoFoundry code.
+Phase 6 does **not** index artifacts, harvest fixtures, implement slice replay testing, or import managed private project code.
 
 ---
 
@@ -67,7 +67,7 @@ The run_id is used in Phase 6 to:
 
 ## Relationship to Phase 5 Producer Compliance
 
-VideoFoundry (Phase 5) writes contract files to the audit bucket:
+managed private project (Phase 5) writes contract files to the audit bucket:
 - `run_status.json` — Phase 2 schema, includes `artifact_manifest_path`.
 - `artifact_manifest.json` — Phase 2 schema, lists all artifacts.
 
@@ -222,9 +222,9 @@ Discovery failures are explicit:
 > `governance_report.json` for every request regardless of outcome.
 
 ```
-operations-center-audit run --repo videofoundry --type representative
-operations-center-audit run --repo videofoundry --type representative --timeout 600
-operations-center-audit run --repo videofoundry --type representative --json
+operations-center-audit run --repo managed-private-project --type representative
+operations-center-audit run --repo managed-private-project --type representative --timeout 600
+operations-center-audit run --repo managed-private-project --type representative --json
 
 operations-center-audit status <path/to/run_status.json>
 operations-center-audit resolve-manifest <path/to/run_status.json> --base-dir /path/to/vf
@@ -248,7 +248,7 @@ Phase 6 explicitly does not implement:
 - **Slice replay testing** — no replay infrastructure.
 - **Persistent distributed locks** — the lock registry is in-memory and process-scoped.
 - **Scheduling / watching** — no daemons or polling.
-- **VideoFoundry code imports** — the hard boundary is enforced and verified by AST test.
+- **managed private project code imports** — the hard boundary is enforced and verified by AST test.
 
 ---
 
@@ -267,7 +267,7 @@ Phase 6 explicitly does not implement:
 [x] missing artifact_manifest_path failures are explicit.
 [x] no artifact indexing is implemented.
 [x] no directory scanning is introduced.
-[x] no VideoFoundry code is imported.
+[x] no managed private project code is imported.
 [x] tests cover success, process failure, contract failure, and locking.
 [x] docs explain dispatch lifecycle and non-goals.
 ```

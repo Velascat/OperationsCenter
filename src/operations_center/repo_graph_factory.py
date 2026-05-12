@@ -5,7 +5,7 @@
 Thin wrapper around ``platform_manifest.load_effective_graph`` that
 defaults to the bundled platform manifest. Optional private, project,
 work-scope, and local manifest paths layer on top per the PlatformManifest
-design (platform → private → project/work-scope → local).
+design (platform -> private -> project/work-scope -> local).
 
 OperationsCenter is a consumer of the EffectiveRepoGraph — it does not
 own the manifests. Owning ResponsibilityHere is purely "give me the
@@ -119,13 +119,14 @@ def build_effective_repo_graph_from_settings(
     Resolution rules:
     - If ``settings.platform_manifest.enabled`` is False → returns None.
     - ``private_manifest_path``: explicit override on settings → fall back
-      to ``PrivateManifest/manifests/<project_slug>/private_manifest.yaml``
-      when that repo is present locally → None.
+      to a sibling private topology repository that exposes
+      ``manifests/<project_slug>/private_manifest.yaml`` when present locally
+      → None.
     - ``project_manifest_path``: explicit override on settings → fall back
       to ``<repo_root>/topology/project_manifest.yaml`` if it exists →
       None (platform-only).
     - ``local_manifest_path``: explicit override → if a ``project_slug`` is
-      set, ask WorkStation's discovery helper → None.
+      set, ask PlatformDeployment/WorkStation's discovery helper -> None.
 
     Any error (missing file referenced explicitly, malformed YAML,
     composition rule violation) is logged at WARNING and the function
@@ -177,7 +178,6 @@ def build_effective_repo_graph_from_settings(
 
 
 _PROJECT_MANIFEST_REL_PATH = Path("topology") / "project_manifest.yaml"
-_PRIVATE_MANIFEST_REPO = "PrivateManifest"
 _PRIVATE_MANIFEST_REL_PATH = Path("manifests")
 _PRIVATE_MANIFEST_FILE = "private_manifest.yaml"
 
@@ -196,15 +196,12 @@ def _resolve_private_manifest_path(pm, repo_root):
         if root in seen:
             continue
         seen.add(root)
-        candidate = (
-            root
-            / _PRIVATE_MANIFEST_REPO
-            / _PRIVATE_MANIFEST_REL_PATH
-            / pm.project_slug
-            / _PRIVATE_MANIFEST_FILE
+        explicit_child_candidates = sorted(
+            root.glob(f"*/{_PRIVATE_MANIFEST_REL_PATH}/{pm.project_slug}/{_PRIVATE_MANIFEST_FILE}")
         )
-        if candidate.is_file():
-            return candidate
+        for candidate in explicit_child_candidates:
+            if candidate.is_file():
+                return candidate
     return None
 
 
@@ -224,19 +221,22 @@ def _resolve_local_manifest_path(pm, repo_root, logger):
     if not pm.project_slug:
         return None
     try:
-        from workstation_cli.local_manifest import discover_local_manifest  # ty:ignore[unresolved-import]
+        from platform_deployment_cli.local_manifest import discover_local_manifest  # ty:ignore[unresolved-import]
     except ImportError:
-        logger.debug(
-            "platform_manifest.project_slug=%r set but workstation_cli is not "
-            "installed; skipping LocalManifest discovery",
-            pm.project_slug,
-        )
-        return None
+        try:
+            from workstation_cli.local_manifest import discover_local_manifest  # ty:ignore[unresolved-import]
+        except ImportError:
+            logger.debug(
+                "platform_manifest.project_slug=%r set but platform_deployment_cli/workstation_cli "
+                "is not installed; skipping LocalManifest discovery",
+                pm.project_slug,
+            )
+            return None
     try:
         return discover_local_manifest(pm.project_slug, repo_root=repo_root)
     except Exception as exc:  # noqa: BLE001 — defensive
-        logger.warning(
-            "WorkStation LocalManifest discovery failed for slug=%r: %s; "
+        logger.debug(
+            "PlatformDeployment LocalManifest discovery failed for slug=%r: %s; "
             "continuing without local layer",
             pm.project_slug, exc,
         )

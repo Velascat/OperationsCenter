@@ -53,7 +53,7 @@ operations-center-regression run \
 
 # 2. Include the report path in the governance request
 operations-center-governance request \
-    --repo videofoundry \
+    --repo managed-private-project \
     --type representative \
     --reason "fixture refresh after pipeline change" \
     --requested-by alice \
@@ -164,8 +164,8 @@ Cooldown state is updated only after a successful dispatch call.
 
 ```
 tools/audit/governance/state/
-  videofoundry__representative__budget.json
-  videofoundry__representative__cooldown.json
+  managed-private-project__representative__budget.json
+  managed-private-project__representative__cooldown.json
 ```
 
 State is OperationsCenter-owned. Managed repo code does not read or write it.
@@ -205,7 +205,7 @@ from operations_center.audit_governance import (
 )
 
 request = AuditGovernanceRequest(
-    repo_id="videofoundry",
+    repo_id="managed-private-project",
     audit_type="representative",
     requested_by="alice",
     requested_reason="fixture refresh after pipeline change",
@@ -214,8 +214,8 @@ request = AuditGovernanceRequest(
 )
 
 cfg = GovernanceConfig(
-    known_repos=["videofoundry"],
-    known_audit_types={"videofoundry": ["representative", "enrichment"]},
+    known_repos=["managed-private-project"],
+    known_audit_types={"managed-private-project": ["representative", "enrichment"]},
 )
 
 result = run_governed_audit(request, governance_config=cfg)
@@ -280,7 +280,7 @@ This preserves the anti-collapse invariant from Phase 8.
 ```bash
 # Create a governance request JSON
 operations-center-governance request \
-    --repo videofoundry \
+    --repo managed-private-project \
     --type representative \
     --reason "fixture refresh after pipeline change" \
     --requested-by alice \
@@ -291,7 +291,7 @@ operations-center-governance request \
 # Evaluate the request against policies (no dispatch)
 operations-center-governance evaluate \
     --request /tmp/request.json \
-    --known-repos videofoundry \
+    --known-repos managed-private-project \
     --known-types representative,enrichment
 
 # Approve a decision that requires manual sign-off
@@ -306,12 +306,12 @@ operations-center-governance approve \
 operations-center-governance run \
     --request /tmp/request.json \
     --approval /tmp/approval.json \
-    --known-repos videofoundry \
+    --known-repos managed-private-project \
     --known-types representative,enrichment
 
 # Inspect a governance report
 operations-center-governance inspect \
-    --report tools/audit/report/governance/videofoundry/representative/<request_id>/governance_report.json
+    --report tools/audit/report/governance/managed-private-project/representative/<request_id>/governance_report.json
 ```
 
 Exit codes:

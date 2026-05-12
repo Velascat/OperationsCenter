@@ -203,16 +203,16 @@ class TestProjectByRepoRootConvention:
 
 
 class TestPrivateBySlugConvention:
-    def test_private_manifest_discovered_from_private_manifest_repo(
+    def test_private_manifest_discovered_from_private_topology_sibling(
         self, tmp_path: Path
     ) -> None:
-        private_dir = tmp_path / "PrivateManifest" / "manifests" / "videofoundry"
+        private_dir = tmp_path / "private-topology-store" / "manifests" / "sample-private-project"
         private_dir.mkdir(parents=True)
         (private_dir / "private_manifest.yaml").write_text(_PRIVATE_YAML, encoding="utf-8")
-        repo_root = tmp_path / "VideoFoundry"
+        repo_root = tmp_path / "managed-project"
         repo_root.mkdir()
 
-        s = _settings(project_slug="videofoundry")
+        s = _settings(project_slug="sample-private-project")
         g = build_effective_repo_graph_from_settings(s, repo_root=repo_root)  # type: ignore[arg-type]
 
         assert g is not None
