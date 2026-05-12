@@ -13,6 +13,8 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    env:
+      CUSTODIAN_PRIVATE_REPO_NAMES: ${{ secrets.CUSTODIAN_PRIVATE_REPO_NAMES }}
     steps:
       - uses: actions/checkout@v4
 

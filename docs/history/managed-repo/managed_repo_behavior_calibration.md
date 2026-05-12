@@ -4,7 +4,7 @@
 
 Behavior calibration is an evidence-based analysis layer that examines managed repo artifact indexes and produces structured findings and recommendations. It does **not** change configuration, re-run audits, or apply any automated remediation. All output is advisory and requires human review before action.
 
-The calibration system sits entirely inside OperationsCenter. It never imports VideoFoundry or any other managed repo code.
+The calibration system sits entirely inside OperationsCenter. It never imports managed private project or any other managed repo code.
 
 ---
 
@@ -34,7 +34,7 @@ Pydantic model (serializable to JSON):
 ```json
 {
   "schema_version": "1.0",
-  "repo_id": "videofoundry",
+  "repo_id": "managed-private-project",
   "run_id": "run999",
   "audit_type": "representative",
   "analysis_profile": "summary",
@@ -189,7 +189,7 @@ operations-center-calibration tune-autonomy \
     --manifest path/to/artifact_manifest.json
 
 operations-center-calibration report \
-    --path /tmp/reports/videofoundry/run999/summary.json
+    --path /tmp/reports/managed-private-project/run999/summary.json
 ```
 
 ---

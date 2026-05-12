@@ -14,7 +14,7 @@ commands.
 Two design forces pull in opposite directions:
 
 1. **Privacy invariant (B1):** OC is a public repository. It must never commit
-   content that names a private managed repo (e.g. VideoFoundry). Violating this
+   content that names a private managed repo. Violating this
    leaks the private repo's existence into the public git history forever.
 
 2. **Operator completeness:** OC still needs a concrete, validated config to

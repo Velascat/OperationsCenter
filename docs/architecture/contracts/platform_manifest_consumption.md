@@ -1,26 +1,28 @@
 # PlatformManifest Consumption
 
-OperationsCenter consumes PlatformManifest as topology and visibility
-metadata. It does not own the PlatformManifest ontology, and it does not
-redefine public/private disclosure policy.
+OperationsCenter consumes RepoGraph-backed PlatformManifest and PrivateManifest
+data as topology and visibility metadata. It does not own canonical graph
+semantics, and it does not redefine public/private disclosure policy.
 
 ## Boundary
 
 ```text
-PlatformManifest owns what exists and what may be disclosed.
+RepoGraph owns what exists and what may be disclosed.
+PlatformManifest publishes the public graph instance.
+PrivateManifest publishes the private graph instance and boundary artifact.
 CxRP owns execution/routing contract semantics.
 RxP owns runtime invocation semantics.
 OperationsCenter owns governance and orchestration implementation.
 ExecutorRuntime performs runtime invocation for OperationsCenter.
-WorkStation deploys and hosts runtime environments.
-VideoFoundry is a separate managed project and reference testbed.
+PlatformDeployment (current repo: WorkStation) deploys and hosts runtime environments.
+Managed private projects remain separate from OperationsCenter.
 Custodian detects leaks and hygiene violations against declared policy.
 ```
 
 Within OperationsCenter, the consumption boundary is narrow:
 
 * `repo_graph_factory.build_effective_repo_graph()` composes the bundled
-  PlatformManifest base plus optional project/work-scope and local layers.
+  PlatformManifest base plus optional private, project/work-scope, and local layers.
 * `repo_graph_factory.build_effective_repo_graph_from_settings()` resolves
   operator-configured paths and degrades to `None` on manifest failures.
 * Downstream OC consumers receive a `RepoGraph` or `None`. They do not parse
@@ -28,13 +30,14 @@ Within OperationsCenter, the consumption boundary is narrow:
 
 ## What OperationsCenter Reads
 
-OperationsCenter reads PlatformManifest for:
+OperationsCenter reads RepoGraph-backed manifest data for:
 
 * canonical repo identity
 * public/private visibility
+* private-manifest layering semantics
 * project and work-scope attachment
 * contract impact analysis
-* local annotations resolved through WorkStation discovery
+* local annotations resolved through PlatformDeployment/WorkStation discovery
 
 OperationsCenter does not read PlatformManifest to define:
 
@@ -60,7 +63,7 @@ replace the platform base with an OC-private fork at runtime.
 
 This is intentional:
 
-* platform ontology remains owned by PlatformManifest
+* platform graph semantics remain owned by RepoGraph
 * public/private visibility rules remain centralized
 * OC stays a consumer rather than a hidden schema authority
 
@@ -73,17 +76,16 @@ The execution split remains:
 2. SwitchBoard returns the routing decision.
 3. OperationsCenter binds and orchestrates execution.
 4. ExecutorRuntime performs runtime invocation using RxP semantics.
-5. WorkStation hosts and deploys the runtime environment.
+5. PlatformDeployment hosts and deploys the runtime environment.
 
-That split matters because WorkStation is not the OC backend, and
+That split matters because PlatformDeployment is not the OC backend, and
 ExecutorRuntime is not the topology owner.
 
 ## Managed Projects
 
-Managed projects such as VideoFoundry remain external to OperationsCenter.
+Managed projects remain external to OperationsCenter.
 OC may manage, audit, or orchestrate them, and may consume their artifact
 manifests and reports, but it must not absorb their project ontology into OC
 core or treat them as internal OC subsystems.
 
-VideoFoundry is a separate managed project and reference testbed for
-OperationsCenter contracts, not part of the OperationsCenter platform core.
+Managed private projects remain outside the OperationsCenter platform core.

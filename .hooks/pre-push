@@ -10,16 +10,26 @@ set -e
 repo_root="$(git rev-parse --show-toplevel)"
 workspace_root="$(cd "$repo_root/.." && pwd)"
 
+# Discover the central private-name blocklist without hardcoding any
+# private repo identity into this public repo.
+if [ -z "${CUSTODIAN_PRIVATE_REPO_NAMES_FILE:-}" ]; then
+    shopt -s nullglob
+    for candidate in         "$workspace_root"/*/policy/private_repo_names.yaml         "$workspace_root"/*/policy/private_repo_names.yml         "$workspace_root"/*/policy/private_repo_names.json         "$workspace_root"/*/policy/private_repo_names.txt
+    do
+        if [ -f "$candidate" ]; then
+            export CUSTODIAN_PRIVATE_REPO_NAMES_FILE="$candidate"
+            break
+        fi
+    done
+    shopt -u nullglob
+fi
+
 custodian_multi=""
 if command -v custodian-multi >/dev/null 2>&1; then
     custodian_multi="$(command -v custodian-multi)"
 fi
 
-for candidate in \
-    "$custodian_multi" \
-    "$repo_root/.venv/bin/custodian-multi" \
-    "$repo_root/.warehouse-venv/bin/custodian-multi" \
-    "$workspace_root/Custodian/.venv/bin/custodian-multi"
+for candidate in     "$custodian_multi"     "$repo_root/.venv/bin/custodian-multi"     "$repo_root/.warehouse-venv/bin/custodian-multi"     "$workspace_root/Custodian/.venv/bin/custodian-multi"
 do
     if [ -x "$candidate" ]; then
         custodian_multi="$candidate"
