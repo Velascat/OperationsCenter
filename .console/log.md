@@ -63,6 +63,18 @@ Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution
 - Added convergence maturity metrics and cycle-summary fields
 - Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
 
+## 2026-05-10 — feat(resource_gate): global rate limits for training mode
+
+Added `max_per_hour` and `max_per_day` to `ResourceGateSettings` (settings.py) and wired
+them into `_evaluate_resource_gate()` (coordinator.py) via a new `global_rate_decision()`
+method on `UsageStore` (usage_store.py). Rate check fires after concurrency check, before
+memory check. Reason code: `global_rate_exceeded` / window: `hourly|daily`.
+
+Config (operations_center.local.yaml) updated to training-mode posture:
+  resource_gate.max_concurrent: 6 → 1  (single executor globally)
+  resource_gate.max_per_hour:   2       (new)
+  resource_gate.max_per_day:   30       (new)
+
 ## 2026-05-10 — docs(watchdog_loop): add PARKED_OPERATOR_BLOCKED state + convergence exit logic
 
 Added PARKED_OPERATOR_BLOCKED health state (1800s cadence) to the watchdog loop runbook and
