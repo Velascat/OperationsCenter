@@ -57,7 +57,7 @@ def _make_result(*, request: ExecutionRequest, failure_reason: str | None = None
 def test_backend_sigkill_transitions_to_unstable_with_cooldown():
     registry = BackendHealthRegistry(cooldown_seconds=1800)
     request = _make_request(
-        runtime_binding=RuntimeBindingSummary(kind="cli_subscription", selection_mode="fixed")
+        runtime_binding=RuntimeBindingSummary(kind="cli_subscription", selection_mode="policy_selected")
     )
     result = _make_result(request=request, failure_reason="executor failed signal=SIGKILL")
 
