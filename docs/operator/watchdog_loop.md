@@ -395,6 +395,17 @@ FORWARD PROGRESS CHECK — before classifying as temporarily-blocked, confirm at
   - Remediation strategy demonstrably adapted (not just re-ran)
 If none apply and remediation is actively running, classify as stagnation, not temporary delay.
 
+KNOWN OPEN ISSUES (carry forward until resolved, remove when closed):
+- 9c7f4bb9: kodo SIGKILL (-9) confirmed. kodo exited -9 at "Analyzing project and creating plan".
+  Hypothesis: time-of-day resource exhaustion, not task complexity. Root cause not yet determined.
+  Investigate via STEP 1 EXECUTOR FAILURE INVESTIGATION (dmesg, journalctl, free -h, kodo-stderr).
+  In training mode, OC tasks and ShippingForm (2b5ff37e) MAY be re-queued once investigation
+  identifies root cause and confirms safe retry conditions. Do not re-queue blindly before that.
+- Campaign 10c50210: STALLED. AgentTopology Done (v0.3.0). ShippingForm (2b5ff37e) Blocked (SIGKILL'd).
+  ShippingForm may be re-queued after kodo SIGKILL root cause is determined.
+  Test/Improve Backlog tasks (3fd02e75, 60390297, 6e32031c, d126bc51) remain phase-gated until
+  ShippingForm reaches Done.
+
 STEP 4 — CONVERGENCE PROMOTION CHECK:
 For each blocked/stalled/non-convergent behavior found in STEP 3, ask:
   - Did the /loop perform this same judgment in a prior cycle?
