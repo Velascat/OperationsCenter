@@ -4488,3 +4488,10 @@ Cadence: HEALTHY → 3600s next wakeup.
 ## 2026-05-10 — Custodian pre-push command resolution
 
 - Updated the pre-push guard to prefer system `custodian-multi`, with repo venv and sibling Custodian venv fallbacks.
+
+## 2026-05-13 — Fix invalid RuntimeBinding combinations in recovery tests
+
+- `RuntimeBinding` now validates `kind × selection_mode` pairs in `__post_init__`. Test fixtures used `kind="kodo"` (not a valid RuntimeKind) and `selection_mode="fixed"` (not a valid SelectionMode), causing ValueError at test construction time.
+- Fixed `test_sigkill_records_backend_cooldown_and_stops_retry`: changed to `kind="cli_subscription"`, `selection_mode="backend_default"`; updated `registry.get("cli_subscription")` assertion key.
+- Fixed `test_backend_sigkill_transitions_to_unstable_with_cooldown`: changed `selection_mode="fixed"` → `"policy_selected"` (registry.record_failure call and all other assertions unchanged).
+- All 3678 tests pass.

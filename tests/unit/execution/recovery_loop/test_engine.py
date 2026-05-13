@@ -100,8 +100,8 @@ class TestEngineRetry:
         req = make_request(
             idempotent=True,
             runtime_binding=RuntimeBindingSummary(
-                kind="kodo",
-                selection_mode="fixed",
+                kind="cli_subscription",
+                selection_mode="backend_default",
             ),
         )
         res = make_result(
@@ -114,7 +114,7 @@ class TestEngineRetry:
         out = eng.evaluate(res, _ctx(req))
 
         assert out.decision == RecoveryDecision.STOP_COOLDOWN_REQUIRED
-        assert registry.get("kodo").state == BackendHealthState.UNSTABLE
+        assert registry.get("cli_subscription").state == BackendHealthState.UNSTABLE
 
 
 class TestEngineReject:
