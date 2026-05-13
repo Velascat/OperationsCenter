@@ -63,6 +63,16 @@ Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution
 - Added convergence maturity metrics and cycle-summary fields
 - Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
 
+## 2026-05-10 — docs: split watchdog_loop.md into three focused files
+
+watchdog_loop.md (811 lines) — operator runbook: preflight, /loop prompt, cadence,
+  cycle summary template, guardrails, lifecycle, canonical example.
+self_healing_model.md (538 lines) — architecture: phases 1–7, anti-god-object,
+  convergence promotion, runtime health model, recovery ownership, behavioral convergence.
+recovery_policy.md (445 lines) — machine-enforceable rules: queue healing, recovery
+  budgets, evidence fingerprinting, stagnation/classification tables, Custodian invariants.
+No content removed — all sections redistributed. Cross-references added.
+
 ## 2026-05-10 — docs(resource_gate): production rate = 2× conservative baseline
 
 Updated production example in ResourceGateSettings docstring:
