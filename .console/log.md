@@ -3,6 +3,11 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-13 — fix: reset-training-branches.sh local branch update
+
+- Added `git branch -f` after each remote push so local training branch refs advance
+  to match origin/main. Without this, local repos required a separate fetch/reset.
+
 ## 2026-05-13 — Loop prompt: KNOWN OPEN ISSUES updated, a5dbf034/5d8bd236 closed
 
 - a5dbf034 and 5d8bd236 implemented this session — removed from KNOWN OPEN ISSUES carry-forward.
