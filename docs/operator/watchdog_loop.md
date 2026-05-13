@@ -51,7 +51,7 @@ scripts/reset-training-branches.sh
 Expected output when all branches are already in sync:
 ```
 = OperationsCenter — already in sync
-= VideoFoundry — already in sync
+= <repo> — already in sync
 ...
 All training branches reset to origin/main.
 ```
@@ -59,7 +59,7 @@ All training branches reset to origin/main.
 Expected output when reset is needed:
 ```
 ✓ OperationsCenter
-✓ VideoFoundry
+✓ <repo>
 ...
 All training branches reset to origin/main.
 ```

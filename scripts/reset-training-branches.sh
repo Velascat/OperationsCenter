@@ -2,37 +2,59 @@
 # Reset all managed repos' training branch to match current origin/main.
 # Run once at the start of each watchdog-loop session before invoking /loop.
 #
+# Repo paths are read from config/operations_center.local.yaml (gitignored)
+# so no private repo names appear in this tracked file.
+#
 # Usage:
 #   scripts/reset-training-branches.sh
 #   scripts/reset-training-branches.sh --dry-run
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG="$REPO_ROOT/config/operations_center.local.yaml"
 TRAINING_BRANCH="operations-center-testing-branch"
 BOUNDARY_ARTIFACT="/home/dev/Documents/GitHub/PrivateManifest/dist/boundary_disclosure_artifact.json"
 DRY_RUN=0
 
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
 
-# Repos whose origin/main carries known pre-existing Custodian findings.
-# Mirroring main→training for these requires --no-verify (we're not introducing
-# anything new; the same code already exists on the published main branch).
-NO_VERIFY_REPOS=("SwitchBoard")
+if [[ ! -f "$CONFIG" ]]; then
+  echo "✗ config not found: $CONFIG"
+  echo "  Run: scripts/operations-center.sh setup"
+  exit 1
+fi
 
-REPOS=(
-  "/home/dev/Documents/GitHub/OperationsCenter"
-  "/home/dev/Documents/GitHub/VideoFoundry"
-  "/home/dev/Documents/GitHub/OperatorConsole"
-  "/home/dev/Documents/GitHub/SwitchBoard"
-  "/home/dev/Documents/GitHub/PlatformDeployment"
-  "/home/dev/Documents/GitHub/Custodian"
-  "/home/dev/Documents/GitHub/CxRP"
-)
+# Read repo local_paths from the gitignored config — keeps private names out of
+# this tracked file. Also reads the no_verify list (repos whose main has
+# pre-existing Custodian findings; mirroring is safe because we're not adding
+# anything new, but the hook would block without --no-verify).
+read -r -d '' PY_EXTRACT <<'PYEOF' || true
+import sys, yaml
+cfg = yaml.safe_load(open(sys.argv[1]))
+repos = cfg.get("repos", {})
+no_verify = cfg.get("training", {}).get("no_verify_repos", [])
+for key, r in repos.items():
+    path = r.get("local_path", "")
+    flag = "no_verify" if key in no_verify else "verify"
+    if path:
+        print(f"{path}\t{flag}")
+PYEOF
+
+mapfile -t REPO_LINES < <(python3 -c "$PY_EXTRACT" "$CONFIG")
+
+if [[ ${#REPO_LINES[@]} -eq 0 ]]; then
+  echo "✗ No repos found in $CONFIG"
+  exit 1
+fi
 
 export REPOGRAPH_BOUNDARY_ARTIFACT_FILE="$BOUNDARY_ARTIFACT"
 
 fail=0
-for path in "${REPOS[@]}"; do
+for line in "${REPO_LINES[@]}"; do
+  path="${line%%	*}"
+  flag="${line##*	}"
   name=$(basename "$path")
 
   if [[ ! -d "$path/.git" ]]; then
@@ -41,18 +63,12 @@ for path in "${REPOS[@]}"; do
     continue
   fi
 
-  # Determine whether --no-verify is needed for this repo
   push_flags=(--force)
-  for nv in "${NO_VERIFY_REPOS[@]}"; do
-    if [[ "$name" == "$nv" ]]; then
-      push_flags+=(--no-verify)
-      break
-    fi
-  done
+  [[ "$flag" == "no_verify" ]] && push_flags+=(--no-verify)
 
   git -C "$path" fetch origin --quiet 2>/dev/null || true
 
-  main_sha=$(git -C "$path" rev-parse origin/main 2>/dev/null)
+  main_sha=$(git -C "$path" rev-parse origin/main 2>/dev/null || echo "")
   if [[ -z "$main_sha" ]]; then
     echo "✗ $name — could not resolve origin/main"
     fail=1
@@ -67,16 +83,15 @@ for path in "${REPOS[@]}"; do
     continue
   fi
 
-  output=$(git -C "$path" push origin \
+  git -C "$path" push origin \
     "origin/main:refs/heads/$TRAINING_BRANCH" \
-    "${push_flags[@]}" 2>&1)
+    "${push_flags[@]}" 2>/dev/null
 
-  # Verify the push landed correctly
   tb_sha=$(git -C "$path" ls-remote origin "refs/heads/$TRAINING_BRANCH" | awk '{print $1}')
   if [[ "$main_sha" == "$tb_sha" ]]; then
     echo "✓ $name"
   else
-    echo "✗ $name — push output: $output"
+    echo "✗ $name — training branch did not match main after push"
     fail=1
   fi
 done

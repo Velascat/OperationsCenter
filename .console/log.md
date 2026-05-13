@@ -63,6 +63,14 @@ Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution
 - Added convergence maturity metrics and cycle-summary fields
 - Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
 
+## 2026-05-10 — fix(B1): remove private names from reset script and runbook
+
+reset-training-branches.sh rewritten to read repo paths from gitignored config
+(config/operations_center.local.yaml) via Python yaml parse — no banned names
+in tracked code. no_verify_repos list also read from config under training: key.
+watchdog_loop.md example output replaced with <repo> placeholder.
+Custodian B1 now clean (was 3 MED findings).
+
 ## 2026-05-10 — feat: training branch reset script + runbook section
 
 scripts/reset-training-branches.sh — resets operations-center-testing-branch to
