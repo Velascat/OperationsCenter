@@ -116,11 +116,11 @@ class ResourceGateSettings(BaseModel):
           max_per_day: 30
           min_available_memory_mb: 12288
 
-        # Production (tune to observed throughput + host headroom)
+        # Production (2× conservative baseline)
         resource_gate:
-          max_concurrent: 4
-          max_per_hour: 10
-          max_per_day: 100
+          max_concurrent: 2
+          max_per_hour: 4
+          max_per_day: 60
           min_available_memory_mb: 12288
     """
 

@@ -63,6 +63,11 @@ Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution
 - Added convergence maturity metrics and cycle-summary fields
 - Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
 
+## 2026-05-10 — docs(resource_gate): production rate = 2× conservative baseline
+
+Updated production example in ResourceGateSettings docstring:
+  max_concurrent: 2, max_per_hour: 4, max_per_day: 60 (2× of 1/2/30).
+
 ## 2026-05-10 — docs(resource_gate): rate-limit docstring environment-neutral
 
 Removed training-mode framing from ResourceGateSettings docstring. The global
