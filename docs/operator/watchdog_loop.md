@@ -72,6 +72,9 @@ All training branches reset to origin/main.
 - `sandbox_base_branch` is already set to `operations-center-testing-branch` in
   `config/operations_center.local.yaml` for all repos — no config change needed
 - The global rate gate (`resource_gate`) limits dispatches to 2/hr and 30/day across all backends
+- **OC self-modification is permitted** — the self_repo_key repo (OperationsCenter) can be
+  dispatched via autonomy-cycle like any other managed repo. Changes land on the testing branch.
+  The proposer auto-adds `self-modify: approved` to all OC-targeted tasks. No extra gate needed.
 
 Training branches are **not automatically synced** between sessions. Always run
 `reset-training-branches.sh` at session start — do not assume the training branch
@@ -200,6 +203,22 @@ STEP 1 — INVESTIGATE (run in parallel where safe):
   .venv/bin/operations-center-reaudit-check   --json
   .venv/bin/operations-center-check-regressions --config config/operations_center.local.yaml --lookback-hours 1 --dry-run
 Collect exit codes and finding counts. Determine affected repos only from tool output — not from vibes or unrelated logs. If an affected repo cannot be determined confidently, create a Plane task and skip direct execution for that finding.
+
+EXECUTOR FAILURE INVESTIGATION — run this whenever triage output shows executor_exit_code/executor_signal
+on a blocked task, OR whenever watcher logs mention a signal kill. Run BEFORE creating a Plane task.
+If root cause is determinable from these logs, include it directly in the task or fix:
+  # Board worker logs — blocked tasks with signal exits
+  grep -h "board_worker.*blocked\|exit_code\|executor" logs/local/watch-all/*.log 2>/dev/null | grep -v "^$" | tail -40
+  # OS OOM killer evidence
+  dmesg | grep -iE "oom|killed process|out of memory" | tail -20
+  journalctl -k --since "2h ago" 2>/dev/null | grep -iE "killed|oom" | tail -20
+  # System memory at time of investigation
+  free -h
+  # Most recent kodo stderr artifacts (written when kodo fails)
+  find logs/ -name "kodo-stderr.log" 2>/dev/null | sort -t/ -k1 | tail -3 | \
+    xargs -I{} sh -c 'echo "=== {} ==="; tail -40 "{}"'
+This investigation applies to ALL backends (kodo, archon, aider) — not just kodo. Any executor
+that exits with a signal or unexpected code should be investigated the same way.
 
 STEP 2 — TRIAGE:
   .venv/bin/operations-center-triage-scan --config config/operations_center.local.yaml --apply
@@ -415,6 +434,13 @@ For each affected repo that passes the execution gate, run one at a time:
   scripts/operations-center.sh autonomy-cycle --config config/operations_center.local.yaml --execute --repo <path>
 Respect kodo max_concurrent=1 — do not dispatch two repos simultaneously.
 
+TRAINING MODE — OC SELF-MODIFICATION:
+In training mode (sandbox_base_branch = operations-center-testing-branch), the self_repo_key repo
+(OperationsCenter) MAY be dispatched via autonomy-cycle like any other managed repo. Changes land
+on the testing branch, not main — the operator reviews before merging. The proposer already adds
+"self-modify: approved" to all OC-targeted tasks automatically. No additional approval gate is
+needed in training mode. Dispatch OC tasks the same way as any other repo.
+
 STEP 7 — INVARIANT ENFORCEMENT:
   .venv/bin/pytest tests/unit/er000_phase0_golden/ -q --tb=short
 Also run targeted tests for any repo touched in STEP 6.
@@ -517,7 +543,7 @@ FORBIDDEN: Do not choose HEALTHY cadence if any of these are true:
   - blocked count unchanged from prior cycle while remediation ran
   - behavioral convergence classified as non-convergent or divergent
   - automation self-deception detected
-  - kodo SIGKILL open issue unresolved AND new OC improve tasks appear in Ready-for-AI
+  - executor signal-kill (SIGKILL/SIGTERM) confirmed this cycle AND root cause not yet determined
   - 2+ consecutive cycles with semantically equivalent failed remediation and no adaptation
 
 FORBIDDEN: Do not choose STALLED cadence when PARKED_OPERATOR_BLOCKED criteria are met.

@@ -3,6 +3,18 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-13 — Loop autonomy expansion: executor investigation + training self-modify
+
+- STEP 1 in loop prompt now includes EXECUTOR FAILURE INVESTIGATION block: reads board_worker
+  logs, dmesg/journalctl for OOM, kodo-stderr.log artifacts, and free -h. Applies to all
+  backends (kodo, archon, aider). Loop investigates before creating a Plane task.
+- STEP 6 now explicitly allows OC (self_repo_key) autonomy-cycle dispatch in training mode —
+  changes land on testing branch, proposer auto-adds self-modify:approved, no extra gate.
+- Training Mode section updated with OC self-modification note.
+- HEALTHY cadence forbidden condition changed from "kodo SIGKILL open issue unresolved" to
+  "executor signal-kill confirmed this cycle AND root cause not yet determined" — more precise,
+  unblocks HEALTHY after root cause is found.
+
 ## 2026-05-13 — Convergence promotion: a5dbf034 + 5d8bd236 watcher telemetry
 
 - **a5dbf034** (triage watcher `blocked_reason`): `_queue_healing_actions` now returns
