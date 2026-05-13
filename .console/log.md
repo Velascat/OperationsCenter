@@ -63,6 +63,12 @@ Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution
 - Added convergence maturity metrics and cycle-summary fields
 - Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
 
+## 2026-05-10 — docs(resource_gate): rate-limit docstring environment-neutral
+
+Removed training-mode framing from ResourceGateSettings docstring. The global
+rate cap is a permanent production feature; the specific values are the current
+conservative tuning. Docstring now shows both conservative and production examples.
+
 ## 2026-05-10 — feat(resource_gate): global rate limits for training mode
 
 Added `max_per_hour` and `max_per_day` to `ResourceGateSettings` (settings.py) and wired
