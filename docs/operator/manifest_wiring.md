@@ -26,7 +26,7 @@ platform_manifest:
 | Field | Meaning |
 |---|---|
 | `enabled` | When false, no graph is composed (coordinator runs with `repo_graph=None`); contract-impact logging stays silent |
-| `project_slug` | Used by PlatformDeployment's `discover_local_manifest()` if `local_manifest_path` is unset; looks at `~/.config/workstation/manifests/<slug>.local.yaml` |
+| `project_slug` | Used by PlatformDeployment's `discover_local_manifest()` if `local_manifest_path` is unset; looks at `~/.config/platformdeployment/manifests/<slug>.local.yaml` |
 | `project_manifest_path` | Single-project mode. Explicit override; takes precedence over the cwd convention. Mutually exclusive with `work_scope_manifest_path` |
 | `work_scope_manifest_path` | Multi-project work-scope mode (PM v0.9.0+). Points at a `WorkScopeManifest` that composes multiple `ProjectManifest`s via explicit `includes:`. Mutually exclusive with `project_manifest_path` |
 | `local_manifest_path` | Explicit override; takes precedence over WS discovery |
@@ -53,9 +53,9 @@ If `settings.platform_manifest.work_scope_manifest_path` is set, OC dispatches t
 
 ### Local layer
 1. `settings.platform_manifest.local_manifest_path` (explicit)
-2. `workstation_cli.discover_local_manifest(project_slug, repo_root=repo_root)` if PlatformDeployment is installed and a slug is set:
-   - `$WORKSTATION_LOCAL_MANIFEST` env override
-   - `$XDG_CONFIG_HOME/workstation/manifests/<slug>.local.yaml`
+2. `platform_deployment_cli.discover_local_manifest(project_slug, repo_root=repo_root)` if PlatformDeployment is installed and a slug is set:
+   - `$PLATFORM_DEPLOYMENT_LOCAL_MANIFEST` env override
+   - `$XDG_CONFIG_HOME/platformdeployment/manifests/<slug>.local.yaml`
    - `<repo_root>/topology/local_manifest.yaml`
 3. None → no local annotations
 
@@ -116,7 +116,7 @@ In single-project mode, running OC from inside a project repo's working director
 | `<project>/topology/project_manifest.yaml` | **committed** (project architecture) |
 | `<project>/topology/local_manifest.example.yaml` | committed (template) |
 | `<project>/topology/local_manifest.yaml` | gitignored (per-machine) |
-| `~/.config/workstation/manifests/<slug>.local.yaml` | not in git at all (user config) |
+| `~/.config/platformdeployment/manifests/<slug>.local.yaml` | not in git at all (user config) |
 
 ## Failure modes
 

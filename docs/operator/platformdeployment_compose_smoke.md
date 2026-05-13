@@ -38,7 +38,7 @@ docker compose \
 
 | Container | Healthy? | Port | Health endpoint |
 |-----------|----------|------|-----------------|
-| `workstation-switchboard` | yes | `${PORT_SWITCHBOARD:-20401}` | `/health` |
+| `platformdeployment-switchboard` | yes | `${PORT_SWITCHBOARD:-20401}` | `/health` |
 
 Verify:
 
@@ -66,8 +66,8 @@ docker compose \
 
 | Container | Healthy? | Port | Health endpoint |
 |-----------|----------|------|-----------------|
-| `workstation-switchboard` | yes | `:20401` | `/health` |
-| `workstation-archon` | yes | `${PORT_ARCHON:-3000}` | `/api/health` |
+| `platformdeployment-switchboard` | yes | `:20401` | `/health` |
+| `platformdeployment-archon` | yes | `${PORT_ARCHON:-3000}` | `/api/health` |
 
 Verify:
 
@@ -98,8 +98,8 @@ docker compose \
 
 | Container | Healthy? | Port(s) | Health endpoint |
 |-----------|----------|---------|-----------------|
-| `workstation-switchboard` | yes | `:20401` | `/health` |
-| `workstation-mailpit` | yes | `:1025` (SMTP), `:8025` (web UI) | `/api/v1/info` |
+| `platformdeployment-switchboard` | yes | `:20401` | `/health` |
+| `platformdeployment-mailpit` | yes | `:1025` (SMTP), `:8025` (web UI) | `/api/v1/info` |
 
 Verify:
 
@@ -129,9 +129,9 @@ docker compose \
 
 | Container | Healthy? | Port | Health endpoint |
 |-----------|----------|------|-----------------|
-| `workstation-switchboard` | yes | `:20401` | `/health` |
-| `workstation-prometheus` | yes | `:9090` | `/-/healthy` |
-| `workstation-grafana` | yes | `:3000` | `/api/health` |
+| `platformdeployment-switchboard` | yes | `:20401` | `/health` |
+| `platformdeployment-prometheus` | yes | `:9090` | `/-/healthy` |
+| `platformdeployment-grafana` | yes | `:3000` | `/api/health` |
 
 Verify:
 

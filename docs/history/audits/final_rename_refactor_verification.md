@@ -13,7 +13,7 @@
 | OperatorConsole | main | `4df0809` | Pushed to origin |
 | OperationsCenter | main | `8d71b59` | Pushed to origin |
 | SwitchBoard | main | `be7c027` | Pushed to origin |
-| WorkStation | main | `6539faa` | Pushed to origin |
+| PlatformDeployment | main | `6539faa` | Pushed to origin |
 
 ---
 
@@ -24,7 +24,7 @@
 | OperationsCenter | 1863 passed, 4 skipped |
 | SwitchBoard | 264 passed |
 | OperatorConsole | 93 passed |
-| WorkStation | 147 passed, 3 skipped |
+| PlatformDeployment | 147 passed, 3 skipped |
 
 Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointing to old repo paths (`/ControlPlane/` and `/FOB/` respectively). Venvs were recreated from scratch; all tests pass.
 
@@ -44,7 +44,7 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `README.md` | `console auto-once` | Fixed → `console cycle` |
 | `README.md` | `console loadout` | Fixed → `console install` |
 | `README.md` | `controlplane` (peers example) | Fixed → `operations_center` |
-| `README.md` | `controlplane`, `console`, `switchboard`, `workstation` (platform group list) | Fixed → `operations_center`, `operator_console`, `switchboard`, `workstation` |
+| `README.md` | `controlplane`, `console`, `switchboard`, `platformdeployment` (platform group list) | Fixed → `operations_center`, `operator_console`, `switchboard`, `platformdeployment` |
 | `README.md` | `delegate` (cockpit doc link description) | Fixed → `run` |
 | `tests/test_cockpit.py` | `src/console/` (6 path references) | Fixed → `src/operator_console/` |
 | `tests/test_architecture_demo.py` | `src/console/` (2 path references) | Fixed → `src/operator_console/` |
@@ -75,7 +75,7 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `.gitignore:99` | `# FOB operator state` comment | Fixed → `# OperatorConsole state` |
 | `uv.lock` | `control-plane` package, `ProtocolWarden/ControlPlane.git` URL | Fixed — regenerated lock file (`uv lock`); pyproject.toml already had correct `operations-center` dependency |
 
-### WorkStation
+### PlatformDeployment
 
 | File | Legacy Term | Action |
 |------|-------------|--------|
@@ -87,10 +87,10 @@ Note: Both OperationsCenter and OperatorConsole venvs had stale shebangs pointin
 | `docs/architecture/system/ownership.md:171` | `fob demo` (section heading) | Fixed → `console demo` |
 | `docs/architecture/system/ownership.md:218` | `fob demo` (checklist item) | Fixed → `console demo` |
 | `docs/architecture/execution/execution-observability.md:253` | `controlplane-routing.md` link | Fixed → `operations-center-routing.md` |
-| docs/architecture/controlplane-routing.md (WorkStation) | Filename | Renamed → `operations-center-routing.md` (content was already updated) |
-| docs/architecture/controlplane-routing-examples.md (WorkStation) | Filename | Renamed → `operations-center-routing-examples.md` (content was already updated) |
-| docs/migration/workstation-9router-removal.md (WorkStation) | `9router` throughout | **Left** — explicitly archival migration doc |
-| docs/architecture/adr/0001-remove-9router.md (WorkStation) | `9router` throughout | **Left** — ADR, explicitly archival |
+| docs/architecture/controlplane-routing.md (PlatformDeployment) | Filename | Renamed → `operations-center-routing.md` (content was already updated) |
+| docs/architecture/controlplane-routing-examples.md (PlatformDeployment) | Filename | Renamed → `operations-center-routing-examples.md` (content was already updated) |
+| docs/migration/platformdeployment-9router-removal.md (PlatformDeployment) | `9router` throughout | **Left** — explicitly archival migration doc |
+| docs/architecture/adr/0001-remove-9router.md (PlatformDeployment) | `9router` throughout | **Left** — ADR, explicitly archival |
 
 ---
 
@@ -109,8 +109,8 @@ The following files were found to contain legacy terms but are correctly classif
 | File | Repo | Reason |
 |------|------|--------|
 | docs/migration/fob-operator-flow-update.md (OperatorConsole) | OperatorConsole | File header: "Historical migration note. Retained only to record the cutover." |
-| docs/migration/workstation-9router-removal.md (WorkStation) | WorkStation | Archival migration note |
-| docs/architecture/adr/0001-remove-9router.md (WorkStation) | WorkStation | ADR explicitly documenting the 9router removal decision |
+| docs/migration/platformdeployment-9router-removal.md (PlatformDeployment) | PlatformDeployment | Archival migration note |
+| docs/architecture/adr/0001-remove-9router.md (PlatformDeployment) | PlatformDeployment | ADR explicitly documenting the 9router removal decision |
 | docs/architecture/phase6-boundary-decision.md (removed) | OperationsCenter | ADR — contains the rule "Historical 9router notes remain only in explicitly historical migration or ADR" |
 | `README.md:935` ("production distributed control plane") | OperationsCenter | Generic networking/systems term, not a reference to the renamed ControlPlane repo |
 

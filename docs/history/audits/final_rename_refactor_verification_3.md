@@ -16,7 +16,7 @@ OperationsCenter operator docs) were fixed during this audit. All test suites pa
 | OperatorConsole | main | f7fd0a21ad485ba7a82a9f5ea43a40bda35c4455 | PASS |
 | OperationsCenter | main | b328087400e949c7799d27aa4b9abdbab4082fb0 | PASS (2 docs fixed) |
 | SwitchBoard | main | e952ad0046199d2ea82a8c0253da23fef36db33e | PASS |
-| WorkStation | main | 03611549658ed75b1342836d2b2b42448bc8c628 | PASS |
+| PlatformDeployment | main | 03611549658ed75b1342836d2b2b42448bc8c628 | PASS |
 
 ---
 
@@ -41,7 +41,7 @@ mission-log\.md|\.briefing|templates/mission
 - All .env.example files
 - `.github/workflows/*.yml` in all repos
 - OperatorConsole CLI modules: cli.py, observer.py, auto_once.py, delegate.py
-- OperationsCenter/SwitchBoard/WorkStation Python source (`*.py`)
+- OperationsCenter/SwitchBoard/PlatformDeployment Python source (`*.py`)
 - `templates/console/` markdown files
 - CONTRIBUTING.md, SECURITY.md in all repos
 
@@ -74,9 +74,9 @@ All remaining hits are in explicitly exempted zones.
 |------|----------|---------|----------------|
 | `OperatorConsole/docs/migration/fob-operator-flow-update.md` | line 6 | `9router`, `control plane` | `docs/migration/` — explicitly labeled "Historical migration note" |
 | `OperatorConsole/docs/audits/final_rename_refactor_verification_2.md` | multiple | `fob`, `9router`, `cp-task`, etc. | `docs/audits/` — prior audit report, content is citations |
-| `WorkStation/docs/history/final-phase-checklist-result.md` | line 24 | `9router` | `docs/history/` — historical checklist result |
-| `WorkStation/docs/migration/workstation-9router-removal.md` | throughout | `9router` | `docs/migration/` — titled "Archival Migration Note" |
-| `WorkStation/docs/architecture/adr/0001-remove-9router.md` | throughout | `9router` | `docs/architecture/adr/` — canonical ADR recording the removal decision |
+| `PlatformDeployment/docs/history/final-phase-checklist-result.md` | line 24 | `9router` | `docs/history/` — historical checklist result |
+| `PlatformDeployment/docs/migration/platformdeployment-9router-removal.md` | throughout | `9router` | `docs/migration/` — titled "Archival Migration Note" |
+| `PlatformDeployment/docs/architecture/adr/0001-remove-9router.md` | throughout | `9router` | `docs/architecture/adr/` — canonical ADR recording the removal decision |
 
 ### SwitchBoard test assertions
 
@@ -136,7 +136,7 @@ The canonical names across all four repositories are:
 | **OperatorConsole** | Per-repo AI console shell; assembles `.console/.context` from source files |
 | **OperationsCenter** | Autonomous workflow orchestrator; board, watchers, backends, policy engine |
 | **SwitchBoard** | Lane routing service; `LaneSelector` + backend adapters |
-| **WorkStation** | Infrastructure host; Docker Compose, env config, provider creds |
+| **PlatformDeployment** | Infrastructure host; Docker Compose, env config, provider creds |
 
 No legacy names (FOB, ControlPlane, control-plane, 9router, nine-router, ProtocolWarden/FOB,
 ProtocolWarden/ControlPlane) appear in any active source, config, template, script, or
