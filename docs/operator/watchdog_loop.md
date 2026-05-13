@@ -22,6 +22,63 @@ with a system scheduler.
 
 ---
 
+## Training Mode
+
+When running the loop in **training / quarantine mode**, the loop operates against
+`operations-center-testing-branch` in each repo (already the configured `sandbox_base_branch`)
+rather than committing directly to `main`. Training branches are reset to current `main`
+at the start of each session so the loop always begins from a clean, known baseline.
+
+### Reset Training Branches (run before each session)
+
+```bash
+scripts/reset-training-branches.sh
+```
+
+This fetches `origin/main` for all 7 managed repos and force-pushes it to
+`operations-center-testing-branch`. It exports `REPOGRAPH_BOUNDARY_ARTIFACT_FILE`
+automatically and uses `--no-verify` only for repos whose `main` already carries
+known pre-existing Custodian findings (currently: SwitchBoard).
+
+```bash
+# Dry run — shows what would change without pushing
+scripts/reset-training-branches.sh --dry-run
+
+# Apply
+scripts/reset-training-branches.sh
+```
+
+Expected output when all branches are already in sync:
+```
+= OperationsCenter — already in sync
+= VideoFoundry — already in sync
+...
+All training branches reset to origin/main.
+```
+
+Expected output when reset is needed:
+```
+✓ OperationsCenter
+✓ VideoFoundry
+...
+All training branches reset to origin/main.
+```
+
+### What Training Mode Changes
+
+- The loop commits to `oc-watchdog/<date>-<topic>` branches off `operations-center-testing-branch`,
+  not off `main`
+- PRs open against `operations-center-testing-branch`, not `main`
+- `sandbox_base_branch` is already set to `operations-center-testing-branch` in
+  `config/operations_center.local.yaml` for all repos — no config change needed
+- The global rate gate (`resource_gate`) limits dispatches to 2/hr and 30/day across all backends
+
+Training branches are **not automatically synced** between sessions. Always run
+`reset-training-branches.sh` at session start — do not assume the training branch
+reflects current `main`.
+
+---
+
 ## Prerequisites
 
 Before starting the loop, confirm:

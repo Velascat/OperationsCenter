@@ -63,6 +63,16 @@ Updated docs/operator/watchdog_loop.md to make the loop's self-healing evolution
 - Added convergence maturity metrics and cycle-summary fields
 - Integrated phase references into promotion, recovery ownership, parked behavior, and operational convergence sections
 
+## 2026-05-10 — feat: training branch reset script + runbook section
+
+scripts/reset-training-branches.sh — resets operations-center-testing-branch to
+origin/main for all 7 managed repos. Exports REPOGRAPH_BOUNDARY_ARTIFACT_FILE,
+uses --no-verify for SwitchBoard (pre-existing findings on main). Supports --dry-run.
+
+watchdog_loop.md — new "Training Mode" section before Prerequisites: explains the
+reset workflow, what training mode changes (sandbox_base_branch, rate gate), and
+the requirement to reset at session start rather than assuming sync.
+
 ## 2026-05-10 — docs: split watchdog_loop.md into three focused files
 
 watchdog_loop.md (811 lines) — operator runbook: preflight, /loop prompt, cadence,
