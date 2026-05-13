@@ -3,6 +3,14 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-13 — Loop prompt: KNOWN OPEN ISSUES updated, a5dbf034/5d8bd236 closed
+
+- a5dbf034 and 5d8bd236 implemented this session — removed from KNOWN OPEN ISSUES carry-forward.
+- 9c7f4bb9 (kodo SIGKILL): removed hard "DO NOT re-queue" block; loop now investigates via
+  STEP 1 executor investigation before deciding to re-queue.
+- Campaign 10c50210: ShippingForm re-queue gated on root cause finding, not operator sign-off.
+- KNOWN OPEN ISSUES block added to STEP 3 in watchdog_loop.md so it persists across sessions.
+
 ## 2026-05-13 — Loop autonomy expansion: executor investigation + training self-modify
 
 - STEP 1 in loop prompt now includes EXECUTOR FAILURE INVESTIGATION block: reads board_worker
