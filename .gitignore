@@ -5,6 +5,8 @@
 !.console/log.md
 !.console/validation/
 !.console/validation/**
+CLAUDE.md
+.custodian/tmp*.yaml
 __pycache__/
 *.pyc
 *.pyo
