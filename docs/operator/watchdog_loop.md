@@ -547,9 +547,9 @@ Loop summaries should report metrics derived from these records:
 Before starting the loop, confirm:
 
 1. **Plane up** — `plane-app-*` containers healthy at `http://localhost:8080`
-2. **WorkStation SwitchBoard up**:
+2. **PlatformDeployment SwitchBoard up**:
    ```bash
-   cd /home/dev/Documents/GitHub/WorkStation
+   cd /home/dev/Documents/GitHub/PlatformDeployment
    docker compose -f compose/docker-compose.yml -f compose/profiles/core.yml up -d
    docker ps --filter name=workstation-switchboard --format '{{.Status}}'
    # expect: Up ... (healthy)
@@ -586,7 +586,7 @@ ls .venv/bin/operations-center-custodian-sweep >/dev/null 2>&1 \
 curl -sf http://localhost:8080/api/health/ >/dev/null \
   && echo "✓ Plane up" || echo "✗ Plane unreachable"
 
-# 5. WorkStation / SwitchBoard up
+# 5. PlatformDeployment / SwitchBoard up
 curl -sf http://localhost:20401/health | python3 -c \
   "import sys,json; d=json.load(sys.stdin); print('✓ SwitchBoard', d['status'])" \
   2>/dev/null || echo "✗ SwitchBoard unreachable"
@@ -653,7 +653,7 @@ STEP 0 — OWNERSHIP + PREFLIGHT:
 Acquire/verify logs/local/watchdog_loop.lock via:
   scripts/operations-center.sh watchdog-loop-acquire
 If another live owner exists, abort. If stale, reclaim.
-Then confirm: Plane at http://localhost:8080, WorkStation/SwitchBoard at http://localhost:20401/health, all 8 OC watchers running, .venv CLIs present, runtime low-cost policy (sonnet/haiku), kodo max_concurrent=1 in config, working tree state via git status.
+Then confirm: Plane at http://localhost:8080, PlatformDeployment/SwitchBoard at http://localhost:20401/health, all 8 OC watchers running, .venv CLIs present, runtime low-cost policy (sonnet/haiku), kodo max_concurrent=1 in config, working tree state via git status.
 
 STEP 1 — INVESTIGATE (run in parallel where safe):
   .venv/bin/operations-center-custodian-sweep --config config/operations_center.local.yaml --emit
@@ -1465,7 +1465,7 @@ Append one block per completed cycle to `.console/log.md`:
 - Health state: <HEALTHY|ACTIVE|STALLED|DEGRADED|CRITICAL>
 - Next cadence: <Ns> — <reason / driving signal>
 - Plane status: <N> Ready-for-AI / <N> Running / <N> Blocked / <N> In-Review
-- WorkStation / SwitchBoard status: <healthy|unreachable>
+- PlatformDeployment / SwitchBoard status: <healthy|unreachable>
 - Watchers: <N>/8 running | restarts this cycle: <role=exit_code,...>
 - Audits run: custodian-sweep ghost-audit flow-audit graph-doctor reaudit-check regressions
 - Findings reproduced this cycle: <tool=N,...> or "none"

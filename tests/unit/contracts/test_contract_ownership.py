@@ -98,7 +98,7 @@ def _result(request: OcExecutionRequest) -> OcExecutionResult:
     )
 
 
-def test_legacy_names_are_compatibility_aliases() -> None:
+def test_labels_are_projection_labels() -> None:
     assert TaskProposal is OcPlanningProposal
     assert LaneDecision is OcRoutingDecision
     assert ExecutionRequest is OcExecutionRequest

@@ -38,7 +38,7 @@ class TestPlatformContractImpact:
 
     def test_legacy_alias_resolves(self) -> None:
         g = build_effective_repo_graph()
-        # ExecutionContractProtocol is the legacy alias for CxRP.
+        # ExecutionContractProtocol is the historical label for CxRP.
         summary = compute_contract_impact(g, "ExecutionContractProtocol")
         assert summary is not None
         assert summary.target.canonical_name == "CxRP"

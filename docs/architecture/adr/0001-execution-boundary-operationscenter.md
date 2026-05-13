@@ -30,7 +30,7 @@ OperationsCenter planning → SwitchBoard routing → OperationsCenter execution
 ## Consequences
 
 - OperationsCenter docs, contract comments, and tests treat execution as living inside OperationsCenter after routing.
-- WorkStation architecture documentation reflects the same boundary and the real policy-before-execution order.
+- PlatformDeployment architecture documentation reflects the same boundary and the real policy-before-execution order.
 - Historical 9router notes remain only in explicitly historical migration or ADR material.
 - There is no separate supported execution service outside OperationsCenter. Any future refactoring that would extract execution into a separate service boundary requires a new ADR with explicit evidence.
 - The stale SwitchBoard adaptive-refresh test was removed because the runtime no longer exposes that loop.

@@ -233,7 +233,7 @@ The standard shape is: one repo node, `runtime_role: managed_repo`, one `Operati
 | Missing `visibility` field | `repo '<id>' missing required 'visibility' field` |
 | Local field in project manifest | `repo '<id>' has local-only field(s) [...] in a project manifest` |
 | Edge to unknown node | `edge #N 'to' unknown: <name>` |
-| Two repos sharing a legacy alias | `name '<alias>' maps to both '<a>' and '<b>'` |
+| Two repos sharing a label | `label '<label>' maps to both '<a>' and '<b>'` |
 | `manifest_kind: platform` in a project file | `expected manifest_kind='project'; got manifest_kind='platform'` |
 
 All caught by `platform-manifest validate` at PR time.

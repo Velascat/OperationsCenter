@@ -84,7 +84,7 @@ class StubArchonAdapter(ArchonAdapter):
 class HttpArchonAdapter(ArchonAdapter):
     """Concrete archon adapter backed by Archon's HTTP workflow API.
 
-    Connects to a running Archon instance (deployed by WorkStation
+    Connects to a running Archon instance (deployed by PlatformDeployment
     via ``compose/profiles/archon.yml``) and dispatches workflows
     end-to-end: conversation create → workflow run → poll-until-terminal
     → status mapping → abandon/cancel. The actual transport flow lives
@@ -93,7 +93,7 @@ class HttpArchonAdapter(ArchonAdapter):
     ABC and converts the dispatcher's ``ArchonRunCapture`` to the
     ``ArchonRunResult`` the invoker expects.
 
-    See ``WorkStation/docs/architecture/adapters/archon-real-workflow-integration.md``
+    See ``PlatformDeployment/docs/architecture/adapters/archon-real-workflow-integration.md``
     for the design.
     """
 

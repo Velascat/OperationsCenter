@@ -6,7 +6,7 @@ Integration tests for OperationsCenter → SwitchBoard routing boundary.
 These tests require a running SwitchBoard instance. They are skipped automatically
 when SwitchBoard is unreachable. To run them:
 
-    # Start the stack first (from WorkStation):
+    # Start the stack first (from PlatformDeployment):
     ./scripts/up.sh
 
     # Then run from this repo:

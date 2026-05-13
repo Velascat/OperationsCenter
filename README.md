@@ -16,7 +16,7 @@ Local planning, execution, policy, and evidence service for the coding platform.
 - SwitchBoard — lane/backend selection lives there
 - ExecutorRuntime — runtime mechanics (subprocess/manual/HTTP) live there
 - CxRP / RxP — canonical contracts live there; OC consumes them via `cxrp_mapper.py`
-- WorkStation — service compose, Dockerfiles, lifecycle scripts live there
+- PlatformDeployment — service compose, Dockerfiles, lifecycle scripts live there
 - RepoGraph / PlatformManifest / PrivateManifest — canonical graph semantics and graph truth live there
 - A scheduler, queue system, or model host
 
@@ -83,7 +83,7 @@ Then:
   it does not own execution step sequencing.
 
 - **Not the infrastructure layer.** OperationsCenter does not deploy or manage services.
-  WorkStation owns the Plane stack, SwitchBoard container, and local model deployment.
+  PlatformDeployment owns the Plane stack, SwitchBoard container, and local model deployment.
 
 - **Not the operator shell.** OpenClaw (optional) provides the human-facing operator
   experience. OperationsCenter is the autonomous engine that runs beneath it.
@@ -127,8 +127,8 @@ bundle = service.plan(PlanningContext(
 ```
 
 For full architecture and examples see:
-- `WorkStation/docs/architecture/routing/operations-center-routing.md`
-- `WorkStation/docs/architecture/routing/operations-center-routing-examples.md`
+- `PlatformDeployment/docs/architecture/routing/operations-center-routing.md`
+- `PlatformDeployment/docs/architecture/routing/operations-center-routing-examples.md`
 
 ### Canonical contract types
 
@@ -140,12 +140,12 @@ OperationsCenter consumes canonical contracts from [CxRP](https://github.com/Pro
 | Module | Types |
 |---|---|
 | `enums.py` | `TaskType`, `LaneName`, `BackendName`, `ExecutionMode`, `Priority`, `RiskLevel` |
-| `proposal.py` | `OcPlanningProposal` (`TaskProposal` compatibility alias) |
-| `routing.py` | `OcRoutingDecision` (`LaneDecision` compatibility alias) |
-| `execution.py` | `OcExecutionRequest` (`ExecutionRequest` compatibility alias), `OcExecutionResult` (`ExecutionResult` compatibility alias), `ExecutionArtifact`, `RunTelemetry` |
+| `proposal.py` | `OcPlanningProposal` |
+| `routing.py` | `OcRoutingDecision` |
+| `execution.py` | `OcExecutionRequest`, `OcExecutionResult`, `ExecutionArtifact`, `RunTelemetry` |
 | `common.py` | `TaskTarget`, `ExecutionConstraints`, `ValidationProfile`, `BranchPolicy` |
 
-See `WorkStation/docs/architecture/contracts/contracts.md` for full documentation.
+See `PlatformDeployment/docs/architecture/contracts/contracts.md` for full documentation.
 
 ### Backend adapters (inside OperationsCenter's execution boundary)
 
@@ -221,7 +221,7 @@ Key design constraints:
 - `execute_and_capture()` exposes raw workflow events for `BackendDetailRef` retention without inlining them into canonical contracts
 - Unsupported requests return `UNSUPPORTED_REQUEST` before invocation; the capture is `None`
 
-See `WorkStation/docs/architecture/adapters/archon-adapter.md` for architecture and usage.
+See `PlatformDeployment/docs/architecture/adapters/archon-adapter.md` for architecture and usage.
 
 ### OpenClaw Backend Adapter (Phase 11, optional)
 
@@ -246,7 +246,7 @@ The adapter never presents inferred or unknown changed files as authoritative.
 
 Subclass `OpenClawRunner` to provide a real implementation; `StubOpenClawRunner` and `OpenClawBackendAdapter.with_stub()` are available for tests and local dev.
 
-See `WorkStation/docs/architecture/adapters/openclaw-backend-adapter.md` for architecture and examples.
+See `PlatformDeployment/docs/architecture/adapters/openclaw-backend-adapter.md` for architecture and examples.
 
 ### OpenClaw Outer Shell (Phase 10, optional)
 
@@ -276,7 +276,7 @@ Key design rules:
 - Shell output types (`ShellRunHandle`, `ShellStatusSummary`, `ShellInspectionResult`) are derived from canonical internal data only — never from OpenClaw-native event streams
 - `wrap_action()` catches exceptions at the shell boundary so failures don't propagate outward
 
-See `WorkStation/docs/architecture/adapters/openclaw-outer-shell.md` for architecture and examples.
+See `PlatformDeployment/docs/architecture/adapters/openclaw-outer-shell.md` for architecture and examples.
 
 ### Execution Observability (Phase 7)
 
@@ -295,13 +295,13 @@ Key model distinctions:
 
 | Model | Purpose |
 |---|---|
-| `OcExecutionResult` | Internal execution-boundary outcome contract (`ExecutionResult` compatibility alias) |
+| `OcExecutionResult` | Internal execution-boundary outcome contract |
 | `ExecutionRecord` | Retained normalized record; wraps result + observability metadata |
 | `ExecutionTrace` | Inspectable report; generated from record on demand |
 | `BackendDetailRef` | Reference to raw backend output; kept separate from canonical data |
 | `ChangedFilesEvidence` | Changed-file knowledge with honest uncertainty (KNOWN/NONE/UNKNOWN/NOT_APPLICABLE) |
 
-See `WorkStation/docs/architecture/execution/execution-observability.md` for architecture and examples.
+See `PlatformDeployment/docs/architecture/execution/execution-observability.md` for architecture and examples.
 
 ### Policy and Guardrails (Phase 12)
 
@@ -345,7 +345,7 @@ execution and are retained as inspectable blocked-execution records.
 
 Config validation: `validate_config(config)` returns a list of error strings for contradictory configs before evaluation.
 
-See `WorkStation/docs/architecture/policy/policy-guardrails.md` for full architecture and `policy-guardrails-examples.md` for usage examples.
+See `PlatformDeployment/docs/architecture/policy/policy-guardrails.md` for full architecture and `policy-guardrails-examples.md` for usage examples.
 
 ### Evidence-Driven Routing Strategy Tuning (Phase 13)
 
@@ -376,7 +376,7 @@ report = service.analyze(records)  # list[ExecutionRecord] → StrategyAnalysisR
 2. Observed historical evidence (retained ExecutionRecords)
 3. Proposed strategy changes (tuning proposals, subject to review)
 
-See [WorkStation/docs/architecture/routing/routing-tuning.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/routing/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/routing/routing-tuning-examples.md) for examples.
+See [PlatformDeployment/docs/architecture/routing/routing-tuning.md](https://github.com/ProtocolWarden/PlatformDeployment/blob/main/docs/architecture/routing/routing-tuning.md) for architecture and [routing-tuning-examples.md](https://github.com/ProtocolWarden/PlatformDeployment/blob/main/docs/architecture/routing/routing-tuning-examples.md) for examples.
 
 ### Upstream Patch Evaluation (Phase 14)
 
@@ -400,7 +400,7 @@ Design rules:
 - Patch proposals are reviewable recommendations, not silent commitments
 - Maintenance burden and divergence risk are part of every serious recommendation
 
-See [WorkStation/docs/architecture/contracts/upstream-patch-evaluation.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/ProtocolWarden/WorkStation/blob/main/docs/architecture/contracts/upstream-patch-evaluation-examples.md).
+See [PlatformDeployment/docs/architecture/contracts/upstream-patch-evaluation.md](https://github.com/ProtocolWarden/PlatformDeployment/blob/main/docs/architecture/contracts/upstream-patch-evaluation.md) and [upstream-patch-evaluation-examples.md](https://github.com/ProtocolWarden/PlatformDeployment/blob/main/docs/architecture/contracts/upstream-patch-evaluation-examples.md).
 
 ---
 
@@ -905,7 +905,7 @@ The minimum required to create a task manually in Plane:
 
 **Labels:** `repo: OperationsCenter`, `task-kind: goal`
 
-Repos currently managed: `OperationsCenter`, `OperatorConsole`, `SwitchBoard`, `WorkStation`.
+Repos currently managed: `OperationsCenter`, `OperatorConsole`, `SwitchBoard`, `PlatformDeployment`.
 
 **Description (plain):**
 ```text
@@ -944,11 +944,11 @@ Notes:
 
 OperationsCenter owns everything about how autonomous agents reason, act, and interact with platform services: the autonomy loop, proposal/decision logic, executor adapters (Aider, Kodo), and client adapters for Plane and SwitchBoard (`PlaneClient`, `SwitchBoardClient`).
 
-OperationsCenter does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [WorkStation](https://github.com/ProtocolWarden/WorkStation). OperationsCenter's `.env.operations-center.example` documents the environment contract (URLs, secrets) that WorkStation satisfies at runtime.
+OperationsCenter does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [PlatformDeployment](https://github.com/ProtocolWarden/PlatformDeployment). OperationsCenter's `.env.operations-center.example` documents the environment contract (URLs, secrets) that PlatformDeployment satisfies at runtime.
 
-**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `WorkStation/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. WorkStation must be cloned as a sibling directory (or `OPERATIONS_CENTER_WORKSTATION_DIR` must be set).
+**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `PlatformDeployment/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. PlatformDeployment must be cloned as a sibling directory (or `OPERATIONS_CENTER_WORKSTATION_DIR` must be set).
 
-For the full platform ownership model see `WorkStation/docs/architecture/system/ownership.md`.
+For the full platform ownership model see `PlatformDeployment/docs/architecture/system/ownership.md`.
 
 ---
 

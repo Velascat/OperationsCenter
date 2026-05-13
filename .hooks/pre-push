@@ -1,35 +1,41 @@
 #!/usr/bin/env bash
 # Custodian regression guard — pre-push hook.
-# Runs the same audit CI runs. Catches new findings before they hit GitHub.
-#
-# Install once per clone:
-#   git config core.hooksPath .hooks
-# Bypass intentionally: git push --no-verify
 set -e
 
 repo_root="$(git rev-parse --show-toplevel)"
 workspace_root="$(cd "$repo_root/.." && pwd)"
 
-# Discover the central private-name blocklist without hardcoding any
-# private repo identity into this public repo.
-if [ -z "${CUSTODIAN_PRIVATE_REPO_NAMES_FILE:-}" ]; then
+if [ -z "${REPOGRAPH_BOUNDARY_ARTIFACT_FILE:-}" ]; then
     shopt -s nullglob
-    for candidate in         "$workspace_root"/*/policy/private_repo_names.yaml         "$workspace_root"/*/policy/private_repo_names.yml         "$workspace_root"/*/policy/private_repo_names.json         "$workspace_root"/*/policy/private_repo_names.txt
+    for candidate in \
+        "$workspace_root"/PrivateManifest/dist/boundary_disclosure_artifact.json \
+        "$workspace_root"/*/dist/boundary_disclosure_artifact.json \
+        "$workspace_root"/*/policy/boundary_disclosure_artifact.json
     do
         if [ -f "$candidate" ]; then
-            export CUSTODIAN_PRIVATE_REPO_NAMES_FILE="$candidate"
+            export REPOGRAPH_BOUNDARY_ARTIFACT_FILE="$candidate"
             break
         fi
     done
     shopt -u nullglob
 fi
 
+if [ -z "${REPOGRAPH_BOUNDARY_ARTIFACT_FILE:-}" ] || [ ! -f "$REPOGRAPH_BOUNDARY_ARTIFACT_FILE" ]; then
+    echo "[custodian-pre-push] missing REPOGRAPH_BOUNDARY_ARTIFACT_FILE; failing closed"
+    echo "  Generate artifact from PrivateManifest first:"
+    echo "  python -m private_manifest.export_boundary_artifact --graph-root graph --out dist/boundary_disclosure_artifact.json"
+    exit 1
+fi
+
 custodian_multi=""
 if command -v custodian-multi >/dev/null 2>&1; then
     custodian_multi="$(command -v custodian-multi)"
 fi
-
-for candidate in     "$custodian_multi"     "$repo_root/.venv/bin/custodian-multi"     "$repo_root/.warehouse-venv/bin/custodian-multi"     "$workspace_root/Custodian/.venv/bin/custodian-multi"
+for candidate in \
+    "$custodian_multi" \
+    "$repo_root/.venv/bin/custodian-multi" \
+    "$repo_root/.warehouse-venv/bin/custodian-multi" \
+    "$workspace_root/Custodian/.venv/bin/custodian-multi"
 do
     if [ -x "$candidate" ]; then
         custodian_multi="$candidate"
@@ -38,10 +44,11 @@ do
 done
 
 if [ -z "$custodian_multi" ]; then
-    echo "[custodian-pre-push] custodian-multi not found — skipping audit guard"
-    echo "    install with: python -m pip install -e /home/dev/Documents/GitHub/Custodian"
-    exit 0
+    echo "[custodian-pre-push] custodian-multi not found"
+    echo "  install with: python -m pip install -e /home/dev/Documents/GitHub/Custodian"
+    exit 1
 fi
 
+echo "[custodian-pre-push] boundary artifact: $REPOGRAPH_BOUNDARY_ARTIFACT_FILE"
 echo "[custodian-pre-push] running audit guard..."
 "$custodian_multi" --repos "$repo_root" --fail-on-findings --no-color

@@ -16,13 +16,13 @@ there in five steps.
 
 - The SwitchBoard image is built. If `docker images | grep switchboard`
   shows nothing or a stale entry, rebuild (step 2 below).
-- The WorkStation `compose/profiles/core.yml` profile is wired (it is
+- The PlatformDeployment `compose/profiles/core.yml` profile is wired (it is
   by default — SwitchBoard is the only service in the core profile).
 
 ## 1. Bring up the SwitchBoard service
 
 ```bash
-cd ~/Documents/GitHub/WorkStation
+cd ~/Documents/GitHub/PlatformDeployment
 docker compose \
   -f compose/docker-compose.yml \
   -f compose/profiles/core.yml \
@@ -59,7 +59,7 @@ contract_kind=None, schema_version=None.
 **Fix**: rebuild the image so it picks up current source:
 
 ```bash
-cd ~/Documents/GitHub/WorkStation
+cd ~/Documents/GitHub/PlatformDeployment
 docker compose \
   -f compose/docker-compose.yml \
   -f compose/profiles/core.yml \

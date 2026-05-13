@@ -753,4 +753,4 @@ tools:
 # be private. Names listed here cause Custodian B1 to fail any tracked
 # file that mentions them, with the noted path patterns excluded.
 privacy:
-  require_private_repo_name_source: true
+  require_boundary_artifact: true

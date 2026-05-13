@@ -31,7 +31,7 @@ request fails with a clear error.
 | Request body | `TaskProposal` (Pydantic v2, JSON) |
 | Response body | `LaneDecision` (Pydantic v2, JSON) |
 
-SwitchBoard listens on port **20401** by default. This is set in WorkStation's
+SwitchBoard listens on port **20401** by default. This is set in PlatformDeployment's
 `docker-compose.yml`.
 
 ---
@@ -42,7 +42,7 @@ SwitchBoard listens on port **20401** by default. This is set in WorkStation's
 |---|---|---|
 | `OPERATIONS_CENTER_SWITCHBOARD_URL` | `http://localhost:20401` | Full base URL for the SwitchBoard service |
 
-Set this in your shell or in WorkStation's `.env` file:
+Set this in your shell or in PlatformDeployment's `.env` file:
 
 ```bash
 OPERATIONS_CENTER_SWITCHBOARD_URL=http://localhost:20401
@@ -128,7 +128,7 @@ if SwitchBoard is not reachable, so they are safe to include in full test runs.
 
 SwitchBoard must be running before OperationsCenter can route any proposal.
 
-WorkStation's `scripts/up.sh` starts SwitchBoard and waits for it to become
+PlatformDeployment's `scripts/up.sh` starts SwitchBoard and waits for it to become
 healthy before returning. If you start OperationsCenter independently, ensure
 SwitchBoard is healthy first:
 

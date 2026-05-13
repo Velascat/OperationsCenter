@@ -148,7 +148,7 @@ audits must remain side-effect-free.
    tree. Runtime audits need a Plane token, GitHub token, and an
    active observation system. Different inputs = different shapes.
 4. **Cross-repo reuse** — Custodian works for any consumer (SwitchBoard,
-   OperatorConsole, WorkStation will get the same C1–C8 baseline plus
+   OperatorConsole, PlatformDeployment will get the same C1–C8 baseline plus
    their own `_custodian/` plugins). OC's ghost/flow audits only make
    sense for OC.
 

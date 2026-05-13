@@ -1,7 +1,3 @@
-# Custodian regression guard.
-# Runs on every push and PR to main. Fails CI on any new finding.
-# The repo is expected to be at zero findings on main; this guard
-# stops drift from creeping back in.
 name: custodian-audit
 
 on:
@@ -13,8 +9,6 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    env:
-      CUSTODIAN_PRIVATE_REPO_NAMES: ${{ secrets.CUSTODIAN_PRIVATE_REPO_NAMES }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +27,29 @@ jobs:
           if [ -f pyproject.toml ]; then
             pip install -e . || true
           fi
+
+      - name: Materialize boundary artifact file
+        env:
+          REPOGRAPH_BOUNDARY_ARTIFACT_FILE: ${{ secrets.REPOGRAPH_BOUNDARY_ARTIFACT_FILE }}
+        run: |
+          if [ -z "${REPOGRAPH_BOUNDARY_ARTIFACT_FILE:-}" ]; then
+            echo "Missing REPOGRAPH_BOUNDARY_ARTIFACT_FILE secret" >&2
+            exit 1
+          fi
+          if [ ! -f "$REPOGRAPH_BOUNDARY_ARTIFACT_FILE" ]; then
+            echo "Boundary artifact file not found at $REPOGRAPH_BOUNDARY_ARTIFACT_FILE" >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          p = Path(os.environ["REPOGRAPH_BOUNDARY_ARTIFACT_FILE"])
+          data = json.loads(p.read_text(encoding="utf-8"))
+          print(f"boundary_provenance={data.get('source_graph_id')}@{data.get('source_ref_or_commit')}")
+          PY
+          echo "REPOGRAPH_BOUNDARY_ARTIFACT_FILE=$REPOGRAPH_BOUNDARY_ARTIFACT_FILE" >> "$GITHUB_ENV"
 
       - name: Run Custodian audit
         run: |

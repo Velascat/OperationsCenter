@@ -5,7 +5,7 @@ operator model and execution boundary; this directory holds OC-internal
 architecture, design notes, operator how-tos, and historical material.
 
 The cross-repo platform architecture (ownership, contracts, routing, backend
-adapters, policy guardrails) lives in [WorkStation/docs/architecture/](https://github.com/ProtocolWarden/WorkStation/tree/main/docs/architecture).
+adapters, policy guardrails) lives in [PlatformDeployment/docs/architecture/](https://github.com/ProtocolWarden/PlatformDeployment/tree/main/docs/architecture).
 This directory holds OC-specific material.
 
 ## Operator
@@ -79,7 +79,7 @@ shape, not any particular bound repo.
 
 > **Tuning and upstream-patch evaluation** (`routing-tuning.md`,
 > `upstream-patch-evaluation.md` and their examples) are now sourced from
-> WorkStation: see [WorkStation/docs/architecture/](https://github.com/ProtocolWarden/WorkStation/tree/main/docs/architecture).
+> PlatformDeployment: see [PlatformDeployment/docs/architecture/](https://github.com/ProtocolWarden/PlatformDeployment/tree/main/docs/architecture).
 
 ## Design
 

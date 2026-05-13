@@ -68,4 +68,4 @@ The adapter is always registered in `CanonicalBackendRegistry.from_settings()`. 
 - Ollama must be running and reachable at `ollama_base_url`
 - The target model must be pulled: `ollama pull qwen2.5-coder:3b`
 
-See [WorkStation docs](../../../WorkStation/docs/operations/local_aider_lane.md) for infrastructure setup.
+See [PlatformDeployment docs](../../../PlatformDeployment/docs/operations/local_aider_lane.md) for infrastructure setup.

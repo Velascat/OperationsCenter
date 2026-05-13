@@ -14,7 +14,7 @@ CxRP owns execution/routing contract semantics.
 RxP owns runtime invocation semantics.
 OperationsCenter owns governance and orchestration implementation.
 ExecutorRuntime performs runtime invocation for OperationsCenter.
-PlatformDeployment (current repo: WorkStation) deploys and hosts runtime environments.
+PlatformDeployment (current repo: PlatformDeployment) deploys and hosts runtime environments.
 Managed private projects remain separate from OperationsCenter.
 Custodian detects leaks and hygiene violations against declared policy.
 ```
@@ -37,7 +37,7 @@ OperationsCenter reads RepoGraph-backed manifest data for:
 * private-manifest layering semantics
 * project and work-scope attachment
 * contract impact analysis
-* local annotations resolved through PlatformDeployment/WorkStation discovery
+* local annotations resolved through PlatformDeployment/PlatformDeployment discovery
 
 OperationsCenter does not read PlatformManifest to define:
 

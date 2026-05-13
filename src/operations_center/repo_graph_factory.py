@@ -126,7 +126,7 @@ def build_effective_repo_graph_from_settings(
       to ``<repo_root>/topology/project_manifest.yaml`` if it exists →
       None (platform-only).
     - ``local_manifest_path``: explicit override → if a ``project_slug`` is
-      set, ask PlatformDeployment/WorkStation's discovery helper -> None.
+      set, ask PlatformDeployment/PlatformDeployment's discovery helper -> None.
 
     Any error (missing file referenced explicitly, malformed YAML,
     composition rule violation) is logged at WARNING and the function
