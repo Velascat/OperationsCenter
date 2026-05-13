@@ -3,6 +3,12 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-13 — Custodian config: new subsystem exclusions + C41 fixes
+
+- Added T6/T7 exclusions for backend_health, evidence_fingerprints, queue_healing, recovery, recovery_policies subsystems.
+- Added doc_conventions.exclude_path_patterns for pre-existing orphan docs (with history/** default re-included).
+- Fixed C41: added ensure_ascii=False to json.dumps in fingerprint.py, intake/main.py, spec_director/main.py.
+
 ## 2026-05-13 — WorkStation → PlatformDeployment hard cutover
 
 - Removed `workstation_cli` fallback import from `repo_graph_factory.py` (hard cutover, no compatibility shim).

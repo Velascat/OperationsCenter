@@ -338,7 +338,7 @@ def _write_heartbeat(status_dir: Path | None) -> None:
     try:
         hb = status_dir / "heartbeat_spec.json"
         hb.write_text(
-            json.dumps({"role": "spec", "at": datetime.now(UTC).isoformat(), "status": "idle"}),
+            json.dumps({"role": "spec", "at": datetime.now(UTC).isoformat(), "status": "idle"}, ensure_ascii=False),
             encoding="utf-8",
         )
     except OSError:

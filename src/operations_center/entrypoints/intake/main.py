@@ -214,7 +214,7 @@ def _write_heartbeat(status_dir: Path | None) -> None:
     try:
         hb = status_dir / "heartbeat_intake.json"
         hb.write_text(
-            json.dumps({"role": "intake", "at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()), "status": "idle"}),
+            json.dumps({"role": "intake", "at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()), "status": "idle"}, ensure_ascii=False),
             encoding="utf-8",
         )
     except OSError:
