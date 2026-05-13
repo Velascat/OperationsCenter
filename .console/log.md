@@ -3,6 +3,21 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-13 — Convergence promotion: a5dbf034 + 5d8bd236 watcher telemetry
+
+- **a5dbf034** (triage watcher `blocked_reason`): `_queue_healing_actions` now returns
+  `(task, decision)` tuples. Queue healing JSON output now includes `blocked_reason`,
+  `blocked_by_backend`, `backend_dependency`, `executor_exit_code`, `executor_signal`
+  — loop reads these directly instead of inferring from label strings.
+- **5d8bd236** (improve watcher executor exit telemetry): Added `executor_exit_code`
+  and `executor_signal` fields to `OcExecutionResult`. kodo normalizer populates them
+  from `capture.exit_code` (negative exit = signal kill via `signal.Signals`).
+  board_worker `_handle_failure` applies `executor-exit-code: N` and
+  `executor-signal: SIGKILL` as Plane labels on blocked tasks and includes them in
+  the Plane comment.
+- Updated `test_triage_scan_emits_queue_healing_decision_from_structured_labels` to
+  unpack the now-(task, decision) return.
+
 ## 2026-05-13 — Custodian config: new subsystem exclusions + C41 fixes
 
 - Added T6/T7 exclusions for backend_health, evidence_fingerprints, queue_healing, recovery, recovery_policies subsystems.

@@ -31,7 +31,7 @@ from operations_center.priority_scans import (
     handle_awaiting_input_scan,
     handle_priority_rescore_scan,
 )
-from operations_center.queue_healing import QueueHealingEngine, QueueHealingTask, QueueTransition
+from operations_center.queue_healing import QueueHealingDecision, QueueHealingEngine, QueueHealingTask, QueueTransition
 
 
 def main() -> int:
@@ -110,11 +110,18 @@ def main() -> int:
         awaiting_actions.append(entry)
 
     queue_healing_actions: list[dict] = []
-    for decision in queue_healing:
-        entry = {
+    for task, decision in queue_healing:
+        entry: dict[str, Any] = {
             "task_id": decision.task_id,
             "transition": decision.transition.value,
             "reason": decision.reason,
+            # Structured task metadata — loop reads these directly instead of
+            # inferring from label text in log output (a5dbf034).
+            "blocked_reason": task.blocked_reason,
+            "blocked_by_backend": task.blocked_by_backend,
+            "backend_dependency": task.backend_dependency,
+            "executor_exit_code": _parse_executor_exit_code(task.labels),
+            "executor_signal": _label_value(task.labels, "executor-signal:") or None,
             "retry_lineage_id": decision.retry_lineage_id,
             "safe": decision.safe,
             "escalate": decision.escalate,
@@ -267,7 +274,19 @@ def _duplicate_blocked_keys(items: list[dict[str, Any]]) -> set[str]:
     return {key for key, count in counts.items() if count > 1}
 
 
-def _queue_healing_actions(items: list[dict[str, Any]], *, now: datetime):
+def _parse_executor_exit_code(labels: tuple[str, ...]) -> int | None:
+    raw = _label_value(labels, "executor-exit-code:")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _queue_healing_actions(
+    items: list[dict[str, Any]], *, now: datetime
+) -> list[tuple["QueueHealingTask", "QueueHealingDecision"]]:
     engine = QueueHealingEngine()
     duplicate_keys = _duplicate_blocked_keys(items)
     decisions = []
@@ -280,7 +299,7 @@ def _queue_healing_actions(items: list[dict[str, Any]], *, now: datetime):
         )
         decision = engine.decide(task, no_consumer_can_execute=no_consumer, now=now)
         if decision.transition != QueueTransition.NONE or decision.escalate:
-            decisions.append(decision)
+            decisions.append((task, decision))
     return decisions
 
 

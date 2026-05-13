@@ -149,9 +149,10 @@ def test_triage_scan_emits_queue_healing_decision_from_structured_labels():
     decisions = _queue_healing_actions(items, now=now)
 
     assert len(decisions) == 1
-    assert decisions[0].task_id == "a"
-    assert decisions[0].transition == QueueTransition.BLOCKED_TO_READY_FOR_AI
-    assert decisions[0].safe is True
+    _task, _decision = decisions[0]
+    assert _decision.task_id == "a"
+    assert _decision.transition == QueueTransition.BLOCKED_TO_READY_FOR_AI
+    assert _decision.safe is True
 
 
 def test_evidence_fingerprint_ignores_timestamp_noise_and_ordering():

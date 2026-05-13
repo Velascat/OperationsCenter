@@ -890,6 +890,9 @@ def _handle_failure(
         role, task_id, status, category, reason,
     )
 
+    executor_exit_code: int | None = result.get("executor_exit_code")
+    executor_signal: str | None = result.get("executor_signal")
+
     try:
         if role == "test":
             follow_id = _create_follow_up(client, issue, settings, follow_kind="goal",
@@ -908,6 +911,11 @@ def _handle_failure(
             split_block = ""
             if split_ids:
                 split_block = f"\n\nAuto-split into {len(split_ids)} focused task(s): {', '.join('#' + i for i in split_ids)}"
+            exec_block = ""
+            if executor_exit_code is not None:
+                exec_block = f"\n- executor-exit-code: {executor_exit_code}"
+                if executor_signal:
+                    exec_block += f"\n- executor-signal: {executor_signal}"
             client.comment_issue(
                 task_id,
                 f"board_worker[{role}] failed\n"
@@ -915,8 +923,15 @@ def _handle_failure(
                 f"- status: {status}\n"
                 f"- category: {category}\n"
                 f"- reason: {reason}"
+                f"{exec_block}"
                 f"{split_block}",
             )
+        # Attach executor telemetry as machine-readable labels so triage_scan
+        # can surface them in structured output without log inference.
+        if executor_exit_code is not None:
+            _add_label(client, issue, f"executor-exit-code: {executor_exit_code}")
+        if executor_signal:
+            _add_label(client, issue, f"executor-signal: {executor_signal}")
     except Exception as exc:
         logger.warning("board_worker[%s]: post-failure transition failed task_id=%s — %s", role, task_id, exc)
 

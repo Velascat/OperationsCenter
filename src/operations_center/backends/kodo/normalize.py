@@ -105,6 +105,9 @@ def normalize(
         failure_reason = capacity_excerpt
         failure_category = FailureReasonCategory.BACKEND_ERROR
 
+    executor_exit_code: int | None = capture.exit_code if not success else None
+    executor_signal: str | None = _signal_name(executor_exit_code)
+
     return ExecutionResult(
         run_id=capture.run_id,
         proposal_id=proposal_id,
@@ -121,6 +124,8 @@ def normalize(
         pull_request_url=None,
         failure_category=failure_category,
         failure_reason=failure_reason,
+        executor_exit_code=executor_exit_code,
+        executor_signal=executor_signal,
         artifacts=artifacts,
         runtime_invocation_ref=getattr(capture, "invocation_ref", None),
     )
@@ -253,6 +258,21 @@ def _build_validation_summary(
             duration_ms=duration_ms,
         )
     return ValidationSummary(status=ValidationStatus.SKIPPED)
+
+
+def _signal_name(exit_code: int | None) -> str | None:
+    """Return the POSIX signal name when the process was killed by a signal.
+
+    On Linux, subprocess.returncode is -N when killed by signal N. Returns
+    None for normal exit codes (>= 0) or when exit_code is None.
+    """
+    if exit_code is None or exit_code >= 0:
+        return None
+    import signal as _signal
+    try:
+        return _signal.Signals(-exit_code).name
+    except ValueError:
+        return f"signal_{-exit_code}"
 
 
 def _map_artifacts(capture: KodoRunCapture) -> list[ExecutionArtifact]:

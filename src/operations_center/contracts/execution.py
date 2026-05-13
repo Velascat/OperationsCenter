@@ -227,6 +227,11 @@ class OcExecutionResult(BaseModel):
         default=None,
         description="Human-readable explanation of why the run failed",
     )
+    # Raw executor exit code and decoded signal name (e.g. "SIGKILL") when the
+    # executor process was killed by a signal (negative exit code on Linux).
+    # None on success or when exit code is not available.
+    executor_exit_code: Optional[int] = None
+    executor_signal: Optional[str] = None
 
     # Artifacts
     artifacts: list[ExecutionArtifact] = Field(default_factory=list)
