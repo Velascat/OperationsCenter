@@ -4495,3 +4495,8 @@ Cadence: HEALTHY → 3600s next wakeup.
 - Fixed `test_sigkill_records_backend_cooldown_and_stops_retry`: changed to `kind="cli_subscription"`, `selection_mode="backend_default"`; updated `registry.get("cli_subscription")` assertion key.
 - Fixed `test_backend_sigkill_transitions_to_unstable_with_cooldown`: changed `selection_mode="fixed"` → `"policy_selected"` (registry.record_failure call and all other assertions unchanged).
 - All 3678 tests pass.
+
+## 2026-05-13 — Add CLAUDE.md and .custodian/tmp*.yaml to .gitignore
+
+- Added CLAUDE.md to .gitignore
+- Added .custodian/tmp*.yaml to exclude custodian audit temp files
