@@ -38,7 +38,7 @@ def canonicalize_evidence(value: Any) -> Any:
         }
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         normalized = [canonicalize_evidence(item) for item in value]
-        return sorted(normalized, key=lambda item: json.dumps(item, sort_keys=True))
+        return sorted(normalized, key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False))
     if isinstance(value, str):
         return _TIMESTAMP_RE.sub("<time>", value.strip())
     return value

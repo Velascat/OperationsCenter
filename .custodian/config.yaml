@@ -166,6 +166,12 @@ audit:
       - "src/operations_center/execution/**"
       - "src/operations_center/domain/**"
       - "src/operations_center/config/**"
+      # New subsystems — tested through integration paths
+      - "src/operations_center/backend_health/**"
+      - "src/operations_center/evidence_fingerprints/**"
+      - "src/operations_center/queue_healing/**"
+      - "src/operations_center/recovery/**"
+      - "src/operations_center/recovery_policies/**"
     T7:
       # Same rationale as T6. Listed per-layer (not src/**) so a NEW
       # top-level package without parallel tests still gets flagged.
@@ -208,6 +214,12 @@ audit:
       - "src/operations_center/execution/**"
       - "src/operations_center/domain/**"
       - "src/operations_center/config/**"
+      # New subsystems — tested through integration paths
+      - "src/operations_center/backend_health/**"
+      - "src/operations_center/evidence_fingerprints/**"
+      - "src/operations_center/queue_healing/**"
+      - "src/operations_center/recovery/**"
+      - "src/operations_center/recovery_policies/**"
       # Top-level scheduled-task entry modules — wired into scheduler, exercised
       # via integration paths.
       - src/operations_center/cross_repo_impact.py
@@ -634,6 +646,17 @@ audit:
     - sign_commits
     - signing_key
     - switchboard_url
+
+doc_conventions:
+  exclude_path_patterns:
+    # Defaults (must re-include when overriding)
+    - "**/archive/**"
+    - "**/history/**"
+    # Pre-existing orphan operator docs — spec/design references, not user guide entries
+    - docs/operator/platformdeployment_compose_smoke.md
+    - docs/operator/watchdog_loop.md
+    - docs/specs/cxrp-backend-card-vocabulary.md
+    - docs/specs/decision-rules-test-coverage.md
 
 architecture:
   layers:
