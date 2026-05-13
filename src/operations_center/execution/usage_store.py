@@ -679,6 +679,56 @@ class UsageStore:
             )
         return BudgetDecision(allowed=True)
 
+    def global_rate_decision(
+        self,
+        *,
+        max_per_hour: int | None,
+        max_per_day: int | None,
+        now: datetime,
+    ) -> "BudgetDecision":
+        """Block when total executions across ALL backends exceed a rolling cap.
+
+        Mirrors ``budget_decision_for_backend`` but counts every
+        ``execution`` event regardless of which backend emitted it.
+        Either limit may be ``None`` to skip that window.
+        """
+        if max_per_hour is None and max_per_day is None:
+            return BudgetDecision(allowed=True)
+        data = self.load()
+        events = self._prune_events(list(data.get("events", [])), now=now)
+        cutoff_hour = now - timedelta(hours=1)
+        cutoff_day = now - timedelta(days=1)
+        hourly = 0
+        daily = 0
+        for e in events:
+            if e.get("kind") != "execution":
+                continue
+            try:
+                ts = datetime.fromisoformat(str(e["timestamp"]))
+            except (ValueError, KeyError):
+                continue
+            if ts >= cutoff_day:
+                daily += 1
+                if ts >= cutoff_hour:
+                    hourly += 1
+        if max_per_hour is not None and hourly >= max_per_hour:
+            return BudgetDecision(
+                allowed=False,
+                reason="global_rate_exceeded",
+                window="hourly",
+                limit=max_per_hour,
+                current=hourly,
+            )
+        if max_per_day is not None and daily >= max_per_day:
+            return BudgetDecision(
+                allowed=False,
+                reason="global_rate_exceeded",
+                window="daily",
+                limit=max_per_day,
+                current=daily,
+            )
+        return BudgetDecision(allowed=True)
+
     def global_memory_decision(
         self,
         *,

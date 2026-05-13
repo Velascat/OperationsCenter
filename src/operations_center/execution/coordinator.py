@@ -443,6 +443,14 @@ class ExecutionCoordinator:
             )
             if not d.allowed:
                 return d
+        if gate.max_per_hour is not None or gate.max_per_day is not None:
+            d = self._usage_store.global_rate_decision(
+                max_per_hour=gate.max_per_hour,
+                max_per_day=gate.max_per_day,
+                now=now,
+            )
+            if not d.allowed:
+                return d
         if gate.min_available_memory_mb is not None:
             d = self._usage_store.global_memory_decision(
                 min_available_memory_mb=gate.min_available_memory_mb,

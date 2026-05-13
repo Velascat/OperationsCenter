@@ -93,26 +93,33 @@ class ResourceGateSettings(BaseModel):
     still push the box past what the co-tenants need to make forward
     progress.
 
-    Both fields are optional; an empty ``resource_gate:`` block means
+    All fields are optional; an empty ``resource_gate:`` block means
     "no global gate" and only per-backend caps fire.
 
     - ``max_concurrent`` — total in-flight OC dispatches across **all**
       backends. Counted as ``execution_started`` minus
       ``execution_finished`` events with no backend filter.
+    - ``max_per_hour`` — maximum ``execution`` events across **all**
+      backends within a rolling 1-hour window.
+    - ``max_per_day`` — maximum ``execution`` events across **all**
+      backends within a rolling 24-hour window.
     - ``min_available_memory_mb`` — pre-dispatch check that free RAM
       (read from ``/proc/meminfo``) is at least this much, regardless
       of which backend is dispatching.
 
-    Typical config (calibrated for a host that shares its CPU/RAM with
-    a heavy background pipeline; leaves 12 GiB and at most 6
-    concurrent OC runs free for the co-tenant)::
+    Typical config (training/calibration posture — conservative global
+    rate during initial platform stabilisation)::
 
         resource_gate:
-          max_concurrent: 6
+          max_concurrent: 1
+          max_per_hour: 2
+          max_per_day: 30
           min_available_memory_mb: 12288   # reserve 12 GiB for co-tenants
     """
 
     max_concurrent: int | None = None
+    max_per_hour: int | None = None
+    max_per_day: int | None = None
     min_available_memory_mb: int | None = None
 
 
