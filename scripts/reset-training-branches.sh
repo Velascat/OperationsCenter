@@ -89,6 +89,10 @@ for line in "${REPO_LINES[@]}"; do
 
   tb_sha=$(git -C "$path" ls-remote origin "refs/heads/$TRAINING_BRANCH" | awk '{print $1}')
   if [[ "$main_sha" == "$tb_sha" ]]; then
+    # Also advance the local branch ref so checkouts don't need another fetch.
+    # Suppressed when the branch is currently checked out (shouldn't happen in
+    # training mode, but safe to ignore — remote is already correct).
+    git -C "$path" branch -f "$TRAINING_BRANCH" "$main_sha" 2>/dev/null || true
     echo "✓ $name"
   else
     echo "✗ $name — training branch did not match main after push"
