@@ -51,7 +51,7 @@ The Archon image bundles ~20 default workflows, including the
 `archon-assist` workflow that OC's `goal` workflow_type resolves to.
 
 ```bash
-docker exec workstation-archon ls /app/.archon/workflows/defaults/ | grep archon-assist
+docker exec platformdeployment-archon ls /app/.archon/workflows/defaults/ | grep archon-assist
 # → archon-assist.yaml
 ```
 

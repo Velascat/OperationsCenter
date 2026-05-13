@@ -5,7 +5,7 @@ phase-based development notes, and remediation summaries. Retained for context
 and inbound links — these do not reflect current architecture guidance.
 
 Current architecture documentation lives in `docs/architecture/` (OC-specific)
-and [WorkStation/docs/architecture/](https://github.com/ProtocolWarden/WorkStation/tree/main/docs/architecture)
+and [PlatformDeployment/docs/architecture/](https://github.com/ProtocolWarden/PlatformDeployment/tree/main/docs/architecture)
 (canonical platform).
 
 ## Layout

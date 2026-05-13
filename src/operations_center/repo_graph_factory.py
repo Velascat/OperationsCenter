@@ -223,15 +223,12 @@ def _resolve_local_manifest_path(pm, repo_root, logger):
     try:
         from platform_deployment_cli.local_manifest import discover_local_manifest  # ty:ignore[unresolved-import]
     except ImportError:
-        try:
-            from workstation_cli.local_manifest import discover_local_manifest  # ty:ignore[unresolved-import]
-        except ImportError:
-            logger.debug(
-                "platform_manifest.project_slug=%r set but platform_deployment_cli/workstation_cli "
-                "is not installed; skipping LocalManifest discovery",
-                pm.project_slug,
-            )
-            return None
+        logger.debug(
+            "platform_manifest.project_slug=%r set but platform_deployment_cli "
+            "is not installed; skipping LocalManifest discovery",
+            pm.project_slug,
+        )
+        return None
     try:
         return discover_local_manifest(pm.project_slug, repo_root=repo_root)
     except Exception as exc:  # noqa: BLE001 — defensive

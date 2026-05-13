@@ -946,7 +946,7 @@ OperationsCenter owns everything about how autonomous agents reason, act, and in
 
 OperationsCenter does **not** own the infrastructure required to run Plane or SwitchBoard. Those are platform dependencies operated through [PlatformDeployment](https://github.com/ProtocolWarden/PlatformDeployment). OperationsCenter's `.env.operations-center.example` documents the environment contract (URLs, secrets) that PlatformDeployment satisfies at runtime.
 
-**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `PlatformDeployment/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. PlatformDeployment must be cloned as a sibling directory (or `OPERATIONS_CENTER_WORKSTATION_DIR` must be set).
+**Plane infra specifically:** `deployment/plane/manage.sh` is a delegation wrapper — it calls `PlatformDeployment/scripts/plane.sh`, which is the canonical Plane lifecycle manager. The wrapper preserves the `dev-up`, `plane-up`, and `plane-down` command interface so existing workflows continue to work without any change. PlatformDeployment must be cloned as a sibling directory (or `OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR` must be set).
 
 For the full platform ownership model see `PlatformDeployment/docs/architecture/system/ownership.md`.
 

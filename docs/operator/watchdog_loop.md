@@ -551,7 +551,7 @@ Before starting the loop, confirm:
    ```bash
    cd /home/dev/Documents/GitHub/PlatformDeployment
    docker compose -f compose/docker-compose.yml -f compose/profiles/core.yml up -d
-   docker ps --filter name=workstation-switchboard --format '{{.Status}}'
+   docker ps --filter name=platformdeployment-switchboard --format '{{.Status}}'
    # expect: Up ... (healthy)
    ```
 3. **OC watchers running** (or being intentionally started):

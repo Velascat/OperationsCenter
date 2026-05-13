@@ -3,6 +3,13 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-13 — WorkStation → PlatformDeployment hard cutover
+
+- Removed `workstation_cli` fallback import from `repo_graph_factory.py` (hard cutover, no compatibility shim).
+- Renamed env var `OPERATIONS_CENTER_WORKSTATION_DIR` → `OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR` in `README.md`, `deployment/plane/manage.sh`, and `docs/demo.md`.
+- `git mv docs/operator/workstation_compose_smoke.md docs/operator/platformdeployment_compose_smoke.md`; updated all container names inside.
+- Updated `docs/operator/archon_workflow_registration.md`, `manifest_wiring.md`, `watchdog_loop.md`, and `docs/history/` sweep.
+
 ## 2026-05-11 — Proposal/routing ownership clarification
 
 - Renamed the OC-native proposal and routing model definitions to `OcPlanningProposal` and

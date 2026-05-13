@@ -265,7 +265,7 @@ This starts:
 - **Plane** on `http://localhost:8080` — Plane infra is owned by PlatformDeployment; `dev-up` delegates to `PlatformDeployment/scripts/plane.sh` automatically
 - **Watchers**: `goal`, `test`, `improve`, `propose`, `review`
 
-**Prerequisite:** PlatformDeployment must be cloned as a sibling of OperationsCenter (or `OPERATIONS_CENTER_WORKSTATION_DIR` set). If PlatformDeployment is not found, the Plane step will print instructions and exit.
+**Prerequisite:** PlatformDeployment must be cloned as a sibling of OperationsCenter (or `OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR` set). If PlatformDeployment is not found, the Plane step will print instructions and exit.
 
 Confirm everything is running:
 

@@ -22,28 +22,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPERATIONS_CENTER_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # PlatformDeployment is expected as a sibling of OperationsCenter.
-# Override with OPERATIONS_CENTER_WORKSTATION_DIR if the layout differs.
-WORKSTATION_DIR="${OPERATIONS_CENTER_WORKSTATION_DIR:-$(cd "${OPERATIONS_CENTER_ROOT}/.." && pwd)/PlatformDeployment}"
+# Override with OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR if the layout differs.
+PLATFORM_DEPLOYMENT_DIR="${OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR:-$(cd "${OPERATIONS_CENTER_ROOT}/.." && pwd)/PlatformDeployment}"
 
-if [[ ! -f "${WORKSTATION_DIR}/scripts/plane.sh" ]]; then
+if [[ ! -f "${PLATFORM_DEPLOYMENT_DIR}/scripts/plane.sh" ]]; then
   echo ""
   echo "  [OperationsCenter] Plane infra delegation — PlatformDeployment not found"
   echo ""
-  echo "  Expected PlatformDeployment at: ${WORKSTATION_DIR}"
+  echo "  Expected PlatformDeployment at: ${PLATFORM_DEPLOYMENT_DIR}"
   echo ""
   echo "  Plane infrastructure is canonically owned by PlatformDeployment."
   echo "  Clone PlatformDeployment alongside OperationsCenter:"
   echo ""
-  echo "    git clone https://github.com/ProtocolWarden/PlatformDeployment ${WORKSTATION_DIR}"
+  echo "    git clone https://github.com/ProtocolWarden/PlatformDeployment ${PLATFORM_DEPLOYMENT_DIR}"
   echo ""
-  echo "  Or set OPERATIONS_CENTER_WORKSTATION_DIR to the PlatformDeployment repo root:"
+  echo "  Or set OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR to the PlatformDeployment repo root:"
   echo ""
-  echo "    export OPERATIONS_CENTER_WORKSTATION_DIR=/path/to/PlatformDeployment"
+  echo "    export OPERATIONS_CENTER_PLATFORM_DEPLOYMENT_DIR=/path/to/PlatformDeployment"
   echo ""
   exit 1
 fi
 
 echo "  [OperationsCenter] Delegating Plane infra to PlatformDeployment canonical stack"
-echo "  PlatformDeployment: ${WORKSTATION_DIR}"
+echo "  PlatformDeployment: ${PLATFORM_DEPLOYMENT_DIR}"
 echo ""
-exec bash "${WORKSTATION_DIR}/scripts/plane.sh" "$@"
+exec bash "${PLATFORM_DEPLOYMENT_DIR}/scripts/plane.sh" "$@"

@@ -1,6 +1,6 @@
 # Integration Invariants Verification
 **Date:** 2026-04-25
-**Scope:** OperationsCenter, SwitchBoard, WorkStation, OperatorConsole
+**Scope:** OperationsCenter, SwitchBoard, PlatformDeployment, OperatorConsole
 **Type:** Verification-only — no code changes
 
 ---
@@ -17,13 +17,13 @@ All 9 invariants pass. All 13 phases (0–12) are verified. No boundary violatio
 
 | # | Invariant | Status | Evidence |
 |---|-----------|--------|----------|
-| 1 | Contracts defined once, in OperationsCenter | **PASS** | `TaskProposal`, `LaneDecision`, `ExecutionRequest`, `ExecutionResult` all live exclusively in `OperationsCenter/src/operations_center/contracts/` — no duplicate class definitions in SwitchBoard, WorkStation, or OperatorConsole source |
+| 1 | Contracts defined once, in OperationsCenter | **PASS** | `TaskProposal`, `LaneDecision`, `ExecutionRequest`, `ExecutionResult` all live exclusively in `OperationsCenter/src/operations_center/contracts/` — no duplicate class definitions in SwitchBoard, PlatformDeployment, or OperatorConsole source |
 | 2 | SwitchBoard imports contracts from OperationsCenter | **PASS** | `SwitchBoard/src/switchboard/lane/engine.py:25` and `api/routes_routing.py:9` both import `from operations_center.contracts import LaneDecision, TaskProposal` |
 | 3 | SwitchBoard does not execute adapters | **PASS** | SwitchBoard routing.py references backend names (kodo, archon, openclaw) only as string keys in cost/capability maps — no `execute()` calls, no adapter imports, no subprocess invocations |
 | 4 | OperatorConsole does not do planning/routing/execution directly | **PASS** | OperatorConsole CLI calls `run_delegate()` → `operations_center.entrypoints.worker.main` and `operations_center.entrypoints.execute.main` — no direct TaskProposal construction, no LaneDecision logic in console source |
-| 5 | WorkStation does not do orchestration | **PASS** | WorkStation Python code is limited to tools (`lane_manager.py`, `status.py`, `lane_cli.py`) and unit tests — zero occurrences of TaskProposal/ExecutionRequest/LaneDecision in non-docs source |
+| 5 | PlatformDeployment does not do orchestration | **PASS** | PlatformDeployment Python code is limited to tools (`lane_manager.py`, `status.py`, `lane_cli.py`) and unit tests — zero occurrences of TaskProposal/ExecutionRequest/LaneDecision in non-docs source |
 | 6 | Single execution path through canonical backend factory | **PASS** | `CanonicalBackendRegistry` in `backends/factory.py` is the sole adapter registry. Only two call sites in active code: `entrypoints/execute/main.py:19` and `execution/coordinator.py:21` |
-| 7 | No legacy identifiers in active source | **PASS** | `9router`, `ControlPlane`, `control_plane`, `fob` — zero hits in all four active source trees. WorkStation docs contain only archival ADR/migration material, explicitly exempt |
+| 7 | No legacy identifiers in active source | **PASS** | `9router`, `ControlPlane`, `control_plane`, `fob` — zero hits in all four active source trees. PlatformDeployment docs contain only archival ADR/migration material, explicitly exempt |
 | 8 | Artifact system persists canonical 5-file run records | **PASS** | `RunArtifactWriter.write_run()` confirmed to write `proposal.json`, `decision.json`, `execution_request.json`, `result.json`, `run_metadata.json`; proven by `tests/integration/test_execution_boundary.py::test_artifact_writer_produces_all_files` |
 | 9 | auto_once is single-cycle (no loops) | **PASS** | `auto_once.py` contains exactly one function `run_auto_once()`, no `while`/`loop`/`daemon`/`background` constructs. Calls `run_delegate()` once and returns its exit code |
 
@@ -34,7 +34,7 @@ All 9 invariants pass. All 13 phases (0–12) are verified. No boundary violatio
 | Phase | Description | Status | Evidence |
 |-------|-------------|--------|----------|
 | 0 | Repos exist and can be imported | **VERIFIED** | All four repos present; test suites import from each repo successfully |
-| 1 | WorkStation startup mechanism | **VERIFIED** | `WorkStation/scripts/up.sh` — single-entrypoint compose startup script that waits on SwitchBoard health (`:20401`) |
+| 1 | PlatformDeployment startup mechanism | **VERIFIED** | `PlatformDeployment/scripts/up.sh` — single-entrypoint compose startup script that waits on SwitchBoard health (`:20401`) |
 | 2 | SwitchBoard lane selection endpoint | **VERIFIED** | `SwitchBoard/src/switchboard/api/routes_routing.py:16` — `@router.post("/route")` accepts `TaskProposal`, returns `LaneDecision`; `/route-plan` variant also present |
 | 3 | Contracts in OperationsCenter/contracts/ | **VERIFIED** | `src/operations_center/contracts/` contains `proposal.py`, `routing.py`, `execution.py`, `enums.py`, `common.py`, `__init__.py` |
 | 4 | OperationsCenter calls SwitchBoard via HTTP | **VERIFIED** | `routing/client.py` — `HttpLaneRoutingClient.select_lane()` POSTs to `{base_url}/route` via `httpx`; URL configurable via `OPERATIONS_CENTER_SWITCHBOARD_URL` env var (default `http://localhost:20401`) |
@@ -43,7 +43,7 @@ All 9 invariants pass. All 13 phases (0–12) are verified. No boundary violatio
 | 7 | Artifact persistence | **VERIFIED** | `execution/artifact_writer.py` — `RunArtifactWriter.write_run()` writes 5 canonical files per run; `observer/artifact_writer.py` and `decision/artifact_writer.py` write auxiliary pipeline artifacts |
 | 8 | `delegate` and `auto-once` CLI commands | **VERIFIED** | `OperatorConsole/src/operator_console/cli.py:619` — `case "run" | "delegate"` dispatches to `run_delegate()`; `case "cycle" | "auto-once"` dispatches to `run_auto_once()` |
 | 9 | Failure/error path tests | **VERIFIED** | `tests/integration/test_execution_boundary.py::test_adapter_returns_canonical_result_for_missing_binary` — asserts `result.success is False`, `result.failure_category == FailureReasonCategory.BACKEND_ERROR`; `tests/test_validation_history.py`, `tests/test_tuning_guardrails.py` cover failure pattern tracking |
-| 10 | No 9router code in active source | **VERIFIED** | Zero hits for `9router` or `nine.router` in all four active source trees; ADR `0001-remove-9router.md` in WorkStation confirms archival removal |
+| 10 | No 9router code in active source | **VERIFIED** | Zero hits for `9router` or `nine.router` in all four active source trees; ADR `0001-remove-9router.md` in PlatformDeployment confirms archival removal |
 | 11 | auto_once single-cycle implementation | **VERIFIED** | `auto_once.py::run_auto_once()` — observe → delegate_args → `run_delegate()` → return. No loops. Docstring: "execute exactly one autonomous cycle" |
 | 12 | Repeated-run stability evidence | **VERIFIED** | `OperatorConsole/tests/test_repeated_runs.py` — explicit Phase 12 test file; covers `list_runs()` sort by timestamp, `latest_run()`, artifact isolation (no overwrites), unique run IDs across consecutive runs |
 
@@ -56,7 +56,7 @@ All 9 invariants pass. All 13 phases (0–12) are verified. No boundary violatio
 Specific checks performed:
 - SwitchBoard source: `kodo`, `archon`, `openclaw` appear only as string literals in cost/capability classification tables in `lane/routing.py` — no imports, no execution calls
 - OperatorConsole source: the words `TaskProposal`, `LaneDecision`, `ExecutionRequest` appear only in `demo.py` comments/docstrings describing the flow, and in `delegate.py` comments — no live construction
-- WorkStation Python source: zero occurrences of contract class names in non-docs code
+- PlatformDeployment Python source: zero occurrences of contract class names in non-docs code
 
 ---
 
@@ -157,7 +157,7 @@ No `while`, `loop`, `daemon`, or `background` constructs anywhere in the file. T
 | OperationsCenter | 1,863 | 4 | 0 | 120 test files; includes integration/, unit/ |
 | SwitchBoard | 264 | 0 | 0 | 17 test files |
 | OperatorConsole | 93 | 0 | 0 | 4 test files |
-| WorkStation | 147 | 0 | 0 | unit/ only (smoke tests require live stack) |
+| PlatformDeployment | 147 | 0 | 0 | unit/ only (smoke tests require live stack) |
 | **Total** | **2,367** | **4** | **0** | |
 
 The 4 skipped tests in OperationsCenter are the live-aider tests gated on `shutil.which("aider")` — correct behavior when aider is not installed.
@@ -168,7 +168,7 @@ The 4 skipped tests in OperationsCenter are the live-aider tests gated on `shuti
 
 **No blockers. Three minor observations:**
 
-1. **WorkStation smoke tests unrunnable in isolation.** `test/smoke/test_stack_health.py` requires a live Docker stack. No pytest environment configured at the system level — WorkStation's `.venv` is present and unit tests pass (147), but smoke tests are integration-only by design. This is expected, not a gap.
+1. **PlatformDeployment smoke tests unrunnable in isolation.** `test/smoke/test_stack_health.py` requires a live Docker stack. No pytest environment configured at the system level — PlatformDeployment's `.venv` is present and unit tests pass (147), but smoke tests are integration-only by design. This is expected, not a gap.
 
 2. **No dedicated Phase 6 e2e test file.** The integration test that proves the full pipeline is `tests/integration/test_execution_boundary.py`, not a file named `test_e2e_*` or `test_integration_*`. It covers the full PlanningContext → ExecutionResult boundary but uses a stub LaneDecision (no live SwitchBoard). A test that fires the actual HTTP call to SwitchBoard does not exist at the unit level — that is the smoke/live-stack tier. Acceptable gap given the architecture, but worth noting.
 

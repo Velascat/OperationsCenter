@@ -46,7 +46,7 @@ All four canonical contract classes are defined once and only in OperationsCente
 | `ExecutionRequest` | `src/operations_center/contracts/execution.py:38` |
 | `ExecutionResult` | `src/operations_center/contracts/execution.py:146` |
 
-No class-level redefinitions found in SwitchBoard, WorkStation, or OperatorConsole. SwitchBoard holds no contract classes — it consumes `LaneDecision` via OperationsCenter's package. `ExecutionRequestBuilder` in `execution/handoff.py:27` is a builder helper, not a contract redefinition.
+No class-level redefinitions found in SwitchBoard, PlatformDeployment, or OperatorConsole. SwitchBoard holds no contract classes — it consumes `LaneDecision` via OperationsCenter's package. `ExecutionRequestBuilder` in `execution/handoff.py:27` is a builder helper, not a contract redefinition.
 
 ---
 
@@ -62,7 +62,7 @@ All required execution-boundary modules are present under `src/operations_center
 - `policy/` — `PolicyEngine`, `PolicyDecision`, `PolicyStatus`, defaults, validate, explain
 - `tuning/`, `insights/`, `autonomy_tiers/`, `upstream_eval/` — also present
 
-Neither SwitchBoard, WorkStation, nor OperatorConsole contain execution coordinator, adapter invocation, or backend dispatch logic.
+Neither SwitchBoard, PlatformDeployment, nor OperatorConsole contain execution coordinator, adapter invocation, or backend dispatch logic.
 
 ---
 
@@ -132,11 +132,11 @@ Contracts do not leak streaming objects. The single reference to `event_stream` 
 
 **SwitchBoard README:** Accurately describes the selector-only role, explicitly lists what SwitchBoard is not (no provider proxy, no auth broker, no model host, no execution engine, no workflow harness). Correct.
 
-**WorkStation README:** Accurately scopes WorkStation as infrastructure owner (deploys SwitchBoard, Plane, tiny models). States "WorkStation does not participate in the request path at runtime." No 9router or removed services described as active.
+**PlatformDeployment README:** Accurately scopes PlatformDeployment as infrastructure owner (deploys SwitchBoard, Plane, tiny models). States "PlatformDeployment does not participate in the request path at runtime." No 9router or removed services described as active.
 
 **OperatorConsole README:** Accurately describes itself as a persistent workspace manager that delegates to OperationsCenter's execute entrypoint. Does not claim execution ownership.
 
-No `9router` or `nine-router` references appear in any active README. All 9router mentions are confined to archival/migration docs (docs/architecture/adr/0001-remove-9router.md in WorkStation, docs/migration/workstation-9router-removal.md in WorkStation, docs/architecture/final-phase-checklist-result.md in OperationsCenter archive) — correctly treated as historical record.
+No `9router` or `nine-router` references appear in any active README. All 9router mentions are confined to archival/migration docs (docs/architecture/adr/0001-remove-9router.md in PlatformDeployment, docs/migration/platformdeployment-9router-removal.md in PlatformDeployment, docs/architecture/final-phase-checklist-result.md in OperationsCenter archive) — correctly treated as historical record.
 
 ---
 
@@ -153,7 +153,7 @@ Search for `FOB|ControlPlane|control.plane|control_plane|9router|nine.router|cp.
 | OperationsCenter | 1863 passed, 4 skipped |
 | SwitchBoard | 264 passed |
 | OperatorConsole | 93 passed |
-| WorkStation (unit) | 147 passed |
+| PlatformDeployment (unit) | 147 passed |
 
 All suites green. No failures. The 4 skipped tests in OperationsCenter are expected (backend integration tests requiring live services).
 
@@ -163,6 +163,6 @@ All suites green. No failures. The 4 skipped tests in OperationsCenter are expec
 
 - **Phases verified:** 1–12 (architecture, contracts, local lane, LaneSelector, kodo adapter, planning/routing integration, observability, Archon adapter, fallback/escalation policy, OpenClaw outer shell + backend adapter, policy/guardrails, tuning)
 - **Total tests passing:** 2,367 across all four repos
-- **Docs verified:** 4 READMEs + WorkStation architecture docs
+- **Docs verified:** 4 READMEs + PlatformDeployment architecture docs
 - **Legacy residue:** None in active runtime paths
 - **Architecture truth:** Confirmed — the canonical flow is accurately implemented and documented in all four repositories.
