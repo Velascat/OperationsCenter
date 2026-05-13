@@ -16,529 +16,9 @@ The loop is session-bound: it runs as long as the Claude Code session is open.
 It uses `ScheduleWakeup`, not cron/systemd/daemon behavior. Do not replace it
 with a system scheduler.
 
----
-
-## Self-Healing Convergence Model
-
-The watchdog loop is not the final architecture. It is transitional
-operational scaffolding that exists to help the platform evolve from
-loop-centric operational intelligence toward watcher-owned healing,
-runtime-owned recovery, queue-owned recovery semantics, and a passive oversight
-loop.
-
-The convergence roadmap is explicit:
-
-```text
-loop-centric operational intelligence
-  -> watcher-owned telemetry
-  -> assisted recovery
-  -> watcher-owned recovery
-  -> runtime-owned healing
-  -> oversight loop
-  -> operational convergence
-```
-
-The purpose of the loop changes by phase. Early phases need investigation and
-classification. Later phases should push recovery ownership downward into
-watchers, queue policies, and runtime recovery engines. The loop should shrink
-over time, not grow into a permanent orchestration brain.
-
-### Ownership Placement
-
-| Owner | Belongs there | Does not belong there |
-|-------|---------------|-----------------------|
-| Loop | Invariant audit, convergence phase estimate, escalation, architecture drift, operator reporting | Common retry paths, queue mutation rules, backend health inference, hidden policy decisions |
-| Watchers | Local recovery, structured telemetry, handoff evidence, retry-safe queue recommendations | Global policy overrides, destructive recovery, opaque state mutation |
-| Runtime recovery systems | Backend health state, cooldowns, retry budgets, evidence fingerprints, recovery state machines | Prompt-only decisions, unbounded retries, runtime policy widening |
-| Queue semantics | Retry lineage, duplicate deadlock handling, stale blocked recovery, replay protection | Silent unsafe unblock, duplicate storms, human approval bypass |
-
-### Phase 1 — Observational Loop
-
-```text
-Loop notices failures
-Loop performs deep investigation
-Loop manually infers recovery state
-Loop classifies stagnation and convergence
-```
-
-Characteristics:
-- Heavy log inspection
-- Repeated inference
-- Low structured telemetry
-- Loop-centric intelligence
-- Reactive operation
-
-This is the historical bootstrap phase. It is useful for discovering missing
-platform behavior, but it is not a target state.
-
-### Phase 2 — Classification Loop
-
-```text
-Loop classifies operational patterns deterministically
-Watchers begin emitting structured evidence
-Convergence/stagnation become machine-readable
-```
-
-Characteristics:
-- `blocked_reason`
-- Executor signals
-- Remediation lineage
-- Duplicate suppression evidence
-- Structured convergence fields
-
-Goal: reduce raw log inference.
-
-### Phase 3 — Assisted Recovery
-
-```text
-Loop orchestrates bounded self-healing
-Recovery policies become machine-enforced
-```
-
-Examples:
-- Backend cooldowns
-- Retry budgets
-- Queue healing
-- Stale blocked recovery
-- Duplicate deadlock breaking
-- Parked-state persistence
-
-Goal: stop replaying unsafe or pointless retries.
-
-### Phase 4 — Watcher-Owned Recovery
-
-```text
-Watchers perform local recovery autonomously
-Loop stops coordinating common remediation paths
-```
-
-Examples:
-- `propose` detects starvation directly
-- `triage` heals retry-safe blocked tasks
-- `improve` handles bounded retries
-- `watchdog` applies backend cooldowns automatically
-
-Goal: recovery ownership moves downward into the platform.
-
-### Phase 5 — Runtime-Owned Healing
-
-```text
-Recovery engine and runtime state machines own operational healing
-```
-
-Examples:
-- Backend health registry
-- Recovery state machine
-- Evidence fingerprints
-- Automatic park/unpark transitions
-- Recovery adaptation tracking
-
-Goal: the platform becomes operationally self-healing.
-
-### Phase 6 — Oversight Loop
-
-```text
-Loop becomes mostly passive
-```
-
-Loop responsibilities become:
-- Invariant enforcement
-- Convergence auditing
-- Escalation
-- Architecture drift detection
-- Operator reporting
-
-The loop no longer:
-- Manually heals queues
-- Repeatedly investigates frozen states
-- Infers backend instability from logs
-- Coordinates common retry paths
-
-### Phase 7 — Operational Convergence
-
-```text
-Platform converges operationally without loop-driven healing
-```
-
-Definition:
-- Watchers recover locally
-- Runtime healing converges automatically
-- Queue deadlocks self-resolve safely
-- Retries adapt automatically
-- Parked states wake automatically on evidence change
-- Loop primarily validates and escalates
-
-Operator involvement becomes limited to:
-- Infrastructure failures
-- Architecture decisions
-- Policy changes
-- Destructive recovery approval
-
-### Convergence Maturity Metrics
-
-The loop summary should expose whether the platform is actually moving through
-these phases:
-- `loop_only_judgments_per_cycle`
-- `manual_inference_events`
-- `watcher_owned_recovery_rate`
-- `automatic_queue_heal_rate`
-- `parked_transition_accuracy`
-- `recovery_adaptation_rate`
-- `operator_escalation_rate`
-
-These metrics are not vanity counters. They answer whether the platform is
-becoming more self-healing or merely centralizing more intelligence inside the
-loop.
-
----
-
-## Anti-God-Object Guardrail
-
-The watchdog loop must not evolve into:
-- A permanent orchestration intelligence layer
-- A hidden policy engine
-- A universal recovery controller
-- An opaque automation authority
-
-The intended architecture is:
-- Bounded
-- Distributed
-- Watcher-owned
-- Runtime-owned
-- Auditable
-- Convergence-driven
-
-The loop exists to help the platform evolve toward self-healing, not to
-centralize all intelligence forever. Repeated loop-only reasoning is
-convergence debt and should become watcher-owned, queue-owned, or
-runtime-owned behavior.
-
----
-
-## Convergence promotion
-
-The watchdog loop is a **temporary operator scaffold**, not the permanent brain of the platform.
-
-Convergence promotion is the mechanism by which the platform transitions from
-earlier convergence phases toward later phases. A loop-only judgment in Phase 1
-or Phase 2 should become structured telemetry, watcher behavior, queue policy,
-or recovery-engine logic in later phases.
-
-When the loop repeatedly performs the same judgment, classification, unblock action, or
-escalation, that behavior should be promoted into the responsible watcher or guardrail.
-The goal is not for the `/loop` to become smarter forever. The goal is for the platform
-to need the `/loop` less over time.
-
-Repeated loop intelligence is technical debt. Every repeated loop-only judgment
-should become platform-owned behavior unless there is a clear safety reason to
-keep it operator-mediated.
-
-| Repeated loop behavior | Promotion target |
-|------------------------|-----------------|
-| Duplicate propose churn detection | propose watcher |
-| Blocked approved task detection | triage / intake watcher |
-| Ready-for-AI starvation detection | goal / propose / watchdog coordination |
-| Dead-remediation detection | improve / review watcher |
-| Repeated executor failure detection | internal watchdog role |
-| Graph drift detection | graph / audit watcher |
-| Queue starvation detection | triage / goal watcher |
-| Stale Plane task detection | intake / triage watcher |
-| Semantic duplicate remediation detection | propose / review watcher |
-| Remediation lineage tracking | improve / review watcher |
-| Automation self-deception detection | watchdog + audit watchers |
-| Cadence pressure / degraded health | internal watchdog role |
-
-**Promotion rule:** if the `/loop` performs the same operational judgment in two or more
-cycles, create or update a Plane task to move that judgment into the appropriate watcher,
-guardrail, or telemetry source. Do not redesign immediately — capture evidence and ownership.
-
-**Over-promotion guardrail:** Promotion candidates require at least one of:
-- Repeated occurrence (2+ cycles)
-- High-severity failure
-- Missing structured evidence that blocked diagnosis
-- Handoff gap that leaves work unowned
-- Automation self-deception risk
-
-Do not create watcher redesign tasks for one-off failures unless they reveal a missing
-invariant or repeated pattern.
-
----
-
-## Scaffold removal direction
-
-The watchdog loop is allowed to coordinate temporarily, but repeated coordination should
-become watcher-owned behavior. Over time, the loop should shrink from active operator
-to oversight layer.
-
-Healthy direction:
-- Less manual inference
-- More structured watcher evidence
-- Fewer loop-only decisions
-- Fewer repeated stuck states
-- Clearer watcher handoffs
-- Less need for short cadence
-
----
-
-## Runtime health model
-
-Backend stability is first-class platform state, not a conclusion the loop
-reconstructs from log tails. Watchers and runtime services should write or
-surface structured health records equivalent to:
-
-```yaml
-backend_health:
-  kodo:
-    state: unstable
-    failure_count: 2
-    last_success_at: null
-    last_failure:
-      signature: signal:SIGKILL
-      signal: SIGKILL
-      exit_code: null
-    cooldown_until: "..."
-    safe_retry_after: "..."
-    recovery_strategy: reduce_pressure
-```
-
-Allowed states are `unknown`, `healthy`, `degraded`, `unstable`,
-`unavailable`, `recovering`, and `operator_blocked`.
-
-Runtime watchers own these transitions:
-- Success resets backend health to `healthy`
-- `SIGKILL` transitions to `unstable`, applies cooldown, and forbids immediate replay
-- Repeated backend failures transition toward `unavailable` and escalation
-- Exhausted recovery marks `operator_blocked` with an explicit reason
-
-The loop should consume this state before reading raw logs. Raw logs are fallback
-evidence only when structured health records are missing or contradictory.
-
----
-
-## Recovery ownership boundaries
-
-The permanent target is:
-
-```text
-watchers = healer + coordinator
-loop = oversight + escalation + audit
-```
-
-This boundary is the transition from Phase 3 to Phase 4 in the self-healing
-convergence model. Early phases allow the loop to coordinate recovery while
-the platform learns; later phases require watchers to own common local recovery
-paths directly.
-
-Watcher telemetry must include enough structured evidence for the next watcher
-or policy layer to act without prompt-side inference.
-
-Required telemetry by owner:
-- `improve`: `executor_exit_code`, `executor_signal`, `retry_strategy_used`,
-  `retry_strategy_changed`, `remediation_attempt_number`,
-  `remediation_lineage_id`, `prior_failure_signature`
-- `triage`: `blocked_reason`, `blocked_by_backend`, `retry_safe`,
-  `queue_transition_recommendation`
-- `goal` / `propose`: `duplicate_reason`, `suppression_reason`,
-  `starvation_detected`, `queue_deadlock_detected`
-- `watchdog` / runtime supervisor: `backend_health_transition`,
-  `cooldown_applied`, `recovery_attempt_started`, `recovery_attempt_result`
-- `review`: remediation lineage and retry adaptation fields matching `improve`
-
-When these fields exist, the loop should validate and audit them. It should not
-repeat the same log analysis unless the structured telemetry is absent,
-incomplete, or semantically changed.
-
----
-
-## Recovery strategies
-
-Autonomous recovery is bounded and auditable. The platform may attempt:
-- Executor restart: restart backend process, restart watcher, reinitialize runtime
-- Queue healing: `Blocked -> Backlog`, `Blocked -> Ready for AI`, stale lock cleanup
-- Runtime pressure mitigation: pause backend temporarily, reroute lightweight tasks,
-  defer expensive remediation
-- Cooldown enforcement: wait until `safe_retry_after` before retrying the same lineage
-
-Recovery strategies begin as Phase 3 assisted recovery, where the loop may
-orchestrate bounded actions. They should migrate toward Phase 4 watcher-owned
-recovery and Phase 5 runtime-owned healing as soon as the safety conditions,
-budgets, and telemetry are machine-enforced.
-
-Guardrails:
-- Do not widen runtime policy automatically
-- Do not increase `kodo` concurrency automatically
-- Do not bypass execution gates silently
-- Do not replay unsafe retries
-- Do not mutate queue state without structured evidence
-
----
-
-## Self-healing state machine
-
-The platform state machine is:
-
-```text
-HEALTHY
-  -> DEGRADED
-  -> RECOVERING
-  -> HEALTHY
-
-RECOVERING
-  -> UNSTABLE
-  -> COOLDOWN
-  -> RECOVERING
-
-UNSTABLE
-  -> OPERATOR_BLOCKED
-  -> PARKED_OPERATOR_BLOCKED
-```
-
-The loop orchestrates and audits transitions. Watchers own the local recovery
-attempts and must emit transition events.
-
-State-machine ownership belongs to later convergence phases. The loop may audit
-and explain transitions, but recovery state machines should gradually replace
-prompt-driven recovery decisions.
-
----
-
-## Queue healing rules
-
-Queue healing is allowed only when structured metadata proves the transition is
-safe.
-
-Automatic duplicate-deadlock breaker:
-
-```text
-IF duplicate exists in Blocked
-AND no consumer can execute it
-AND retry_safe = true
-AND retry budget remains
-THEN transition Blocked -> Ready for AI
-```
-
-Stale blocked recovery:
-
-```text
-IF task is Blocked beyond stale threshold
-AND retry_safe = true
-AND replay budget remains
-THEN transition Blocked -> Backlog
-```
-
-Required queue metadata:
-- `retry_lineage_id`
-- `retry_safe`
-- `backend_dependency`
-- `recovery_attempt_count`
-- `blocked_reason`
-- `duplicate_key`
-
-Required invariants:
-- No infinite replay
-- No duplicate storms
-- No unsafe unblock
-- No queue freeze caused by duplicate suppression
-
----
-
-## Recovery budgets
-
-Investigation and recovery are bounded by machine-enforced budgets:
-
-```yaml
-recovery_budget:
-  max_cycles_before_escalation: 3
-  max_equivalent_retries: 2
-  max_recovery_attempts: 5
-```
-
-After exhaustion, the system must escalate, park when appropriate, and wait for
-semantic evidence change. The loop should not perform fresh deep investigation
-for an unchanged, budget-exhausted root cause.
-
----
-
-## Evidence fingerprinting
-
-Use canonical evidence hashes to distinguish real change from timestamp churn.
-
-Hash inputs:
-- exit code and signal
-- normalized stacktrace or failure category
-- queue state
-- watcher state
-- regression IDs
-- backend health state
-
-Ignore:
-- timestamps
-- cycle IDs
-- run IDs
-- log ordering noise
-
-Parked and stalled decisions should use these hashes. Timestamp-only changes are
-not new evidence.
-
----
-
-## Formal parked behavior
-
-`PARKED_OPERATOR_BLOCKED` is a persisted system state, not just loop prose.
-PARKED is not failure. It represents successful convergence of the loop's role
-for a known blocker: the loop determined that no safe retry exists, escalation
-already exists, no new evidence is present, and monitoring-only behavior is
-required until evidence changes.
-
-Parked metadata must include:
-
-```yaml
-parked_state:
-  root_cause_signature: kodo_sigkill_plan_phase
-  parked_reason: backend cooldown exhausted without safe retry
-  unchanged_cycles: 14
-  last_evidence_hash: abc123
-  unpark_conditions:
-    - backend_health_change
-    - queue_change
-    - runtime_config_change
-    - watcher_state_change
-    - execution_outcome_change
-```
-
-When parked, skip repeated deep investigation. Check only unpark conditions and
-semantic evidence hash changes.
-This is Phase 5/6 behavior: runtime and evidence state decide whether to wake;
-the loop audits the decision instead of repeatedly re-investigating frozen
-facts.
-
----
-
-## Recovery telemetry
-
-Recovery events should be emitted as structured records:
-- `recovery_attempt_started`
-- `recovery_attempt_result`
-- `cooldown_applied`
-- `backend_health_transition`
-- `queue_healing_decision`
-- `recovery_budget_exhausted`
-- `parked_state_entered`
-- `parked_state_unparked`
-
-Loop summaries should report metrics derived from these records:
-- recovery success rate
-- retry adaptation rate
-- queue evolution quality
-- backend stability state
-- unchanged evidence cycles
-- convergence phase estimate
-- loop-only judgments per cycle
-- manual inference events
-- watcher-owned recovery rate
-- automatic queue heal rate
-- parked transition accuracy
-- operator escalation rate
+**Related docs:**
+- [`self_healing_model.md`](self_healing_model.md) — convergence phases 1–7, architecture, ownership model
+- [`recovery_policy.md`](recovery_policy.md) — classification tables, gate criteria, enforcement invariants
 
 ---
 
@@ -566,7 +46,7 @@ Before starting the loop, confirm:
 
 ---
 
-## Preflight checklist
+## Preflight Checklist
 
 Copy-paste this block at the start of each session before invoking `/loop`:
 
@@ -613,7 +93,7 @@ python3 -c "import yaml; d=yaml.safe_load(open('config/operations_center.local.y
 
 ---
 
-## Loop ownership lock
+## Loop Ownership Lock
 
 To prevent two Claude Code sessions from running the platform loop simultaneously,
 acquire the lock before the first cycle and release it on clean stop.
@@ -642,7 +122,7 @@ must only run when this loop owns the lock.
 
 ---
 
-## Starting the loop
+## Starting the Loop
 
 Invoke in the Claude Code session:
 
@@ -999,7 +479,7 @@ Pass this full /loop prompt verbatim as the ScheduleWakeup prompt.
 
 ---
 
-## Adaptive cadence
+## Adaptive Cadence
 
 The loop shortens its wake interval automatically when the platform is unhealthy.
 The goal is to stabilize broken states quickly and back off once forward progress
@@ -1033,427 +513,7 @@ It does not require two consecutive cycles of evidence.
 
 ---
 
-## Starvation and closed-loop stagnation
-
-These are distinct from simple "blocked work" and require immediate escalation.
-
-### Starvation
-
-**Definition:** Work exists and remediation candidates are generated, but the pipeline
-produces no net forward progress because execution paths are blocked, duplicated,
-skipped, or never consumed.
-
-Starvation does NOT require multiple hours or multiple cycles of evidence. A single
-cycle is sufficient when the pattern is already closed:
-
-| Signal | Interpretation |
-|--------|---------------|
-| `propose: skipped=N, created=0` while Blocked has duplicates | Deduplication deadlock — starvation |
-| Blocked tasks with `self-modify:approved`, Ready-for-AI=0 | Workers cannot consume — starvation |
-| Same candidates emitted and skipped repeatedly | No queue movement — starvation |
-| `tasks_created=None` while board has blocked approved work | Propose stuck — starvation |
-
-### Closed-loop stagnation
-
-**Definition:** The platform repeatedly generates or retries equivalent remediation
-work while queue state, task state, or execution state does not materially change.
-
-Examples:
-- Propose emits duplicates already in Blocked → skips → nothing changes → repeats
-- Ready-for-AI never drains despite tasks present
-- Same repos skipped every cycle at execution gate
-- Same regressions recreated every cycle
-- Blocked tasks never re-enter executable state
-
-### Distinction from temporary delay
-
-| Condition | Meaning | Cadence |
-|-----------|---------|---------|
-| Temporary delay | Work is still progressing | ACTIVE or HEALTHY |
-| Starvation | No forward progress despite active work generation | STALLED minimum |
-| Dead-remediation | Retries occurring without any state improvement | STALLED minimum |
-| Closed-loop stagnation | Activity without measurable progress | STALLED minimum |
-| Non-convergent automation | Retries reproduce equivalent outcomes with no evolution | STALLED minimum |
-| Divergent automation | Platform health worsening under active remediation | DEGRADED minimum |
-| Automation self-deception | Activity logs but state never evolves | DEGRADED minimum |
-| Blocked queue deadlock | Work trapped in non-executable state | DEGRADED |
-| Operator-blocked (parked) | Root cause known, Plane exists, no new evidence for 2+ cycles | PARKED_OPERATOR_BLOCKED (1800s) |
-
-### Forbidden language
-
-Do not write:
-- "potential starvation — monitor for recurrence"
-- "flagging for next cycle"
-- "will assess again after one more cycle"
-
-once the evidence already demonstrates a closed retry/no-progress pattern. Similarly, do not
-write "automation is running normally" when convergence analysis shows non-convergent behavior.
-
----
-
-## Behavioral convergence analysis
-
-**Definition:** Automation behavior is convergent when retries, remediation, and planning
-evolve platform state toward resolution rather than reproducing equivalent outcomes repeatedly.
-
-| Convergence state | Meaning | Required action |
-|------------------|---------|-----------------|
-| `convergent` | Retries evolve toward resolution | Note in summary |
-| `weakly-convergent` | Progress occurring slowly but directionally | Monitor; note in summary |
-| `non-convergent` | Retries reproduce equivalent outcomes with no net state change | STALLED + Plane task |
-| `divergent` | Automation making platform health measurably worse | DEGRADED + escalate |
-
-### Non-convergent signals (any of these is sufficient)
-
-- Same propose duplicates skipped in 2+ consecutive cycles with no queue evolution
-- Same repo targeted by autonomy-cycle 3+ times with identical failure or no-change outcome
-- Regression retries recreate identical findings each cycle
-- Blocked tasks recycled to Ready-for-AI with the same failed execution outcome repeatedly
-- Remediation titles/labels/root-causes semantically equivalent across multiple cycles without strategy change
-
-### Divergent signals
-
-- Blocked count increasing cycle-over-cycle while remediation is actively running
-- Retries introducing new regressions rather than resolving existing ones
-- Board health metrics worsening across consecutive cycles despite audits reporting clean
-
-### What convergence is NOT
-
-Convergence is not measured by whether the automation ran or produced logs. A retry that
-produces the same outcome as all prior retries is not convergent even if it ran successfully.
-The watchdog must ask: **did the automation adapt after failure?** If not, it is not converging.
-
-### Remediation lineage
-
-Before any direct fix or Plane task creation, check the remediation history:
-
-1. How many prior cycles targeted this exact finding?
-2. Did prior remediation attempts change the execution outcome?
-3. Did the strategy adapt, or was it a replay of the same path?
-
-If 2+ equivalent prior attempts produced no outcome change: classify `dead-remediation`.
-Do not replay identical paths. Include the prior-attempt history in the Plane task description.
-
----
-
-## Semantic duplicate remediation detection
-
-The watchdog does not require LLM-based semantic analysis. Compare across cycle summaries:
-
-- **Title similarity** — task titles targeting the same repo with >80% shared tokens
-- **Root-cause keywords** — same root-cause summary appearing in consecutive remediation attempts
-- **Regression signatures** — same test name/path failing after a "successful" fix
-- **Failure outcomes** — same repo+task_type+outcome combination repeated across cycles
-- **Label overlap** — same `family:` and `area:` label combination on consecutive tasks
-
-If any pattern is detected:
-1. Classify as non-convergent
-2. Create a Plane task with: which cycles showed the duplication, what was equivalent, what strategy should differ
-3. Do NOT create another equivalent task
-4. Do NOT retry the equivalent remediation path this cycle
-
-Semantic duplication is evidence of planner non-convergence, not bad luck. The watchdog
-must surface it rather than treating each retry as an independent fresh attempt.
-
----
-
-## Watcher handoff investigation
-
-When a task is blocked or stalled, the loop must ask not only "what is blocked?" but also:
-
-- Which watcher produced this state?
-- Which watcher should consume this state?
-- Did the producing watcher emit enough evidence for the next watcher?
-- Did a handoff contract fail?
-- Did the queue state become non-consumable by any watcher?
-- Is this a missing watcher behavior or a broken watcher behavior?
-
-If the answer to any of these is "unknown" and the loop had to infer the answer manually,
-that inference is a promotion candidate — the producing watcher should emit it as structured
-evidence.
-
----
-
-## Watcher-owned evidence
-
-When the watchdog has to infer behavior from logs manually, the responsible watcher should
-emit structured evidence instead. Examples of evidence that should be watcher-emitted:
-
-| Evidence | Producing watcher |
-|----------|------------------|
-| Duplicate candidate count + reason | propose |
-| Skipped candidate reason | propose |
-| Blocked task reason | triage / intake |
-| Last attempted remediation id | improve / review |
-| Prior remediation lineage | improve / review |
-| Retry strategy changed yes/no | improve |
-| Queue transition attempted yes/no | goal / triage |
-| Handoff target watcher | any transition |
-| Why task is not executable | triage / goal |
-| Why task is safe/unsafe to re-queue | triage / intake |
-
-If this evidence is missing and caused watchdog guesswork in the current cycle, create or
-update a Plane task for telemetry improvement targeting the responsible watcher.
-
----
-
-## Automation self-deception
-
-**Definition:** The platform reports activity, retries, task creation, or remediation
-while meaningful execution progress does not occur. The system appears healthy by
-operational metrics while producing no forward progress.
-
-### Detection signals
-
-- Retries and cycles run but queue/task state is frozen across 2+ cycles
-- Tasks recreated under new IDs with semantically equivalent scope and labels
-- Watchers all healthy and propose active, but board state unchanged between cycles
-- Remediation logs "completed" but the same regression or gap immediately recurs
-- `propose.tasks_created > 0` but Blocked count never decreases
-- Custodian sweep reports 0 findings but flow-audit reports the same open gaps cycle-over-cycle
-
-### Why it matters
-
-Automation self-deception means the platform's health signals are decoupled from reality.
-A cycle summary that says "audits clean, tasks created, watchers running" may still be
-describing a frozen platform. The watchdog must not confuse **activity** with **progress**.
-
-### Required response
-
-1. Classify the cycle as containing automation self-deception in the summary
-2. Investigate: which specific metric claimed progress while state did not change?
-3. Create a Plane task: what is the deception mechanism? (duplicate creation? false-clean audit?)
-4. DEGRADED cadence minimum — HEALTHY is forbidden
-5. Do not retry the same execution path this cycle
-
----
-
-## Executor-quality investigation
-
-When non-convergent, divergent, or self-deception is classified, investigate what the
-automation/framework actually **did**, not merely whether it produced output.
-
-### Evidence to examine
-
-| Question | Where to look |
-|----------|--------------|
-| Did the retry change execution strategy? | Compare task labels/descriptions across cycles |
-| Did the planner emit tasks that evolved queue state? | Compare Blocked/Ready counts before/after propose |
-| Did autonomy-cycle pick a different path after failure? | Autonomy-cycle logs + cycle summary history |
-| Did propose adapt candidate selection after repeated skips? | propose log events: `tasks_skipped`, `tasks_created` trend |
-| Did the execution path reach a worker? | Watcher logs + Running state transitions |
-| Did remediation adapt after failure? | Failure categories in consecutive cycle summaries |
-
-### Classification
-
-| Executor quality | Evidence | Required action |
-|----------------|----------|-----------------|
-| `adaptive` | Strategy materially changed after failure | Convergent — continue |
-| `repetitive` | Same strategy rerun without adaptation | Non-convergent — escalate |
-| `degenerate` | Retries making state worse or introducing new failures | Divergent — escalate + DEGRADED |
-
-### Guardrail
-
-Do not accept "automation ran without errors" as evidence of quality. Require evidence that
-the automation strategy **changed** after a prior failure before classifying as adaptive.
-
----
-
-## Queue-unblocking investigation
-
-When starvation or closed-loop stagnation is detected, investigate:
-
-1. **Why are Blocked tasks blocked?**
-   - Did a prior kodo run fail and move them to Blocked?
-   - Were they manually blocked by the operator?
-   - Is a phase gate holding them (spec campaign phase not yet active)?
-
-2. **Is duplicate suppression causing a deadlock?**
-   - Propose emits candidates → skips because Blocked duplicates exist
-   - Workers only consume Ready-for-AI → Blocked tasks never execute
-   - No one re-queues them → permanent starvation
-
-3. **What is the safe unblock path?**
-   - Blocked → Backlog: safe if the task should be retried from scratch
-   - Blocked → Ready-for-AI: safe if the task should be retried immediately
-   - Leave blocked: only if operator action is explicitly required
-
-4. **Do not blindly mutate queue state.** Identify the path and escalate via Plane task.
-   If the operator has indicated that `self-modify:approved` tasks may be re-queued,
-   moving them to Backlog is the safe default.
-
----
-
-## Forward progress invariant
-
-**Invariant:** Repeated remediation activity without measurable queue or execution
-progress is platform degradation, not normal operation.
-
-Measurable forward progress (any of these counts):
-- Blocked count decreased vs prior cycle
-- Ready-for-AI drained (tasks moved to Running or Done)
-- Task state transitions occurred (Blocked→Ready, Running→Done, etc.)
-- Regressions resolved (regression check findings decreased)
-- Graph recovered (graph-doctor status improved)
-- Watcher stabilized after a prior crash
-- Autonomy-cycle outcomes improved (success rate increased)
-- Propose `tasks_created > 0`
-
-If remediation runs but none of these are true:
-- Classify as stagnation
-- Shorten cadence
-- Escalate immediately
-- Stop blindly retrying identical remediation paths
-
-This invariant applies even if all individual audit tools report clean.
-A platform that runs fine but produces no forward progress is stagnant.
-
----
-
-## Blocked/stalled work investigation
-
-The loop must actively detect and classify stuck work — not just report audit
-findings. Each cycle reads the last 3 cycle summaries from `.console/log.md`
-before classifying blocked items.
-
-**Stagnation signals (any of these triggers immediate classification):**
-- propose `skipped > 0` and `created = 0` while Blocked tasks exist (single cycle)
-- Blocked count nonzero and Ready-for-AI is zero (single cycle, if approved work exists)
-- Same audit finding present in 2+ consecutive cycle summaries
-- Same Plane task title appearing in `Follow-ups` across 2+ cycles
-- Same repo repeatedly skipped at execution gate
-- Same watcher role in crash restarts across 2+ cycles
-- Autonomy-cycle failures in recent cycles with no resolution
-- Graph invariant failures persisting across cycles
-- Flow-audit gaps open across 2+ cycles
-
-**Blocked work classification:**
-
-| Class | Meaning | Action |
-|-------|---------|--------|
-| `temporarily-blocked` | retry next cycle — forward progress IS occurring elsewhere | note in summary |
-| `infra-blocked` | platform instability preventing execution | Plane task + DEGRADED cadence |
-| `ownership-ambiguous` | affected repo not determinable | Plane task + skip execution |
-| `validation-blocked` | failing tests / regressions | Plane task + targeted fix |
-| `structurally-blocked` | needs operator or design action | Plane task + escalate |
-| `crash-looping` | same failure repeating | Plane task + anti-flap rule |
-| `starvation` | work exists and candidates generated, but no net forward progress | Plane task + STALLED + investigate queue |
-| `dead-remediation` | retries with no state improvement or adaptation | Plane task + STALLED + stop retrying |
-| `closed-loop stagnation` | activity without measurable progress | Plane task + STALLED + investigate loop |
-| `non-convergent` | retries reproducing equivalent outcomes with no evolution | Plane task + STALLED + convergence analysis |
-| `divergent` | automation measurably worsening platform health | Plane task + DEGRADED + executor investigation |
-| `operator-blocked` | root cause known and unchanged; Plane escalation exists; no safe retry; no new evidence for 2+ cycles | Remain parked at PARKED_OPERATOR_BLOCKED (1800s); check unpark conditions only |
-
-`structurally-blocked`, `dead-remediation`, `starvation`, `closed-loop stagnation`,
-`non-convergent`, and `divergent` must be escalated with a Plane task immediately.
-Do not retry them in the same cycle.
-Do not use "monitor for recurrence" language once the pattern is demonstrated.
-`operator-blocked` requires no further Plane escalation if one already exists — transition to PARKED.
-
----
-
-## Execution gate — criteria reference
-
-| Criterion | Direct fix allowed | Plane task only |
-|-----------|-------------------|-----------------|
-| Reproduced in current cycle | ✓ | ✗ |
-| Affected repo known from tool output | ✓ | ✗ |
-| Implementation-level work | ✓ | ✗ |
-| ADR / policy / design-only | ✗ | ✓ |
-| Blocked on credentials / infra | ✗ | ✓ |
-| Requires destructive cleanup | ✗ | ✓ |
-| Requires concurrency/model widening | ✗ | ✓ |
-| Classified dead-remediation, starvation, or closed-loop stagnation | ✗ | ✓ |
-
----
-
-## Affected-repo discovery — deterministic sources
-
-Affected repos come **only** from:
-
-1. `operations-center-custodian-sweep --emit` — repo key in emitted Plane task metadata
-2. `operations-center-ghost-audit --since 1h` — `repo` field in JSON output
-3. `operations-center-flow-audit` — `repo` field in JSON output
-4. `operations-center-graph-doctor` — manifest graph shows which repo's invariant failed
-5. `operations-center-reaudit-check --json` — `backends[].needed=true` → OperationsCenter
-6. `operations-center-check-regressions` — `findings[].repo` field
-7. Watcher log root-cause classification — watcher process path identifies the role/repo
-8. Plane task metadata after triage promotion — `label_detail` repo key
-
-Do not infer affected repos from unrelated logs, memory, or prior sessions.
-
----
-
-## Destructive-action guardrails
-
-The loop must **never** do the following without explicit operator approval:
-
-- `git reset --hard` — prefer a revert commit instead
-- Broad deletion of untracked files (`git clean -fdx`)
-- Deleting Docker volumes
-- Deleting or recreating databases
-- Unregistering WSL distributions
-- Force-pushing (`git push --force`)
-- Changing secrets or credentials
-- Modifying ADRs (`docs/architecture/adr/`)
-- Changing runtime model policy (`config/runtime_binding_policy.yaml`)
-- Widening `kodo max_concurrent` beyond 1
-- Replacing `ScheduleWakeup` with cron/systemd/daemon behavior
-
-**Regression revert procedure** (when `check-regressions` confirms a regression):
-1. Identify the exact branch/commit range from the tool output
-2. State the evidence: which test failed, which commit introduced it
-3. Create a normal revert commit: `git revert <sha> --no-edit`
-4. Run validation before pushing
-5. If operator approval is needed (e.g., force-push, destructive reset) → Plane task
-
----
-
-## Branch and commit hygiene
-
-**Default posture:** do not commit to `main` unless the operator explicitly allows it
-for the current session/task.
-
-If not allowed and currently on `main`:
-```bash
-git checkout -b oc-watchdog/$(date +%Y%m%d-%H%M)-<short-topic>
-```
-
-**Per cycle:**
-- One logical commit per repo per cycle
-- Commit only after validation passes (`pytest`, `ruff`, repo's own validation commands)
-- Commit message format:
-  ```
-  fix(<repo>): <root cause> — <invariant/gate fixed>
-  ```
-- Never force-push
-- Never amend previous loop commits automatically
-- Do not commit generated reports, audit JSON outputs, or log files unless intentionally tracked
-
----
-
-## Watcher restart classification and anti-flap
-
-| Exit code | Classification | Action |
-|-----------|---------------|--------|
-| 143 (SIGTERM) | Benign deliberate stop | Note in cycle summary only |
-| 1 or 2 | Crash | Read log context; fix config/code or open Plane task; restart once |
-| 0 | Unexpected clean exit | Read last 30 log lines; treat as soft crash |
-
-**Anti-flap rule:** if the same watcher produces a non-143 restart event in **two consecutive
-cycles**, do not blindly restart it again. Instead:
-1. Read the full log context for both events
-2. Create or update a Plane task with root cause and log excerpts
-3. Leave the watcher stopped until the Plane task is resolved
-4. Report in the cycle summary that this role is intentionally paused
-5. Treat the stopped watcher as a DEGRADED signal for adaptive cadence
-
-Track per-role crash events in the cycle summary. If `.console/log.md` shows two consecutive
-`watcher_restart` entries for the same role, the anti-flap rule applies.
-
----
-
-## Structured cycle summary
+## Structured Cycle Summary
 
 Append one block per completed cycle to `.console/log.md`:
 
@@ -1462,7 +522,7 @@ Append one block per completed cycle to `.console/log.md`:
 
 - Lock owner: pid=<pid> hostname=<host>
 - Branch / commit: <branch> @ <short-sha>
-- Health state: <HEALTHY|ACTIVE|STALLED|DEGRADED|CRITICAL>
+- Health state: <HEALTHY|ACTIVE|STALLED|DEGRADED|CRITICAL|PARKED_OPERATOR_BLOCKED>
 - Next cadence: <Ns> — <reason / driving signal>
 - Plane status: <N> Ready-for-AI / <N> Running / <N> Blocked / <N> In-Review
 - PlatformDeployment / SwitchBoard status: <healthy|unreachable>
@@ -1522,14 +582,14 @@ Append one block per completed cycle to `.console/log.md`:
 
 ---
 
-## What each cycle does
+## What Each Cycle Does
 
 | Step | Tools / commands | Action on findings |
 |------|-----------------|-------------------|
 | Ownership | `watchdog-loop-acquire` | Abort if live lock held by another PID |
 | Preflight | curl, git status, grep | Confirm all services + config up front |
 | Investigate | 6 audit CLIs in parallel | Collect findings; classify affected repos |
-| Triage | `triage-scan --apply` | Promote Backlog → Ready for AI |
+| Triage | `triage-scan --apply` | Promote Backlog → Ready for AI; queue self-healing if evidence allows |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
 | Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
 | Phase estimate | Structured telemetry + recovery actions | Estimate self-healing phase 1–7; identify ownership migration candidates |
@@ -1545,54 +605,82 @@ Append one block per completed cycle to `.console/log.md`:
 
 ---
 
-## Custodian enforcement
+## Destructive-Action Guardrails
 
-The following invariants are enforced by Custodian detectors on every sweep:
+The loop must **never** do the following without explicit operator approval:
 
-- **OC10** (`kodo max_concurrent must be 1`) — reads
-  `config/operations_center.local.yaml` and fails if `backend_caps.kodo.max_concurrent != 1`.
-  Silently passes on fresh clones (local config absent).
+- `git reset --hard` — prefer a revert commit instead
+- Broad deletion of untracked files (`git clean -fdx`)
+- Deleting Docker volumes
+- Deleting or recreating databases
+- Unregistering WSL distributions
+- Force-pushing (`git push --force`)
+- Changing secrets or credentials
+- Modifying ADRs (`docs/architecture/adr/`)
+- Changing runtime model policy (`config/runtime_binding_policy.yaml`)
+- Widening `kodo max_concurrent` beyond 1
+- Replacing `ScheduleWakeup` with cron/systemd/daemon behavior
 
-Additional invariants maintained by runbook convention (not currently code-enforced):
-- **The loop is temporary operational scaffolding, not the permanent execution brain**
-- **Repeated loop-only reasoning is convergence debt**
-- **Common recovery paths must migrate into watchers or recovery engines**
-- **The platform should become more autonomous without becoming opaque**
-- **Recovery ownership should move downward toward runtime and watcher layers**
-- **The loop should shrink over time, not grow indefinitely**
-- No cron/systemd/daemon replacement for this loop
-- No ADR modification from watchdog/autonomy loop paths
-- No destructive git operations in loop helpers
-- No runtime model policy widening from loop actions
-- Adaptive cadence must not widen kodo concurrency regardless of urgency
-- **HEALTHY cadence forbidden while starvation, closed-loop stagnation, non-convergent, or divergent automation is active**
-- **Demonstrated stagnation escalates immediately — "monitor for recurrence" is not an action**
-- **Repeated duplicate remediation generation with zero queue movement is starvation, not noise**
-- **Non-convergent automation (retries with no adaptation) requires STALLED cadence + Plane task**
-- **Divergent automation (health worsening under remediation) requires DEGRADED cadence + escalation**
-- **Automation self-deception (activity without state evolution) forbids HEALTHY cadence**
-- **Semantic duplicate remediation across 2+ cycles requires lineage investigation before retry**
-- **"Automation ran" is not evidence of quality — adaptation after failure must be demonstrated**
-- **The watchdog loop is a temporary scaffold — repeated loop-only judgment is technical debt**
-- **Same loop judgment in 2+ cycles requires a Plane task promoting it to the responsible watcher**
-- **Watcher handoff gaps (producing watcher didn't emit enough evidence) are promotion candidates**
-- **Promotion is evidence-driven — do not create redesign tasks for one-off failures**
-- **Do NOT remain STALLED indefinitely when park criteria are met — transition to PARKED_OPERATOR_BLOCKED**
-- **PARKED state requires a Plane escalation task; if none exists, remain STALLED and create one**
-- **Parked cycle must check unpark conditions before scheduling — do not skip the check**
-- **Timestamp differences alone do not qualify as new evidence — evidence requires changed state**
-- **Operational convergence ≠ recovery — correct abstention from unsafe retry is a valid convergent outcome**
-- **A loop that correctly parks (identifies blocker, creates escalation, abstains from replay) has converged**
+**Regression revert procedure** (when `check-regressions` confirms a regression):
+1. Identify the exact branch/commit range from the tool output
+2. State the evidence: which test failed, which commit introduced it
+3. Create a normal revert commit: `git revert <sha> --no-edit`
+4. Run validation before pushing
+5. If operator approval is needed (e.g., force-push, destructive reset) → Plane task
 
 ---
 
-## Operator-blocked lifecycle
+## Branch and Commit Hygiene
+
+**Default posture:** do not commit to `main` unless the operator explicitly allows it
+for the current session/task.
+
+If not allowed and currently on `main`:
+```bash
+git checkout -b oc-watchdog/$(date +%Y%m%d-%H%M)-<short-topic>
+```
+
+**Per cycle:**
+- One logical commit per repo per cycle
+- Commit only after validation passes (`pytest`, `ruff`, repo's own validation commands)
+- Commit message format:
+  ```
+  fix(<repo>): <root cause> — <invariant/gate fixed>
+  ```
+- Never force-push
+- Never amend previous loop commits automatically
+- Do not commit generated reports, audit JSON outputs, or log files unless intentionally tracked
+
+---
+
+## Watcher Restart Classification and Anti-Flap
+
+| Exit code | Classification | Action |
+|-----------|---------------|--------|
+| 143 (SIGTERM) | Benign deliberate stop | Note in cycle summary only |
+| 1 or 2 | Crash | Read log context; fix config/code or open Plane task; restart once |
+| 0 | Unexpected clean exit | Read last 30 log lines; treat as soft crash |
+
+**Anti-flap rule:** if the same watcher produces a non-143 restart event in **two consecutive
+cycles**, do not blindly restart it again. Instead:
+1. Read the full log context for both events
+2. Create or update a Plane task with root cause and log excerpts
+3. Leave the watcher stopped until the Plane task is resolved
+4. Report in the cycle summary that this role is intentionally paused
+5. Treat the stopped watcher as a DEGRADED signal for adaptive cadence
+
+Track per-role crash events in the cycle summary. If `.console/log.md` shows two consecutive
+`watcher_restart` entries for the same role, the anti-flap rule applies.
+
+---
+
+## Operator-Blocked Lifecycle
 
 When the platform is blocked on an infrastructure or operator dependency that cannot be resolved
 by automation alone, the loop should transition to a **passive evidence-monitoring posture** rather
 than continuing to run deep investigation each cycle.
 
-### Lifecycle stages
+### Lifecycle Stages
 
 ```
 New finding → STALLED (active investigation, 600s cadence)
@@ -1602,7 +690,7 @@ New finding → STALLED (active investigation, 600s cadence)
            STALLED/DEGRADED/ACTIVE (resume active investigation)
 ```
 
-### Park criteria (all must hold)
+### Park Criteria (all must hold)
 
 1. Root cause is known and has not changed across ≥3 consecutive cycles
 2. A Plane escalation task exists and covers the blocker
@@ -1616,7 +704,7 @@ When ALL five hold, do NOT continue running full deep-investigation cycles. Swit
 - If no unpark condition: schedule 1800s, emit minimal parked-cycle summary
 - If any unpark condition: run full cycle at STALLED/DEGRADED/ACTIVE cadence
 
-### Required metadata when parking
+### Required Metadata When Parking
 
 The cycle that triggers the transition must record in its summary:
 - `Park reason:` — one-sentence blocker summary
@@ -1625,7 +713,7 @@ The cycle that triggers the transition must record in its summary:
 - `Safe retry condition:` — what must be true before retrying (operator action, infra fix, etc.)
 - `Active remediation suspended:` — yes, and why
 
-### Unpark conditions
+### Unpark Conditions
 
 Any of these triggers a return to full investigation:
 - Queue state changed (any Blocked/R4AI/InReview count difference)
@@ -1640,64 +728,12 @@ Any of these triggers a return to full investigation:
 
 ---
 
-## Operational convergence exit
-
-**Convergence does not mean recovery.** A loop can converge correctly even when the platform
-is still unhealthy — if the loop has correctly identified the blocker, escalated via Plane,
-safely abstained from unsafe retry, and transitioned to PARKED state.
-
-Operational convergence is Phase 7 in the self-healing convergence model. It
-means the loop is no longer needed for common recovery paths because watchers,
-queue semantics, and runtime recovery engines converge without prompt-driven
-healing.
-
-### The convergence exit definition
-
-The watchdog loop has reached **operational convergence** when:
-
-1. The root cause of the block is identified and documented
-2. A Plane escalation task exists, is current, and covers the blocker
-3. No safe automation path exists to progress further
-4. The loop has transitioned to PARKED_OPERATOR_BLOCKED (not looping at STALLED)
-5. The loop is actively monitoring for new evidence (checking unpark conditions each cycle)
-
-At this point, **the loop's job is done until the operator acts**. The loop is not failing;
-it is correctly waiting. Remaining at STALLED cadence past this point is waste, not diligence.
-
-### Why "operational convergence" matters
-
-A loop that correctly abstained from 179 equivalent retries while maintaining a Plane escalation
-behaved correctly — but inefficiently because it never transitioned to PARKED. The cost was
-100+ wasted cycles at 600s intervals that produced no new information.
-
-Operational convergence gives the operator a clear signal: "I am parked. I will wake when
-something changes. Nothing has changed." This is more actionable than repeated STALLED cycles
-with identical summaries.
-
-### Behavioral convergence vs operational convergence
-
-Short distinction:
-
-| Concept | Meaning |
-|---------|---------|
-| Behavioral convergence | retries evolve toward resolution |
-| Operational convergence | loop no longer needed for common recovery paths |
-
-| | Behavioral convergence | Operational convergence |
-|---|---|---|
-| Definition | Retries materially evolve platform state toward resolution | Loop correctly identifies blocker, escalates, abstains from unsafe retry, parks |
-| Platform needs to recover? | Yes — convergent means it's making progress | No — convergent means the loop's role is complete until operator acts |
-| Outcome when correct | CONVERGENT or WEAKLY-CONVERGENT | PARKED_OPERATOR_BLOCKED |
-| Outcome when incorrect | NON-CONVERGENT | STALLED indefinitely (loop running but not converging) |
-
----
-
-## Canonical example: kodo SIGKILL (9c7f4bb9)
+## Canonical Example: kodo SIGKILL (9c7f4bb9)
 
 This section documents the SIGKILL block that ran for ~179 cycles (2026-05 session) as a
 reference for future operator-blocked situations.
 
-### What happened
+### What Happened
 
 - kodo exited -9 (SIGKILL) at "Analyzing project and creating plan" regardless of task scope
 - Both OC improve tasks and bounded CxRP tasks (ShippingForm) reproduced the pattern
@@ -1705,7 +741,7 @@ reference for future operator-blocked situations.
   at 20:22Z, ShippingForm SIGKILL'd at 23:46Z)
 - Plane task 5d8bd236 escalated with DIVERGENT finding
 
-### How the loop should have behaved (retroactive)
+### How the Loop Should Have Behaved (Retroactive)
 
 | Cycle range | Correct behavior | Actual behavior |
 |-------------|-----------------|-----------------|
@@ -1713,7 +749,7 @@ reference for future operator-blocked situations.
 | 4–5 (confirmation) | Verify same root cause, same tasks; park criteria met | Continued STALLED — missed park transition |
 | 6–179 (frozen) | PARKED_OPERATOR_BLOCKED (1800s); check unpark conditions only | Ran full 600s cycles with no new information |
 
-### What should have triggered the park transition
+### What Should Have Triggered the Park Transition
 
 After cycle 5 (≥3 cycles, same root cause, same tasks, Plane task 5d8bd236 exists, no queue
 evolution, NEW_EVIDENCE_DETECTED=no for 2 consecutive cycles):
@@ -1723,21 +759,14 @@ evolution, NEW_EVIDENCE_DETECTED=no for 2 consecutive cycles):
 - Behavior: skip deep investigation; check 9 unpark conditions only
 - Summary: minimal parked-cycle entry with park metadata fields
 
-### Unpark conditions that would have triggered (had they occurred)
-
-- Plane task 5d8bd236 status changed (operator commented, resolved, or escalated further)
-- kodo config changed (max_concurrent, timeout, model)
-- New exit signal different from -9
-- Queue counts changed
-
-### Safe retry condition for this case
+### Safe Retry Condition for This Case
 
 `kodo SIGKILL resolved` — operator must diagnose and fix kodo resource exhaustion before
 any blocked improve tasks or ShippingForm can be re-queued.
 
 ---
 
-## Design-change procedure
+## Design-Change Procedure
 
 If remediation appears to require a platform design change:
 
@@ -1757,7 +786,7 @@ incidental remediation.
 
 ---
 
-## Stopping the loop
+## Stopping the Loop
 
 The loop stops when you close the Claude Code session, or tell Claude to stop.
 To stop explicitly, tell Claude: "stop the loop" — it will omit the next
