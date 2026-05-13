@@ -107,14 +107,21 @@ class ResourceGateSettings(BaseModel):
       (read from ``/proc/meminfo``) is at least this much, regardless
       of which backend is dispatching.
 
-    Typical config (training/calibration posture — conservative global
-    rate during initial platform stabilisation)::
+    Typical configs::
 
+        # Conservative (initial stabilisation / training mode)
         resource_gate:
           max_concurrent: 1
           max_per_hour: 2
           max_per_day: 30
-          min_available_memory_mb: 12288   # reserve 12 GiB for co-tenants
+          min_available_memory_mb: 12288
+
+        # Production (tune to observed throughput + host headroom)
+        resource_gate:
+          max_concurrent: 4
+          max_per_hour: 10
+          max_per_day: 100
+          min_available_memory_mb: 12288
     """
 
     max_concurrent: int | None = None
