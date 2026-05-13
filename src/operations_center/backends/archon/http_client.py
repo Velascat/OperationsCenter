@@ -7,8 +7,8 @@ lookup, run cancel/abandon, workflow listing. Higher-level orchestration
 (kickoff → poll-until-terminal → status mapping) lives in
 ``http_workflow.py``.
 
-Archon is deployed by WorkStation
-(``compose/profiles/archon.yml`` in the WorkStation repo) at
+Archon is deployed by PlatformDeployment
+(``compose/profiles/archon.yml`` in the PlatformDeployment repo) at
 ``http://localhost:3000`` by default.
 """
 from __future__ import annotations

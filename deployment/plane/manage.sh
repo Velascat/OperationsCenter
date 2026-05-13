@@ -4,7 +4,7 @@
 #
 # DELEGATION WRAPPER — OperationsCenter no longer owns canonical Plane infra.
 #
-# Plane infrastructure is managed by WorkStation/scripts/plane.sh.
+# Plane infrastructure is managed by PlatformDeployment/scripts/plane.sh.
 # This script is kept for backward-compatibility with existing commands
 # (start, plane-up, dev-up, dev-down) that call it via PLANE_MANAGER.
 #
@@ -13,7 +13,7 @@
 #   deployment/plane/manage.sh down
 #   deployment/plane/manage.sh status
 #
-# See WorkStation/docs/operations/service-map.md and WorkStation/docs/operations/runbook.md
+# See PlatformDeployment/docs/operations/service-map.md and PlatformDeployment/docs/operations/runbook.md
 # for canonical Plane lifecycle documentation.
 # =============================================================================
 set -euo pipefail
@@ -21,29 +21,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPERATIONS_CENTER_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# WorkStation is expected as a sibling of OperationsCenter.
+# PlatformDeployment is expected as a sibling of OperationsCenter.
 # Override with OPERATIONS_CENTER_WORKSTATION_DIR if the layout differs.
-WORKSTATION_DIR="${OPERATIONS_CENTER_WORKSTATION_DIR:-$(cd "${OPERATIONS_CENTER_ROOT}/.." && pwd)/WorkStation}"
+WORKSTATION_DIR="${OPERATIONS_CENTER_WORKSTATION_DIR:-$(cd "${OPERATIONS_CENTER_ROOT}/.." && pwd)/PlatformDeployment}"
 
 if [[ ! -f "${WORKSTATION_DIR}/scripts/plane.sh" ]]; then
   echo ""
-  echo "  [OperationsCenter] Plane infra delegation — WorkStation not found"
+  echo "  [OperationsCenter] Plane infra delegation — PlatformDeployment not found"
   echo ""
-  echo "  Expected WorkStation at: ${WORKSTATION_DIR}"
+  echo "  Expected PlatformDeployment at: ${WORKSTATION_DIR}"
   echo ""
-  echo "  Plane infrastructure is canonically owned by WorkStation."
-  echo "  Clone WorkStation alongside OperationsCenter:"
+  echo "  Plane infrastructure is canonically owned by PlatformDeployment."
+  echo "  Clone PlatformDeployment alongside OperationsCenter:"
   echo ""
-  echo "    git clone https://github.com/ProtocolWarden/WorkStation ${WORKSTATION_DIR}"
+  echo "    git clone https://github.com/ProtocolWarden/PlatformDeployment ${WORKSTATION_DIR}"
   echo ""
-  echo "  Or set OPERATIONS_CENTER_WORKSTATION_DIR to the WorkStation repo root:"
+  echo "  Or set OPERATIONS_CENTER_WORKSTATION_DIR to the PlatformDeployment repo root:"
   echo ""
-  echo "    export OPERATIONS_CENTER_WORKSTATION_DIR=/path/to/WorkStation"
+  echo "    export OPERATIONS_CENTER_WORKSTATION_DIR=/path/to/PlatformDeployment"
   echo ""
   exit 1
 fi
 
-echo "  [OperationsCenter] Delegating Plane infra to WorkStation canonical stack"
-echo "  WorkStation: ${WORKSTATION_DIR}"
+echo "  [OperationsCenter] Delegating Plane infra to PlatformDeployment canonical stack"
+echo "  PlatformDeployment: ${WORKSTATION_DIR}"
 echo ""
 exec bash "${WORKSTATION_DIR}/scripts/plane.sh" "$@"

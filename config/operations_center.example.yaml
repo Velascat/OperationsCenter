@@ -176,7 +176,7 @@ report_root: tools/report/kodo_plane
 #
 # platform_manifest:
 #   enabled: true
-#   project_slug: <managed-repo>              # for WorkStation LocalManifest discovery
+#   project_slug: <managed-repo>              # for PlatformDeployment LocalManifest discovery
 #   private_manifest_path: /home/dev/Documents/GitHub/PrivateManifest/manifests/<project-slug>/private_manifest.yaml
 #   project_manifest_path: /home/dev/Documents/GitHub/<managed-repo>/topology/project_manifest.yaml
 #   local_manifest_path:   /home/dev/Documents/GitHub/<managed-repo>/topology/local_manifest.yaml

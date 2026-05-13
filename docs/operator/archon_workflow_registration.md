@@ -19,15 +19,15 @@ through the four steps an operator runs once per Archon deployment.
 ## 0. Prerequisites
 
 - The Archon image is built and present locally (`docker images | grep archon`).
-- The WorkStation `compose/profiles/archon.yml` profile is wired (it is
-  by default — see `WorkStation/compose/profiles/archon.yml`).
+- The PlatformDeployment `compose/profiles/archon.yml` profile is wired (it is
+  by default — see `PlatformDeployment/compose/profiles/archon.yml`).
 - The OperationsCenter codebase you want Archon to act on is
   reachable as a git URL or already mounted into the container.
 
 ## 1. Bring up the Archon service
 
 ```bash
-cd ~/Documents/GitHub/WorkStation
+cd ~/Documents/GitHub/PlatformDeployment
 docker compose \
   -f compose/docker-compose.yml \
   -f compose/profiles/core.yml \

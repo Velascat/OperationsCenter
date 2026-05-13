@@ -119,7 +119,7 @@ class ResourceGateSettings(BaseModel):
 class ArchonSettings(BaseModel):
     """Settings for the Archon HTTP workflow backend.
 
-    Archon is deployed by WorkStation (``compose/profiles/archon.yml``)
+    Archon is deployed by PlatformDeployment (``compose/profiles/archon.yml``)
     at ``http://localhost:3000`` by default. ``workflow_names`` maps OC
     workflow_type values to actual Archon workflow names operators have
     shipped under ``.archon/workflows/``.

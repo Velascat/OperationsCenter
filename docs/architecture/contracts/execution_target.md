@@ -47,8 +47,8 @@ Forbidden in shared docs (informal notes are fine):
 |---|---|---|
 | Lane category vocabulary | `LaneType` enum | (kept as string in BoundExecutionTarget) |
 | Backend names | open `str` | `BackendName` enum |
-| Executor names | open `str` | `LaneName` enum (legacy name; carries executor identities) |
-| Runtime binding | `RuntimeBinding` (validated dataclass) | `RuntimeBindingSummary` compatibility alias to canonical `RuntimeBinding` |
+| Executor names | open `str` | `LaneName` enum (carries executor identities) |
+| Runtime binding | `RuntimeBinding` (validated dataclass) | canonical `RuntimeBinding` |
 | Provenance (fork/ref/patches) | **not present** | `BackendProvenance` |
 
 ## Lifecycle

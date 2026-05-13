@@ -55,7 +55,7 @@ def compute_contract_impact(
     """Return the impact summary for a contract change in ``target_name``.
 
     ``target_name`` is matched case-insensitively against canonical and
-    legacy names via the graph's existing resolver. Returns ``None`` if
+    projection labels via the graph's resolver. Returns ``None`` if
     no node matches (caller decides whether that's an error or a
     pass-through — typically pass-through for non-contract repos).
     """

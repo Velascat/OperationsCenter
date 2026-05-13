@@ -1,15 +1,15 @@
-# WorkStation compose profile smoke runbook
+# PlatformDeployment compose profile smoke runbook
 
-> Operator runbook. Closes the "WorkStation compose profile smoke per
+> Operator runbook. Closes the "PlatformDeployment compose profile smoke per
 > profile" Verification Gaps backlog item. Verification-only — surfaces
 > what works, names what doesn't, does not fix. Findings worth fixing
 > are filed back to backlog.
 >
-> Smoke run executed 2026-05-08 against current main of WorkStation +
+> Smoke run executed 2026-05-08 against current main of PlatformDeployment +
 > sibling repos. Repeat with the same commands against new images to
 > re-verify.
 
-WorkStation ships four compose profiles. This runbook brings each up,
+PlatformDeployment ships four compose profiles. This runbook brings each up,
 probes its health, lists expected containers + ports, and documents
 known caveats. It does **not** validate deep features — that's each
 service's own concern.
@@ -17,7 +17,7 @@ service's own concern.
 ## Prerequisites
 
 - Sibling repos cloned at expected paths under `~/Documents/GitHub/`:
-  `WorkStation`, `SwitchBoard`, `Archon`. (Compose contexts resolve
+  `PlatformDeployment`, `SwitchBoard`, `Archon`. (Compose contexts resolve
   relative to these locations.)
 - Service images built or pullable. SwitchBoard + Archon images build
   from source; rebuild when source changes.
@@ -29,7 +29,7 @@ service's own concern.
 Minimal baseline. SwitchBoard runs alone.
 
 ```bash
-cd ~/Documents/GitHub/WorkStation
+cd ~/Documents/GitHub/PlatformDeployment
 docker compose \
   -f compose/docker-compose.yml \
   -f compose/profiles/core.yml \
@@ -125,7 +125,7 @@ docker compose \
   up -d
 ```
 
-**Smoke status: ✅ clean (post WorkStation #16)**
+**Smoke status: ✅ clean (post PlatformDeployment #16)**
 
 | Container | Healthy? | Port | Health endpoint |
 |-----------|----------|------|-----------------|
@@ -145,11 +145,11 @@ curl -fsS http://localhost:3000/api/health | jq .database
 #### Historical note
 
 Earlier versions of this profile mounted from
-`../../config/observability/` — a sibling-of-WorkStation path
+`../../config/observability/` — a sibling-of-PlatformDeployment path
 that no clean clone has authored. Docker auto-created the missing
 host files as root-owned directories on first start, which then
 permanently broke subsequent starts with `failed to mount: not a
-directory`. WorkStation #16 shipped a skeleton inside the repo at
+directory`. PlatformDeployment #16 shipped a skeleton inside the repo at
 `config/observability/` and updated the compose mount paths, so a
 fresh clone now boots the observability profile without manual
 setup.
@@ -173,7 +173,7 @@ together, **port 3000 collides** — both Grafana and Archon default to
 
 ```bash
 # Stop services in any active profile (the override list is forgiving):
-cd ~/Documents/GitHub/WorkStation
+cd ~/Documents/GitHub/PlatformDeployment
 docker compose \
   -f compose/docker-compose.yml \
   -f compose/profiles/core.yml \
@@ -197,4 +197,4 @@ fast. `down` removes containers but keeps named volumes
 | `core` | None — clean. |
 | `archon` | None — clean. The codebase-registration step lives in its own playbook. |
 | `dev` | None — clean. The commented-out `mitmproxy` block could be removed or wired in; not urgent. |
-| `observability` | Now clean (was broken on first-run prior to WorkStation #16). The compose previously mounted from a sibling-of-WorkStation path that no clean clone authored, which Docker silently turned into root-owned empty directories. WorkStation #16 ships an in-repo skeleton at `config/observability/` and updates the mount paths; a fresh clone now boots without manual setup. |
+| `observability` | Now clean (was broken on first-run prior to PlatformDeployment #16). The compose previously mounted from a sibling-of-PlatformDeployment path that no clean clone authored, which Docker silently turned into root-owned empty directories. PlatformDeployment #16 ships an in-repo skeleton at `config/observability/` and updates the mount paths; a fresh clone now boots without manual setup. |

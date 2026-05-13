@@ -3,7 +3,7 @@
 """ArchonHttpWorkflowDispatcher — Phase-A invoker for the real Archon API.
 
 Implements the design in
-``WorkStation/docs/architecture/adapters/archon-real-workflow-integration.md``.
+``PlatformDeployment/docs/architecture/adapters/archon-real-workflow-integration.md``.
 
 Flow:
     health probe

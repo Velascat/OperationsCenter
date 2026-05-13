@@ -65,7 +65,7 @@ operations-center-propagation-links = "operations_center.entrypoints.propagation
 # Use the `platform-manifest` CLI directly (provided by that package).
 # ER-002 — Run Memory primitive.
 operations-center-run-memory        = "operations_center.run_memory.cli:app"
-# Archon health probe (see WorkStation compose/profiles/archon.yml).
+# Archon health probe (see PlatformDeployment compose/profiles/archon.yml).
 # Workflow dispatch is not yet wired — see backlog.
 operations-center-archon-probe      = "operations_center.entrypoints.archon_probe.main:main"
 # Single-command provenance reader — prints OC↔RxP↔SwitchBoard chain
