@@ -3,6 +3,19 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-15 — Add operations-center-board-unblock autonomous unblocking CLI
+
+Added `src/operations_center/entrypoints/maintenance/board_unblock.py` and registered
+`operations-center-board-unblock` in pyproject.toml.
+
+Motivation: the watchdog loop was deferring dead-remediation cancellations, task-kind:investigate
+R4AI starvation, and improve-task unblocking to the operator, causing the board to freeze
+indefinitely. This CLI applies three rules autonomously (dry-run by default, --apply to act):
+
+  Rule 1 DEAD_REMEDIATION_CANCEL — cancel tasks labelled dead-remediation or with ≥3 SIGKILL retries.
+  Rule 2 INVESTIGATE_DEPRIORITISE — move task-kind:investigate out of Ready for AI → Backlog.
+  Rule 3 IMPROVE_UNBLOCK — move improve tasks from Blocked → Backlog when blocker resolved or stale.
+
 ## 2026-05-13 — fix: reset-training-branches.sh local branch update
 
 - Added `git branch -f` after each remote push so local training branch refs advance
