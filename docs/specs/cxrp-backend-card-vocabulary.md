@@ -10,7 +10,7 @@ repos:
 area_keywords:
   - vocabulary
   - contracts
-status: active
+status: cancelled
 created_at: 2026-05-08T19:05:42.731001+00:00
 ---
 

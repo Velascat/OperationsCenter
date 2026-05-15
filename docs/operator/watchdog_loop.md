@@ -227,6 +227,18 @@ This scan now includes queue self-healing when tasks carry structured evidence l
 It may transition Blocked→Ready-for-AI or Blocked→Backlog only when retry budgets
 and safety evidence allow it; otherwise it comments an escalation.
 
+STEP 2.5 — AUTONOMOUS BOARD UNBLOCKING:
+  .venv/bin/operations-center-board-unblock --config config/operations_center.local.yaml --apply
+This step runs after triage and autonomously resolves known stuck patterns without operator intervention:
+  Rule 1 DEAD_REMEDIATION_CANCEL — cancel tasks labelled dead-remediation OR with ≥3 SIGKILL retries
+    that are not already in a terminal state (Cancelled/Done).
+  Rule 2 INVESTIGATE_DEPRIORITISE — move task-kind:investigate tasks out of Ready for AI → Backlog.
+    No board_worker consumer exists for this task-kind; they stall the R4AI slot indefinitely.
+  Rule 3 IMPROVE_UNBLOCK — move improve tasks from Blocked → Backlog when:
+    (a) their blocking dependency (blocked-by: label) is now Cancelled/Done, OR
+    (b) they have been Blocked for >4h with no executor progress (stale).
+Log all actions taken (applied or would_apply) in the cycle summary.
+
 STEP 3 — BLOCKED/STALLED WORK INVESTIGATION:
 Read the last 3 cycle summaries from .console/log.md to identify repeated patterns.
 
@@ -684,6 +696,7 @@ Append one block per completed cycle to `.console/log.md`:
 | Preflight | curl, git status, grep | Confirm all services + config up front |
 | Investigate | 6 audit CLIs in parallel | Collect findings; classify affected repos |
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI; queue self-healing if evidence allows |
+| **Board unblock** | `board-unblock --apply` | Cancel dead-remediation tasks; deprioritise investigate tasks out of R4AI; move stale improve tasks to Backlog |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
 | Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
 | Phase estimate | Structured telemetry + recovery actions | Estimate self-healing phase 1–7; identify ownership migration candidates |

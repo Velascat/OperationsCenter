@@ -657,6 +657,8 @@ doc_conventions:
     - docs/operator/watchdog_loop.md
     - docs/specs/cxrp-backend-card-vocabulary.md
     - docs/specs/decision-rules-test-coverage.md
+    - docs/specs/operational-health-test-coverage.md
+    - docs/specs/recovery-subsystem-test-coverage.md
 
 architecture:
   layers:

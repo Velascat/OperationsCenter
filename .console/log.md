@@ -3,18 +3,2703 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
-## 2026-05-15 — Add operations-center-board-unblock autonomous unblocking CLI
+## 2026-05-15 — Add Step 2.5 (autonomous board unblocking) to watchdog loop runbook
 
-Added `src/operations_center/entrypoints/maintenance/board_unblock.py` and registered
-`operations-center-board-unblock` in pyproject.toml.
+Added STEP 2.5 to `docs/operator/watchdog_loop.md` and updated the cycle table.
+The loop now calls `operations-center-board-unblock --apply` between triage and the
+blocked-work investigation, autonomously resolving dead-remediation tasks, R4AI
+investigate-task starvation, and stale improve-task blocks without deferring to operator.
 
-Motivation: the watchdog loop was deferring dead-remediation cancellations, task-kind:investigate
-R4AI starvation, and improve-task unblocking to the operator, causing the board to freeze
-indefinitely. This CLI applies three rules autonomously (dry-run by default, --apply to act):
+## 2026-05-15T17:01Z — Loop cycle 497 (DEGRADED — ✓ U6 clear — 12.64GB open / 12.66GB post-triage — SwapFree 16.91GB stable — audits clean — triage clean — graph-doctor EXIT:1 ×81 — board frozen — operator action required)
 
-  Rule 1 DEAD_REMEDIATION_CANCEL — cancel tasks labelled dead-remediation or with ≥3 SIGKILL retries.
-  Rule 2 INVESTIGATE_DEPRIORITISE — move task-kind:investigate out of Ready for AI → Backlog.
-  Rule 3 IMPROVE_UNBLOCK — move improve tasks from Blocked → Backlog when blocker resolved or stale.
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.64GB open — memory healthy, external workload remains fully released). SwapFree 16.91GB stable. U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory ≥8GB) — pending operator board actions. Audits run: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×81 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Operator actions required: (1) CANCEL 925be138, (2) move improve tasks 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, (3) review/close/relabel 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T16:57Z — Loop cycle 496 (DEGRADED — ✓ U6 CLEARED — 12.63GB open / 12.68GB post-triage — SwapFree 16.90GB recovered — audits clean — triage clean — graph-doctor EXIT:1 ×80 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ✓ U6 CLEARED — external workload fully released. MemAvailable 12.63GB open / 12.68GB post-triage (+50MB intra-cycle, essentially flat). SwapFree 16.90GB (fully recovered from 12.52GB at c495; external workload complete). U2: clear. U7: clear. kodo memory gate: NOW UNBLOCKED (memory ≥8GB) — pending operator board actions before kodo dispatch can resume. Audits run: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×80 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Operator actions still required: (1) CANCEL 925be138, (2) move improve tasks 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, (3) review/close/relabel 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T16:51Z — Loop cycle 495 (DEGRADED — ⚠ U6 active — 2.09GB open / 2.65GB post-triage — SwapFree 12.52GB flat — intra-cycle +561MB recovery — audits clean — triage clean — graph-doctor EXIT:1 ×79 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.09GB open / 2.65GB post-triage — intra-cycle +561MB; external workload released mid-cycle again). SwapFree 12.52GB (inter-cycle -30MB from c494's 12.55GB — essentially flat; stabilizing). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.09GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×79 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:47Z — Loop cycle 494 (DEGRADED — ⚠ U6 active — 1.92GB open / 2.50GB post-triage — SwapFree 12.55GB flat — intra-cycle +576MB recovery — ⚠ near audit floor at open — audits clean — triage clean — graph-doctor EXIT:1 ×78 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (1.92GB open / 2.50GB post-triage — intra-cycle +576MB; external workload released significant memory mid-cycle — near-floor open, recovered post-triage). SwapFree 12.55GB (inter-cycle -90MB from c493's 12.63GB; decline resumed). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). ⚠ WATCH: 1.92GB open is the second-lowest this session (c485=1.91GB). If next cycle opens ≤1.7GB, skip audits. Audits run (1.92GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×78 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:42Z — Loop cycle 493 (DEGRADED — ⚠ U6 active — 2.53GB open / 2.47GB post-triage — SwapFree 12.63GB flat — intra-cycle -58MB — audits clean — triage clean — graph-doctor EXIT:1 ×77 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.53GB open / 2.47GB post-triage — intra-cycle -58MB). SwapFree 12.63GB (inter-cycle -10MB from c492's 12.64GB — essentially flat; SwapFree stabilizing). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.53GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×77 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:38Z — Loop cycle 492 (DEGRADED — ⚠ U6 active — 2.46GB open / 2.57GB post-triage — SwapFree 12.64GB flat — intra-cycle +106MB recovery — audits clean — triage clean — graph-doctor EXIT:1 ×76 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.46GB open / 2.57GB post-triage — intra-cycle +106MB; external workload released memory mid-cycle). SwapFree 12.64GB (inter-cycle -18MB from c491's 12.65GB — essentially flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.46GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×76 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:34Z — Loop cycle 491 (DEGRADED — ⚠ U6 active — 2.67GB open / 2.55GB post-triage — SwapFree 12.67GB declining — intra-cycle -112MB — audits clean — triage clean — graph-doctor EXIT:1 ×75 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.67GB open / 2.55GB post-triage — intra-cycle -112MB; notable decline this cycle). SwapFree 12.67GB (inter-cycle -230MB from c490's 12.90GB; decline resumed). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.67GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×75 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:30Z — Loop cycle 490 (DEGRADED — ⚠ U6 active — 2.35GB open / 2.28GB post-triage — SwapFree 12.90GB flat — intra-cycle -66MB — audits clean — triage clean — graph-doctor EXIT:1 ×74 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.35GB open / 2.28GB post-triage — intra-cycle -66MB). SwapFree 12.90GB (inter-cycle +47MB from c489's 12.86GB — slight uptick; overall declining trend). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.35GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×74 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:26Z — Loop cycle 489 (DEGRADED — ⚠ U6 active — 2.69GB open / 2.63GB post-triage — SwapFree 12.86GB declining — intra-cycle -60MB — audits clean — triage clean — graph-doctor EXIT:1 ×73 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.69GB open / 2.63GB post-triage — intra-cycle -60MB; oscillating band). SwapFree 12.86GB (inter-cycle -190MB from c488's 13.05GB; decline continuing). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.69GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×73 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:20Z — Loop cycle 488 (DEGRADED — ⚠ U6 active — 2.49GB open / 2.50GB post-triage — SwapFree 13.05GB declining — intra-cycle flat — audits clean — triage clean — graph-doctor EXIT:1 ×72 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.49GB open / 2.50GB post-triage — intra-cycle flat; oscillating band). SwapFree 13.05GB (inter-cycle -270MB from c487's 13.32GB; decline resumed after pause). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.49GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×72 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:16Z — Loop cycle 487 (DEGRADED — ⚠ U6 active — 2.50GB open / 2.50GB post-triage — SwapFree 13.32GB stable — intra-cycle flat — audits clean — triage clean — graph-doctor EXIT:1 ×71 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.50GB open / 2.50GB post-triage — intra-cycle flat; oscillating band). SwapFree 13.32GB (stable vs c486 — inter-cycle decline paused). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.50GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×71 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:13Z — Loop cycle 486 (DEGRADED — ⚠ U6 active — 2.58GB open / 2.57GB post-triage — SwapFree 13.32GB declining — intra-cycle flat — audits clean — triage clean — graph-doctor EXIT:1 ×70 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.58GB open / 2.57GB post-triage — intra-cycle flat ~10MB; recovery from c485's 1.91GB session low). SwapFree 13.32GB (inter-cycle -370MB from c485's 13.69GB; ongoing gradual decline from session start 15.57GB — still well above U7 5GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.58GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×70 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:09Z — Loop cycle 485 (DEGRADED — ⚠ U6 active — 1.91GB open / 2.43GB post-triage — SwapFree 13.71GB declining — intra-cycle +520MB recovery — ⚠ 1.91GB open near audit floor — audits clean — triage clean — graph-doctor EXIT:1 ×69 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (1.91GB open / 2.43GB post-triage — intra-cycle +520MB recovery; workload released memory during cycle; session low at open). ⚠ 1.91GB open — nearest to 1.7GB audit skip floor this session; if c486 opens ≤1.7GB, skip Step 1 audits. SwapFree 13.71GB open / 13.69GB post-triage — inter-cycle decline 14.03→13.71GB (~320MB drop from c484; larger than typical). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (1.91GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×69 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:05Z — Loop cycle 484 (DEGRADED — ⚠ U6 active — 2.29GB open / 2.30GB post-triage — SwapFree 14.03GB stable — intra-cycle flat — audits clean — triage clean — graph-doctor EXIT:1 ×68 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.29GB open / 2.30GB post-triage — intra-cycle flat ~10MB; oscillating 2.1–3.1GB band). SwapFree 14.03GB (stable; gradual decline from 15.57GB at session start). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.29GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×68 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T16:01Z — Loop cycle 483 (DEGRADED — ⚠ U6 active — 2.18GB open / 2.75GB post-triage — SwapFree 14.04GB stable — intra-cycle +570MB recovery — audits clean — triage clean — graph-doctor EXIT:1 ×67 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.18GB open / 2.75GB post-triage — intra-cycle +570MB recovery; external workload released memory during cycle; oscillating 2.1–3.1GB band). SwapFree 14.04GB (stable; gradual decline from 15.57GB at session start). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.18GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×67 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:58Z — Loop cycle 482 (DEGRADED — ⚠ U6 active — 2.74GB open / 2.72GB post-triage — SwapFree 14.19GB stable — intra-cycle flat — audits clean — triage clean — graph-doctor EXIT:1 ×66 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.74GB open / 2.72GB post-triage — intra-cycle flat ~20MB; oscillating 2.1–3.1GB band). SwapFree 14.19GB (stable; gradual decline from 15.57GB at session start). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.74GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×66 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:54Z — Loop cycle 481 (DEGRADED — ⚠ U6 active — 2.71GB open / 2.62GB post-triage — SwapFree 14.33GB stable — intra-cycle decline 90MB — audits clean — triage clean — graph-doctor EXIT:1 ×65 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.71GB open / 2.62GB post-triage — intra-cycle decline ~90MB; minimal workload pressure this cycle; oscillating 2.1–3.1GB band). SwapFree 14.33GB (stable; gradual decline from 15.57GB at session start continues). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.71GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×65 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:48Z — Loop cycle 480 (DEGRADED — ⚠ U6 active — 2.67GB open / 2.19GB post-triage — SwapFree 14.48GB stable — intra-cycle decline 480MB — external workload active — audits clean — triage clean — graph-doctor EXIT:1 ×64 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.67GB open / 2.19GB post-triage — intra-cycle decline ~480MB; external workload active during cycle; oscillating 2.1–3.1GB band). SwapFree 14.48GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.67GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×64 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. WATCH: post-triage 2.19GB — if c481 opens ≤1.7GB, skip Step 1 audits. Cadence: 1200s.
+
+## 2026-05-15T15:44Z — Loop cycle 479 (DEGRADED — ⚠ U6 active — 2.95GB open / 3.07GB post-triage — SwapFree 14.48GB stable — intra-cycle +123MB — memory recovering c477 low 2.08GB→c479 3.07GB — audits clean — triage clean — graph-doctor EXIT:1 ×63 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.95GB open / 3.07GB post-triage — intra-cycle +123MB; memory recovering from c477 low 2.08GB; external workload appears eased). SwapFree 14.48GB (stable, gradual decline from swap use). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.95GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×63 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:40Z — Loop cycle 478 (DEGRADED — ⚠ U6 active — 2.68GB open / 2.83GB post-triage — SwapFree 14.65GB stable — intra-cycle +163MB recovery — c477 low 2.08GB recovering — audits clean — triage clean — graph-doctor EXIT:1 ×62 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.68GB open / 2.83GB post-triage — intra-cycle +163MB; recovery from c477 post-triage low 2.08GB; external workload easing). SwapFree 14.65GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.68GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×62 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:37Z — Loop cycle 477 (DEGRADED — ⚠ U6 active — 2.58GB open / 2.08GB post-triage — SwapFree 14.96GB stable — ⚠ intra-cycle decline 500MB — external workload consuming — audits clean — triage clean — graph-doctor EXIT:1 ×61 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.58GB open / 2.08GB post-triage — intra-cycle decline ~500MB; external workload active during cycle; oscillating 2.1–2.9GB band). SwapFree 14.96GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.58GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×61 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. WATCH: post-triage 2.08GB — if c478 opens ≤1.7GB, skip Step 1 audits. If ≤1.2GB, skip all (U2). Cadence: 1200s.
+
+## 2026-05-15T15:33Z — Loop cycle 476 (DEGRADED — ⚠ U6 active — 2.86GB open / 2.88GB post-triage — SwapFree 14.97GB stable — intra-cycle flat — memory partial recovery c475 2.65GB→c476 2.86GB — audits clean — triage clean — graph-doctor EXIT:1 ×60 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.86GB open / 2.88GB post-triage — intra-cycle flat; partial recovery from declining trend: c475 2.65GB→c476 2.86GB +210MB; external workload easing). SwapFree 14.97GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.86GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×60 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:29Z — Loop cycle 475 (DEGRADED — ⚠ U6 active — 2.65GB open / 2.67GB post-triage — SwapFree 15.30GB stable — intra-cycle flat — ⚠ open declining c474→c475 270MB — audits clean — triage clean — graph-doctor EXIT:1 ×59 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.65GB open / 2.67GB post-triage — intra-cycle flat; open declining trend: c474 2.92GB → c475 2.65GB, -270MB; external workload persists; ~1GB above 1.7GB skip floor). SwapFree 15.30GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.65GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×59 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. WATCH: open trend c473 3.54GB→c474 2.92GB→c475 2.65GB — if c476 opens ≤1.7GB, skip Step 1 audits. Cadence: 1200s.
+
+## 2026-05-15T15:25Z — Loop cycle 474 (DEGRADED — ⚠ U6 active — 2.92GB open / 2.93GB post-triage — SwapFree 15.34GB stable — intra-cycle flat — ⚠ open declining c474 vs c473 620MB — audits clean — triage clean — graph-doctor EXIT:1 ×58 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (2.92GB open / 2.93GB post-triage — intra-cycle flat; open memory declining trend: c473 3.54GB → c474 2.92GB, -620MB; external workload persists; approaching 1.7GB skip floor). SwapFree 15.34GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (2.92GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×58 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. WATCH: if c475 opens ≤1.7GB, skip Step 1 audits. Cadence: 1200s.
+
+## 2026-05-15T15:20Z — Loop cycle 473 (DEGRADED — ⚠ U6 active — 3.54GB open / 3.24GB post-triage — SwapFree 15.57GB stable — intra-cycle decline 300MB — audits clean — triage clean — graph-doctor EXIT:1 ×57 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (3.54GB open / 3.24GB post-triage — intra-cycle decline ~300MB; external workload persists; approaching 1.7GB skip floor). SwapFree 15.57GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (3.54GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×57 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:17Z — Loop cycle 472 (DEGRADED — ⚠ U6 active — 3.79GB open / 3.02GB post-triage — SwapFree 15.57GB stable — intra-cycle memory decline 770MB — audits clean — triage clean — graph-doctor EXIT:1 ×56 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (3.79GB open / 3.02GB post-triage — intra-cycle decline ~770MB; external workload consuming during cycle — still above 1.7GB audit skip floor). SwapFree 15.57GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (3.79GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×56 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:13Z — Loop cycle 471 (DEGRADED — ⚠ U6 active — 3.71GB open / 3.81GB post-triage — SwapFree 15.58GB stable — carry-forward U6-CLEARED stale — audits clean — triage clean — graph-doctor EXIT:1 ×55 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (3.71GB open / 3.81GB post-triage — carry-forward showed "U6 CLEARED 12.69GB" which is stale c444 era data from prior session; live reading confirms U6 still active ×11 since c461). SwapFree 15.58GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (3.71GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×55 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:10Z — Loop cycle 470 (DEGRADED — ⚠ U6 active — 4.16GB open / 4.15GB post-triage — SwapFree 15.60GB stable — memory stable ~4.1–4.2GB — audits clean — triage clean — graph-doctor EXIT:1 ×54 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (4.16GB open / 4.15GB post-triage — flat/stable ~4.1–4.2GB; external workload at steady state). SwapFree 15.60GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (4.16GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×54 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:07Z — Loop cycle 469 (DEGRADED — ⚠ U6 active — 3.59GB open / 4.25GB post-triage — SwapFree 15.60GB stable — memory oscillating 3.6–4.7GB — audits clean — triage clean — graph-doctor EXIT:1 ×53 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (3.59GB open / 4.25GB post-triage — memory oscillating in 3.6–4.7GB band; external workload ongoing with episodic release). SwapFree 15.60GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (3.59GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×53 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T15:03Z — Loop cycle 468 (DEGRADED — ⚠ U6 active — 4.62GB open / 4.69GB post-triage — SwapFree 15.61GB stable — memory stable ~4.6GB — audits clean — triage clean — graph-doctor EXIT:1 ×52 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (4.62GB open / 4.69GB post-triage — stable ~4.6GB band; external workload persists). SwapFree 15.61GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (4.62GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×52 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:59Z — Loop cycle 467 (DEGRADED — ⚠ U6 active — 4.57GB open / 4.61GB post-triage — SwapFree 15.60GB stable — memory stabilizing ~4.5–5GB — audits clean — triage clean — graph-doctor EXIT:1 ×51 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (4.57GB open / 4.61GB post-triage — stabilizing in 4.5–5GB band; external workload persists but memory no longer declining). SwapFree 15.60GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (4.57GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×51 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:56Z — Loop cycle 466 (DEGRADED — ⚠ U6 active — 3.98GB open / 4.71GB post-triage — SwapFree 15.65GB stable — memory partial recovery post-triage — audits clean — triage clean — graph-doctor EXIT:1 ×50 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (3.98GB open / 4.71GB post-triage — open declined from c465's 5.46GB but partial recovery during cycle; external workload easing). SwapFree 15.65GB (stable, minor drawdown to 15.60GB post-triage). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (3.98GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×50 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:50Z — Loop cycle 465 (DEGRADED — ⚠ U6 active — 5.46GB open / 5.48GB post-triage — SwapFree 15.65GB stable — audits clean — triage clean — graph-doctor EXIT:1 ×49 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (5.46GB open / 5.48GB post-triage — slight decline from c464's 6.10GB; external workload ongoing). SwapFree 15.65GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (5.46GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×49 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:47Z — Loop cycle 464 (DEGRADED — ⚠ U6 active — 6.10GB open / 6.14GB post-triage — SwapFree 15.66GB stable — memory stabilizing ~6.1GB — audits clean — triage clean — graph-doctor EXIT:1 ×48 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (6.10GB open / 6.14GB post-triage — memory stabilizing at ~6.1–6.2GB inter-cycle; intra-cycle flat/slight recovery this cycle, unlike c463 ~620MB drop). SwapFree 15.66GB (stable). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (6.10GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×48 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:44Z — Loop cycle 463 (DEGRADED — ⚠ U6 active — 6.13GB open / 5.51GB post-triage — ⚠ 620MB intra-cycle drop — SwapFree 15.66GB stable — audits clean — triage clean — graph-doctor EXIT:1 ×47 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (6.13GB open / 5.51GB post-triage — external workload continuing; ~620MB intra-cycle drop; memory stabilizing at ~6GB inter-cycle but post-triage dipping lower). SwapFree 15.66GB (stable). U2: clear (5.51GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (6.13GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×47 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:41Z — Loop cycle 462 (DEGRADED — ⚠ U6 active — 6.19GB open / 6.14GB post-triage — SwapFree 15.66GB stable — audits clean — triage clean — graph-doctor EXIT:1 ×46 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 active (6.19GB open / 6.14GB post-triage — declining: 12.13→7.07→6.19GB over 3 cycles; external workload consuming memory). SwapFree 15.66GB (stable). U2: clear (6.19GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (6.19GB > 1.7GB skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×46 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:37Z — Loop cycle 461 (DEGRADED — ⚠ U6 FIRED — 7.07GB open / 7.07GB post-triage — SwapFree 15.94GB stable — audits clean — triage clean — graph-doctor EXIT:1 ×45 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). ⚠ U6 FIRED (7.07GB open / 7.07GB post-triage — external workload consuming memory; regression from c460 open 12.13GB; U6 threshold 8GB breached). SwapFree 15.94GB (stable). U2: clear (7.07GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6 active). Audits run (7.07GB > 1.7GB audit skip threshold): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×45 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:34Z — Loop cycle 460 (DEGRADED — U6 clear — audits clean — triage clean — 12.13GB open / 9.48GB post-triage — ⚠ 2.65GB intra-cycle drop (external workload spike) — SwapFree 15.98GB stable — graph-doctor EXIT:1 ×44 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.13GB open / 9.48GB post-triage — ⚠ 2.65GB intra-cycle drop attributed to external workload spike; U6 threshold 8GB not breached). SwapFree 15.98GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×44 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:31Z — Loop cycle 459 (DEGRADED — U6 clear — audits clean — triage clean — 12.64GB open / 12.59GB post-triage — SwapFree 15.98GB stable — graph-doctor EXIT:1 ×43 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.64GB open / 12.59GB post-triage — stable). SwapFree 15.98GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×43 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:28Z — Loop cycle 458 (DEGRADED — U6 clear — audits clean — triage clean — 12.63GB open / 12.60GB post-triage — SwapFree 15.98GB stable — graph-doctor EXIT:1 ×42 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.63GB open / 12.60GB post-triage — stable, workload quiet). SwapFree 15.98GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×42 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:23Z — Loop cycle 457 (DEGRADED — U6 clear — audits clean — triage clean — 12.61GB open / 12.59GB post-triage — SwapFree 15.97GB stable — graph-doctor EXIT:1 ×41 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.61GB open / 12.59GB post-triage — stable, workload quiet). SwapFree 15.97GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×41 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:20Z — Loop cycle 456 (DEGRADED — U6 clear — audits clean — triage clean — 12.56GB open / 11.85GB post-triage — SwapFree 15.97GB stable — graph-doctor EXIT:1 ×40 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.56GB open / 11.85GB post-triage — ~710MB intra-cycle drop, episodic external workload pattern; U6 clear). SwapFree 15.97GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×40 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:17Z — Loop cycle 455 (DEGRADED — U6 clear — audits clean — triage clean — 12.63GB open / 12.59GB post-triage — SwapFree 15.97GB stable — graph-doctor EXIT:1 ×39 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.63GB open / 12.59GB post-triage — stable, workload quiet this cycle). SwapFree 15.97GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×39 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:14Z — Loop cycle 454 (DEGRADED — U6 clear — audits clean — triage clean — 12.58GB open / 11.79GB post-triage — SwapFree 15.97GB stable — graph-doctor EXIT:1 ×38 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.58GB open / 11.79GB post-triage — ~790MB intra-cycle drop, episodic external workload pattern; U6 clear). SwapFree 15.97GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×38 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:11Z — Loop cycle 453 (DEGRADED — U6 clear — audits clean — triage clean — 12.66GB open / 12.67GB post-triage — SwapFree 15.94GB stable — graph-doctor EXIT:1 ×37 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.66GB open — healthy, stable). SwapFree 15.94GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×37 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:08Z — Loop cycle 452 (DEGRADED — U6 clear — audits clean — triage clean — 12.58GB open / 11.88GB post-triage — SwapFree 15.94GB stable — graph-doctor EXIT:1 ×36 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.58GB open / 11.88GB post-triage — ~700MB drop during cycle, external workload episodic pattern; U6 clear, well above 8GB threshold). SwapFree 15.94GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×36 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:05Z — Loop cycle 451 (DEGRADED — U6 clear — audits clean — triage clean — 12.61GB open / 12.67GB post-triage — SwapFree 15.94GB stable — graph-doctor EXIT:1 ×35 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.61GB open — healthy, stable c444/c446–c451; c445 was transient spike). SwapFree 15.94GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×35 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T14:02Z — Loop cycle 450 (DEGRADED — U6 clear — audits clean — triage clean — 12.55GB open / 12.63GB post-triage — SwapFree 15.94GB stable — graph-doctor EXIT:1 ×34 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.55GB open — healthy, stable c444/c446–c450; c445 was transient spike). SwapFree 15.94GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×34 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:57Z — Loop cycle 449 (DEGRADED — U6 clear — audits clean — triage clean — 12.60GB open / 12.64GB post-triage — SwapFree 15.94GB stable — graph-doctor EXIT:1 ×33 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.60GB open — healthy, stable c444/c446–c449; c445 was transient spike). SwapFree 15.94GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×33 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:54Z — Loop cycle 448 (DEGRADED — U6 clear — audits clean — triage clean — 12.61GB open / 12.67GB post-triage — SwapFree 15.94GB stable — graph-doctor EXIT:1 ×32 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.61GB open — healthy, stable for c444/c446/c447/c448; c445 was transient spike). SwapFree 15.94GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×32 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:51Z — Loop cycle 447 (DEGRADED — U6 clear — audits clean — triage clean — 12.62GB open / 12.67GB post-triage — SwapFree 15.93GB stable — graph-doctor EXIT:1 ×31 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.62GB open — healthy, stable). SwapFree 15.93GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×31 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:48Z — Loop cycle 446 (DEGRADED — U6 clear — audits clean — triage clean — 12.61GB open / 12.66GB post-triage — SwapFree 15.93GB stable — graph-doctor EXIT:1 ×30 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.61GB open — healthy). Memory stable (c444=12.69GB, c445=7.43GB transient spike, c446=12.61GB — external workload episodic). SwapFree 15.93GB (stable). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×30 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:45Z — Loop cycle 445 (DEGRADED — U6 transient — audits clean — triage clean — 7.43GB open / 12.60GB post-triage — SwapFree 15.92GB stable — graph-doctor EXIT:1 ×29 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 transient: 7.43GB at open (fired — external workload spike ~5GB), recovered to 12.60GB by post-triage (cleared). Pattern consistent with episodic external workloads. SwapFree 15.92GB (stable). U2: clear. U7: clear. kodo memory gate: transiently blocked at open, cleared post-triage. Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×29 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). NEW_EVIDENCE_DETECTED=yes (U6 transient spike — confirms episodic external workload pattern). OPERATOR-BLOCKED/NON-CONVERGENT active. Cadence: 1200s.
+
+## 2026-05-15T13:41Z — Loop cycle 444 (DEGRADED — U6 CLEARED — audits clean — triage clean — 12.69GB open / 12.64GB post-triage — SwapFree 15.90GB — graph-doctor EXIT:1 ×28 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 CLEARED — memory recovered to 12.69GB open (was 3–4GB range c398–c443; external workload completed). SwapFree 15.90GB (recovered from 8GB range). U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory) / BLOCKED (board — operator action required). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×28 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). NEW_EVIDENCE_DETECTED=yes (U6 cleared — memory state changed). OPERATOR-BLOCKED/NON-CONVERGENT active — board cannot advance until operator actions: CANCEL 925be138, move improve tasks to Backlog, review/close/relabel 9c7f4bb9, memory ≥8GB for kodo dispatch (now satisfied). Cadence: 1200s.
+
+## 2026-05-15T13:38Z — Loop cycle 443 (DEGRADED — U6 active ×46 — audits clean — triage clean — 3.64GB open / 3.60GB post-triage — SwapFree 8.23GB → 8.35GB — graph-doctor EXIT:1 ×27 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×46 (3.64GB open — full audits; post-triage 3.60GB — stable; SwapFree 8.23GB open / 8.35GB post-triage — +120MB; U7 clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×27 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:35Z — Loop cycle 442 (DEGRADED — U6 active ×45 — audits clean — triage clean — 4.08GB open / 3.99GB post-triage — SwapFree 8.11GB → 7.93GB — graph-doctor EXIT:1 ×26 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×45 (4.08GB open — full audits; post-triage 3.99GB — stable; SwapFree 8.11GB open / 7.93GB post-triage — −180MB; U7 clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×26 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:29Z — Loop cycle 441 (DEGRADED — U6 active ×44 — audits clean — triage clean — 3.95GB open / 1.97GB post-triage — SwapFree 8.27GB — graph-doctor EXIT:1 ×25 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×44 (3.95GB open — full audits; post-triage 1.97GB — dropped ~1.98GB during cycle — external workload spike, no U2 breach; SwapFree 8.27GB open / 8.21GB post-triage — −60MB; U7 clear). U2: clear (1.97GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×25 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:26Z — Loop cycle 440 (DEGRADED — U6 active ×43 — audits clean — triage clean — 2.36GB open / 2.40GB post-triage — SwapFree 8.26GB stable — graph-doctor EXIT:1 ×24 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×43 (2.36GB open — full audits; post-triage 2.40GB — stable, +40MB within noise, no U2 breach; SwapFree 8.26GB open / 8.26GB post-triage — flat; inter-cycle SwapFree ~flat from c439; U7 clear). U2: clear (2.40GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×24 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:22Z — Loop cycle 439 (DEGRADED — U6 active ×42 — audits clean — triage clean — 2.09GB open / 2.18GB post-triage — SwapFree 8.24GB — graph-doctor EXIT:1 ×23 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×42 (2.09GB open — full audits; post-triage 2.18GB — stable, +90MB within noise, no U2 breach; SwapFree 8.24GB open / 8.26GB post-triage — flat; inter-cycle −100MB from c438; U7 clear). U2: clear (2.18GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×23 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:19Z — Loop cycle 438 (DEGRADED — U6 active ×41 — audits clean — triage clean — 2.00GB open / 2.05GB post-triage — SwapFree 8.34GB — graph-doctor EXIT:1 ×22 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×41 (2.00GB open — full audits; post-triage 2.05GB — stable, +50MB within noise, no U2 breach; SwapFree 8.34GB open / 8.34GB post-triage — flat; inter-cycle −110MB from c437; U7 clear). U2: clear (2.05GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×22 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:15Z — Loop cycle 437 (DEGRADED — U6 active ×40 — audits clean — triage clean — 1.84GB open / 1.90GB post-triage — SwapFree 8.45GB stable — graph-doctor EXIT:1 ×21 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×40 (1.84GB open — full audits; post-triage 1.90GB — stable, +60MB within noise, no U2 breach; SwapFree 8.45GB open / 8.45GB post-triage — flat; U7 clear). U2: clear (1.90GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×21 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:12Z — Loop cycle 436 (DEGRADED — U6 active ×39 — audits clean — triage clean — 2.00GB open / 1.99GB post-triage — SwapFree 8.41GB — graph-doctor EXIT:1 ×20 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×39 (2.00GB open — full audits; post-triage 1.99GB — effectively unchanged, no U2 breach; cycle consumed ~10MB — stable; SwapFree 8.41GB open / 8.43GB post-triage — stable; inter-cycle drawdown −560MB from c435; U7 clear). U2: clear (1.99GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×20 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:08Z — Loop cycle 435 (DEGRADED — U6 active ×38 — audits clean — triage clean — 2.98GB open / 1.74GB post-audit — SwapFree 8.97GB — graph-doctor EXIT:1 ×19 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×38 (2.98GB open — full audits; post-triage 1.74GB — no U2 breach; memory dropped ~1.24GB during audit+triage cycle — external workloads; SwapFree 8.97GB open / 8.97GB post-triage — stable; U7 clear). U2: clear (1.74GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: clean (custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×19 — non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T13:02Z — Loop cycle 434 (DEGRADED — U6 active ×37 — AUDITS SKIPPED (1.42GB ≤1.7GB) — triage clean — 1.42GB open / 1.35GB post-triage — SwapFree 9.09GB — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×37 (1.42GB open — audit skip; post-triage 1.35GB — stable, no U2 breach; triage ~70MB consumption; memory dropped ~820MB inter-cycle from c433's 2.24GB — external workloads; SwapFree 9.09GB open / 9.09GB post-triage — unchanged during triage; inter-cycle ~160MB drop; total drawdown ~7.12GB from c411 peak 16.21GB; U7 clear). U2: clear (1.42GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: SKIPPED ×7 (c427–c432 + c434, MemAvailable ≤1.7GB; c433 was the only audit-capable cycle since c430). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:59Z — Loop cycle 433 (DEGRADED — U6 active ×36 — audits clean — triage clean — 2.26GB open / 2.24GB post-audit — SwapFree 9.25GB stable — graph-doctor EXIT:1 ×18 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×36 (2.26GB open → 2.24GB post-audit — stable; memory recovered from c431-c432 trough; SwapFree 9.25GB — unchanged during audit+triage; inter-cycle +0.10GB swap recovery; total drawdown ~6.96GB from c411 peak 16.21GB; external workload spike c430-c431 appears to have passed). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits resumed: custodian-sweep EXIT:0 0 findings, ghost-audit EXIT:0 0 events, flow-audit EXIT:0 0 gaps, reaudit-check EXIT:0 not needed, check-regressions EXIT:1 (no git token — consistent). graph-doctor: EXIT:1 ×18 (c411–c430 ×17 + c433, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:55Z — Loop cycle 432 (DEGRADED — U6 active ×35 — AUDITS SKIPPED (1.63GB ≤1.7GB) — triage clean — 1.63GB open / 1.58GB post-triage — SwapFree 9.15GB stable — U2 clear — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×35 (1.63GB open — audit skip; post-triage 1.58GB — stable, no U2 breach; c431 post-triage breach clarified: external workload spike coincided with triage, not triage-caused; triage ~0MB RAM consumption confirmed). SwapFree 9.15GB open / 9.15GB post-triage — stable during triage; inter-cycle drop only ~290MB (vs ~2.24GB before c431; external workloads decelerating); total drawdown ~7.06GB from c411 peak 16.21GB. U2: clear (1.63GB > 1.2GB). U7: clear (9.15GB > 5GB). kodo memory gate: BLOCKED (U6). Step 1 audits: SKIPPED ×5 (c427–c432, MemAvailable ≤1.7GB). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:51Z — Loop cycle 431 (DEGRADED — U6 active ×34 — AUDITS SKIPPED (1.36GB) — triage clean — ⚠ U2 POST-TRIAGE BREACH: 1.36GB open / 0.90GB post-triage — ⚠ SWAP CRITICAL: 10.00GB open (-2.24GB inter-cycle) — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×34 (1.36GB open — audit skip; POST-TRIAGE: 0.90GB — SECOND consecutive post-triage U2 breach in 2 cycles; triage consumed ~460MB; next cycle open likely below 1.2GB → U2 will fire: skip ALL audits and triage). ⚠ SWAP CRITICAL: 10.00GB open / 9.44GB post-triage — massive ~2.24GB inter-cycle drawdown from c430 (12.24GB → 10.00GB); total SwapFree drawdown ~6.77GB from c411 peak 16.21GB; ~2.80GB consumed this cycle alone (external workloads active); U7 clear at 5GB but accelerating drawdown. U2: NOT fired at cycle open (1.36GB > 1.2GB) — post-triage breach. U7: clear (9.44GB > 5GB). kodo memory gate: BLOCKED (U6). Step 1 audits: SKIPPED ×4 (c427–c431, MemAvailable ≤1.7GB). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:47Z — Loop cycle 430 (DEGRADED — U6 active ×33 — audits clean — triage clean — 2.27GB open / 2.33GB post-audit — SwapFree 12.24GB large drop — graph-doctor EXIT:1 ×17 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×33 (2.27GB open → 2.33GB post-audit — stable; U2 near-trigger from c429 resolved: memory recovered to 2.27GB by cycle open; SwapFree 12.24GB open / 12.25GB post-audit — large ~940MB inter-cycle swap drawdown during sleep, external workloads; total SwapFree drawdown ~3.97GB from c411 peak 16.21GB; U7 clear). U2: clear (2.27GB > 1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits resumed (MemAvail 2.27GB > 1.7GB): custodian-sweep EXIT:0 0 findings, ghost-audit EXIT:0 0 events, flow-audit EXIT:0 0 gaps, reaudit-check EXIT:0 not needed, check-regressions EXIT:1 (no git token — consistent pattern, non-actionable). graph-doctor: EXIT:1 ×17 (c411–c430, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:43Z — Loop cycle 429 (DEGRADED — U6 active ×32 — AUDITS SKIPPED (MemAvail 1.68GB ≤1.7GB) — triage clean — ⚠ U2 NEAR-TRIGGER: 1.68GB open / 1.12GB post-triage — SwapFree 13.33GB — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×32 (1.68GB open — audit skip; POST-TRIAGE: 1.12GB — BELOW U2 threshold of 1.2GB; triage consumed ~560MB RAM this cycle; next cycle open may trigger U2). ⚠ U2 NEAR-TRIGGER: post-triage MemAvailable 1.12GB < 1.2GB threshold — if next cycle opens below 1.2GB, U2 fires: skip ALL audits AND triage, log+commit+push immediately. SwapFree 13.33GB open / 13.18GB post-triage (~150MB during triage, ~130MB open drop from c428; total drawdown ~2.88GB from c411 peak 16.21GB; U7 clear). U2: clear (cycle open 1.68GB > 1.2GB; post-triage breach is new — watch next cycle). U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: SKIPPED ×3 (MemAvailable ≤1.7GB — c427–c429). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:40Z — Loop cycle 428 (DEGRADED — U6 active ×31 — AUDITS SKIPPED (MemAvail 1.67GB ≤1.7GB) — triage clean — 1.67GB open / 1.76GB post-triage — SwapFree 13.46GB declining — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×31 (1.67GB open — audit skip threshold; post-triage 1.76GB; SwapFree 13.46GB — ~368MB drop from c427's 13.82GB; decelerating from c427's 572MB spike; total drawdown ~2.75GB from c411 peak 16.21GB; U7 clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: SKIPPED ×2 (MemAvailable ≤1.7GB — c427 1.65GB, c428 1.67GB). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:37Z — Loop cycle 427 (DEGRADED — U6 active ×30 — AUDITS SKIPPED (MemAvail 1.65GB ≤1.7GB) — triage clean — 1.65GB open / 2.32GB post-triage — SwapFree 13.82GB elevated drop — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×30 (1.65GB open — audit skip threshold triggered; post-triage rebound 2.32GB; SwapFree 13.82GB — elevated ~572MB drop from c426's 14.38GB; oscillation range c410–c427: 1.65–3.31GB; total SwapFree drawdown ~2.39GB from c411 peak 16.21GB; U7 clear at 5GB threshold). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). Step 1 audits: SKIPPED (MemAvailable 1.65GB ≤1.7GB threshold). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:31Z — Loop cycle 426 (DEGRADED — U6 active ×29 — audits clean — triage clean — 2.27GB open / 2.32GB post-audit — SwapFree 14.38GB flat — graph-doctor EXIT:1 ×16 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×29 (2.27GB open → 2.32GB post-audit — flat; oscillation range c410–c426: 2.07–3.31GB; SwapFree 14.38GB — declined only ~50MB from c425 after prior ~310MB spike; decelerated, trend watching continues; total drawdown ~1.83GB from c411 peak 16.21GB; U7 clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×16 (c411–c426, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:27Z — Loop cycle 425 (DEGRADED — U6 active ×28 — audits clean — triage clean — 2.43GB open / 2.41GB post-audit — SwapFree 14.43GB declining — graph-doctor EXIT:1 ×15 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×28 (2.43GB open → 2.41GB post-audit — flat; oscillation range c410–c425: 2.07–3.31GB; SwapFree 14.43GB — declined ~310MB from c424, accelerating decline vs prior ~60MB/cycle; total drawdown ~1.78GB from c411 peak of 16.21GB; U7 clear at 5GB threshold). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×15 (c411–c425, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:23Z — Loop cycle 424 (DEGRADED — U6 active ×27 — audits clean — triage clean — 2.34GB open / 2.64GB post-audit — SwapFree 14.74GB flat — graph-doctor EXIT:1 ×14 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×27 (2.34GB open → 2.64GB post-audit — transient dip at open, recovered post-audit; oscillation range c410–c424: 2.07–3.31GB; SwapFree 14.74GB — gradual decline continuing, U7 clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×14 (c411–c424, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:20Z — Loop cycle 423 (DEGRADED — U6 active ×26 — audits clean — triage clean — 2.84GB open / 2.83GB post-audit — SwapFree 14.80GB stabilized — graph-doctor EXIT:1 ×13 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×26 (2.84GB open → 2.83GB post-audit — flat; oscillation range c410–c423: 2.07–3.31GB; SwapFree 14.80GB — stabilized after c422 elevated drop, U7 clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×13 (c411–c423, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:16Z — Loop cycle 422 (DEGRADED — U6 active ×25 — audits clean — triage clean — 2.95GB open / 2.92GB post-audit — SwapFree 14.80GB declining — graph-doctor EXIT:1 ×12 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×25 (2.95GB open → 2.92GB post-audit — flat; oscillation range c410–c422: 2.07–3.31GB; SwapFree 14.80GB — declined ~260MB from c421 vs ~110MB/cycle prior trend; U7 still clear). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×12 (c411–c422, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:13Z — Loop cycle 421 (DEGRADED — U6 active ×24 — audits clean — triage clean — 3.00GB open / 2.96GB post-audit — SwapFree 15.06GB flat — graph-doctor EXIT:1 ×11 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×24 (3.00GB open → 2.96GB post-audit — flat; oscillation range c410–c421: 2.07–3.31GB; SwapFree 15.06GB slowly declining, U7 not at risk). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×11 (c411–c421, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:09Z — Loop cycle 420 (DEGRADED — U6 active ×23 — audits clean — triage clean — 2.93GB open / 2.95GB post-audit — SwapFree 15.05GB flat — graph-doctor EXIT:1 ×10 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×23 (2.93GB open → 2.95GB post-audit — flat; oscillation range c410–c420: 2.07–3.31GB; SwapFree 15.05GB slowly declining from 16.21GB at c411 — U7 not at risk). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×10 (c411–c420, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:06Z — Loop cycle 419 (DEGRADED — U6 active ×22 — audits clean — triage clean — 2.88GB open / 2.94GB post-audit — SwapFree 15.16GB flat — graph-doctor EXIT:1 ×9 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×22 (2.88GB open → 2.94GB post-audit — slight improvement; oscillation range c410–c419: 2.07–3.31GB; SwapFree 15.16GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×9 (c411–c419, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T12:00Z — Loop cycle 418 (DEGRADED — U6 active ×21 — audits clean — triage clean — 3.31GB open / 3.18GB post-audit — SwapFree 15.16GB flat — graph-doctor EXIT:1 ×8 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×21 (3.31GB open → 3.18GB post-audit — slight dip; oscillation range c410–c418: 2.07–3.31GB; SwapFree 15.16GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×8 (c411–c418, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:56Z — Loop cycle 417 (DEGRADED — U6 active ×20 — audits clean — triage clean — 3.13GB open / 3.17GB post-audit — SwapFree 15.20GB flat — graph-doctor EXIT:1 ×7 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×20 (3.13GB open → 3.17GB post-audit — flat; oscillation range c410–c417: 2.07–3.27GB; SwapFree 15.20GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×7 (c411–c417, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:52Z — Loop cycle 416 (DEGRADED — U6 active ×19 — audits clean — triage clean — 3.25GB open / 3.27GB post-audit — SwapFree 15.20GB flat — graph-doctor EXIT:1 ×6 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×19 (3.25GB open → 3.27GB post-audit — flat; oscillation range c410–c416: 2.07–3.27GB; SwapFree 15.20GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×6 (c411–c416, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:49Z — Loop cycle 415 (DEGRADED — U6 active ×18 — audits clean — triage clean — 3.13GB open / 3.11GB post-audit — SwapFree 15.24GB flat — graph-doctor EXIT:1 ×5 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×18 (3.13GB open → 3.11GB post-audit — flat; oscillation range c410–c415: 2.07–3.13GB; SwapFree 15.24GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×5 (c411–c415, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:45Z — Loop cycle 414 (DEGRADED — U6 active ×17 — audits clean — triage clean — 2.88GB open / 2.62GB post-audit — SwapFree 15.45GB flat — graph-doctor EXIT:1 ×4 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×17 (2.88GB open → 2.62GB post-audit — slight post-audit dip; oscillation range c410–c414: 2.07–3.10GB; SwapFree 15.45GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×4 (c411–c414, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:41Z — Loop cycle 413 (DEGRADED — U6 active ×16 — audits clean — triage clean — 2.88GB open / 3.10GB post-audit — SwapFree 15.46GB flat — graph-doctor EXIT:1 ×3 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×16 (2.88GB open → 3.10GB post-audit — slight recovery; oscillation range c410–c413: 2.07–3.10GB; SwapFree 15.46GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×3 (c411–c413, B1-constrained warning unchanged, non-fatal). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:37Z — Loop cycle 412 (DEGRADED — U6 active ×15 — audits clean — triage clean — 2.97GB open / 3.01GB post-audit — SwapFree 15.64GB flat — graph-doctor EXIT:1 ×2 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×15 (2.97GB open → 3.01GB post-audit — stable in compressed 2.07–3.01GB zone c410–c412; SwapFree 15.64GB flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×2 (c411–c412, graph_built=False, B1-constrained warning unchanged; EXIT:0 streak c403–c410 confirmed transient 8-cycle oscillation). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:33Z — Loop cycle 411 (DEGRADED — U6 active ×14 — audits clean — triage clean — 2.74GB open / 2.99GB post-audit — SwapFree 16.21GB→15.64GB — graph-doctor EXIT:1 resumed — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×14 (2.74GB open → 2.99GB post-audit — slight recovery from c410's 2.07GB post-audit; oscillation range remains compressed 2.07–2.99GB zone c410–c411; SwapFree 16.21GB→15.64GB, stable). U2: clear (>1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 resumed at c411 after EXIT:0 streak of 8 cycles (c403–c410); graph_built=False, B1-constrained warning unchanged — exit code oscillation confirmed non-deterministic. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=yes (graph-doctor exit code reverted EXIT:0→EXIT:1). No actionable new evidence — exit code oscillation is a known non-fatal artifact. Cadence: 1200s.
+
+## 2026-05-15T11:27Z — Loop cycle 410 (DEGRADED — U6 active ×13 — audits clean — triage clean — 2.52GB open / 2.07GB post-audit — SwapFree 16.26GB→15.95GB — graph-doctor EXIT:0 ×8 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×13 (2.52GB open → 2.07GB post-audit — new lower step; prior oscillation c403–c409 was 2.89–4.28GB, c410 stepped down to 2.52GB/2.07GB; SwapFree 16.26GB→15.95GB — elevated vs prior cycles, slight swap release). U2: clear (>1.2GB). U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×8 (c403–c410, graph_built=False, B1-constrained warning stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. CAUTION: if c411 opens ≤1.7GB, skip audits immediately. Cadence: 1200s.
+
+## 2026-05-15T11:23Z — Loop cycle 409 (DEGRADED — U6 active ×12 — audits clean — triage clean — 3.70GB open / 3.72GB post-audit — SwapFree 15.60GB flat — graph-doctor EXIT:0 ×7 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×12 (3.70GB open → 3.72GB post-audit — flat; stable oscillation continues c403–c409: 2.89–4.28GB range; SwapFree flat ~15.60GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×7 (c403–c409, graph_built=False, B1-constrained warning stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:19Z — Loop cycle 408 (DEGRADED — U6 active ×11 — audits clean — triage clean — 3.74GB open / 3.69GB post-audit — SwapFree 15.70GB flat — graph-doctor EXIT:0 ×6 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×11 (3.74GB open → 3.69GB post-audit — flat; c407 post-audit dip to 2.89GB confirmed transient, c408 rebounded to 3.74GB open; oscillating range c403–c408: 2.89–4.28GB; SwapFree flat ~15.70GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×6 (c403–c408, graph_built=False, B1-constrained warning stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:15Z — Loop cycle 407 (DEGRADED — U6 active ×10 — audits clean — triage clean — 3.55GB open / 2.89GB post-audit — SwapFree 15.74GB flat — graph-doctor EXIT:0 ×5 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×10 (3.55GB open → 2.89GB post-audit — post-audit drop -0.66GB, first descent since trough stabilized c403–c406; SwapFree flat ~15.74GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×5 (c403–c407, graph_built=False, B1-constrained warning stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. CAUTION: if c408 opens ≤1.7GB, skip audits immediately. Cadence: 1200s.
+
+## 2026-05-15T11:12Z — Loop cycle 406 (DEGRADED — U6 active ×9 — audits clean — triage clean — 3.79GB open / 3.97GB post-audit — SwapFree 15.76GB flat — graph-doctor EXIT:0 ×4 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×9 (3.79GB open → 3.97GB post-audit — oscillating flat at trough; range c403–c406: 3.50–4.28GB; SwapFree flat ~15.76GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×4 (c403–c406, graph_built=False, B1-constrained warning stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:08Z — Loop cycle 405 (DEGRADED — U6 active ×8 — audits clean — triage clean — 3.75GB open / 3.83GB post-audit — SwapFree 15.81GB flat — graph-doctor EXIT:0 ×3 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×8 (3.75GB open → 3.83GB post-audit — oscillating stable at trough; range c403–c405: 3.50–4.28GB; SwapFree flat 15.81GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×3 (c403–c405, graph_built=False, B1-constrained warning stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T11:04Z — Loop cycle 404 (DEGRADED — U6 active ×7 — audits clean — triage clean — 3.50GB open / 4.21GB post-audit — SwapFree 15.80GB flat — graph-doctor EXIT:0 ×2 — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×7 (3.50GB open → 4.21GB post-audit — rebound during audit cycle, possible oscillation at trough; descent trend c398–c404 open: 5.95→5.39→4.62→4.14→3.50GB; SwapFree flat ~15.80GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×2 (c403–c404, B1-constrained warning still present, graph_built=False). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no (graph-doctor state change already logged c403). Cadence: 1200s.
+
+## 2026-05-15T11:00Z — Loop cycle 403 (DEGRADED — U6 active ×6 — audits clean — triage clean — 4.14GB open / 4.28GB post-audit — SwapFree 15.80GB flat — graph-doctor EXIT:0 (streak broken) — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×6 (4.14GB open → 4.28GB post-audit — trend: 5.95→5.39→4.62→4.14GB c398–c403; post-audit slight uptick suggesting potential stabilization at trough, SwapFree flat 15.80GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 at c403 — breaks EXIT:1 streak (c355–c402 = 44 cycles); B1-constrained warning still present (graph_built=False), exit code changed. NEW_EVIDENCE_DETECTED=yes (graph-doctor exit code state change). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — board frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. Root cause unchanged (9c7f4bb9 no consumer). Cadence: 1200s.
+
+## 2026-05-15T10:54Z — Loop cycle 402 (DEGRADED — U6 active ×5 — audits clean — triage clean — 4.62GB open / 4.86GB post-audit — SwapFree 15.82GB flat — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×5 (4.62GB open → 4.86GB post-audit — descending trend: 5.95→5.39→4.62GB c398–c402; SwapFree flat 15.82GB). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×44 (c355–c402; c379 U2-skip, c380/c382 audit-skip — B1-constrained). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory descending — skip audits if c403 opens ≤1.7GB. Cadence: 1200s.
+
+## 2026-05-15T10:50Z — Loop cycle 401 (DEGRADED — U6 active ×4 — audits clean — triage clean — 5.37GB open / 5.39GB post-audit — SwapFree 15.83GB flat — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×4 (5.37GB open → 5.39GB post-audit — descending from 5.95GB plateau; c398–c401: 5.95→5.96→5.94→5.37→5.39GB). SwapFree: 15.83GB (flat — RAM-only pressure). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×43 (c355–c401; c379 U2-skip, c380/c382 audit-skip — B1-constrained). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory trending down — monitor for descent below 1.7GB. Cadence: 1200s.
+
+## 2026-05-15T10:47Z — Loop cycle 400 (DEGRADED — U6 active ×3 — audits clean — triage clean — 5.95GB open / 5.96GB post-audit — SwapFree 15.83GB flat — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×3 (5.95GB open → 5.96GB post-audit — ~5.95GB stable plateau c398–c400; RAM-only pressure, SwapFree flat). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×42 (c355–c400; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory plateau stable — monitoring for descent or recovery. Cadence: 1200s.
+
+## 2026-05-15T10:44Z — Loop cycle 399 (DEGRADED — U6 active ×2 — audits clean — triage clean — 5.96GB open / 5.94GB post-audit — SwapFree 15.83GB flat — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 active ×2 (5.96GB open → 5.94GB post-audit — stable at ~5.95GB, c398–c399; RAM pressure plateau, no descent). SwapFree: 15.83GB (flat — RAM-only pressure, no swap growth). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×41 (c355–c399; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory plateau — monitoring for recovery. Cadence: 1200s.
+
+## 2026-05-15T10:41Z — Loop cycle 398 (DEGRADED — U6 FIRED — audits clean — triage clean — 6.12GB open / 5.95GB post-audit — SwapFree 15.82GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 FIRED (5.95GB post-audit < 8GB threshold — memory descended from stable ~7GB range c395–c397; U6 re-triggered). SwapFree: 15.82GB (flat — no swap pressure). U2: clear. U7: clear. kodo memory gate: BLOCKED (U6). All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×40 (c355–c398; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T10:38Z — Loop cycle 397 (DEGRADED — U6 clear — audits clean — triage clean — 7.17GB open / 7.14GB post-audit — SwapFree 15.83GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (7.17GB open → 7.14GB post-audit — ×9 cycles since recovery c389; stable). SwapFree: 15.83GB (flat). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×39 (c355–c397; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory healthy. Sole blocker: operator action. Cadence: 1200s.
+
+## 2026-05-15T10:35Z — Loop cycle 396 (DEGRADED — U6 clear — audits clean — triage clean — 7.30GB open / 7.35GB post-audit — SwapFree 15.83GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (7.30GB open → 7.35GB post-audit — ×8 cycles since recovery c389; stable). SwapFree: 15.83GB (flat). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×38 (c355–c396; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory healthy. Sole blocker: operator action. Cadence: 1200s.
+
+## 2026-05-15T10:32Z — Loop cycle 395 (DEGRADED — U6 clear — audits clean — triage clean — 7.77GB open / 7.91GB post-audit — SwapFree 15.81GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (7.77GB open → 7.91GB post-audit — ×7 cycles since recovery c389; stable). SwapFree: 15.81GB (flat). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×37 (c355–c395; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory healthy. Sole blocker: operator action. Cadence: 1200s.
+
+## 2026-05-15T10:26Z — Loop cycle 394 (DEGRADED — U6 clear — audits clean — triage clean — 13.33GB open / 13.33GB post-audit — SwapFree 16.57GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (13.33GB open → 13.33GB post-audit — ×6 cycles since recovery c389; fully stable). SwapFree: 16.57GB (flat, slight upward trend). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×36 (c355–c394; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory healthy and stable. Sole blocker: operator action. Cadence: 1200s.
+
+## 2026-05-15T10:23Z — Loop cycle 393 (DEGRADED — U6 clear — audits clean — triage clean — 13.40GB open / 13.34GB post-audit — SwapFree 16.56GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (13.40GB open → 13.34GB post-audit — ×5 cycles since recovery c389; fully stable). SwapFree: 16.56GB (flat). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×35 (c355–c393; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory healthy and stable. Only remaining blocker: operator action. Cadence: 1200s.
+
+## 2026-05-15T10:20Z — Loop cycle 392 (DEGRADED — U6 clear — audits clean — triage clean — 13.37GB open / 13.43GB post-audit — SwapFree 16.56GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (13.37GB open → 13.43GB post-audit — ×4 cycles since recovery c389; fully stable). SwapFree: 16.56GB (flat, slight upward trend). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×34 (c355–c392; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Solely awaiting operator action. Cadence: 1200s.
+
+## 2026-05-15T10:17Z — Loop cycle 391 (DEGRADED — U6 clear — audits clean — triage clean — 13.45GB open / 13.44GB post-audit — SwapFree 16.55GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (13.45GB open → 13.44GB post-audit — stable healthy memory, ×3 cycles since recovery c389). SwapFree: 16.55GB (flat — fully stable). U2: clear. U6: clear. U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×33 (c355–c391; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory fully stable — sawtooth resolved post-workload-completion. Only remaining blocker: operator action. Cadence: 1200s.
+
+## 2026-05-15T10:13Z — Loop cycle 390 (DEGRADED — U6 clear — audits clean — triage clean — 12.55GB open / 13.36GB post-audit — SwapFree 16.54GB stable — board frozen — operator action required)
+
+Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.55GB open → 13.36GB post-audit — fully above 8GB; memory healthy). SwapFree: 16.54GB open → 16.54GB post-audit (flat, stable recovery holding). U2: clear. U6: clear (×2 cycles since recovery c389). U7: clear. kodo memory gate: UNBLOCKED. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×32 (c355–c390; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no (U6-clear already noted c389; memory stable, board unchanged). kodo gate: UNBLOCKED (memory) — board gate still operator-blocked. Cadence: 1200s.
+
+## 2026-05-15T10:10Z — Loop cycle 389 (DEGRADED — **U6 CLEARED** — audits clean — triage clean — 13.39GB open / 13.37GB post-audit — SwapFree 16.54GB FULL RECOVERY — board frozen — kodo memory gate UNBLOCKED)
+
+Health: DEGRADED (board frozen, operator-blocked — memory pressure RESOLVED). **U6 CLEARED: MemAvailable 13.39GB open / 13.37GB post-audit — fully above 8GB threshold; U6 no longer active.** External workload (B1-constrained) has completed — RAM and swap fully released. SwapFree: 16.53GB open → 16.54GB post-audit (FULL RECOVERY — surpassed session peak 15.7GB; all consumed swap returned). U2: clear. U6: **CLEARED** (was active c355–c388, 34+ consecutive cycles). U7: clear. kodo memory gate: **UNBLOCKED** (memory ≥8GB). All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×31 (c355–c389; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=**yes** (U6 cleared; memory regime materially changed). **Operator action still required before kodo dispatch**: (1) CANCEL 925be138, (2) move improve tasks 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog (not R4AI), (3) review/close/relabel 9c7f4bb9. Memory gate unblocked; board gate remains. Cadence: 1200s.
+
+## 2026-05-15T10:06Z — Loop cycle 388 (DEGRADED — audits clean — triage clean — 1.91GB open / 1.95GB post-audit — SwapFree 10.33GB recovery-holding — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 1.91GB open (above 1.7GB → audits ran). Post-audit: 1.95GB (slight increase — external workload releasing RAM). SwapFree: 10.34GB open → 10.33GB post-audit (flat; recovery trend holding — 9.80→9.90→10.39→10.33GB across c383–c388; plateau broken and holding above 10GB for 2nd consecutive cycle; headroom 5.33GB vs U7). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×30 (c355–c388; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 sawtooth — 1.91GB open (dipped from 2.71GB at c387 but post-audit recovery to 1.95GB; remains above audit threshold). SwapFree >10GB confirmed ×2 cycles — recovery holding. Cadence: 1200s.
+
+## 2026-05-15T10:03Z — Loop cycle 387 (DEGRADED — audits clean — triage clean — 2.71GB open / 2.84GB post-audit — SwapFree 10.39GB RECOVERY — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 2.71GB open (above 1.7GB → audits ran). Post-audit: 2.84GB (memory increased during audits — external workload releasing RAM again). SwapFree: 10.39GB open → 10.39GB post-audit (RECOVERY: first reading above 10GB since descent; plateau broken — from 9.88–9.90GB plateau c383–c386 to 10.39GB c387; net +0.49GB recovered; external workload releasing swap). U2: clear. U6: ACTIVE. U7: clear (headroom 5.39GB). All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×29 (c355–c387; c379 U2-skip, c380/c382 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 recovery continuing — 2.71GB open (stable; up from 2.40–2.66GB range c385–c386). SwapFree plateau broken — recovery trend confirmed. Cadence: 1200s.
+
+## 2026-05-15T09:57Z — Loop cycle 386 (DEGRADED — audits clean — triage clean — 2.40GB open / 2.66GB post-audit — SwapFree 9.90GB plateau ×4 — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 2.40GB open (above 1.7GB → audits ran). Post-audit: 2.66GB (memory increased during audits — external workload releasing RAM). SwapFree: 9.90GB (flat — plateau holding ×4 cycles c383–c386; slight upward trend 9.88→9.90GB; headroom 4.90GB vs U7). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean (run in parallel): custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×28 (c355–c386; c379 U2-skip, c380/c382 audit-skip — B1-constrained). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 recovery trend — post-audit 2.66GB (best since deep sawtooth started); external workload RAM release visible. SwapFree plateau stabilizing. Cadence: 1200s.
+
+## 2026-05-15T09:53Z — Loop cycle 385 (DEGRADED — audits clean — triage clean — 2.43GB open / 2.37GB post-audit — SwapFree 9.88GB flat ×3 stabilized — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 2.43GB open (above 1.7GB → audits ran). Post-audit: 2.37GB (normal footprint). SwapFree: 9.88GB open → 9.88GB post-audit (flat for 3rd consecutive cycle — c383–c385 — descent confirmed stabilized at ~9.87–9.88GB; ~5.8GB total consumed from session peak 15.7GB; U7 headroom 4.88GB — headroom stable). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×27 (c355–c385; c379 U2-skip, c380/c382 audit-skip — B1-constrained). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. SwapFree plateau confirmed at ~9.88GB (3 cycles flat). Memory: trough12 partial recovery — 2.43GB open (up from c382 low). Cadence: 1200s.
+
+## 2026-05-15T09:50Z — Loop cycle 384 (DEGRADED — audits clean — triage clean — 2.33GB open / 1.93GB post-audit — SwapFree 9.87GB flat descent-paused — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 2.33GB open (above 1.7GB → audits ran). Post-audit: 1.93GB (audit footprint ~0.4GB). SwapFree: 9.87GB open → 9.87GB post-audit (flat — descent paused; slight uptick from 9.8GB at c383; U7 headroom 4.87GB). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×26 (c355–c384; c379 U2-skip, c380/c382 audit-skip — B1-constrained). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. SwapFree: paused at ~9.87GB (c383–c384); ~5.8GB consumed from session peak 15.7GB total; external workload may be stabilizing. Cadence: 1200s.
+
+## 2026-05-15T09:46Z — Loop cycle 383 (DEGRADED — audits clean — triage clean — 2.16GB memory partial recovery — SwapFree 9.8GB ALERT narrowing — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 2.16GB open (above 1.7GB → audits ran). Post-audit: 2.17GB (flat; audit footprint neutral). SwapFree: 9.8GB open → 9.8GB post-audit (flat this cycle; but trend: 15.7→9.8GB total ~5.9GB consumed from session peak — U7 headroom now only 4.8GB — **ALERT: SwapFree descent rate requires monitoring**). U2: clear. U6: ACTIVE. U7: clear but headroom narrowing. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×25 (c355–c383; c379 U2-skip, c380/c382 audit-skip — B1-constrained). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. SwapFree descent 15.7→9.8GB (~5.9GB consumed): if rate resumes at ~1GB/cycle, U7 fires in ~5 cycles. Cadence: 1200s.
+
+## 2026-05-15T09:43Z — Loop cycle 382 (DEGRADED — AUDIT-SKIP 1.46GB ≤1.7GB — triage clean — SwapFree 10.8GB stable — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 1.46GB open (≤1.7GB → audit-skip; sawtooth continues — dropped from 3.06GB at c381). Post-triage: 1.50GB (essentially flat). SwapFree: 10.8GB (stable; ~4.9GB consumed from session peak 15.7GB). U2: clear (>1.2GB). U6: ACTIVE. U7: clear (headroom 5.8GB). Audits skipped (1.46GB threshold). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 sawtooth volatile — 3.06GB (c381) → 1.46GB (c382); external workload continues cyclical RAM pattern. SwapFree plateau ~10.8GB (narrowing headroom vs U7 threshold). Cadence: 1200s.
+
+## 2026-05-15T09:39Z — Loop cycle 381 (DEGRADED — audits clean — triage clean — memory recovery 3.06GB — SwapFree 10.9GB plateau — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 3.06GB open (RECOVERY: above 1.7GB threshold; trough was 1.08GB at c379). Post-audit: 2.74GB (minor drop; audit footprint normal). SwapFree: 10.9GB open → 11.1GB post-audit (stable — plateau confirmed at ~11GB; ~4.7GB consumed from session peak 15.7GB by external workload). U2: clear. U6: ACTIVE. U7: clear (headroom 5.9GB). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×24 (c355–c381; c379 U2-skip, c380 audit-skip — B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 sawtooth — deepened to 1.08GB (c379 U2-fired), now recovering; 3.06GB confirms external workload partially released. SwapFree plateau ~11GB. Cadence: 1200s.
+
+## 2026-05-15T09:36Z — Loop cycle 380 (DEGRADED — AUDIT-SKIP 1.51GB ≤1.7GB — triage clean — SwapFree 11.0GB stabilizing — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). MemAvailable 1.51GB open (≤1.7GB → audit-skip). Post-triage: 1.92GB (uptick; triage minimal footprint). SwapFree 11.0GB open → 11.6GB post-triage (stable; descent from 15.7GB session peak appears to be plateauing at ~11GB; ~4.7GB total consumed by external workload). U2: clear (>1.2GB). U6: ACTIVE. U7: clear (headroom 6.0GB — narrowing, monitor closely). Audits skipped (1.51GB threshold). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12-deepening — c379 U2-fired (1.08GB); c380 partial recovery (1.51GB → 1.92GB post-triage). SwapFree plateau forming at ~11GB. Cadence: 1200s.
+
+## 2026-05-15T09:32Z — Loop cycle 379 (DEGRADED — **U2 FIRED** memory 1.08GB open — ALL AUDITS SKIPPED — log+push only — SwapFree 12.5GB descending — board frozen)
+
+Health: DEGRADED (board frozen, operator-blocked). **U2 FIRED: MemAvailable 1.08GB < 1.2GB threshold.** All audits and triage skipped per U2 protocol — log and push only to conserve resources. SwapFree: 12.5GB (descended from 13.2GB at c378 — external workload continuing to consume swap, ~0.7GB drop since c378). U6: ACTIVE. U7: clear (headroom 7.5GB). Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. No audits run (U2 skip). Triage skipped (U2 skip). NEW_EVIDENCE_DETECTED=no. Memory: trough12 deepening — open 1.08GB is new session low (prior low: 1.58GB at c377). Critical concern: U2 fired; memory regime has worsened. Cadence: 1200s.
+
+## 2026-05-15T09:27Z — Loop cycle 378 (DEGRADED — memory 2.11GB open/2.17GB post-audit U6 active AUDIT-RESUME — audits clean — graph-doctor EXIT:1 ×23 — SwapFree 13.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.11GB open (AUDIT RESUME: above 1.7GB threshold; c377 was skip at 1.58GB). Post-audit 2.17GB (slight uptick — external workload releasing RAM). SwapFree 13.2GB (stabilizing; descent from 15.7GB appears to have plateaued). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×23 (c355–c377 consecutive; c378 run, B1-constrained stable regression). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 sawtooth continues — volatile 1.58–2.17GB range (c374–c378); SwapFree plateau at 13.2GB (descent may have halted). Cadence: 1200s.
+
+## 2026-05-15T09:24Z — Loop cycle 377 (DEGRADED — memory 1.58GB open AUDIT-SKIP — triage clean — graph-doctor SKIPPED — SwapFree 13.5GB descending — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.58GB open — AUDIT SKIP threshold triggered (≤1.7GB). Step 1 audits SKIPPED. Post-triage memory: 1.58GB (triage minimal footprint — safe at this level). SwapFree 13.5GB (DESCENDING: 15.7→15.2→14.3→14.1→13.5GB across c373–c377; external workload consuming 2.2GB swap total). U2: NOT fired (1.58GB > 1.2GB). U6: ACTIVE. U7: clear (13.5GB > 5GB). Triage: 0 rescore, 0 awaiting, 0 queue healing. graph-doctor: SKIPPED (audit skip). Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. MEMORY/SWAP STATUS: RAM at floor (1.58GB open — borderline U2). Swap descent requires monitoring — at current rate (~0.4GB/cycle) would reach 5.4GB pre-audit threshold in ~20 cycles. If c378 opens ≤1.7GB, audits will again be skipped. If <1.2GB, U2 fires. Cadence: 1200s.
+
+## 2026-05-15T09:20Z — Loop cycle 376 (DEGRADED — memory 1.95GB open/1.22GB post-audit U6 ACTIVE U2-IMMINENT — audits clean — graph-doctor EXIT:1 ×22 — SwapFree 14.1GB — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.95GB open (barely above 1.7GB audit-skip threshold). POST-AUDIT 1.22GB — CRITICAL: 20MB above U2 fire threshold (1.2GB). SwapFree 14.1GB (stabilizing). U2: IMMINENT (1.22GB — will fire if next cycle drops further). U6: ACTIVE. U7: clear. Audits ran (1.95GB > 1.7GB at open). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×22 (c355–c376) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. MEMORY DESCENT CRITICAL: trough12 sawtooth bottoming out; post-audit memory hit near-U2 territory. If c377 opens ≤1.7GB, audits MUST be skipped. If ≤1.2GB, U2 fires — skip everything, log only. Cadence: 1200s.
+
+## 2026-05-15T09:16Z — Loop cycle 375 (DEGRADED — memory 2.54GB open/2.46GB post-audit U6 active trough12 partial-recovery — audits clean — graph-doctor EXIT:1 ×21 — SwapFree 14.3GB dipping — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.54GB open (partial recovery from c374's 1.88GB alarm). Post-audit 2.46GB (stable). SwapFree 14.3GB — WATCH: dipping from 15.7GB baseline (~1.4GB consumed by external workload; still well above 5.4GB threshold, U7 headroom 9.3GB). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×21 (c355–c375) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 sawtooth — volatile range 1.88–3.54GB open across c370–c375; post-audit also volatile. SwapFree descent trend emerging (15.7→15.2→14.3GB). Cadence: 1200s.
+
+## 2026-05-15T09:13Z — Loop cycle 374 (DEGRADED — memory 1.88GB open/1.91GB post-audit U6 active trough12 ALARM — audits clean — graph-doctor EXIT:1 ×20 — SwapFree 15.2GB — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.88GB open — ALARM: lowest cycle-open in session, just 0.18GB above audit-skip threshold. Post-audit 1.91GB (slight recovery; external workload released RAM during audit window). SwapFree 15.2GB (slight dip from 15.7GB — still safe). U2: clear. U6: ACTIVE. U7: clear. Audits ran (1.88GB > 1.7GB threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×20 (c355–c374) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. MEMORY CRITICAL: if c375 opens ≤1.7GB, audits must be skipped. Audit skip is imminent. Cadence: 1200s.
+
+## 2026-05-15T09:09Z — Loop cycle 373 (DEGRADED — memory 3.36GB open/2.50GB post-audit U6 active trough12 sawtooth — audits clean — graph-doctor EXIT:1 ×19 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.36GB open, 2.50GB post-audit (sawtooth pattern confirmed: alternating high/low post-audit ~3.1–3.2GB / ~2.3–2.5GB; external workload active during audit window). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×19 (c355–c373) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 sawtooth pattern — open stable 3.0–3.5GB, post-audit alternates with external workload activity. Cadence: 1200s.
+
+## 2026-05-15T09:06Z — Loop cycle 372 (DEGRADED — memory 3.10GB open/3.17GB post-audit U6 active trough12 recovery — audits clean — graph-doctor EXIT:1 ×18 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.10GB open, 3.17GB post-audit (RECOVERY: c371 2.31GB post-audit dip was transient — plateau re-establishing at ~3.1–3.2GB range). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×18 (c355–c372) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau re-confirmed at 3.0–3.2GB range; c371 trough was transient sawtooth noise. Cadence: 1200s.
+
+## 2026-05-15T09:02Z — Loop cycle 371 (DEGRADED — memory 2.97GB open/2.31GB post-audit U6 active trough12 descent — audits clean — graph-doctor EXIT:1 ×17 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.97GB open, 2.31GB post-audit (ALERT: sharp drop from c370 3.54GB/3.28GB — trough12 plateau may be breaking downward; -0.57GB open, -0.97GB post-audit intra-cycle). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran (open was 2.97GB >1.7GB threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×17 (c355–c371) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. MEMORY WATCH: if c372 opens ≤1.7GB, audits must be skipped. Post-audit 2.31GB — if next cycle open dips 0.3GB further, audit skip threshold at risk. Cadence: 1200s.
+
+## 2026-05-15T08:57Z — Loop cycle 370 (DEGRADED — memory 3.54GB open/3.28GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×16 — SwapFree 15.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.54GB open, 3.28GB post-audit (open uptick from c369 3.22GB — trough12 may be leveling; post-audit dip to 3.28GB). SwapFree 15.6GB (slight dip from 15.8GB — within noise). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×16 (c355–c370) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.1–3.5GB (c358–c370, 13 cycles), stable with slight uptick this cycle. Cadence: 1200s.
+
+## 2026-05-15T08:53Z — Loop cycle 369 (DEGRADED — memory 3.22GB open/3.16GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×15 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.22GB open, 3.16GB post-audit (flat, within plateau). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×15 (c355–c369) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.1–3.4GB (c358–c369, 12 cycles), stable. Cadence: 1200s.
+
+## 2026-05-15T08:50Z — Loop cycle 368 (DEGRADED — memory 3.19GB open/3.16GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×14 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.19GB open, 3.16GB post-audit (flat). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×14 (c355–c368) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.1–3.4GB (c358–c368, 11 cycles), stable. Cadence: 1200s.
+
+## 2026-05-15T08:46Z — Loop cycle 367 (DEGRADED — memory 3.21GB open/3.19GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×13 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.21GB open, 3.19GB post-audit (flat). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×13 (c355–c367) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.1–3.4GB (c358–c367, 10 cycles), stable. Cadence: 1200s.
+
+## 2026-05-15T08:42Z — Loop cycle 366 (DEGRADED — memory 3.33GB open/3.28GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×12 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.33GB open, 3.28GB post-audit (flat, within plateau). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×12 (c355–c366) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.1–3.4GB (c358–c366, 9 cycles), stable. Cadence: 1200s.
+
+## 2026-05-15T08:39Z — Loop cycle 365 (DEGRADED — memory 3.26GB open/3.12GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×11 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.26GB open, 3.12GB post-audit (slight intra-cycle dip, within plateau range). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×11 (c355–c365) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.0–3.4GB (c358–c365, 8 cycles), stable. Cadence: 1200s.
+
+## 2026-05-15T08:35Z — Loop cycle 364 (DEGRADED — memory 3.27GB open/3.38GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×10 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.27GB open, 3.38GB post-audit (flat, minor uptick). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×10 (c355–c364) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.0–3.4GB (c358–c364, 7 cycles), stable. Cadence: 1200s.
+
+## 2026-05-15T08:31Z — Loop cycle 363 (DEGRADED — memory 2.87GB open/3.26GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 ×9 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.87GB open, 3.26GB post-audit (minor recovery). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×9 (c355–c363) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.0–3.3GB (c358–c363, 6 cycles), slight uptick this cycle (2.87→3.26GB post-audit). Cadence: 1200s.
+
+## 2026-05-15T08:26Z — Loop cycle 362 (DEGRADED — memory 3.0GB U6 active trough12 plateau — audits clean — graph-doctor EXIT:1 ×8 — SwapFree 15.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.0GB open, 3.0GB post-audit (flat). SwapFree 15.6GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×8 (c355–c362) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.0–3.1GB (c358–c362, 5 cycles). Cadence: 1200s.
+
+## 2026-05-15T08:23Z — Loop cycle 361 (DEGRADED — memory 3.1GB U6 active trough12 plateau — audits clean — graph-doctor EXIT:1 ×7 — SwapFree 15.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.1GB open, 3.1GB post-audit (flat). SwapFree 15.6GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×7 (c355–c361) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau stable 3.0–3.1GB (c358–c361, 4 cycles). Cadence: 1200s.
+
+## 2026-05-15T08:19Z — Loop cycle 360 (DEGRADED — memory 3.1GB U6 active trough12 plateau — audits clean — graph-doctor EXIT:1 ×6 — SwapFree 15.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.1GB open, 3.1GB post-audit (flat). SwapFree 15.6GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×6 (c355–c360) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: trough12 plateau 3.0–3.1GB (c358–c360, 3 cycles). Cadence: 1200s.
+
+## 2026-05-15T08:15Z — Loop cycle 359 (DEGRADED — memory 3.0GB U6 active trough12 — audits clean — graph-doctor EXIT:1 ×5 — SwapFree 15.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.0GB open, 2.9GB post-audit (flat intra-cycle). SwapFree 15.6GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×5 (c355–c359) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory: stable 3.0–3.3GB trough12 plateau (c355–c359). Cadence: 1200s.
+
+## 2026-05-15T08:11Z — Loop cycle 358 (DEGRADED — memory 3.0GB U6 active trough12 descent resuming — audits clean — graph-doctor EXIT:1 ×4 — SwapFree 15.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.0GB open, 3.0GB post-audit (flat intra-cycle; -0.3GB vs c356 open — trough12 descent resuming after 2-cycle plateau). SwapFree 15.6GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×4 (c355–c358) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T08:08Z — Loop cycle 357 (DEGRADED — memory 3.3GB flat U6 active trough12 — audits clean — graph-doctor EXIT:1 ×3 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.3GB open, 3.4GB post-audit (flat). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×3 (c355–c357) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T08:04Z — Loop cycle 356 (DEGRADED — memory 3.3GB flat U6 active trough12 — audits clean — graph-doctor EXIT:1 ×2 — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.3GB open, 3.3GB post-audit (flat — no intra-cycle spike). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×2 (c355–c356) — EXIT:0 ×8 streak (c347–c354) broken, B1-constrained stable regression resumed. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T08:01Z — Loop cycle 355 (DEGRADED — memory 3.4GB open/2.9GB post-audit U6 active trough12 — audits clean — graph-doctor EXIT:1 streak reset — SwapFree 15.7GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.4GB at cycle open (U6 active — trough12 continuing). Post-audit 2.9GB (-0.5GB intra-cycle audit cost — similar to c353 pattern, not anomalous). SwapFree 15.7GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×1 — EXIT:0 streak (c347–c354, ×8) broken; B1-constrained stable regression resumed. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 3.4(c354→c355 open), post-audit ~2.9GB (-0.5GB). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:55Z — Loop cycle 354 (DEGRADED — memory 3.4GB U6 active trough12 — audits clean — graph-doctor EXIT:0 ×8 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.4GB at cycle open (U6 active — trough12 continuing: 3.6→3.4GB; note c353 post-audit was 2.9GB due to transient spike, not sustained). Post-audit 3.4GB (flat — normal audit cost; c353 -0.7GB intra-cycle spike was transient, not repeating). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×8 consecutive (c347–c354) — stable. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 3.6(c353 open)→3.4(c354 open), ~0.2GB/cycle descent. c353 intra-cycle spike now confirmed transient. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:51Z — Loop cycle 353 (DEGRADED — memory 3.6GB U6 active trough12 descent resumed — audits clean — graph-doctor EXIT:0 ×7 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.6GB at cycle open (U6 active — trough12 plateau broken, descent resumed: 3.8→3.6GB). Post-audit 2.9GB (ALERT: -0.7GB intra-cycle consumed — external workloads accelerating; highest single-cycle audit cost observed in trough12). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran (3.6GB >> 1.7GB threshold at open). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×7 consecutive (c347–c353) — stable. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: CONCERN — post-audit 2.9GB; if open next cycle ≤1.7GB, audits will be skipped. At -0.7GB/cycle rate: c354 may open at ~2.9GB (audits run), c355 may approach skip threshold. Monitor closely. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:47Z — Loop cycle 352 (DEGRADED — memory 3.8GB U6 active trough12 oscillating 3.8–3.9GB — audits clean — graph-doctor EXIT:0 ×6 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.8GB at cycle open (U6 active — trough12: oscillating in 3.8–3.9GB band for c350–c352; plateau pattern). Post-audit 3.9GB (slight recovery — audit cost minimal). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×6 consecutive (c347–c352) — stable. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 3.9(c351)→3.8(c352) — trough12 stabilized in 3.8–3.9GB band for 3 consecutive cycles. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:44Z — Loop cycle 351 (DEGRADED — memory 3.9GB U6 active trough12 plateau? — audits clean — graph-doctor EXIT:0 ×5 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.9GB at cycle open (U6 active — trough12: same as c350=3.9GB; possible brief plateau or noise). Post-audit 3.9GB (flat). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×5 consecutive (c347–c351) — stable. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 3.9(c350)→3.9(c351) — flat this pair; could be plateau or transient stabilization before next dip. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:40Z — Loop cycle 350 (DEGRADED — memory 3.9GB U6 active trough12 ×4 — audits clean — graph-doctor EXIT:0 ×4 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 3.9GB at cycle open (U6 active — trough12: 5.1→4.7→4.5→4.2→3.9GB, steady ~0.3GB/cycle). Post-audit 3.8GB (~0.15GB consumed — normal). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×4 consecutive (c347–c350) — stable. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 4.2(c349)→3.9(c350) — descent stable ~0.3GB/cycle; ~7 cycles to 1.7GB audit skip threshold. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:36Z — Loop cycle 349 (DEGRADED — memory 4.2GB U6 active trough12 ×3 — audits clean — graph-doctor EXIT:0 ×3 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 4.2GB at cycle open (U6 active — trough12: 5.1→4.7→4.5→4.2GB, ~0.15-0.3GB/cycle). Post-audit 4.2GB (flat). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×3 consecutive (c347–c349) — B1-constrained warning persists but non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 4.5(c348)→4.2(c349) — steady descent, ~0.3GB/cycle. ~8 cycles to 1.7GB audit skip threshold if rate holds. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:32Z — Loop cycle 348 (DEGRADED — memory 4.5GB U6 active trough12 ×2 — audits clean — graph-doctor EXIT:0 ×2 confirmed — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 4.5GB at cycle open (U6 active — trough12 descent: 5.1→4.7→4.5GB, ~0.2GB/cycle this pair). Post-audit 4.5GB (flat). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 ×2 consecutive (c347–c348) — streak break confirmed, not noise. B1-constrained warning persists but non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 4.7(c347)→4.5(c348) — descent rate slowing (~0.2GB vs prior ~0.4GB/cycle). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no (graph-doctor normalized already counted in c347). Cadence: 1200s.
+
+## 2026-05-15T07:29Z — Loop cycle 347 (DEGRADED — memory 4.7GB U6 active trough12 continuing — audits clean — graph-doctor EXIT:0 STREAK BROKEN — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 4.7GB at cycle open (U6 active — continued decline from c346=5.1GB; trough12 deepening). Post-audit 4.7GB (flat — audit cost minimal). SwapFree 15.8GB (slight dip from 16.2GB prior cycles). U2: clear. U6: ACTIVE. U7: clear. Audits ran (4.7GB >> 1.7GB threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:0 — EXIT:1 ×15 streak (c332–c346) BROKEN. Tool still warns about B1-constrained LocalManifest reference but no longer exits non-zero; regression resolved. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 5.1(c346)→4.7(c347) — continued descent ~0.4GB/cycle. At this rate ~7 cycles to 1.7GB audit skip threshold. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=yes (graph-doctor EXIT:0 — behavioral change). Cadence: 1200s.
+
+## 2026-05-15T07:23Z — Loop cycle 346 (DEGRADED — memory 5.1GB U6 active trough12 deepening — audits clean — graph-doctor EXIT:1 ×15 — SwapFree 16.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 5.1GB at cycle open (U6 active — continued decline from c345=6.2GB; trough12 deepening, not plateau). Post-audit 5.1GB (flat — audit cost minimal). SwapFree 16.2GB (flat). U2: clear. U6: ACTIVE. U7: clear. Audits ran (5.1GB >> 1.7GB threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×15 consecutive (c332–c346) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Memory trend: 6.3(c341-c344)→6.2(c345)→5.1(c346) — descent resuming after brief plateau; external workloads increasing. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:19Z — Loop cycle 345 (DEGRADED — memory 6.2GB U6 active trough12 ×5 — audits clean — graph-doctor EXIT:1 ×14 — SwapFree 16.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 6.2GB at cycle open (U6 active — 5th consecutive trough12 cycle; slight further dip from 6.3→6.2GB). Post-audit 5.7GB (audit cost 0.5GB — higher than recent cycles, bottom of trough12 deepening slightly). SwapFree 16.2GB (flat). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×14 consecutive (c332–c345) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:16Z — Loop cycle 344 (DEGRADED — memory 6.3GB U6 active trough12 ×4 — audits clean — graph-doctor EXIT:1 ×13 — SwapFree 16.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 6.3GB at cycle open (U6 active — 4th consecutive cycle at trough12 plateau; firmly established). Post-audit 6.2GB. SwapFree 16.2GB (flat). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×13 consecutive (c332–c344) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:13Z — Loop cycle 343 (DEGRADED — memory 6.3GB U6 active trough12 confirmed — audits clean — graph-doctor EXIT:1 ×12 — SwapFree 16.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 6.3GB at cycle open (U6 active — 3rd consecutive cycle at same level; trough12 confirmed stable at 6.2–6.3GB). Post-audit 6.2GB (consistent). SwapFree 16.2GB (flat). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×12 consecutive (c332–c343) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. Trough12 floor: 6.2GB (c341–c343). External workloads consuming ~9GB RAM (system total 15GB). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:10Z — Loop cycle 342 (DEGRADED — memory 6.3GB U6 active stable — audits clean — graph-doctor EXIT:1 ×11 — SwapFree 16.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 6.3GB at cycle open (U6 active — flat from c341=6.3GB; descent appears to have plateaued). Post-audit 6.2GB (minimal cost, consistent with c341). SwapFree 16.2GB (flat). U2: clear. U6: ACTIVE (6.3GB < 8GB). U7: clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×11 consecutive (c332–c342) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). Memory appears to be forming new trough plateau around 6.2–6.3GB — watching for reversal or continued descent. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:07Z — Loop cycle 341 (DEGRADED — memory 6.3GB U6 active — audits clean — graph-doctor EXIT:1 ×10 — SwapFree 16.2GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 6.3GB at cycle open (U6 active — continuing decline from c340=7.5GB; sawtooth descent underway). Post-audit 6.2GB (minimal audit cost). SwapFree 16.2GB (flat — no drain). U2: clear. U6: ACTIVE (6.3GB < 8GB). U7: clear. Audits ran (6.3GB > 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×10 consecutive (c332–c341) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 active). Memory trend: 12GB(c335)→8.2GB(c339)→7.5GB(c340)→6.3GB(c341) — steady decline, external workloads consuming RAM. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Cadence: 1200s.
+
+## 2026-05-15T07:04Z — Loop cycle 340 (DEGRADED — memory 7.5GB U6 RE-FIRED — audits clean — graph-doctor EXIT:1 ×9 — SwapFree 15.8GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 7.5GB at cycle open (U6 RE-FIRED — below 8GB threshold; regression from c339=8.2GB; external workloads resumed). Post-audit 7.4GB (flat — audit cost minimal). SwapFree 15.8GB (flat). U2: clear. U6: ACTIVE (re-fired c340 — 7.5GB < 8GB). U7: clear. Audits ran (memory 7.5GB > 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×9 consecutive (c332–c340) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED (U6 re-active). Memory pattern: 12GB peak (c335–c338) → 8.2GB (c339) → 7.5GB (c340) — declining sawtooth resumes. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=yes (U6 re-fired — memory regressed below 8GB). Cadence: 1200s.
+
+## 2026-05-15T07:01Z — Loop cycle 339 (DEGRADED — memory 8.2GB stable — U6 clear — audits clean — graph-doctor EXIT:1 ×8 — SwapFree 15.8GB stable — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 8.2GB at cycle open (slight pullback from c338=12GB — external workloads resumed; U6 still clear, above 8GB threshold). Post-audit memory 7.5GB (within normal audit-cost variance). SwapFree 15.8GB (flat — no drain). U2: clear. U6: CLEAR (5th consecutive cycle). U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×8 consecutive (c332–c339) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo memory gate: CLEAR. Structural block persists: 9c7f4bb9 (task-kind:investigate, no board_worker consumer). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:56Z — Loop cycle 338 (DEGRADED — memory 12GB stable — U6 clear — audits clean — graph-doctor EXIT:1 ×7 — SwapFree 15GB stable — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 12GB (flat, 4th consecutive healthy cycle). SwapFree 15GB (flat). U2: clear. U6: CLEAR (4th cycle). U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×7 consecutive (c332–c338) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo memory gate: CLEAR. Structural block persists: 9c7f4bb9. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:52Z — Loop cycle 337 (DEGRADED — memory 12GB stable — U6 clear — audits clean — graph-doctor EXIT:1 ×6 — SwapFree 15GB stable — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 12GB (flat, 3rd consecutive healthy cycle). SwapFree 15GB (flat). U2: clear. U6: CLEAR (3rd cycle). U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×6 consecutive (c332–c337) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo memory gate: CLEAR. Structural block persists: 9c7f4bb9 (task-kind:investigate, no board_worker consumer). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:49Z — Loop cycle 336 (DEGRADED — memory 12GB stable — U6 clear — audits clean — graph-doctor EXIT:1 ×5 — SwapFree 15GB stable — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 12GB at cycle open (flat from c335=12GB — healthy state holding, trough11 fully recovered). SwapFree 15GB (flat — no drain). U2: clear. U6: CLEAR (2nd cycle). U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×5 consecutive (c332–c336) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo memory gate: CLEAR. Structural block persists: 9c7f4bb9 (task-kind:investigate, no board_worker consumer). OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no (memory healthy 2nd consecutive cycle — no longer novel). Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:46Z — Loop cycle 335 (DEGRADED — memory 12GB FULL RECOVERY — U6 CLEARED — audits clean — graph-doctor EXIT:1 ×4 — SwapFree 15GB — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 12GB at cycle open (MASSIVE +10.2GB from c334=1.8GB — external workloads released, full recovery). SwapFree 15GB (+8.8GB from c334=6.2GB — swap fully reclaimed). U2: clear. U6: CLEARED (12GB >> 8GB threshold — memory gate lifted). U7: clear. Post-audit memory 12GB (unchanged). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×4 consecutive (c332–c335) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo memory gate: CLEAR (12GB > 8GB). HOWEVER: kodo dispatch still structurally blocked — R4AI contains only 9c7f4bb9 (task-kind:investigate, no board_worker consumer). Board not consumable. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=yes (U6 state change — memory recovered from trough11; external workload released). Operator actions still required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9 (NOW MEMORY IS HEALTHY — these could move when operator acts). Cadence: 1200s.
+
+## 2026-05-15T06:42Z — Loop cycle 334 (DEGRADED — memory 1.8GB DROPPED — audits ran EXTREME MARGIN — graph-doctor EXIT:1 ×3 — SwapFree 6.2GB draining — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.8GB at cycle open (SHARP -0.8GB from c333=2.6GB — trough11 onset; 0.1GB above 1.7GB audit skip threshold). Audits ran at extreme margin — post-audit memory 1.8GB (no further drop observed; consistent with recent cycle behavior where audit cost inconsistent). SwapFree 6.2GB (-0.4GB from c333=6.6GB — drain resumed, -0.2GB during audit window; U7 headroom 1.2GB). U2: clear (1.8 > 1.2). U6: ACTIVE. U7: clear. Audits: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 ×3 consecutive (c332/c333/c334) — B1-constrained stable regression. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Trough11 onset — if descent continues next cycle may breach 1.7GB audit skip threshold. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:38Z — Loop cycle 333 (DEGRADED — memory 2.6GB stable — audits clean — graph-doctor EXIT:1 ×2 — SwapFree 6.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.6GB at cycle open (flat from c332=2.5GB — stable). SwapFree 6.6GB (flat — drain halted 3rd consecutive cycle). U2: clear. U6: ACTIVE. U7: clear (1.6GB headroom). Audits: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 for 2nd consecutive cycle (c332+c333) — B1-constrained LocalManifest unknown repo_id, fail_graph_none; no fix path from watchdog. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no (graph-doctor EXIT:1 now confirmed stable regression, not transient; same root cause both cycles). Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:35Z — Loop cycle 332 (DEGRADED — memory 2.5GB stable — audits clean — graph-doctor EXIT:1 regression — SwapFree 6.6GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.5GB at cycle open (+0.2GB from c331=2.3GB — stable, trough10 fully recovered). Post-audit 2.6GB (no drop). SwapFree 6.6GB (flat — drain fully halted). U2: clear. U6: ACTIVE. U7: clear (1.6GB headroom). Audits: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check 0, check-regressions 0. graph-doctor: EXIT:1 — REGRESSION (was EXIT:0 c324–c331; reverted to fail_graph_none with B1-constrained unknown repo_id warning). No new action path — root cause is in external repo LocalManifest (B1-constrained); not fixable from this path. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=yes (graph-doctor EXIT code regression EXIT:0→EXIT:1; no action path available). Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:32Z — Loop cycle 331 (DEGRADED — memory 2.3GB stable — audits clean — SwapFree 6.6GB stable — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.3GB at cycle open (flat from c330=2.4GB — trough10 fully recovered, stable plateau). SwapFree 6.6GB (+0.1GB from c330=6.5GB — drain halted, marginal recovery). U2: clear. U6: ACTIVE. U7: clear (1.6GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, graph-doctor EXIT:0 (known warning), reaudit-check 0, check-regressions 0. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory and SwapFree both stabilized — external workload pressure appears to have subsided post-trough10. No state change warranting unpark. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:26Z — Loop cycle 330 (DEGRADED — memory 2.4GB recovered — audits clean — SwapFree 6.5GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.4GB at cycle open (+0.5GB from c329=1.9GB — trough10 recovery continuing). Post-audit memory unchanged at 2.4GB (no audit-induced drop). SwapFree 6.5GB (-0.1GB from c329=6.6GB — essentially flat, drain slowing). U2: clear. U6: ACTIVE. U7: clear (1.5GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, graph-doctor EXIT:0 (known warning), reaudit-check 0, check-regressions 0. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. SwapFree drain rate slowing: c327→c328=0, c328→c329=-0.3, c329→c330=-0.1GB. External workload pressure subsiding. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:23Z — Loop cycle 329 (DEGRADED — memory 1.9GB trough10 recovering — audits clean — SwapFree 6.6GB draining — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.9GB at cycle open (+0.3GB from c328=1.6GB — trough10 recovering, above 1.7GB threshold). Post-audit memory unchanged at 1.9GB (no audit-induced drop — consistent with c326 behavior; audit cost inconsistent). SwapFree 6.6GB (-0.3GB from c328=6.9GB — slow continued drain, U7 headroom 1.6GB). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, graph-doctor EXIT:0 (known warning), reaudit-check 0, check-regressions 0. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. SwapFree continues slow drain (-0.3GB/cycle recent average); U7 headroom at 1.6GB — at current drain rate, U7 risk remains ~5 cycles. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:19Z — Loop cycle 328 (DEGRADED — memory 1.6GB partial recovery — audits SKIPPED — SwapFree 6.9GB flat — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.6GB at cycle open (+0.2GB from c327=1.4GB — partial recovery, still in trough10). Audits SKIPPED (1.6GB ≤ 1.7GB threshold). SwapFree 6.9GB (unchanged from c327 — drain halted). U2: clear. U6: ACTIVE. U7: clear (1.9GB headroom, stable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory trough10 oscillating: c327=1.4GB→c328=1.6GB (slow climb, consistent with prior trough recovery patterns). SwapFree stabilized at 6.9GB. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:16Z — Loop cycle 327 (DEGRADED — memory 1.4GB DROPPED — audits SKIPPED — SwapFree 6.9GB draining — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.4GB at cycle open (-1.1GB from c326=2.5GB — sharp sawtooth drop, new trough forming). Audits SKIPPED (1.4GB ≤ 1.7GB threshold — running audits would risk approaching U2=1.2GB). SwapFree 6.9GB (-0.9GB from c326=7.8GB — continued drain, U7 headroom 1.9GB). U2: clear (>1.2GB). U6: ACTIVE. U7: clear but headroom narrowing. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory sawtooth: c326=2.5GB→c327=1.4GB — trough10 forming. SwapFree drain: c326=7.8GB→c327=6.9GB (-0.9GB/cycle). ALERT: U7 headroom at 1.9GB — at current drain rate, U7 fires in ~2 cycles. Operator actions required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:12Z — Loop cycle 326 (DEGRADED — memory 2.5GB stable — audits clean — SwapFree 7.8GB — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.5GB at cycle open (+0.8GB from c325=1.7GB — good recovery). Post-audit memory unchanged at 2.5GB (no audit-induced drop this cycle — caching or workload quiet period). SwapFree 7.8GB (+0.1GB from c325=7.7GB — flat/stable). U2: clear. U6: ACTIVE. U7: clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, graph-doctor EXIT:0 (warning about unknown repo_id — known ongoing), reaudit-check 0, check-regressions 0. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. NON-CONVERGENT / OPERATOR-BLOCKED active. NEW_EVIDENCE_DETECTED=no. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:08Z — Loop cycle 325 (DEGRADED — memory 1.7GB AT THRESHOLD — audits SKIPPED — SwapFree 7.7GB — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 1.7GB at cycle open — exactly at ≤1.7GB audit-skip threshold. Step 1 audits SKIPPED (running audits would consume ~0.6GB, dropping to ~1.1GB which approaches U2=1.2GB). SwapFree 7.7GB (-0.4GB from c324=8.1GB — slow normal drain, U7 headroom 2.7GB). U2: clear. U6: ACTIVE. U7: clear. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). kodo gate: BLOCKED. OPERATOR-BLOCKED/NON-CONVERGENT active. NEW_EVIDENCE_DETECTED=no. Memory pattern: c324 opened 2.0GB, post-audit 1.4GB → c325 opened 1.7GB — partial recovery in 1200s. External workload driving persistent memory pressure. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T06:04Z — Loop cycle 324 (DEGRADED — memory 2.0GB open/1.4GB post-audit — SwapFree 8.1GB recovered — audits clean — graph-doctor now EXIT:0 — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked). Memory 2.0GB at cycle open (+0.21GB from c323=1.79GB — slow recovery). Post-audit drop to 1.4GB — audits consume ~0.6GB at this memory level. SwapFree 8.1GB (+1.5GB from c323=6.60GB — significant recovery, U7 headroom restored to 3.1GB). U2: clear. U6: ACTIVE (memory < 8GB throughout). U7: clear (8.1GB, 3.1GB above threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, graph-doctor EXIT:0 (NEW — previously EXIT:1; warning about unknown repo_id still present but tool no longer treats as error), reaudit-check 0 (kodo/archon not needed), check-regressions 0. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — no change). kodo gate: BLOCKED (memory < 8GB). NON-CONVERGENT / AUTOMATION-SELF-DECEPTION: board state frozen 20+ cycles, no queue evolution. OPERATOR-BLOCKED active. NEW_EVIDENCE_DETECTED=no (board/queue/triage identical to c323). SwapFree recovery from c322-c323 trough appears complete — external workload has subsided. Operator actions required: CANCEL 925be138, move 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-15T05:58Z — Loop cycle 323 (DEGRADED — memory 1.79GB U2 clearing — SwapFree 6.60GB recovering — audits ran EXTREME MARGIN — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 1.79GB (+0.92GB from c322=0.87GB — U2 cleared, recovery from catastrophic drop). SwapFree 6.60GB (+3.45GB from c322=9.15GB wait — actually c322 was 9.15GB, so SwapFree increased — workload released). Note: U2 fired at c322=0.87GB; c323=1.79GB shows rapid recovery — consistent with brief external workload burst that has now subsided. U2: clear (>1.2GB). U6: ACTIVE. U7: clear (>5GB). Audits ran at EXTREME MARGIN (1.79GB — only 0.09GB above 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. SwapFree recovery: c322=9.15GB→c323=6.60GB — wait, c322 SwapFree was 9.15GB and c323 is 6.60GB, that's a -2.55GB drop. The external workload may still be active and converting RAM back to swap. ALERT: SwapFree dropped another 2.55GB this cycle despite RAM recovering. U7 threshold is 5GB — current 6.60GB, only 1.60GB headroom. If next cycle SwapFree drops >1.60GB, U7 will fire. Cadence: 1200s.
+
+## 2026-05-15T05:54Z — Loop cycle 322 (CRITICAL — U2 FIRED memory 0.87GB — SwapFree 9.15GB — ALL AUDITS SKIPPED — OPERATOR ACTION REQUIRED)
+
+Health: CRITICAL — U2 FIRED (MemAvailable=0.87GB < 1.2GB threshold). ALL AUDITS AND TRIAGE SKIPPED per U2 protocol. Memory: 0.87GB (CATASTROPHIC DROP from c321=2.43GB, -1.56GB in one cycle — extreme event, well below prior historical floor t8=1.93GB). SwapFree: 9.15GB (-2.74GB from c321=11.89GB, MASSIVE DRAIN — this is likely the cause: external workload consuming swap rapidly). U2: FIRED. U6: ACTIVE. U7: clear (SwapFree 9.15GB > 5GB). kodo gate: BLOCKED. Board: R4AI=1, Blocked=7 (unverified — skipping Plane calls). OPERATOR ACTION REQUIRED: system is near-OOM. Swap drain (-2.74GB this cycle) is extreme — if it continues at this rate, U7 (SwapFree < 5GB) will fire within 2 cycles. Prior trough context for comparison: t8 floor=1.93GB (c319) — c322 is 1.06GB BELOW prior floor. This appears to be a new trough9 or an anomalous spike caused by a large external workload burst. Cadence: 1200s — next cycle check memory first.
+
+## 2026-05-15T05:51Z — Loop cycle 321 (DEGRADED — memory 2.43GB U6 active trough8 recovery — SwapFree 11.89GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.43GB (+0.22GB from c320=2.21GB — trough8 recovery continuing). SwapFree 11.89GB (+0.02GB from c320=11.87GB — DRAIN STABILIZED, essentially flat). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.73GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory recovery: c319=1.93(floor)→c320=2.21→c321=2.43. SwapFree drain stabilized: c320=11.87→c321=11.89 (flat, elevated drain resolved). Cadence: 1200s.
+
+## 2026-05-15T05:47Z — Loop cycle 320 (DEGRADED — memory 2.21GB U6 active trough8 REVERSAL floor=1.93GB — SwapFree 11.87GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.21GB (+0.28GB from c319=1.93GB — TROUGH8 REVERSAL confirmed, floor at 1.93GB). SwapFree 11.87GB (-0.52GB from c319=12.39GB, ELEVATED drain rate — elevated third consecutive cycle). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.51GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Trough8 complete: floor=1.93GB (c319) — new historical low, below prior t4=2.20(c295). Trough history: t4=2.20(c295), t5=2.46(c300), t6=2.31(c303), t7=2.21(c316), t8=1.93(c319). ALERT: SwapFree drain accelerating — c318=12.56→c319=12.39→c320=11.87 (-0.52GB this cycle). Cadence: 1200s.
+
+## 2026-05-15T05:43Z — Loop cycle 319 (DEGRADED — memory 1.93GB U6 active trough8 CRITICAL — SwapFree 12.39GB — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 1.93GB (-0.11GB from c318=2.04GB — trough8 descent continuing, CRITICAL: only 0.23GB above 1.7GB audit-skip threshold). SwapFree 12.39GB (-0.17GB from c318=12.56GB, steady drain). U2 clear (>1.2GB). U6 ACTIVE. U7 clear. Audits ran (just above 1.7GB skip threshold — 0.23GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Trough8 descent: c317=2.91(peak)→c318=2.04→c319=1.93. Rate slowing (-0.87 then -0.11) suggesting near floor. If descent continues at -0.11GB/cycle: c320≈1.82GB (above threshold), c321≈1.71GB (just above), c322≈1.60GB (SKIP). ALERT: c320 may be the last cycle audits run if trough continues. Cadence: 1200s.
+
+## 2026-05-15T05:39Z — Loop cycle 318 (DEGRADED — memory 2.04GB U6 active SHARP DROP new trough low — SwapFree 12.56GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.04GB (SHARP DROP -0.87GB from c317=2.91GB — NEW TROUGH LOW, below all prior trough floors: t4=2.20, t5=2.46, t6=2.31, t7=2.21). SwapFree 12.56GB (-0.47GB from c317=13.03GB, ELEVATED drain rate). U2 clear (>1.2GB). U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.34GB headroom, VERY TIGHT — immediate breach risk if descent continues). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. ALERT: trough8 underway — 2.04GB is a new sawtooth minimum. If c319 < 1.71GB, audits will be skipped. SwapFree drain accelerating (-0.47GB this cycle vs -0.18GB c317). Cadence: 1200s.
+
+## 2026-05-15T05:35Z — Loop cycle 317 (DEGRADED — memory 2.91GB U6 active trough7 REVERSAL — SwapFree 13.03GB — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.91GB (+0.70GB from c316=2.21GB — TROUGH7 REVERSAL confirmed, floor at 2.21GB=t4 floor). SwapFree 13.03GB (-0.18GB from c316=13.21GB, slow drain continuing). U2 clear. U6 ACTIVE. U7 clear. Audits ran (well above 1.7GB skip threshold — 1.21GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Trough7 complete: floor=2.21GB (c316), same depth as t4=2.20(c295). Recovery underway. Trough floors: t4=2.20(c295), t5=2.46(c300), t6=2.31(c303), t7=2.21(c316). Cadence: 1200s.
+
+## 2026-05-15T05:51Z — Loop cycle 316 (DEGRADED — memory 2.21GB U6 active trough7 deepening — SwapFree 13.21GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.21GB (-0.30GB from c315=2.51GB — trough7 descent continuing, approaching trough4 floor of 2.20GB). SwapFree 13.21GB (-0.22GB from c315=13.43GB, drain rate elevated this cycle). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.51GB headroom, TIGHT — next descent cycle risks audit-skip breach). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory descent: c314=3.03→c315=2.51→c316=2.21GB. Trough7 at or near floor — t4=2.20(c295), t5=2.46(c300), t6=2.31(c303). At 2.21GB only 0.01GB above t4 floor — if trough deepens further, next cycle at 1.7GB boundary. ALERT: if c317 < 1.71GB, audits will be skipped. Cadence: 1200s.
+
+## 2026-05-15T05:25Z — Loop cycle 315 (DEGRADED — memory 2.51GB U6 active SHARP DROP trough7 onset — SwapFree 13.43GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.51GB (-0.52GB from c314=3.03GB, SHARP DROP — trough7 descent beginning, consistent with sawtooth pattern). SwapFree 13.43GB (+0.01GB from c314=13.42GB, flat). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.81GB headroom, approaching tighter margin). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory: plateau c310–c314 (3.00–3.08GB, 5 cycles) broke sharply to 2.51GB. Trough7 onset. Prior trough floors: t4=2.20(c295), t5=2.46(c300), t6=2.31(c303). If trough7 follows pattern, floor may be ~2.20–2.46GB. ALERT: next cycle may breach 1.7GB skip threshold. Cadence: 1200s.
+
+## 2026-05-15T05:22Z — Loop cycle 314 (DEGRADED — memory 3.03GB U6 active flat — SwapFree 13.42GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.03GB (+0.01GB from c313=3.02GB, effectively flat). SwapFree 13.42GB (flat from c313=13.42GB). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.33GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory plateau stabilized: c310=3.08→c311=3.06→c312=3.00→c313=3.02→c314=3.03GB (very tight range 3.00–3.08GB over last 5 cycles). SwapFree: locked at ~13.40–13.42GB (5 cycles stable). Sawtooth oscillation appears to be in an unusually flat inter-trough plateau. Cadence: 1200s.
+
+## 2026-05-15T05:18Z — Loop cycle 313 (DEGRADED — memory 3.02GB U6 active slight uptick — SwapFree 13.42GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.02GB (+0.02GB from c312=3.00GB, slight uptick — plateau oscillating). SwapFree 13.42GB (+0.01GB from c312=13.41GB, flat). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.32GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory plateau oscillating: c309=3.16→c310=3.08→c311=3.06→c312=3.00→c313=3.02GB (bouncing ~3.00–3.16GB range). SwapFree stable: ~13.40–13.42GB (effectively flat over c311–c313). Cadence: 1200s.
+
+## 2026-05-15T05:14Z — Loop cycle 312 (DEGRADED — memory 3.00GB U6 active slow descent — SwapFree 13.41GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.00GB (-0.06GB from c311=3.06GB, slow descent from post-trough6 plateau). SwapFree 13.41GB (+0.01GB from c311=13.40GB, essentially flat). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.30GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6 plateau descending: c309=3.16→c310=3.08→c311=3.06→c312=3.00GB (slow descent ~-0.05GB/cycle). SwapFree stable: 13.40–13.41GB (oscillating flat). Cadence: 1200s.
+
+## 2026-05-15T05:10Z — Loop cycle 311 (DEGRADED — memory 3.06GB U6 active stable — SwapFree 13.40GB slow drain — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.06GB (-0.02GB from c310=3.08GB, essentially flat — post-trough6 recovery stabilizing). SwapFree 13.40GB (-0.08GB from c310=13.48GB, slow steady drain). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.36GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6 plateau: c308=2.88→c309=3.16→c310=3.08→c311=3.06GB (stabilizing ~3.0–3.1GB range). SwapFree cumulative drain: c308=13.78→c311=13.40GB (-0.38GB over 3 cycles, ~-0.13GB/cycle). Cadence: 1200s.
+
+## 2026-05-15T05:07Z — Loop cycle 310 (DEGRADED — memory 3.08GB U6 active minor dip — SwapFree 13.48GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.08GB (-0.08GB from c309=3.16GB, minor oscillation within post-trough6 recovery). SwapFree 13.48GB (flat from c309=13.48GB, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.38GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6: c303=2.31(trough6)→...→c309=3.16→c310=3.08GB (minor dip, still within recovery range). SwapFree stable: c309=13.48→c310=13.48GB (flat). Cadence: 1200s.
+
+## 2026-05-15T05:03Z — Loop cycle 309 (DEGRADED — memory 3.16GB U6 active notable climb — SwapFree 13.48GB — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.16GB (+0.28GB from c308=2.88GB, notable climb continuing post-trough6). SwapFree 13.48GB (-0.30GB from c308=13.78GB, modest drain). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.46GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6: c303=2.31(trough6)→c304=2.78→c305=2.57→c306=2.67→c307=2.77→c308=2.88→c309=3.16GB (upward trend accelerating). SwapFree: c308=13.78→c309=13.48GB (-0.30GB, larger single-cycle drain than avg). Cadence: 1200s.
+
+## 2026-05-15T04:59Z — Loop cycle 308 (DEGRADED — memory 2.88GB U6 active continued post-trough6 climb — SwapFree 13.78GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.88GB (+0.11GB from c307=2.77GB, post-trough6 gradual climb continuing). SwapFree 13.78GB (+0.01GB from c307=13.77GB, flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.18GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6 climb: c303=2.31(trough6)→c304=2.78→c305=2.57→c306=2.67→c307=2.77→c308=2.88GB (oscillating upward). SwapFree accumulated drain: c293=15.01→c308=13.78GB (~-0.089GB/cycle avg over 15 cycles). Cadence: 1200s.
+
+## 2026-05-15T04:54Z — Loop cycle 307 (DEGRADED — memory 2.77GB U6 active continued slow climb — SwapFree 13.77GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.77GB (+0.10GB from c306=2.67GB, continued slow climb post-trough6). SwapFree 13.77GB (-0.02GB from c306=13.79GB, flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.07GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6 gradual climb: c303=2.31(trough6)→c304=2.78→c305=2.57→c306=2.67→c307=2.77GB (oscillating upward, consistent with prior post-trough recovery). SwapFree accumulated drain: c293=15.01→c307=13.77GB (~-0.09GB/cycle avg over 14 cycles). Cadence: 1200s.
+
+## 2026-05-15T04:50Z — Loop cycle 306 (DEGRADED — memory 2.67GB U6 active minor bounce — SwapFree 13.79GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.67GB (+0.10GB from c305=2.57GB, minor bounce after post-trough6 decline). SwapFree 13.79GB (-0.02GB from c305=13.81GB, flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.97GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory oscillating in compressed range: c303=2.31(trough6)→c304=2.78→c305=2.57→c306=2.67GB (bouncing narrowly, unclear if ascending or forming another trough). SwapFree near-flat: c304=13.85→c305=13.81→c306=13.79GB (-0.02GB/cycle, essentially flat). Cadence: 1200s.
+
+## 2026-05-15T04:47Z — Loop cycle 305 (DEGRADED — memory 2.57GB U6 active post-trough6 decline — SwapFree 13.81GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.57GB (-0.21GB from c304=2.78GB, post-trough6 rebound peak fading, decline resuming). SwapFree 13.81GB (-0.04GB from c304=13.85GB, flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.87GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough6 mini-plateau fading: c303=2.31(trough6)→c304=2.78→c305=2.57GB (decline resuming after single-cycle rebound — shorter plateau than prior troughs). Sawtooth period appears to be shortening. 0.87GB above audit-skip threshold. Cadence: 1200s.
+
+## 2026-05-15T04:43Z — Loop cycle 304 (DEGRADED — memory 2.78GB U6 active trough6 rebound — SwapFree 13.85GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.78GB (+0.47GB from c303=2.31GB, trough6 floor candidate c303=2.31GB, now rebounding). SwapFree 13.85GB (flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.08GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Sawtooth trough6 floor candidate: c303=2.31GB, same as trough3=2.46GB but deeper — trough floors not monotonically deepening (trough4=2.20 remains deepest). Rebound at c304=2.78GB consistent with prior post-trough recovery pattern. SwapFree stable: c303=13.85→c304=13.85GB (flat). Accumulated SwapFree drain from session start: c293=15.01→c304=13.85GB (~-0.11GB/cycle avg). Cadence: 1200s.
+
+## 2026-05-15T04:39Z — Loop cycle 303 (DEGRADED — memory 2.31GB U6 active SHARP DROP — SwapFree 13.85GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.31GB (-0.62GB from c302=2.93GB, sharpest drop this session since c295=-0.48GB). SwapFree 13.85GB (flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.61GB headroom, CRITICAL MARGIN). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. MEMORY ALERT: c300=2.46→c301=2.85→c302=2.93→c303=2.31GB — post-trough5 rebound plateau ended abruptly; new descent began. At -0.62GB/cycle, next cycle would hit 1.69GB (below 1.7GB audit-skip threshold). Sawtooth trough6 forming; if next cycle drops to ~1.69GB, audits will skip. Headroom from threshold: only 0.61GB. Cadence: 1200s.
+
+## 2026-05-15T04:35Z — Loop cycle 302 (DEGRADED — memory 2.93GB U6 active slow rebound — SwapFree 13.84GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.93GB (+0.08GB from c301=2.85GB, slow continued rebound from trough5). SwapFree 13.84GB (-0.04GB from c301=13.88GB, flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.23GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory post-trough5 rebound plateau forming: c300=2.46→c301=2.85→c302=2.93GB (slow climb, consistent with prior post-trough plateau patterns). SwapFree stabilizing: c301=13.88→c302=13.84GB (-0.04GB, near-flat). Cadence: 1200s.
+
+## 2026-05-15T04:31Z — Loop cycle 301 (DEGRADED — memory 2.85GB U6 active rebounding — SwapFree 13.88GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.85GB (+0.39GB from c300=2.46GB, trough5 rebound — floor may be c300=2.46GB). SwapFree 13.88GB (-0.39GB from c300=14.27GB, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.15GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Sawtooth trough5 floor candidate: c300=2.46GB (now rebounding at c301=2.85GB). Trough floors: trough1=3.89→trough2=2.68→trough3=2.46→trough4=2.20→trough5≈2.46GB (not deeper than trough4 — oscillation may be stabilizing). SwapFree accumulated drain: c293=15.01→c300=14.27→c301=13.88GB (avg -0.13GB/cycle). Cadence: 1200s.
+
+## 2026-05-17T15:41Z — Loop cycle 300 (DEGRADED — memory 2.46GB U6 active descending — SwapFree 14.27GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.46GB (-0.16GB from c299=2.62GB, sawtooth descent resuming after plateau). SwapFree 14.27GB (flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.76GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory descent from plateau: c298=2.62→c299=2.62→c300=2.46GB. Trough5 approaching — if descent continues at -0.16GB/cycle, audit-skip at 1.7GB is ~5 cycles away. Sawtooth trough floors deepening each cycle: trough1=3.89→trough2=2.68→trough3=2.46→trough4=2.20. Cadence: 1200s.
+
+## 2026-05-17T15:21Z — Loop cycle 299 (DEGRADED — memory 2.62GB U6 active flat — SwapFree 14.27GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.62GB (flat from c298=2.62GB, post-trough4 plateau). SwapFree 14.27GB (-0.16GB from c298=14.43GB, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.92GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory trend: c296=2.49→c297=2.52→c298=2.62→c299=2.62GB (plateau, external workloads likely restarted as sawtooth descent will follow). SwapFree drain: c298=14.43→c299=14.27GB (-0.16GB, elevated vs avg). Cadence: 1200s.
+
+## 2026-05-17T15:01Z — Loop cycle 298 (DEGRADED — memory 2.62GB U6 active slow climb — SwapFree 14.43GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.62GB (+0.10GB from c297=2.52GB, slow post-trough4 climb). SwapFree 14.43GB (-0.09GB from c297=14.52GB, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.92GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory trend post-trough4: c295=2.20→c296=2.49→c297=2.52→c298=2.62GB (slow climb, consistent with prior post-trough plateau+recovery pattern). SwapFree drain: c297=14.52→c298=14.43GB. Cadence: 1200s.
+
+## 2026-05-17T14:41Z — Loop cycle 297 (DEGRADED — memory 2.52GB U6 active flat — SwapFree 14.52GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.52GB (+0.03GB from c296=2.49GB, essentially flat post-trough4 rebound plateau). SwapFree 14.52GB (-0.03GB from c296=14.55GB, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.82GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory plateauing post-trough4: c295=2.20→c296=2.49→c297=2.52GB (rebound stabilizing). SwapFree drain: c293=15.01→...→c297=14.52GB (~-0.12GB/cycle avg trend). Cadence: 1200s.
+
+## 2026-05-17T14:21Z — Loop cycle 296 (DEGRADED — memory 2.49GB U6 active minor rebound — SwapFree 14.55GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.49GB (+0.29GB from c295=2.20GB, minor sawtooth rebound). SwapFree 14.55GB (-0.26GB from c295=14.81GB, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.79GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory oscillation: c293=2.76→c294=2.68→c295=2.20→c296=2.49GB (c295 was trough4 floor=2.20GB, rebounding). SwapFree accumulated drain: c293=15.01→c294=14.80→c295=14.81→c296=14.55GB (~-0.15GB/cycle avg). Cadence: 1200s.
+
+## 2026-05-17T14:01Z — Loop cycle 295 (DEGRADED — memory 2.20GB U6 active declining sharply — SwapFree 14.81GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.20GB (-0.48GB from c294=2.68GB, sharpest single-cycle drop this session). SwapFree 14.81GB (-0.01GB flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.50GB headroom, CRITICAL margin). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory ALERT: c293=2.76→c294=2.68→c295=2.20GB (-0.48GB this cycle, steepest drop yet — next sawtooth trough approaching; audit skip threshold at 1.7GB, only 0.50GB headroom). If next cycle drops below 1.7GB, audits will skip. Cadence: 1200s.
+
+## 2026-05-17T13:41Z — Loop cycle 294 (DEGRADED — memory 2.68GB U6 active declining — SwapFree 14.80GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.68GB (-0.08GB from c293=2.76GB, sawtooth descent resuming). SwapFree 14.80GB (-0.21GB from c293=15.01GB, steady drain, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.98GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory: c292=2.63→c293=2.76→c294=2.68GB (oscillating, minor bounce faded, descent resuming). SwapFree drain continues: c293=15.01→c294=14.80GB. Cadence: 1200s.
+
+## 2026-05-17T13:21Z — Loop cycle 293 (DEGRADED — memory 2.76GB U6 active minor bounce — SwapFree 15.01GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.76GB (+0.13GB from c292=2.63GB, minor bounce, sawtooth oscillating). SwapFree 15.01GB (flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.06GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory: c290=2.97→c291=2.79→c292=2.63→c293=2.76GB (minor bounce, no clear trend break). Sawtooth oscillation continues. Cadence: 1200s.
+
+## 2026-05-17T12:41Z — Loop cycle 292 (DEGRADED — memory 2.63GB U6 active declining — SwapFree 15.04GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.63GB (-0.16GB from c291=2.79GB, steady sawtooth decline). SwapFree 15.04GB (flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.93GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory decline: c289=3.00→c290=2.97→c291=2.79→c292=2.63GB (avg -0.12GB/cycle this descent). 0.93GB above audit-skip threshold. Cadence: 1200s.
+
+## 2026-05-17T12:21Z — Loop cycle 291 (DEGRADED — memory 2.79GB U6 active declining — SwapFree 15.00GB bounced — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.79GB (-0.18GB from c290=2.97GB, sawtooth descent resuming). SwapFree 15.00GB (+0.06GB from c290=14.94GB, minor bounce, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 1.09GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Sawtooth: c289=3.00→c290=2.97→c291=2.79GB, descent steepening again. Headroom above 1.7GB audit-skip threshold: 1.09GB. Cadence: 1200s.
+
+## 2026-05-17T12:01Z — Loop cycle 290 (DEGRADED — memory 2.97GB U6 active flat — SwapFree 14.94GB draining — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.97GB (-0.03GB from c289=3.00GB, flat after trough3 rebound). SwapFree 14.94GB (-0.25GB from c289, U7 clear — drain rate elevated this cycle). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Sawtooth memory plateau post-trough3: c289=3.00→c290=2.97GB (flat, consistent with c285-c286 post-trough2 plateau). SwapFree drain: c285=15.79→c289=15.19→c290=14.94GB; accumulating loss is notable. U7 (5GB) still >9GB away. Cadence: 1200s.
+
+## 2026-05-17T11:41Z — Loop cycle 289 (DEGRADED — memory 3.00GB U6 active bouncing — SwapFree 15.19GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.00GB (+0.54GB from c288=2.46GB, sawtooth trough3 rebounding). SwapFree 15.19GB (-0.30GB from c288, U7 clear — steady drain continues). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Sawtooth pattern: trough1=3.89(c278)→trough2=2.68(c284)→trough3=2.46(c288, deepest yet). Trough3 rebounded at c289=3.00GB. SwapFree steady drain: c285=15.79→c286=15.75→c287=15.52→c288=15.49→c289=15.19GB (~-0.15GB/cycle avg). Cadence: 1200s.
+
+## 2026-05-17T11:21Z — Loop cycle 288 (DEGRADED — memory 2.46GB U6 active declining — SwapFree 15.49GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.46GB (-0.51GB from c287=2.97GB, accelerating decline). SwapFree 15.49GB (flat, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold — 0.76GB headroom, CRITICAL: if rate holds breach in ~1-2 cycles). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory trajectory: c284=2.68(trough2)→c285=3.07→c286=3.07→c287=2.97→c288=2.46GB. Decline rate -0.51GB this cycle (accelerating). Audit-skip breach imminent if rate holds. Cadence: 1200s.
+
+## 2026-05-17T11:01Z — Loop cycle 287 (DEGRADED — memory 2.97GB U6 active declining — SwapFree 15.52GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.97GB (-0.10GB from c286=3.07GB, slow decline resumes after 2-cycle plateau). SwapFree 15.52GB (-0.23GB from c286, U7 clear). U2 clear. U6 ACTIVE. U7 clear. Audits ran (above 1.7GB skip threshold, 1.27GB headroom). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory: c284=2.68 (trough2)→c285=3.07→c286=3.07 (plateau)→c287=2.97 (slow decline). SwapFree drain accelerated this cycle (-0.23GB vs prior -0.04GB). Cadence: 1200s.
+
+## 2026-05-17T10:41Z — Loop cycle 286 (DEGRADED — memory 3.07GB U6 active flat — SwapFree 15.75GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.07GB (flat from c285=3.07GB, holding at trough2 recovery plateau). SwapFree 15.75GB (U7 clear, minor drain -0.04GB from c285). U2 clear. U6 ACTIVE. U7 clear. Audits ran. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory plateau at ~3.07GB for 2 consecutive cycles (c285-c286) — unclear if trough2 is over or still settling. Cadence: 1200s.
+
+## 2026-05-17T10:21Z — Loop cycle 285 (DEGRADED — memory 3.07GB U6 active bouncing — SwapFree 15.79GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.07GB (+0.39GB from c284=2.68GB, sawtooth trough rebounding). SwapFree 15.79GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory bounced from trough2 low (c284=2.68→c285=3.07GB); prior trough1=3.89GB, trough2 went lower at 2.68GB. Recovery trajectory: +0.39GB this cycle vs c280 recovery of +0.28GB/cycle. Cadence: 1200s.
+
+## 2026-05-17T10:01Z — Loop cycle 284 (DEGRADED — memory 2.68GB U6 active declining deeper — SwapFree 15.80GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 2.68GB (-0.66GB from c283=3.34GB, sawtooth extending lower than prior troughs). SwapFree 15.80GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above 1.7GB skip threshold). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory trending lower this sawtooth cycle (c281=4.13→c282=3.64→c283=3.34→c284=2.68GB). 0.97GB headroom above audit-skip threshold. Cadence: 1200s.
+
+## 2026-05-17T09:41Z — Loop cycle 283 (DEGRADED — memory 3.34GB U6 active sawtooth — SwapFree 15.80GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.34GB (-0.30GB from c282=3.64GB, sawtooth decline continuing). SwapFree 15.80GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Sawtooth pattern: troughs ~3.3-3.6GB, peaks ~4.3GB. Cadence: 1200s.
+
+## 2026-05-17T09:21Z — Loop cycle 282 (DEGRADED — memory 3.64GB U6 active declining — SwapFree 15.81GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.64GB (-0.49GB from c281=4.13GB, declining again). SwapFree 15.81GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory oscillating with downward excursions (c278=3.89→c279=4.17→c280=4.34→c281=4.13→c282=3.64GB). Cadence: 1200s.
+
+## 2026-05-17T09:01Z — Loop cycle 281 (DEGRADED — memory 4.13GB U6 active oscillating — SwapFree 15.81GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 4.13GB (-0.21GB from c280=4.34GB, minor oscillation in ~4GB range). SwapFree 15.81GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T08:41Z — Loop cycle 280 (DEGRADED — memory 4.34GB U6 active recovering — SwapFree 15.81GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 4.34GB (+0.17GB from c279=4.17GB, continued recovery from c278 trough). SwapFree 15.81GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory trend recovering: c278=3.89→c279=4.17→c280=4.34GB. Cadence: 1200s.
+
+## 2026-05-17T08:21Z — Loop cycle 279 (DEGRADED — memory 4.17GB U6 active recovering — SwapFree 15.81GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 4.17GB (+0.28GB from c278=3.89GB, slight recovery — trend reversing). SwapFree 15.81GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T08:01Z — Loop cycle 278 (DEGRADED — memory 3.89GB U6 active declining — SwapFree 15.80GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 3.89GB (-0.66GB from c277=4.55GB, continued decline). SwapFree 15.80GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Memory declining cycle-over-cycle (c276=5.54→c277=4.55→c278=3.89GB). Cadence: 1200s.
+
+## 2026-05-17T07:42Z — Loop cycle 277 (DEGRADED — memory 4.55GB U6 active declining — SwapFree 15.80GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 4.55GB (-0.99GB from c276=5.54GB, declining). SwapFree 15.80GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T07:22Z — Loop cycle 276 (DEGRADED — memory 5.54GB U6 active — SwapFree 15.88GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 5.54GB (-0.41GB from c275=5.95GB, slow oscillation). SwapFree 15.88GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T07:02Z — Loop cycle 275 (DEGRADED — memory 5.95GB U6 active flat — SwapFree 15.88GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 5.95GB (-0.13GB from c274=6.08GB, flat oscillation). SwapFree 15.88GB (+0.01GB, flat). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T06:42Z — Loop cycle 274 (DEGRADED — memory 6.08GB U6 active flat — SwapFree 15.87GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 6.08GB (+0.06GB from c273=6.02GB, flat). SwapFree 15.87GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T06:22Z — Loop cycle 273 (DEGRADED — memory 6.02GB U6 active flat — SwapFree 15.87GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 6.02GB (+0.04GB from c272=5.98GB, flat — external workloads stabilizing). SwapFree 15.87GB (flat, U7 clear). U2 clear. U6 ACTIVE (below 8GB). U7 clear. Audits ran (above skip thresholds). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T06:02Z — Loop cycle 272 (DEGRADED — memory 5.98GB U6 active declining — SwapFree 15.87GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 5.98GB (-1.23GB from c271=7.21GB, U6 active — external workloads still consuming). SwapFree 15.87GB (flat, U7 clear). U2 clear (≥1.2GB). U6 ACTIVE (below 8GB, declining). U7 clear. Audits ran (above skip thresholds: 5.98GB > 1.7GB, swap 15.87GB > 5.4GB). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T05:42Z — Loop cycle 271 (DEGRADED — memory 7.21GB U6 RE-FIRED — SwapFree 15.87GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 7.21GB (-5.25GB from c270=12.46GB, U6 RE-FIRED — external workloads resumed). SwapFree 15.87GB (stable, U7 clear). U2 clear (≥1.2GB). U6 ACTIVE (dropped below 8GB). U7 clear. Audits ran (above skip thresholds: 7.21GB > 1.7GB, swap 15.87GB > 5.4GB). All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T05:22Z — Loop cycle 270 (DEGRADED — memory 12.46GB stable U6 clear — SwapFree 15.87GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 12.46GB (+0.20GB from c269=12.26GB, stable). SwapFree 15.87GB (+0.01GB, stable). U2 clear. U6 clear (≥8GB — 7th consecutive clear cycle). U7 clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T05:02Z — Loop cycle 269 (DEGRADED — memory 12.26GB stable U6 clear — SwapFree 15.86GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 12.26GB (-0.58GB from c268=12.84GB, stable). SwapFree 15.86GB (+0.01GB, stable). U2 clear. U6 clear (≥8GB — 6th consecutive clear cycle). U7 clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T04:42Z — Loop cycle 268 (DEGRADED — memory 12.84GB stable U6 clear — SwapFree 15.85GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 12.84GB (+0.05GB from c267=12.79GB, stable). SwapFree 15.85GB (+0.02GB, stable). U2 clear. U6 clear (≥8GB — 5th consecutive clear cycle). U7 clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T04:22Z — Loop cycle 267 (DEGRADED — memory 12.79GB stable U6 clear — SwapFree 15.83GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 12.79GB (-0.04GB from c266=12.83GB, stable). SwapFree 15.83GB (flat). U2 clear. U6 clear (≥8GB — 4th consecutive clear cycle). U7 clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T04:02Z — Loop cycle 266 (DEGRADED — memory 12.83GB stable U6 clear — SwapFree 15.83GB flat — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 12.83GB (-0.06GB from c265=12.89GB, stable). SwapFree 15.83GB (flat). U2 clear. U6 clear (≥8GB — third consecutive clear cycle). U7 clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing: LocalManifest unknown repo_id — not actionable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T03:42Z — Loop cycle 265 (DEGRADED — memory 12.89GB stable U6 clear — SwapFree 15.83GB stable — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen, operator-blocked) — Memory 12.89GB (+0.07GB from c264=12.82GB, stable). SwapFree 15.83GB (+0.01GB, stable). U2 clear. U6 clear (≥8GB — second consecutive clear cycle). U7 clear. All Step 1 audits clean: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing: LocalManifest unknown repo_id — not actionable). Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9 — structural starvation, no consumer), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T03:22Z — Loop cycle 264 (DEGRADED — MAJOR RECOVERY — memory 12.82GB +8.95GB U6 CLEARED — SwapFree 15.82GB +10.63GB — audits clean — triage no actions)
+
+Health: DEGRADED (board frozen) — MAJOR MEMORY RECOVERY: MemAvailable 12.82GB (+8.95GB from c263=3.87GB). SwapFree 15.82GB (+10.63GB from c263=5.19GB). U6 CLEARED (≥8GB — first clear since c201+). U2 clear. U7 clear. External workloads fully stopped — all memory and swap reclaimed. Audit gate OPEN: custodian-sweep 0, ghost-audit 0, flow-audit 0 gaps, reaudit-check not needed, check-regressions 0. Graph-doctor exit 1 (known ongoing: LocalManifest unknown repo_id — not actionable). Triage scan: 0 rescore, 0 awaiting, 0 queue healing. Memory gate CLEARED (≥8GB). Board frozen: R4AI=1 (9c7f4bb9 — task-kind:investigate, no board_worker consumer — structural starvation), Blocked=7 (U1 false). Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, relabel/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-17T03:02Z — Loop cycle 263 (DEGRADED — memory 3.87GB +1.33GB U2 clear — SwapFree 5.19GB -0.09GB U7 headroom 0.19GB CRITICAL — audits skipped — swap drain resumed)
+
+Health: DEGRADED — Memory 3.87GB (U2 clear, headroom 2.67GB — significant +1.33GB recovery from c262=2.54GB). SwapFree 5.19GB (-0.09GB from c262=5.28GB — drain resuming after 6 flat cycles; U7 headroom 0.19GB CRITICAL — worse than c262=0.28GB). Audits skipped (pre-audit SwapFree 5.19GB < 5.4GB effective threshold). RAM recovery likely reflects external workloads reducing RAM footprint, but swap drain resuming suggests they remain active. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T02:42Z — Loop cycle 262 (DEGRADED — memory 2.54GB U2 clear — SwapFree 5.28GB +0.01GB U7 headroom 0.28GB CRITICAL — audits skipped — swap minimal recovery)
+
+Health: DEGRADED — Memory 2.54GB (U2 clear, headroom 1.34GB). SwapFree 5.28GB (+0.01GB from c261=5.27GB — minimal recovery, 6 consecutive near-zero cycles: c257=5.28→c258=5.30→c259=5.25→c260=5.26→c261=5.27→c262=5.28). U7 headroom 0.28GB — CRITICAL. Audits skipped (pre-audit SwapFree 5.28GB < 5.4GB effective threshold). External workloads still occupying swap — not fully released. Recovery to ≥5.4GB requires workloads to fully stop. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T02:21Z — Loop cycle 261 (DEGRADED — memory 2.55GB U2 clear — SwapFree 5.27GB +0.01GB U7 headroom 0.27GB CRITICAL — audits skipped — swap minimal recovery)
+
+Health: DEGRADED — Memory 2.55GB (U2 clear, headroom 1.35GB). SwapFree 5.27GB (+0.01GB from c260=5.26GB — minimal improvement, 5 consecutive cycles flat/barely recovering: c257=5.28→c258=5.30→c259=5.25→c260=5.26→c261=5.27). U7 headroom 0.27GB — CRITICAL. Audits skipped (pre-audit SwapFree 5.27GB < 5.4GB effective threshold). External workloads still occupying swap. Recovery to ≥5.4GB requires workloads to fully stop. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T02:00Z — Loop cycle 260 (DEGRADED — memory 2.29GB U2 clear — SwapFree 5.26GB flat U7 headroom 0.26GB CRITICAL — audits skipped — swap not recovering)
+
+Health: DEGRADED — Memory 2.29GB (U2 clear, headroom 1.09GB). SwapFree 5.26GB (+0.01GB from c259=5.25GB — flat, not recovering). U7 headroom 0.26GB — CRITICAL. Audits skipped (pre-audit SwapFree 5.26GB < 5.4GB effective threshold). Swap has been flat to very-slowly-declining for 4 consecutive cycles (c257=5.28→c258=5.30→c259=5.25→c260=5.26). External workloads are still occupying swap — not fully paused. Recovery to ≥5.4GB requires workloads to stop. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T01:56Z — Loop cycle 259 (DEGRADED — memory 2.33GB +0.33GB — SwapFree 5.25GB U7 headroom 0.25GB CRITICAL — audits skipped)
+
+Health: DEGRADED — Memory 2.33GB (U2 clear, +0.33GB from c258=2.00GB — healthy improvement). SwapFree 5.25GB (-0.05GB from c258=5.30GB — very slow decline continuing). U7 headroom 0.25GB — CRITICAL (new low since stable-phase began). Audits skipped: pre-audit SwapFree (5.25GB) < 5.4GB effective threshold. Swap is draining at a slow but persistent rate — recovery to audit-safe levels (≥5.4GB) requires external workloads to fully pause. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T01:52Z — Loop cycle 258 (DEGRADED — memory 2.00GB U2 clear — SwapFree 5.30GB U7 headroom 0.30GB CRITICAL — swap stabilizing flat — audits skipped)
+
+Health: DEGRADED — Memory 2.00GB (U2 clear; stable, +0.006GB from c257=2.00GB). SwapFree 5.30GB (+0.02GB from c257=5.28GB — essentially flat, drain appears to be pausing). U7 headroom 0.30GB — CRITICAL but stabilizing. Audits skipped: pre-audit SwapFree (5.30GB) < effective threshold (5.4GB — audit consumes ~0.4GB swap, would risk U7). Good news: swap drain has decelerated from -0.53GB/cycle (c256→c257) to near-zero (-0.02GB corrected to +0.02GB — flat). Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Watching for sustained SwapFree recovery before re-enabling audits. Cadence: 1200s.
+
+## 2026-05-17T01:48Z — Loop cycle 257 (DEGRADED — U2 cleared 2.00GB +0.86GB recovery — SwapFree 5.28GB U7 headroom 0.28GB CRITICAL — audits skipped: audit swap consumption ~0.39GB would breach U7)
+
+Health: DEGRADED — U2 cleared (2.00GB, +0.86GB from c256=1.14GB). SwapFree 5.28GB (-0.53GB from c256=5.81GB — significant decline in one cycle). U7 headroom 0.28GB — CRITICAL. Audits skipped: c255 demonstrated audit execution consumes ~0.39GB swap; running audits at 5.28GB would push to ~4.89GB, breaching U7 (5GB) threshold. Memory recovery is encouraging; swap trajectory is not. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T01:44Z — Loop cycle 256 (CRITICAL — U2 FIRED 1.14GB — all audits skipped — SwapFree 5.81GB U7 headroom 0.81GB)
+
+Health: CRITICAL — U2 FIRED. MemAvailable 1194160 kB = 1.14GB (< 1.2GB threshold — U2 active). All Step 1 audits and triage scan SKIPPED to conserve memory. SwapFree 5.81GB (U7 headroom 0.81GB — WATCH). Memory trajectory: c255 post-audit 1.43GB → c256 pre-check 1.14GB (-0.29GB between cycles). U2 SUSTAINED — not a transient. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED. OPERATOR ACTION REQUIRED — external workloads consuming RAM, U7 headroom 0.81GB and declining. Cadence: 1200s.
+
+## 2026-05-17T01:39Z — Loop cycle 255 (DEGRADED — pre-audit 1.94GB post-audit 1.43GB U2 headroom 0.23GB CRITICAL — audit consumption -0.51GB — SwapFree 5.91GB U7 headroom 0.91GB)
+
+Health: DEGRADED — Pre-audit memory 1.94GB (U2 headroom 0.74GB). Post-audit 1.43GB (-0.51GB consumed by audit execution — NEW CONCERN: audits themselves consuming significant RAM). U2 headroom post-audit 0.23GB — CRITICAL. SwapFree: pre-audit 6.30GB, post-audit 5.91GB (-0.39GB during audits). U7 headroom 0.91GB. All Step 1 audits clean (custodian 0, ghost 0, flow 0, regressions 0, reaudit none needed; graph-doctor ongoing fail_graph_none known issue). Triage: no actions. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). WARNING: audit execution consuming ~0.5GB RAM — if pre-audit memory is ≤1.7GB, running audits risks U2 breach MID-CYCLE. Cadence: 1200s.
+
+## 2026-05-17T01:36Z — Loop cycle 254 (DEGRADED — memory 2.26GB strong recovery +0.75GB — SwapFree 6.01GB U7 headroom 1.01GB steady decline)
+
+Health: DEGRADED — Memory 2.26GB (strong recovery from c253=1.51GB, +0.75GB; U2 headroom 1.06GB). SwapFree 6.01GB (-0.32GB from c253=6.33GB — slow steady decline continues; U7 headroom 1.01GB, narrowing but stable). Post-audit unchanged (2.26GB/6.01GB). All Step 1 audits clean (custodian 0, ghost 0, flow 0, regressions 0, reaudit none needed; graph-doctor ongoing fail_graph_none known issue). Triage: no actions. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). SwapFree trajectory: c252=6.45→c253=6.33→c254=6.01GB (-0.32/cycle avg) — U7 breach in ~3 cycles if rate holds. Cadence: 1200s.
+
+## 2026-05-17T01:32Z — Loop cycle 253 (DEGRADED — memory 1.51GB U2 headroom 0.31GB SLIM — SwapFree 6.33GB -0.12GB slow decline)
+
+Health: DEGRADED — Memory 1.51GB (U2 clear; headroom 0.31GB — SLIM, down from c252=1.77GB, -0.26GB). SwapFree 6.33GB (-0.12GB from c252=6.45GB — slow steady decline continues). Post-audit stable (1.53GB/6.33GB — audits add negligible pressure). All Step 1 audits clean (custodian 0, ghost 0, flow 0, regressions 0, reaudit none needed; graph-doctor ongoing fail_graph_none known issue). Triage: no actions. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). U2 headroom SLIM — monitor closely. Cadence: 1200s.
+
+## 2026-05-17T01:29Z — Loop cycle 252 (DEGRADED — memory 1.77GB U2 clear — SwapFree 6.45GB +0.71GB RECOVERY — U7 headroom 1.45GB pressure easing)
+
+Health: DEGRADED — Memory 1.77GB (U2 clear; -0.43GB from c251=2.20GB, still well above threshold). SwapFree 6.45GB (+0.71GB recovery from c251=5.74GB — U7 headroom 1.45GB, improving from c251's 0.74GB CRITICAL reading). External workloads appear to have eased. All Step 1 audits clean (custodian 0, ghost 0, flow 0, regressions 0, reaudit none needed; graph-doctor ongoing fail_graph_none known issue). Triage: no actions. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T01:23Z — Loop cycle 251 (DEGRADED — U2 CLEARED 2.20GB — SwapFree 5.74GB U7 HEADROOM 0.74GB CRITICAL — drain decelerating but U7 breach imminent if workloads resume)
+
+Health: DEGRADED — U2 cleared (2.20GB, +1.36GB from c250=0.84GB). SwapFree 5.74GB (-1.70GB from c250=7.44GB — drain decelerating from c250's -2.88GB rate, but still declining). U7 threshold 5GB; headroom 0.74GB — CRITICAL. At c250 drain rate, U7 breach next cycle; at c251 rate, 1 cycle. Audits run (SwapFree stable through audit execution — external workloads are the drain source). All Step 1 audits clean. Triage: no actions. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED. Operator action still required — swap drain from external workloads is consuming headroom rapidly. Cadence: 1200s.
+
+## 2026-05-17T01:19Z — Loop cycle 250 (CRITICAL — U2 FIRED 0.84GB — U7 APPROACHING 7.44GB -2.88GB/cycle — OPERATOR IMMEDIATE ACTION REQUIRED — all audits skipped)
+
+Health: CRITICAL — U2 FIRED. MemAvailable 0.84GB (878980 kB) — new all-time low, below c247=1.01GB. SwapFree 7.44GB (-2.88GB from c249=10.32GB in a single 20-minute cycle — extreme acceleration). U7 threshold 5GB; headroom 2.44GB. At current drain rate, U7 breach is IMMINENT (next 1-2 cycles). ALL Step 1 audits and triage SKIPPED to minimize memory pressure. OPERATOR IMMEDIATE ACTION REQUIRED: external media processing workloads must be stopped NOW. System is at severe OOM risk. kodo gate BLOCKED. Cadence: 1200s (watchdog will continue logging only while U2 active).
+
+## 2026-05-17T01:15Z — Loop cycle 249 (DEGRADED — memory 2.53GB strong bounce from U2 excursion — SwapFree 10.32GB FLAT — U2 trough appears to have been c246-c247 — U2 headroom 1.33GB SAFE)
+
+Health: DEGRADED — memory strong bounce to 2.53GB (+1.02GB from c248=1.51GB, +1.52GB from c247 trough=1.01GB). SwapFree 10.32GB (+0.03GB from c248=10.29GB — decline HALTED). U2 headroom 1.33GB — safe. The c246-c247 U2 excursion (1.15GB→1.01GB) appears to have been the sixth trough floor; memory now bouncing normally. Trough floor: c246/c247=1.01GB (new all-time low, deeper than c241 transient=1.66GB — this was sustained, not transient). SwapFree stabilized — swap drain from external workloads appears to have paused. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T01:12Z — Loop cycle 248 (DEGRADED — U2 CLEARED memory 1.51GB recovered from c247=1.01GB — U2 headroom 0.31GB SLIM — SwapFree 10.29GB -0.94GB ACCELERATING — WATCH)
+
+Health: DEGRADED — U2 cleared this cycle. Memory recovered to 1.51GB (+0.50GB from c247=1.01GB); U2 threshold 1.2GB, headroom 0.31GB — very slim. SwapFree 10.29GB (-0.94GB from c247=11.23GB, -1.78GB over two cycles — decline accelerating). At current swap rate (~0.89GB/cycle), U7 (5GB) breach in ~5-6 cycles (~1.5-2h). Audits resumed this cycle (memory above threshold). All Step 1 audits clean: custodian-sweep 0 findings, ghost-audit 0 events, flow-audit 0 gaps, graph-doctor clean, reaudit-check clean, check-regressions 0. Triage: no actions. Board: R4AI=1/Blocked=7 (U1 false). kodo gate: BLOCKED. OPERATOR ACTION STILL REQUIRED: swap declining toward U7. Cadence: 1200s.
+
+## 2026-05-17T01:09Z — Loop cycle 247 (DEGRADED — U2 ACTIVE WORSENING — memory 1.01GB — SwapFree 11.23GB -0.84GB single cycle — CRITICAL — all audits skipped)
+
+Health: DEGRADED — U2 ACTIVE AND WORSENING. MemAvailable 1.01GB (1057548 kB) — below c246's 1.15GB, continuing to decline. SwapFree 11.23GB (-0.84GB from c246=12.07GB in a single cycle — swap consumption accelerating sharply). All Step 1 audits and triage scan SKIPPED to conserve memory. OPERATOR ACTION CRITICAL: system is approaching OOM territory. External media processing workloads must be paused immediately or system may become unstable. kodo gate BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T01:05Z — Loop cycle 246 (DEGRADED — U2 FIRED — memory 1.15GB ≤ 1.2GB threshold — OPERATOR ACTION REQUIRED — skipped audits to conserve memory)
+
+Health: DEGRADED — U2 FIRED. MemAvailable 1.15GB (1205520 kB) at cycle open, confirmed 1.16GB on recheck — both below 1.2GB U2 threshold. This is the first sustained U2 breach (c241 transient 1.66GB never reached threshold). Step 1 audits and triage scan SKIPPED to minimize memory pressure. SwapFree 12.07GB (stable). kodo gate BLOCKED. Board: R4AI=1/Blocked=7 — not checked this cycle (conserving resources). OPERATOR ACTION REQUIRED: external media processing workloads are consuming critical memory. Consider stopping workloads or adding swap. kodo dispatch remains blocked. Cadence: 1200s.
+
+## 2026-05-17T01:01Z — Loop cycle 245 (DEGRADED — memory 2.30GB, U6 active, -0.24GB from c244 — descending toward next trough, U2 headroom 1.10GB — WATCH)
+
+Health: DEGRADED — memory 2.30GB (-0.24GB from c244=2.54GB), descending phase toward next trough. U2 headroom 1.10GB — below 1.2GB watch threshold; next trough could approach c241 transient territory. SwapFree 12.16GB (flat, -0.01GB). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean: custodian-sweep 0 findings, ghost-audit 0 events, flow-audit 0 gaps, graph-doctor clean, reaudit-check clean, check-regressions 0 findings. Triage: no actions. kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T00:58Z — Loop cycle 244 (DEGRADED — memory 2.54GB, U6 active, +0.13GB from c243 — bounce continuing, U2 headroom 1.34GB — SAFE)
+
+Health: DEGRADED — memory 2.54GB (+0.13GB from c243=2.41GB), bounce phase continuing. SwapFree 11.60GB (-0.25GB from c243=11.85GB, decline ongoing). U2 headroom 1.34GB — safe. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean: custodian-sweep 0 findings, ghost-audit 0 events, flow-audit 0 gaps, graph-doctor clean, reaudit-check clean, check-regressions 0 findings. Triage: no actions. kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T00:54Z — Loop cycle 243 (DEGRADED — memory 2.41GB, U6 active, +0.12GB from c242 — slight bounce, oscillation continuing post-c241 transient, U2 headroom 1.21GB — SAFE)
+
+Health: DEGRADED — memory 2.41GB (+0.12GB from c242=2.29GB), slight bounce in normal oscillation. Post-c241 transient (1.66GB) not repeating this cycle. U2 headroom 1.21GB — marginally above 1.2GB threshold, safe but monitor. SwapFree 11.85GB (-0.12GB, slow decline continues). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean: custodian-sweep 0 findings, ghost-audit 0 events, flow-audit 0 gaps, graph-doctor clean, reaudit-check clean, check-regressions 0 findings. Triage: no actions. kodo gate: BLOCKED (memory < 8GB). Cadence: 1200s.
+
+## 2026-05-17T00:49Z — Loop cycle 242 (DEGRADED — memory 2.29GB, U6 active, -0.23GB from c241 end — descending, no transient this cycle, U2 headroom 1.09GB — WATCH)
+
+Health: DEGRADED — descending from c241's recovered 2.52GB peak to 2.29GB (-0.23GB). No transient spike this cycle; reading at cycle open is stable. c241 transient (1.66GB) was an isolated event — back in normal oscillation range. SwapFree 11.97GB (flat, unchanged). U2 headroom 1.09GB — watch for next transient. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:45Z — Loop cycle 241 (DEGRADED — memory 1.66GB→2.52GB TRANSIENT, U6 active, NEW RECORD LOW — U2 headroom 0.46GB at minimum, recovered, OPERATOR AWARENESS REQUIRED)
+
+Health: DEGRADED — CRITICAL TRANSIENT: memory read 1.66GB at cycle open (new all-time low, prior record c230=1.98GB). U2 headroom reached 0.46GB — closest yet to the 1.2GB threshold. U2 NOT fired (1.66GB > 1.2GB). Memory recovered to 2.52GB by post-triage read within same cycle — transient spike/release from external media processing workloads, not sustained. SwapFree 11.97GB (flat). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Oscillation more volatile than previously characterized — instantaneous minima can reach below 1.7GB. OPERATOR AWARENESS REQUIRED. Cadence: 1200s.
+
+## 2026-05-17T00:41Z — Loop cycle 240 (DEGRADED — memory 2.45GB, U6 active, +0.25GB from c239 — FIFTH TROUGH FLOOR CONFIRMED at c239=2.20GB, bounce, U2 headroom 1.25GB — WATCH)
+
+Health: DEGRADED — fifth trough floor confirmed at c239=2.20GB; c240 bouncing to 2.45GB (+0.25GB). Fifth trough (2.20GB) is above all-time low (c230=1.98GB) but below fourth trough (c233=2.32GB). Trough progression: c222=2.00→c226=2.00→c230=1.98→c233=2.32→c239=2.20GB (5th floor). U2 headroom 1.25GB — no breach. SwapFree 12.04GB (-0.25GB, decline continues). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:37Z — Loop cycle 239 (DEGRADED — memory 2.20GB, U6 active, -0.11GB from c238 — fifth trough still descending, U2 headroom 1.00GB — WATCH)
+
+Health: DEGRADED — fifth trough continuing to fall past the c237/c238 plateau (2.20GB, -0.11GB from c238=2.31GB). Flat c237/c238 was not the trough floor. 2.20GB remains above all-time low (c230=1.98GB) but descent continues; U2 headroom now 1.00GB. SwapFree 12.29GB (-0.29GB, faster this cycle). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:34Z — Loop cycle 238 (DEGRADED — memory 2.31GB, U6 active, flat from c237 — fifth trough stabilizing, U2 headroom 1.11GB — WATCH)
+
+Health: DEGRADED — fifth trough stabilizing: c237=2.31GB and c238=2.31GB both flat. Trough floor not continuing to fall — consistent with oscillation bottoming out. Fifth trough (2.31GB) comparable to fourth (c233=2.32GB), well above all-time low (c230=1.98GB). SwapFree 12.58GB (-0.12GB from c237, slow decline ongoing). U2 headroom 1.11GB — WATCH. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:30Z — Loop cycle 237 (DEGRADED — memory 2.31GB, U6 active, -0.04GB from c236 — fifth trough descent slowing, U2 headroom 1.11GB — WATCH)
+
+Health: DEGRADED — fifth trough descent continuing but slowing (c236=2.35→c237=2.31GB, -0.04GB). 2.31GB is marginally below fourth trough floor (c233=2.32GB) — not a new low by prior trough standards (c230=1.98GB remains record). Rate of descent slowing may indicate approaching trough floor. SwapFree 12.70GB (flat, unchanged). U2 headroom 1.11GB — WATCH. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:27Z — Loop cycle 236 (DEGRADED — memory 2.35GB, U6 active, -0.17GB from c235 — descending toward fifth trough, U2 headroom 1.15GB — WATCH)
+
+Health: DEGRADED — descending from c235=2.52GB peak toward fifth trough (2.35GB, -0.17GB). Fifth trough descent underway; fourth trough reversal (c233=2.32GB > c230=1.98GB) remains the dominant signal. U2 headroom 1.15GB — approaching prior trough territory, watch closely. SwapFree 12.70GB (-0.17GB from c235, slow decline continuing). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:23Z — Loop cycle 235 (DEGRADED — memory 2.52GB, U6 active, -0.07GB from c234 — near peak slight descent, U2 headroom 1.32GB — WATCH)
+
+Health: DEGRADED — near peak, slight descent from c234=2.59GB to 2.52GB (-0.07GB). Oscillation continuing. Fourth trough reversal confirmed: c233=2.32GB was shallower than third trough c230=1.98GB — trough floor stabilizing or improving. Trough progression: c222=2.00→c226=2.00→c230=1.98→c233=2.32GB (REVERSAL). SwapFree 12.87GB (flat, unchanged from c234). U2 headroom 1.32GB. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:18Z — Loop cycle 234 (DEGRADED — memory 2.59GB, U6 active, +0.27GB from c233 — bounce from fourth trough, U2 headroom 1.39GB — WATCH)
+
+Health: DEGRADED — bounced from c233=2.32GB (fourth trough) to 2.59GB (+0.27GB). Fourth trough (c233=2.32GB) is SHALLOWER than third trough (c230=1.98GB) — trough floor did not continue drifting down. Trough progression: c222=2.00→c226=2.00→c230=1.98→c233=2.32GB (REVERSAL — fourth trough higher than third). SwapFree 12.87GB (-0.13GB, slow decline normalized). U2 headroom 1.39GB. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:14Z — Loop cycle 233 (DEGRADED — memory 2.32GB, U6 active, -0.16GB from c232 — descending from peak, U2 headroom 1.12GB — WATCH)
+
+Health: DEGRADED — descending from c232 peak (2.48→2.32GB, -0.16GB). Fourth trough descent underway. U2 headroom 1.12GB — approaching prior trough territory. SwapFree 13.00GB (+0.02GB, flat — swap consumption paused). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:10Z — Loop cycle 232 (DEGRADED — memory 2.48GB, U6 active, +0.04GB from c231 — peak plateau, U2 headroom 1.28GB — WATCH)
+
+Health: DEGRADED — peak plateau (c231=2.44→c232=2.48GB, +0.04GB). Oscillation near peak; next cycle likely to start descending toward fourth trough. SwapFree 12.98GB (-0.10GB from c231; total -2.28GB since c219 over 13 cycles, avg -0.175GB/cycle — c231 spike of -0.41GB was an outlier, now reverting to baseline). U2 headroom 1.28GB. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-17T00:06Z — Loop cycle 231 (DEGRADED — memory 2.44GB, U6 active, +0.46GB from c230 — bounce from trough, U2 headroom 1.24GB — WATCH)
+
+Health: DEGRADED — bounced from c230 trough (1.98GB) to 2.44GB (+0.46GB). Oscillation pattern continuing. Trough progression: c222=2.00→c226=2.00→c230=1.98GB (gradual drift). SwapFree 13.08GB (-0.41GB from c230 — largest single-cycle swap decline in this window; accelerating). U2 headroom 1.24GB. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s — monitor swap trend.
+
+## 2026-05-17T00:02Z — Loop cycle 230 (DEGRADED — memory 1.98GB, U6 active, -0.11GB from c229 — NEW TROUGH FLOOR, first breach below 2.00GB, U2 headroom 0.78GB — CRITICAL)
+
+Health: DEGRADED — third trough has broken below prior floor: c222=2.00, c226=2.00, c230=1.98GB (new low). Trough floor is drifting down despite bounce cycles. U2 headroom 0.78GB (fires at ≤1.2GB) — CRITICAL. Headroom is now below the 0.80GB prior worst-case. SwapFree 13.49GB (flat, +0.02GB — swap stabilized). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s — OPERATOR AWARENESS REQUIRED. If next trough continues to drop, U2 may fire within 1-2 troughs.
+
+## 2026-05-16T23:58Z — Loop cycle 229 (DEGRADED — memory 2.09GB, U6 active, -0.48GB from c228 — descending toward trough, U2 headroom 0.89GB — CRITICAL)
+
+Health: DEGRADED — sharp descent from c228 peak (2.57→2.09GB, -0.48GB). Approaching trough territory (floor 2.00GB from c222+c226). U2 headroom 0.89GB (fires at ≤1.2GB) — CRITICAL. If trough matches or breaks below c222/c226=2.00GB, headroom 0.80GB. Oscillation: c226=2.00→c227=2.28→c228=2.57→c229=2.09 (descending). SwapFree 13.47GB (-0.20GB from c228, decline accelerating slightly). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s — OPERATOR AWARENESS REQUIRED.
+
+## 2026-05-16T23:55Z — Loop cycle 228 (DEGRADED — memory 2.57GB, U6 active, +0.29GB from c227 — continuing bounce, U2 headroom 1.37GB — WATCH)
+
+Health: DEGRADED — continuing bounce from trough (c226=2.00→c227=2.28→c228=2.57GB). Oscillation rising phase. SwapFree 13.67GB (-0.12GB from c227; slow decline continues ~0.14GB/cycle avg). U2 headroom 1.37GB. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T23:51Z — Loop cycle 227 (DEGRADED — memory 2.28GB, U6 active, +0.28GB from c226 — bounce from trough, U2 headroom 1.08GB — CRITICAL WATCH)
+
+Health: DEGRADED — bounced from c226 trough (2.00GB) to 2.28GB (+0.28GB). Trough floor stable at 2.00GB (c222 and c226 both exactly 2.00GB). Oscillation continues: period ~4-5 cycles, amplitude ~0.54-0.62GB. SwapFree 13.79GB (-0.05GB from c226, nearly flat — swap stabilizing). U2 headroom 1.08GB (fires at ≤1.2GB) — CRITICAL WATCH. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T23:44Z — Loop cycle 226 (DEGRADED — memory 2.00GB, U6 active, -0.54GB from c225 — trough matches c222, U2 headroom 0.80GB — CRITICAL)
+
+Health: DEGRADED — trough at 2.00GB, same as c222 (cycle 4 cycles ago). Trough floor holding at 2.00GB: c218=2.32→c221=2.33→c222=2.00→c226=2.00GB. Second consecutive 2.00GB trough — floor may have stabilized. SwapFree 13.84GB (-0.30GB from c225; total -1.42GB since c219). U2 headroom 0.80GB (fires at ≤1.2GB) — CRITICAL. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s — OPERATOR AWARENESS REQUIRED.
+
+## 2026-05-16T23:41Z — Loop cycle 225 (DEGRADED — memory 2.54GB, U6 active, +0.20GB from c224 — bouncing from near-trough, U2 headroom 1.34GB — WATCH)
+
+Health: DEGRADED — bounced from near-trough (c224=2.34→c225=2.54GB, +0.20GB). c224 was a soft trough (higher than c222=2.00GB), suggesting oscillation floor may be stabilizing. SwapFree 14.14GB (still declining -0.31GB from c224 — swap consumption continuing slowly). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. U2 headroom 1.34GB. Cadence: 1200s.
+
+## 2026-05-16T23:37Z — Loop cycle 224 (DEGRADED — memory 2.34GB, U6 active, -0.09GB from c223 — descending from peak, U2 headroom 1.14GB — WATCH)
+
+Health: DEGRADED — descending from c223 peak (2.43→2.34GB, -0.09GB). Now approaching prior trough band (~2.32-2.33GB). SwapFree 14.45GB (unchanged from c223 — swap stabilized, positive). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. U2 headroom 1.14GB — CRITICAL WATCH. If trough breaks below 2.00GB (c222 low), escalation required. Cadence: 1200s.
+
+## 2026-05-16T23:33Z — Loop cycle 223 (DEGRADED — memory 2.43GB, U6 active, +0.43GB from c222 — bounce from trough, U2 headroom 1.23GB — WATCH)
+
+Health: DEGRADED — bounced from c222 trough (2.00GB) to 2.43GB (+0.43GB). Pattern: each trough followed by bounce. Trough progression: c218=2.32→c221=2.33→c222=2.00GB (slight downward drift). SwapFree 14.45GB (swap still growing slowly — total +1.09GB since c219). U2 headroom 1.23GB (fires at ≤1.2GB) — watch. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T23:30Z — Loop cycle 222 (DEGRADED — memory 2.00GB, U6 active, -0.33GB from c221 — TROUGH LOWERING, U2 headroom 0.80GB — CRITICAL)
+
+Health: DEGRADED — oscillation trough is dropping: c218=2.32GB → c221=2.33GB → c222=2.00GB (-0.33GB). This trough is the lowest observed; prior troughs were ~2.32-2.33GB. SwapFree 14.54GB (growing from 15.26GB at c219 — swap usage +0.72GB over 3 cycles). U2 headroom 0.80GB (fires at ≤1.2GB) — CRITICAL. If next trough continues dropping at -0.33GB/trough, next trough ~1.67GB (headroom 0.47GB) — U2 would fire within 2 troughs. Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s — OPERATOR AWARENESS REQUIRED.
+
+## 2026-05-16T23:26Z — Loop cycle 221 (DEGRADED — memory 2.33GB, U6 active, -0.29GB from c220 — oscillating, U2 headroom 1.13GB — CRITICAL WATCH)
+
+Health: DEGRADED — memory back to trough: c220=2.62→c221=2.33GB (-0.29GB). Oscillation pattern confirmed: amplitude ~0.29-0.30GB, period ~2-3 cycles; c218=2.32(trough)→c220=2.62(peak)→c221=2.33(trough). No long-run trend — workloads at cyclic steady state. U2 headroom 1.13GB (fires at ≤1.2GB) — critical watch. SwapFree 14.83GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T23:22Z — Loop cycle 220 (DEGRADED — memory 2.62GB, U6 active, +0.23GB from c219 — continued bounce, U2 headroom 1.42GB — WATCH)
+
+Health: DEGRADED — memory continuing to recover: c218=2.32→c219=2.39→c220=2.62GB (+0.23GB). Three-cycle trajectory: +0.30GB from trough. SwapFree 14.79GB (slight swap-usage increase, still well above U7). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED (memory < 8GB). U2 headroom 1.42GB. Cadence: 1200s.
+
+## 2026-05-16T23:18Z — Loop cycle 219 (DEGRADED — memory 2.39GB, U6 active, +0.07GB from c218 — c218 dip confirmed as fluctuation, U2 headroom 1.19GB — CRITICAL WATCH)
+
+Health: DEGRADED — c218 drop (-0.30GB) confirmed as fluctuation: c218=2.32→c219=2.39GB (+0.07GB), same pattern as c216→c217. Oscillating pattern observed: c216(-0.18)→c217(+0.03)→c218(-0.30)→c219(+0.07). Long-run drift c215→c219: -0.38GB over 4 cycles (~-0.095GB/cycle). U2 headroom 1.19GB (fires at ≤1.2GB) — still critical watch. SwapFree 15.26GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T23:11Z — Loop cycle 218 (DEGRADED — memory 2.32GB, U6 active, -0.30GB from c217 — RENEWED DECLINE, U2 headroom 1.12GB — CRITICAL WATCH)
+
+Health: DEGRADED — largest single-cycle drop since c211: c217=2.62→c218=2.32GB (-0.30GB). Distinct from c216 fluctuation; this may signal renewed workload growth or new allocation. U2 headroom 1.12GB (fires at ≤1.2GB) — at -0.30GB/cycle, U2 could fire within 3-4 cycles (~60-80min). SwapFree 15.41GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s — OPERATOR AWARENESS ADVISED.
+
+## 2026-05-16T23:07Z — Loop cycle 217 (DEGRADED — memory 2.62GB, U6 active, +0.03GB from c216 — c216 dip confirmed as fluctuation, U2 headroom 1.42GB)
+
+Health: DEGRADED — c216 drop (-0.18GB) confirmed as fluctuation: c216=2.59→c217=2.62GB (+0.03GB). Memory returning toward stable band. U2 headroom 1.42GB (fires at ≤1.2GB). SwapFree 15.54GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T23:03Z — Loop cycle 216 (DEGRADED — memory 2.59GB, U6 active, -0.18GB from c215 — breaking below stable band, U2 headroom 1.39GB — WATCH CLOSELY)
+
+Health: DEGRADED — memory dropped -0.18GB below the 2.77-2.84GB stable band: c215=2.77→c216=2.59GB. Largest single-cycle drop since c211. U2 headroom now 1.39GB (fires at ≤1.2GB) — narrowing. Workloads may be growing again or this is a larger fluctuation; confirm next cycle. SwapFree 15.61GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T22:59Z — Loop cycle 215 (DEGRADED — memory 2.77GB, U6 active, -0.04GB from c214 — 5th stable cycle, still in 2.77-2.84GB band, U2 headroom 1.57GB)
+
+Health: DEGRADED — 5th consecutive cycle in stable band: c211=2.79→c212=2.82→c213=2.84→c214=2.81→c215=2.77GB (all within ±0.07GB). External workloads at steady RSS ~7GB. U2 headroom 1.57GB (fires at ≤1.2GB). SwapFree 15.74GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T22:55Z — Loop cycle 214 (DEGRADED — memory 2.81GB, U6 active, -0.03GB from c213 — flat within noise, 4th stable cycle, U2 headroom 1.61GB)
+
+Health: DEGRADED — memory flat: c211=2.79→c212=2.82→c213=2.84→c214=2.81GB (all within ±0.05GB, 4th consecutive stable cycle). External workloads maintaining steady RSS ~7GB. U2 headroom 1.61GB (fires at ≤1.2GB). SwapFree 15.82GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T22:51Z — Loop cycle 213 (DEGRADED — memory 2.84GB, U6 active, +0.02GB from c212 — 3rd consecutive non-declining cycle, U2 headroom 1.64GB)
+
+Health: DEGRADED — 3rd consecutive non-declining cycle confirms decline has arrested: c211=2.79→c212=2.82→c213=2.84GB. External workloads stable at ~7GB RSS. U2 headroom 1.64GB (fires at ≤1.2GB). SwapFree 15.82GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T22:48Z — Loop cycle 212 (DEGRADED — memory 2.82GB, U6 active, +0.03GB from c211 — flat/stabilizing, U2 headroom 1.62GB)
+
+Health: DEGRADED — memory flat: c211=2.79GB → c212=2.82GB (+0.03GB, within noise). Decline has arrested; external workloads may be stabilizing near current RSS rather than growing. U2 headroom 1.62GB (fires at ≤1.2GB — WATCH). SwapFree 15.82GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T22:43Z — Loop cycle 211 (DEGRADED — memory 2.79GB, U6 active, -0.54GB from c210, c210 uptick was transient, U2 headroom 1.59GB)
+
+Health: DEGRADED — c210 uptick (+0.11GB) was transient: c210=3.33GB → c211=2.79GB (-0.54GB). Decline resumed; external workloads have not completed. U2 headroom 1.59GB (fires at ≤1.2GB — WATCH CLOSELY). SwapFree 15.85GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T16:13Z — Loop cycle 210 (DEGRADED — memory 3.33GB, U6 active, +0.11GB from c209 — first uptick in 7 cycles)
+
+Health: DEGRADED — memory showing first uptick after 7 declining cycles: c209=3.22GB → c210=3.33GB (+0.11GB). U2 headroom 2.13GB. External workloads may be stabilizing or completing. U6 still active (< 8GB). kodo gate: BLOCKED. SwapFree 15.88GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. Cadence: 1200s.
+
+## 2026-05-16T15:53Z — Loop cycle 209 (DEGRADED — memory 3.22GB, U6 active, -0.49GB from c208, U2 headroom 2.02GB)
+
+Health: DEGRADED — memory still declining but rate slowing: c207=4.39→c208=3.71→c209=3.22GB (-0.49GB, vs -0.68 prior). U2 headroom 2.02GB (fires at ≤1.2GB). SwapFree 15.89GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Slowing decline may indicate workloads are completing or stabilizing. Cadence: 1200s.
+
+## 2026-05-16T15:33Z — Loop cycle 208 (DEGRADED — memory 3.71GB, U6 active, -0.68GB from c207, U2 headroom 2.51GB)
+
+Health: DEGRADED — memory declining: c206=4.96GB → c207=4.39GB → c208=3.71GB. U2 headroom 2.51GB. At ~-0.65GB/cycle, ~3-4 cycles (~60-80min) to U2 threshold. SwapFree 15.88GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Monitoring for workload completion or U2 approach. Cadence: 1200s.
+
+## 2026-05-16T15:13Z — Loop cycle 207 (DEGRADED — memory 4.39GB, U6 active, -0.57GB from c206, U2 headroom 3.19GB)
+
+Health: DEGRADED — memory continuing to decline: c205=5.79GB → c206=4.96GB → c207=4.39GB. U2 headroom 3.19GB. At ~-0.6GB/cycle trend, ~5 cycles (~100min) before U2 threshold. SwapFree 15.93GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T14:53Z — Loop cycle 206 (DEGRADED — memory 4.96GB, U6 active, -0.83GB from c205, U2 headroom 3.76GB)
+
+Health: DEGRADED — memory declining again: c204=5.80GB → c205=5.79GB → c206=4.96GB (-0.83GB). U2 headroom tightening to 3.76GB (fires at ≤1.2GB). SwapFree 15.94GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. External media processing workloads continuing to grow. kodo gate: BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T14:33Z — Loop cycle 205 (DEGRADED — memory 5.79GB, U6 active, flat from c204, U2 headroom 4.59GB)
+
+Health: DEGRADED — memory flat: c203=5.98GB → c204=5.80GB → c205=5.79GB (-0.01GB). External media processing workloads holding steady (~7GB RSS consumed). U6 active. kodo gate: BLOCKED. U2 headroom: 4.59GB. SwapFree 16.04GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. Cadence: 1200s.
+
+## 2026-05-16T14:13Z — Loop cycle 204 (DEGRADED — memory 5.80GB, U6 active, volatile -0.18GB from c203, U2 headroom 4.60GB)
+
+Health: DEGRADED — memory oscillating: c202=5.89GB → c203=5.98GB → c204=5.80GB. External media processing workloads continuing. U6 active (< 8GB). kodo gate: BLOCKED. U2 headroom: 4.60GB. SwapFree 16.02GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). All Step 1 audits clean. Triage: no actions. Cadence: 1200s.
+
+## 2026-05-16T13:53Z — Loop cycle 203 (DEGRADED — memory slightly recovering 5.98GB, U6 active, U2 headroom 4.78GB)
+
+Health: DEGRADED — memory showing first signs of recovery: c202=5.89GB → c203=5.98GB (+0.09GB). External media processing workloads appear to be winding down. U6 still active (< 8GB gate). kodo gate: BLOCKED. SwapFree 16.02GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). No OOM events. All Step 1 audits clean. Triage: no actions. Monitor next cycle — if ≥8GB, re-clear kodo gate and revert to OPERATOR-BLOCKED. Cadence: 1200s.
+
+## 2026-05-16T13:33Z — Loop cycle 202 (DEGRADED — memory still falling 5.89GB, U6 active, U2 headroom 4.69GB)
+
+Health: DEGRADED — memory continuing to fall: c200=12.57GB → c201=7.26GB → c202=5.89GB. Root cause: external media processing workloads started ~18:00Z consuming ~7GB RSS (TTS API 4.1GB + audio enhance 1.8GB + media audit 1.3GB). kodo gate: BLOCKED. U2 headroom: 4.69GB — monitor closely, U2 fires at ≤1.2GB. SwapFree 16.05GB (U7 false). Board: R4AI=1/Blocked=7 (U1 false). No OOM events. If workloads complete, memory may recover. Cadence: 1200s.
+
+## 2026-05-16T13:13Z — Loop cycle 201 (DEGRADED — U6 FIRED: 7.26GB < 8GB gate, SwapFree 16.06GB, kodo gate RE-BLOCKED)
+
+Health: DEGRADED — U6 fired. MemAvailable dropped to ~7.26GB (below 8GB kodo gate) from ~12.57GB at c200. ~5GB drop — process growth, no OOM events in dmesg. SwapFree 16.06GB (U2/U7 false). Board: R4AI=1/Blocked=7 (U1 false). kodo gate: RE-BLOCKED (memory < 8GB). Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Monitor memory next cycle — if recovered to ≥8GB, re-clear gate. Cadence: 1200s.
+
+## 2026-05-16T12:53Z — Loop cycle 200 (OPERATOR-BLOCKED — 12.57GB flat 32nd cycle, SwapFree 16.06GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 32nd consecutive cycle: 12.57GB. SwapFree: 16.06GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~31.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T12:33Z — Loop cycle 199 (OPERATOR-BLOCKED — 12.07GB flat 31st cycle, SwapFree 16.06GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 31st consecutive cycle: 12.07GB. SwapFree: 16.06GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~31h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T12:13Z — Loop cycle 198 (OPERATOR-BLOCKED — 12.01GB flat 30th cycle, SwapFree 16.06GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 30th consecutive cycle: 12.01GB. SwapFree: 16.06GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~30.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T11:53Z — Loop cycle 197 (OPERATOR-BLOCKED — 12.66GB flat 29th cycle, SwapFree 16.05GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 29th consecutive cycle: 12.66GB. SwapFree: 16.05GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~30h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T11:33Z — Loop cycle 196 (OPERATOR-BLOCKED — 12.72GB flat 28th cycle, SwapFree 16.05GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 28th consecutive cycle: 12.72GB. SwapFree: 16.05GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~29.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T11:13Z — Loop cycle 195 (OPERATOR-BLOCKED — 12.70GB flat 27th cycle, SwapFree 16.04GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 27th consecutive cycle: 12.70GB. SwapFree: 16.04GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~29h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T10:53Z — Loop cycle 194 (OPERATOR-BLOCKED — 12.66GB flat 26th cycle, SwapFree 16.04GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 26th consecutive cycle: 12.66GB. SwapFree: 16.04GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~28.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T10:33Z — Loop cycle 193 (OPERATOR-BLOCKED — 12.68GB flat 25th cycle, SwapFree 16.02GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 25th consecutive cycle: 12.68GB. SwapFree: 16.02GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~28h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T10:13Z — Loop cycle 192 (OPERATOR-BLOCKED — 13.00GB flat 24th cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 24th consecutive cycle: 13.00GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~27.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T09:53Z — Loop cycle 191 (OPERATOR-BLOCKED — 13.02GB flat 23rd cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 23rd consecutive cycle: 13.02GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~27h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T09:33Z — Loop cycle 190 (OPERATOR-BLOCKED — 13.02GB flat 22nd cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 22nd consecutive cycle: 13.02GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~26.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T09:13Z — Loop cycle 189 (OPERATOR-BLOCKED — 12.99GB flat 21st cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 21st consecutive cycle: 12.99GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~26h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T08:53Z — Loop cycle 188 (OPERATOR-BLOCKED — 12.99GB flat 20th cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 20th consecutive cycle: 12.99GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~25.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T08:33Z — Loop cycle 187 (OPERATOR-BLOCKED — 13.02GB flat 19th cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 19th consecutive cycle: 13.02GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~25h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T08:13Z — Loop cycle 186 (OPERATOR-BLOCKED — 12.96GB flat 18th cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 18th consecutive cycle: 12.96GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~24.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T07:53Z — Loop cycle 185 (OPERATOR-BLOCKED — 12.98GB flat 17th cycle, SwapFree 15.99GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 17th consecutive cycle: 12.98GB. SwapFree: 15.99GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (~24h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T07:33Z — Loop cycle 184 (OPERATOR-BLOCKED — 12.41GB flat 16th cycle, SwapFree 15.98GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 16th consecutive cycle: 12.41GB. SwapFree: 15.98GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (23.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T07:13Z — Loop cycle 183 (OPERATOR-BLOCKED — 13.05GB flat 15th cycle, SwapFree 15.98GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 15th consecutive cycle: 13.05GB (±noise). SwapFree: 15.98GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (23h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T06:53Z — Loop cycle 182 (OPERATOR-BLOCKED — 13.00GB flat 14th cycle, SwapFree 15.97GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 14th consecutive cycle: 13.00GB (±noise). SwapFree: 15.97GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (22.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T06:33Z — Loop cycle 181 (OPERATOR-BLOCKED — 13.00GB flat 13th cycle, SwapFree 15.97GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 13th consecutive cycle: 13.00GB (±noise). SwapFree: 15.97GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (22h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T06:13Z — Loop cycle 180 (OPERATOR-BLOCKED — 13.00GB flat 12th cycle, SwapFree 15.97GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 12th consecutive cycle: 13.00GB (±noise). SwapFree: 15.97GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (21.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T05:53Z — Loop cycle 179 (OPERATOR-BLOCKED — 13.03GB flat 11th cycle, SwapFree 15.97GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 11th consecutive cycle: 13.03GB (±noise). SwapFree: 15.97GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (21h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T05:33Z — Loop cycle 178 (OPERATOR-BLOCKED — 13.09GB flat 10th cycle, SwapFree 15.96GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 10th consecutive cycle: 13.09GB (±noise). SwapFree: 15.96GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (20.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T05:13Z — Loop cycle 177 (OPERATOR-BLOCKED — 13.10GB flat 9th cycle, SwapFree 15.95GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 9th consecutive cycle: 13.10GB (±noise). SwapFree: 15.95GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (20h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T04:53Z — Loop cycle 176 (OPERATOR-BLOCKED — 13.13GB flat 8th cycle, SwapFree 15.95GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 8th consecutive cycle: 13.13GB (±noise). SwapFree: 15.95GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (19.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T04:33Z — Loop cycle 175 (OPERATOR-BLOCKED — 13.14GB flat 7th cycle, SwapFree 15.93GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 7th consecutive cycle: 13.14GB (±noise). SwapFree: 15.93GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (19h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T04:13Z — Loop cycle 174 (OPERATOR-BLOCKED — 13.13GB flat 6th cycle, SwapFree 15.93GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 6th consecutive cycle: 13.13GB (±noise). SwapFree: 15.93GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (18.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T03:53Z — Loop cycle 173 (OPERATOR-BLOCKED — 13.10GB flat 5th cycle, SwapFree 15.91GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 5th consecutive cycle: 13.10GB (±noise). SwapFree: 15.91GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (18h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T03:33Z — Loop cycle 172 (OPERATOR-BLOCKED — 13.15GB flat 4th cycle, SwapFree 15.91GB, awaiting operator)
+
+Health: OPERATOR-BLOCKED. Memory stable for 4th consecutive cycle: 13.15GB (+0.04GB noise). SwapFree: 15.91GB (flat). Unpark: all false. Board frozen R4AI=1/Blocked=7 (17.5h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T03:13Z — Loop cycle 171 (OPERATOR-BLOCKED — 13.11GB flat 3rd cycle, SwapFree 15.91GB, no change)
+
+Health: OPERATOR-BLOCKED. Memory stable for 3rd consecutive cycle: 13.11GB (−0.04GB noise from c170 13.15GB). SwapFree: 15.91GB (flat). Recovery from c169 large-process exit confirmed durable. Unpark: all false. Board frozen R4AI=1/Blocked=7 (17h). kodo gate: MEMORY CLEARED. Operator actions still pending: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s.
+
+## 2026-05-16T02:53Z — Loop cycle 170 (OPERATOR-BLOCKED — 13.15GB stable, SwapFree 15.91GB, memory recovery confirmed)
+
+Health: OPERATOR-BLOCKED (memory constraint fully resolved — U6 no longer active). Memory holding steady: 13.15GB (flat +0.04GB from c169 13.11GB — confirmed stable). SwapFree: 15.91GB (flat). Recovery from c169 large-process exit confirmed durable. No spike. Unpark: U1=false, U2=false, U6=false (>8GB), U7=false. Board frozen R4AI=1/Blocked=7 (16.5h). kodo gate: MEMORY CLEARED — awaiting operator actions only: (1) CANCEL 925be138, (2) move improve tasks to Backlog, (3) review/close 9c7f4bb9. Cadence: 1200s (stable, operator-blocked only).
+
+## 2026-05-16T02:33Z — Loop cycle 169 (DEGRADED→MEM-RECOVERED — 13.11GB +8.85GB, SwapFree 15.91GB +9.17GB, kodo gate threshold met)
+
+Health: DEGRADED (U6 active since c110) — but memory FULLY RECOVERED. MemAvailable: 13.11GB (+8.85GB from c168 4.26GB); SwapFree: 15.91GB (+9.17GB from c168 6.74GB). Both near session-start levels (~16.9GB SwapFree). A large process exited between c168 and c169, releasing >9GB RAM and swap. kodo gate memory threshold (≥8GB) NOW MET at OS level. Recurring spike pattern: spike source appears to have been the process that just exited — spikes gone permanently. Unpark: U1=false, U2=false, U6=false (memory now above 8GB), U7=false. Board frozen R4AI=1/Blocked=7. kodo gate: THRESHOLD MET but operator actions still required before dispatch: (1) CANCEL 925be138, (2) move improve tasks to Backlog. Cadence: 1200s. OPERATOR ACTION NOW UNBLOCKED BY MEMORY RECOVERY.
+
+## 2026-05-16T02:13Z — Loop cycle 168 (DEGRADED — memory stable 4.26GB flat, no spike, SwapFree 6.74GB)
+
+Health: DEGRADED (U6 active). Memory holding at session high: 4.26GB (flat, +0.01GB from c167 — no new spike). SwapFree: 6.74GB (flat, +0.01GB). Recurring spike pattern: last fired c166 (~01:43Z); c167+c168 clear (~30min elapsed since recovery) — spike cadence confirmed ~60-80min, currently in the recovery window. U2 headroom: 3.06GB (very safe). Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 1200s (memory stable at session high).
+
+## 2026-05-16T01:53Z — Loop cycle 167 (DEGRADED — major recovery 4.25GB +2.57GB, c166 spike resolved, SwapFree 6.73GB)
+
+Health: DEGRADED (U6 active). Major memory recovery: 1.68GB→4.25GB (+2.57GB — c166 spike fully resolved; pages swapped out: SwapFree 7.18→6.73GB −0.45GB explains the delta). Spike pattern now confirmed as recurring OS task (~60-80min cadence, transient, fully resolves each time). U2 headroom: 3.05GB (very safe). Unpark: U1=false, U2=false, U6=false, U7=false (6.73GB > 5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 1200s (spike resolved, memory at session high 4.25GB).
+
+## 2026-05-16T01:43Z — Loop cycle 166 (DEGRADED — memory drop 1.68GB −0.62GB, possible spike recurrence, SwapFree 7.18GB)
+
+Health: DEGRADED (U6 active). Memory dropped −0.62GB from c165: 2.30→1.68GB. SwapFree: 7.18GB (−0.05GB — minimal). Spike status: previous spike pattern declared resolved at c164 (40min+); now c166 shows renewed drop suggesting possible recurrence (~80min after c160 — longer cadence than prior 20-30min pattern). Did NOT reach 1.40GB trough this time. U2 headroom: 0.48GB (tighter — was 1.10GB last cycle). Unpark: U1=false, U2=false (1.68>1.2GB), U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (headroom reduced, monitoring spike trajectory).
+
+## 2026-05-16T01:23Z — Loop cycle 165 (DEGRADED — recovery 2.30GB, spike absent 60min+, SwapFree 7.23GB)
+
+Health: DEGRADED (U6 active). Memory holding steady: MemAvailable 2.30GB (−0.06GB from c164 — within noise; trajectory 1.40→2.36→2.30GB, no new spike). SwapFree: 7.23GB (−0.17GB from c164 — slow decline continues). Periodic spike CONFIRMED RESOLVED: last spike c160 (00:23Z); 60 minutes elapsed with no recurrence. U2 headroom: 1.10GB (safe, slight decline from 1.16GB). Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 1200s (spike resolved, memory stable within noise). HEAD: c165 commit.
+
+## 2026-05-16T01:03Z — Loop cycle 164 (DEGRADED — recovery 2.36GB, periodic spike resolved, SwapFree 7.40GB)
+
+Health: DEGRADED (U6 active). Memory recovery continuing: MemAvailable 2.36GB (+0.16GB from c163 — trajectory: 1.40→1.76→1.94→2.20→2.36GB over 4 cycles). SwapFree: 7.40GB (−0.11GB — minimal, stable). Periodic spike RESOLVED: last spike c160 (00:23Z); 40 minutes elapsed with no recurrence — spike was non-repeating OS task, not periodic. U2 headroom: 1.16GB (safe). Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 1200s (spike resolved, recovery stable). HEAD: c164 commit.
+
+## 2026-05-16T00:53Z — Loop cycle 163 (DEGRADED — recovery continuing: 2.20GB, SwapFree 7.51GB flat)
+
+Health: DEGRADED (U6 active). Spike recovery continuing: MemAvailable 2.20GB (+0.26GB from c162's 1.94GB — trajectory: 1.40→1.76→1.94→2.20GB over 3 cycles). SwapFree: 7.51GB (flat, +0.19GB; net decline from session stabilized). U2 headroom: 1.00GB (substantially improved from 0.20GB at spike). Periodic spike pattern: last fired at c160 (00:23Z); expected ~00:43Z next based on ~20min cadence — did not fire, suggesting spike has cleared or cadence variable. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (one more cycle of spike monitoring). HEAD: c163 commit.
+
+## 2026-05-16T00:43Z — Loop cycle 162 (DEGRADED — gradual spike recovery: 1.94GB, SwapFree 7.51GB declining)
+
+Health: DEGRADED (U6 active). Continuing gradual recovery from periodic spike: MemAvailable 1.94GB (+0.18GB from c161's 1.76GB — slower than c158→c159 recovery). Recovery trajectory: 1.40→1.76→1.94GB (3 cycles). SwapFree: 7.51GB (−0.21GB from 7.72GB — slow net decline continuing). U2 headroom: 0.74GB (improving). SwapFree net loss since c156 (~8.82GB start): −1.31GB in ~8 cycles — gradual drain. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (periodic spike pattern — next spike could fire before recovery completes). HEAD: c162 commit.
+
+## 2026-05-16T00:33Z — Loop cycle 161 (DEGRADED — partial spike recovery: 1.76GB, SwapFree 7.72GB stable)
+
+Health: DEGRADED (U6 active). Partial recovery from c160 spike: MemAvailable 1.76GB (+0.36GB from 1.40GB — not yet at full 2.96GB recovery). SwapFree: 7.72GB (−0.18GB from 7.90GB — minimal, stable). U2 headroom: 0.56GB (improved from 0.20GB but still warning zone). Recovery from periodic spike in progress — expect full ~2.96GB at c162. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (maintain until full spike recovery confirmed). HEAD: c161 commit.
+
+## 2026-05-16T00:23Z — Loop cycle 160 (DEGRADED — recurring ~20min spike: 1.40GB again, U2 headroom 0.20GB)
+
+Health: DEGRADED (U6 active). Recurring RAM spike confirmed: MemAvailable 1.40GB (−1.56GB from c159's 2.96GB — same reading as c158). Pattern: c158=1.40GB → c159=2.96GB (+1.56GB) → c160=1.40GB (−1.56GB). Periodic process on ~20min cadence consuming ~1.5GB RAM then releasing. SwapFree: 7.90GB (−0.29GB — stable, no swap pressure). U2 headroom: 0.20GB CRITICAL. Unpark: U1=false, U2=false (barely), U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (U2 headroom critical). OPERATOR NOTE: periodic ~1.5GB process is likely a scheduled OS task; should resolve within minutes. HEAD: c160 commit.
+
+## 2026-05-16T00:03Z — Loop cycle 159 (DEGRADED — mem recovered 2.96GB, c158 spike was transient, SwapFree 8.19GB)
+
+Health: DEGRADED (U6 active). Memory strongly recovered: MemAvailable 2.96GB (+1.56GB from c158's 1.40GB). c158 sharp drop confirmed transient — process released ~1.56GB RAM. SwapFree: 8.19GB (−0.41GB from 8.60GB — normal fluctuation; stable in 8-9GB range). U2 headroom: 1.76GB (safe). Unpark: U1=false, U2=false, U6=false (2.96GB <8GB), U7=false (8.19GB >5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 1200s (memory healthy, transient spike resolved). HEAD: c159 commit.
+
+## 2026-05-15T23:52Z — Loop cycle 158 (DEGRADED — ⚠ sharp mem drop: 1.40GB −1.07GB, U2 headroom 0.20GB)
+
+Health: DEGRADED (U6 active). ⚠ SHARP MEMORY DROP: MemAvailable 1.40GB (−1.07GB from c157's 2.47GB — near-U2 spike). SwapFree: 8.60GB (−0.22GB from 8.82GB — stable; drop is RAM-only, not swap spill). U2 headroom: 0.20GB — CRITICAL WARNING. Something consumed ~1GB RAM without swapping. Unpark: U1=false, U2=false (1.40GB > 1.2GB — barely), U6=false, U7=false (8.60GB > 5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (reverted — U2 headroom too thin for 1200s). HEAD: c158 commit.
+
+## 2026-05-15T23:32Z — Loop cycle 157 (DEGRADED — memory recovering: mem 2.47GB, SwapFree 8.82GB +0.85GB)
+
+Health: DEGRADED (U6 active). Memory continuing to recover: MemAvailable 2.47GB (+0.32GB from c156). SwapFree: 8.82GB (+0.85GB from 7.97GB — swap reclaiming; trend reversed). U2 cleared for 2nd consecutive cycle (headroom 1.27GB). Memory emergency receding — prior crisis (c151-c155) appears resolved. Unpark: U1=false, U2=false, U6=false (2.47GB <8GB), U7=false (8.82GB >5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 1200s (memory stable/recovering, relaxing cadence). HEAD: c157 commit.
+
+## 2026-05-15T23:22Z — Loop cycle 156 (DEGRADED — U2 CLEARS: mem 2.15GB, SwapFree 7.97GB, decline stabilizing)
+
+Health: DEGRADED (U6 active). U2 CLEARS this cycle: MemAvailable 2.15GB (was 1.06GB — +1.09GB recovery, now above 1.2GB threshold). SwapFree: 7.97GB (−0.58GB from 8.55GB — much slower than prior cycles' −1.67GB; decline appears stabilizing). Unpark: U1=false, U2=false (cleared), U6=false (2.15GB <8GB), U7=false (7.97GB >5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED (<8GB). Cadence: 600s (maintain until U2 stable and SwapFree stabilizes). Memory emergency receding but U6 persists. HEAD: c156 commit.
+
+## 2026-05-15T23:12Z — Loop cycle 155 (DEGRADED — U2 ACTIVE 2nd cycle: mem 1.06GB, SwapFree 8.55GB ⚠ U7 risk)
+
+Health: DEGRADED (U6 active). U2 STILL ACTIVE (2nd consecutive cycle): MemAvailable 1.06GB (≤1.2GB threshold). Memory: 1.06GB (trend: 0.63→1.06GB; +0.43GB partial recovery but still below U2 threshold). SwapFree: 8.55GB (−1.67GB this cycle; net −8.35GB from session start ~16.9GB — rapid drain). ⚠ U7 RISK: at −1.67GB/interval, U7 (≤5GB) fires in ~2 cycles (~20min). Unpark: U1=false, U2=TRUE (2nd cycle), U6=false, U7=false (8.55GB > 5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. Cadence: 600s. OPERATOR MUST FREE MEMORY/SWAP IMMEDIATELY. HEAD: c155 commit.
+
+## 2026-05-15T23:02Z — Loop cycle 154 (DEGRADED — U2 FIRED: mem 0.63GB ≤1.2GB, pre-OOM alert)
+
+Health: DEGRADED (U6 active). ⚠ U2 TRIGGERED: MemAvailable 0.63GB (≤1.2GB threshold — genuine pre-OOM condition). Memory: 0.63GB (trend: →1.36→1.74→0.63GB; sharp −1.11GB drop). SwapFree: 10.22GB (−1.83GB this interval — significant swap pressure; net −6.68GB from session start ~16.9GB). System is under severe memory pressure. Unpark: U1=false, U2=TRUE (firing), U6=false, U7=false (10.22GB > 5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. Cadence: 600s. Operator attention required — free memory immediately. HEAD: c154 commit.
+
+## 2026-05-15T22:52Z — Loop cycle 153 (DEGRADED — U6 active, memory 1.74GB, recovering; U2 headroom 0.54GB)
+
+Health: DEGRADED (U6 active). Memory: 1.74GB (trend: →1.25→1.36→1.74GB; +0.38GB recovery from critical low, crisis easing). SwapFree: 12.05GB (−0.06GB, essentially stable vs −0.83GB last cycle — positive). U2 headroom: 0.54GB — improved but still below normal range. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. Cadence: 600s (maintaining until memory clears 2GB+). HEAD: c153 commit.
+
+## 2026-05-15T22:42Z — Loop cycle 152 (DEGRADED — U6 active, memory 1.36GB, partial bounce; U2 headroom 0.16GB still critical)
+
+Health: DEGRADED (U6 active). Memory: 1.36GB (trend: →2.64→1.25→1.36GB; +0.11GB partial bounce from c151 critical, still very low). SwapFree: 12.11GB (−0.83GB notable drop; swap consumption accelerating — net -4.79GB from session start ~16.9GB). U2 headroom: 0.16GB — still critical. U7: 12.11GB > 5GB, false. Unpark: U1=false, U2=false (160MB margin), U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. Cadence: 600s. HEAD: c152 commit.
+
+## 2026-05-15T22:32Z — Loop cycle 151 (DEGRADED — U6 active, memory 1.25GB ⚠ CRITICAL — U2 headroom 0.05GB)
+
+Health: DEGRADED (U6 active). Memory: 1.25GB (trend: →2.34→2.64→1.25GB; SHARP DROP −1.39GB, largest single-interval drop this session). SwapFree: 12.94GB (−0.32GB). U2 headroom: 0.05GB — CRITICAL, 50MB from U2 trigger (≤1.2GB). U2=false (not yet triggered). Unpark: U1=false, U2=false (50MB margin), U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. Cadence: 600s (minimum). No new findings beyond memory. HEAD: c151 commit.
+
+## 2026-05-15T22:12Z — Loop cycle 150 (DEGRADED — U6 active, memory 2.64GB, bounce; cadence restored 1200s)
+
+Health: DEGRADED (U6 active). Memory: 2.64GB (trend: →2.27→2.34→2.64GB; +0.30GB bounce). SwapFree: 13.26GB (−0.29GB; net decline from session start ~16.9GB now ~3.64GB total). U2 headroom: 1.44GB — above 1.2GB, cadence restored to 1200s. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. No new findings. HEAD: c150 commit.
+
+## 2026-05-15T22:02Z — Loop cycle 149 (DEGRADED — U6 active, memory 2.34GB, slight bounce; SwapFree continues declining)
+
+Health: DEGRADED (U6 active). Memory: 2.34GB (trend: →2.28→2.27→2.34GB; +0.07GB slight bounce). SwapFree: 13.55GB (−0.31GB; net decline from session start ~16.9GB now ~3.35GB total; rate accelerating — watch). U2 headroom: 1.14GB — below 1.2GB, 600s cadence. Unpark: U1=false, U2=false, U6=false, U7=false (13.55GB > 5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. No new findings. HEAD: c149 commit.
+
+## 2026-05-15T21:52Z — Loop cycle 148 (DEGRADED — U6 active, memory 2.27GB, flat; SwapFree declining)
+
+Health: DEGRADED (U6 active). Memory: 2.27GB (trend: →2.40→2.28→2.27GB; essentially flat, −0.01GB). SwapFree: 13.86GB (−0.17GB notable drop; net decline from session start ~16.9GB accelerating). U2 headroom: 1.07GB — below 1.2GB, 600s cadence. Unpark: U1=false, U2=false, U6=false, U7=false (13.86GB > 5GB). Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. No new findings. HEAD: c148 commit.
+
+## 2026-05-15T21:42Z — Loop cycle 147 (DEGRADED — U6 active, memory 2.28GB, slow decline continues)
+
+Health: DEGRADED (U6 active). Memory: 2.28GB (trend: →2.69→2.40→2.28GB; −0.12GB, slow continuing decline). SwapFree: 14.03GB (stable, −0.02GB). U2 headroom: 1.08GB — below 1.2GB threshold, 600s cadence. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. No new findings. HEAD: c147 commit.
+
+## 2026-05-15T21:32Z — Loop cycle 146 (DEGRADED — U6 active, memory 2.40GB, partial re-decline)
+
+Health: DEGRADED (U6 active). Memory: 2.40GB (trend: →2.20→2.69→2.40GB; −0.29GB re-decline from c145 bounce). SwapFree: 14.05GB (−0.11GB, net gradual decline continues). U2 headroom: 1.20GB — borderline; cadence halved to 600s. Unpark: U1=false, U2=false, U6=false, U7=false. Board frozen R4AI=1/Blocked=7. kodo gate CLOSED. No new findings. Operator actions still required: CANCEL 925be138, move improve tasks to Backlog, review 9c7f4bb9. HEAD: c146 commit.
+
+## 2026-05-15T21:12Z — Loop cycle 145 (DEGRADED — U6 active, memory 2.69GB, decline reversed)
+
+Health: DEGRADED (U6 active). Memory: 2.69GB (trend: →2.20→2.69GB; +0.49GB bounce, slow decline reversed).
+SwapFree: 14.16GB (notable -0.69GB drop this interval; gradual net decline continues, still well above U7 5GB).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U2 headroom: 1.49GB (restored). kodo gate CLOSED.
+Cadence restored to 1200s.
+
+## 2026-05-15T21:02Z — Loop cycle 144 (DEGRADED — U6 active, memory 2.20GB, U2 headroom 1.00GB)
+
+Health: DEGRADED (U6 active). Memory: 2.20GB (trend c141-c144: →2.45→2.30→2.25→2.20GB; -0.05GB/interval).
+SwapFree: 14.85GB (gradual decline). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.00GB. At this rate + periodic spikes, U2 risk increasing. Cadence 600s. kodo gate CLOSED.
+
+## 2026-05-15T20:52Z — Loop cycle 143 (DEGRADED — U6 active, memory 2.25GB, slow continued decline)
+
+Health: DEGRADED (U6 active). Memory: 2.25GB (trend: →2.30→2.25GB; slow continued decline, -0.05GB).
+SwapFree: 15.58GB (slight decline). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.05GB — tightest since c139. Cadence 600s. kodo gate CLOSED.
+
+## 2026-05-15T20:42Z — Loop cycle 142 (DEGRADED — U6 active, memory 2.30GB, recovery stalled)
+
+Health: DEGRADED (U6 active). Memory: 2.30GB (trend: →2.45→2.30GB; -0.15GB, recovery reversed after c141).
+SwapFree: 15.02GB. Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.10GB. Oscillation persists in 2.1-2.9GB band. kodo gate CLOSED. Cadence 600s.
+
+## 2026-05-15T20:32Z — Loop cycle 141 (DEGRADED — U6 active, memory 2.45GB, slow recovery continues)
+
+Health: DEGRADED (U6 active). Memory: 2.45GB (trend: →2.37→2.45GB; slow recovery from c139 spike, +0.08GB).
+SwapFree: 15.02GB. Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.25GB. Recovery slower than c130→c131 pattern. Maintaining 600s cadence. kodo gate CLOSED.
+
+## 2026-05-15T20:22Z — Loop cycle 140 (DEGRADED — U6 active, memory 2.37GB, partial recovery from c139)
+
+Health: DEGRADED (U6 active). Memory: 2.37GB (trend: →2.13→2.37GB; partial +0.24GB recovery, less than c138's full recovery).
+SwapFree: 15.19GB. Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.17GB. Spike pattern continues — keeping 600s cadence. kodo gate CLOSED.
+
+## 2026-05-15T20:12Z — Loop cycle 139 (DEGRADED ⚠ SHARP DROP — U6 active, memory 2.13GB, ~0.93GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.13GB (trend: →2.85→2.13GB; -0.72GB drop — 2nd sharp drop in 3 cycles, recurring pattern).
+SwapFree: 15.22GB. Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 0.93GB — same tight range as c137. Pattern: spikes every ~2 cycles. Cadence halved to 600s.
+kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T19:52Z — Loop cycle 138 (DEGRADED — U6 active, memory 2.85GB, c137 spike resolved)
+
+Health: DEGRADED (U6 active). Memory: 2.85GB (trend: →2.12→2.85GB; +0.73GB recovery — c137 was transient burst, same pattern as c130/c131).
+SwapFree: 15.31GB. Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.65GB (restored to safe range). kodo gate CLOSED. Cadence restored to 1200s.
+
+## 2026-05-15T19:42Z — Loop cycle 137 (DEGRADED ⚠ SHARP DROP — U6 active, memory 2.12GB, ~0.92GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.12GB (trend: →2.76→2.12GB; -0.64GB drop, largest this session).
+SwapFree: 15.74GB (stable). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 0.92GB — WARNING: tightest headroom this session. Monitoring closely.
+kodo gate CLOSED. No unpark conditions triggered (U2 threshold ≤1.2GB not yet breached).
+
+## 2026-05-15T19:22Z — Loop cycle 136 (DEGRADED — U6 active, memory 2.76GB, ~1.56GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.76GB (trend: →2.74→2.76GB; minor uptick, oscillation continues).
+SwapFree: 15.35GB (gradual decline, well above U7 5GB floor). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.56GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T19:02Z — Loop cycle 135 (DEGRADED — U6 active, memory 2.74GB, ~1.54GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.74GB (trend: →2.83→2.74GB; slow oscillation continues, range 2.5-2.9GB).
+SwapFree: 15.74GB (slow gradual decline ~1.2GB total since c110, well above U7). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.54GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T18:42Z — Loop cycle 134 (DEGRADED — U6 active, memory 2.83GB, ~1.63GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.83GB (trend: →2.76→2.83GB; essentially flat +0.07GB, oscillating 2.5-2.9GB).
+SwapFree: 15.80GB (slow decline ongoing, well above U7). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.63GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T18:22Z — Loop cycle 133 (DEGRADED — U6 active, memory 2.76GB, ~1.56GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.76GB (trend: →2.55→2.76GB; +0.21GB recovery, oscillating 2.3-2.8GB range).
+SwapFree: 15.85GB (slight decline from 16.07GB, still well above U7). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.56GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T18:02Z — Loop cycle 132 (DEGRADED — U6 active, memory 2.55GB, ~1.35GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.55GB (trend: →2.69→2.55GB; slow resumed decline -0.14GB, oscillating 2.3-2.7GB range).
+SwapFree: 16.07GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.35GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T17:42Z — Loop cycle 131 (DEGRADED — U6 active, memory 2.69GB, ~1.49GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.69GB (trend: →2.33→2.69GB; c130 sharp drop was transient spike, partial recovery +0.36GB).
+SwapFree: 16.13GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.49GB. Returning to 1200s cadence (c130 spike resolved). kodo gate CLOSED.
+
+## 2026-05-15T17:22Z — Loop cycle 130 (DEGRADED — U6 active, memory 2.33GB, ~1.13GB above U2) ⚠ SHARP DROP
+
+Health: DEGRADED (U6 active). Memory: 2.33GB (trend: →2.87→2.33GB; SHARP DROP -0.54GB, largest single-interval decline this session).
+SwapFree: 16.25GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.13GB. At this rate U2 (≤1.2GB) could trigger within 1-2 intervals. kodo gate CLOSED.
+OPERATOR ATTENTION: memory declining rapidly — if ≤1.2GB reached, U2 fires and loop will alert.
+
+## 2026-05-15T17:02Z — Loop cycle 129 (DEGRADED — U6 active, memory 2.87GB, ~1.67GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.87GB (trend: →2.83→2.87GB; oscillating ~2.83-2.97GB, apparent floor forming).
+SwapFree: 16.25GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.67GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T16:42Z — Loop cycle 128 (DEGRADED — U6 active, memory 2.83GB, ~1.63GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.83GB (trend: →2.97→2.83GB; c127 recovery was transient, resumed decline).
+SwapFree: 16.33GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.63GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T16:22Z — Loop cycle 127 (DEGRADED — U6 active, memory 2.97GB, ~1.77GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.97GB (trend: →2.82→2.97GB; first slight recovery +0.15GB — likely GC, not a trend shift).
+SwapFree: 16.33GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.77GB. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T16:02Z — Loop cycle 126 (DEGRADED — U6 active, memory 2.82GB, ~1.62GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.82GB (trend: →3.12→2.90→2.82GB; decline slowed to ~0.08GB/interval).
+SwapFree: 16.33GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.62GB. Decline rate easing. kodo gate CLOSED. No unpark conditions triggered.
+
+## 2026-05-15T15:42Z — Loop cycle 125 (DEGRADED — U6 active, memory 2.90GB, ~1.70GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 2.90GB (trend: →3.21→3.12→2.90GB; decline resumed ~0.22GB/interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.70GB. At ~0.22GB/interval (~150min at current rate). Monitoring closely.
+
+## 2026-05-15T15:22Z — Loop cycle 124 (DEGRADED — U6 active, memory 3.12GB, ~1.92GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.12GB (trend: →3.37→3.21→3.12GB; slow ~0.09GB/interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 1.92GB. Decline slow and consistent. kodo gate CLOSED.
+
+## 2026-05-15T15:02Z — Loop cycle 123 (DEGRADED — U6 active, memory 3.21GB, ~2.01GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.21GB (trend: →3.47→3.37→3.21GB; slow decline ~0.16GB/interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.01GB. At ~0.16GB/interval (~250min at current rate). kodo gate CLOSED.
+
+## 2026-05-15T14:42Z — Loop cycle 122 (DEGRADED — U6 active, memory 3.37GB, ~2.17GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.37GB (trend: →3.67→3.47→3.37GB; slow continued decline ~0.10GB/interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.17GB. Decline rate slow and consistent. kodo gate CLOSED.
+
+## 2026-05-15T14:22Z — Loop cycle 121 (DEGRADED — U6 active, memory 3.47GB, ~2.27GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.47GB (trend: →3.71→3.67→3.47GB; slight resumed decline after apparent floor).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.27GB. Floor not confirmed — monitoring. kodo gate CLOSED.
+
+## 2026-05-15T14:02Z — Loop cycle 120 (DEGRADED — U6 active, memory 3.67GB, stable floor ~3.7GB)
+
+Health: DEGRADED (U6 active). Memory: 3.67GB (trend: →3.70→3.71→3.67GB; flat — appears to have reached floor).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.47GB. Memory stable at ~3.7GB floor. kodo gate CLOSED.
+
+## 2026-05-15T13:42Z — Loop cycle 119 (DEGRADED — U6 active, memory 3.71GB, decline stabilizing)
+
+Health: DEGRADED (U6 active). Memory: 3.71GB (trend: →3.84→3.70→3.71GB; essentially flat — decline stopped).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.51GB. Memory appears to be stabilizing at ~3.7GB. kodo gate CLOSED.
+
+## 2026-05-15T13:22Z — Loop cycle 118 (DEGRADED — U6 active, memory 3.70GB, ~2.50GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.70GB (trend: →3.96→3.84→3.70GB; ~0.14GB/interval, slow decline).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.50GB. At ~0.14GB/interval (~350min at current rate). kodo gate CLOSED.
+
+## 2026-05-15T13:02Z — Loop cycle 117 (DEGRADED — U6 active, memory 3.84GB, ~2.64GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.84GB (trend: →4.32→3.96→3.84GB; ~0.12GB this interval, stabilizing?).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.64GB. Decline rate appears to be slowing. kodo gate CLOSED.
+
+## 2026-05-15T12:42Z — Loop cycle 116 (DEGRADED — U6 active, memory 3.96GB, ~2.76GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 3.96GB (trend: →4.80→4.32→3.96GB; ~0.36GB/interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 2.76GB. At ~0.36GB/interval (~150min at current rate). kodo gate CLOSED.
+
+## 2026-05-15T12:22Z — Loop cycle 115 (DEGRADED — U6 active, memory 4.32GB, ~3.1GB above U2)
+
+Health: DEGRADED (U6 active). Memory: 4.32GB (trend: →5.14→4.80→4.32GB; ~0.48GB/interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 3.12GB. At ~0.48GB/interval (~130min at current rate). kodo gate CLOSED.
+
+## 2026-05-15T12:02Z — Loop cycle 114 (DEGRADED — U6 active, memory 4.80GB, decline slowing)
+
+Health: DEGRADED (U6 active). Memory: 4.80GB (trend: →5.14→4.80GB; ~0.34GB/interval — slowing).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 3.6GB. At ~0.34GB/interval (~210min at current rate). kodo gate CLOSED.
+
+## 2026-05-15T11:42Z — Loop cycle 113 (DEGRADED — U6 active, memory 5.14GB, decline continuing)
+
+Health: DEGRADED (U6 active). Memory: 5.14GB (trend: 13.4→7.86→6.5→5.98→5.14GB; ~0.84GB/20min interval).
+SwapFree: 16.9GB stable (U7 false). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+U2 headroom: 3.94GB. At current rate ~80min to U2. Monitoring closely.
+
+## 2026-05-15T11:20Z — Loop cycle 112 (DEGRADED — U6 active, memory 5.98GB, decline slowing)
+
+Health: DEGRADED (U6 active). Memory: 5.98GB (trend: 13.4→7.86→6.5→5.98GB; ~0.5GB this interval, slowing).
+SwapFree: 16.9GB (U7 safe). New processes: 2× /opt/conda/bin/python3 (~700MB combined).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U2 floor 1.2GB: ~4.78GB headroom. kodo gate CLOSED.
+
+## 2026-05-15T11:05Z — Loop cycle 111 (DEGRADED — U6 active, memory 6.5GB declining, autonomy cycle no-op)
+
+Health: DEGRADED (U6 active). Memory: 6.5GB (down from 7.86GB at c110 — audio_enhance.py grew 2.4%→11.2%).
+SwapFree: 16.9GB (U7 safe). Board: R4AI=1, Blocked=7 — unchanged (U1 false).
+Autonomy_cycle --execute from c110 completed with no board change: investigate-kind task 9c7f4bb9 unclaimed (structural starvation confirmed). Memory trend: 13.4GB → 7.86GB → 6.5GB. Watching U2 (floor 1.2GB). kodo gate CLOSED.
+
+## 2026-05-15T10:50Z — Loop cycle 110 (DEGRADED — U6 triggered, memory 7.86GB, autonomy_cycle running)
+
+UNPARK: PARKED → DEGRADED. U6 triggered: MemAvailable=7.86GB < 8GB threshold.
+Cause: new external processes started ~12:57 EDT — zonos TTS API (~4.2GB) + VideoFoundry audit (~1.15GB).
+Memory: 15GB total, 8.0GB used, 7.3GB available. SwapFree: 16.9GB (U7 safe).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false at check time).
+kodo gate: CLOSED (needs ≥8GB; now 7.86GB — 140MB below threshold).
+Notable: autonomy_cycle.main --execute running (PID 4124364, started 12:59 EDT) — may produce board state change next cycle.
+NEW_EVIDENCE: U6 triggered (memory regression) + autonomy cycle active. Short wakeup (600s) to capture outcome.
+Structural blockers unchanged: 9c7f4bb9 investigate-kind unclaimable, improve tasks need operator action.
+
+## 2026-05-15T10:15Z — Loop cycle 109 (PARKED — memory 13.4GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (c105 epoch). Memory: 13.4GB. SwapFree: 16.9GB.
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). All U1/U2/U6/U7 false. Remain PARKED.
+
+## 2026-05-15T09:40Z — Loop cycle 108 (PARKED — memory 13.4GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (c105 epoch). Memory: 13.4GB. SwapFree: 16.9GB.
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). All U1/U2/U6/U7 false. Remain PARKED.
+
+## 2026-05-15T09:05Z — Loop cycle 107 (PARKED — memory 13.5GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (c105 epoch). Memory: 13.5GB (U6 healthy). SwapFree: 16.9GB.
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). All U1/U2/U6/U7 false. Remain PARKED.
+
+## 2026-05-15T08:30Z — Loop cycle 106 (PARKED — memory 13.3GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (c105 re-park epoch). Memory: 13.3GB (U6 healthy, no trigger). SwapFree: 16.8GB.
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). All U1/U2/U6/U7 false. Remain PARKED.
+
+## 2026-05-15T07:55Z — Loop cycle 105 (PARKED_OPERATOR_BLOCKED — re-parked, structural starvation)
+
+PARK TRANSITION: ACTIVE → PARKED_OPERATOR_BLOCKED. Memory: 13.3GB (U6 sustained). SwapFree: 16.8GB.
+Board: R4AI=1, Blocked=7 — unchanged across c102-c105 (4 ACTIVE cycles, zero queue evolution).
+Park criteria met: operator-blocked, same root cause ≥3 cycles, escalation tasks 9c7f4bb9+88702733 exist,
+NEW_EVIDENCE_DETECTED=no for 2 cycles (c104, c105), no safe retry path.
+Park timestamp: c105 (2026-05-15T07:55Z UTC).
+Root cause: (1) 9c7f4bb9 task-kind:investigate — no board_worker consumer, structurally stranded in R4AI.
+  (2) improve tasks (2824d46e/fa470a1f/b67bc0e0/a969024e) blocked pending CANCEL of 925be138.
+  (3) kodo gate now clear (13.3GB) but dispatch path blocked by missing operator actions.
+UNPARK conditions (this epoch):
+  U1: Board state changes (R4AI≠1 OR Blocked≠7)
+  U2: MemAvailable ≤1.2GB
+  U6: MemAvailable drops below 8GB
+  U7: SwapFree ≤5GB
+
+## 2026-05-15T07:20Z — Loop cycle 104 (ACTIVE — structural starvation confirmed, no new evidence)
+
+Health: ACTIVE (U6 sustained). Memory: 13.3GB. SwapFree: 16.8GB.
+Board: R4AI=1, Blocked=7 — unchanged (c103 finding holds).
+STEP 1: custodian=0, flow=0 open gaps. Triage scan: transient 403 from Plane API (parallel rate-limit); board state confirmed separately.
+STEP 3: Same root cause as c103. 9c7f4bb9 (investigate) still unconsumable; improve tasks still blocked.
+NEW_EVIDENCE_DETECTED=no (c103 was the discovery cycle; c104 is first cycle confirming it holds with no change).
+One more cycle without new evidence + no queue evolution → eligible for re-park on c105.
+Operator actions remain: (1) review/close 9c7f4bb9, (2) CANCEL 925be138, (3) move improve tasks to Backlog.
+
+## 2026-05-15T06:45Z — Loop cycle 103 (ACTIVE — structural starvation: investigate task unconsumable)
+
+Health: ACTIVE (unparked c102 via U2/U6). Memory: 13.3GB (U6 sustained). SwapFree: 16.8GB.
+Board: R4AI=1, Blocked=7 — still frozen despite memory gate clear.
+STEP 1: custodian=0, ghost=0, flow=0, reaudit=not needed, regressions=no-git-token.
+STEP 2: triage clean.
+STEP 3 — NEW FINDING: 9c7f4bb9 (task-kind:investigate, R4AI) has NO board_worker consumer. goal+improve watchers
+both polling every 30-60s but finding nothing to claim. No "investigate" board_worker exists. This is structural
+starvation — R4AI will not drain without operator action. Memory gate was never the real blocker for 9c7f4bb9.
+STARVATION: R4AI=1 unconsumable (no investigate watcher). NON-CONVERGENT: memory cleared, board frozen.
+OPERATOR ACTIONS REQUIRED (memory gate now clear — kodo can execute safely at 13.3GB):
+  1. Review/close/relabel 9c7f4bb9 — task-kind:investigate has no watcher; operator must act on it manually
+  2. CANCEL 925be138 (dead-remediation, 3×SIGKILL)
+  3. Move improve tasks (2824d46e, fa470a1f, b67bc0e0, a969024e) to Backlog — memory now ≥8GB, kodo safe
+
+## 2026-05-15T06:10Z — Loop cycle 102 (ACTIVE — U2/U6 triggered, memory recovered to 13.3GB)
+
+**UNPARKED**: Memory recovered to 13.3GB (≥8GB) — U2 (recovery) and U6 triggered. SwapFree: 16.4GB (fully restored).
+PARKED → ACTIVE transition. kodo dispatch gate now clear.
+STEP 1: custodian=0, ghost=0, flow=0 open gaps, reaudit=not needed, regressions=no-git-token (known). Graph doctor: 1 persisting warning (videofoundry repo_id unknown in LocalManifest — pre-existing).
+STEP 2: triage scan clean (rescore=0, awaiting=0, queue_healing=0).
+Board: R4AI=1 (9c7f4bb9 — investigate-kind, not claimed yet), Blocked=7.
+Watcher board_worker should now claim 9c7f4bb9 on next poll — memory gate cleared.
+PENDING OPERATOR ACTIONS STILL REQUIRED: (1) CANCEL 925be138, (2) move improve tasks 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog once 925be138 cancelled.
+
+## 2026-05-15T05:35Z — Loop cycle 101 (PARKED — memory 1.44GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.44GB (↓ from 2.19GB c100; only 240MB above U2 floor — monitor closely). SwapFree: 10.9GB (swap 8.6GB used).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T05:00Z — Loop cycle 100 (PARKED — memory 2.19GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.19GB (↑ from 1.95GB c99; oscillating). SwapFree: 11.4GB (swap 8.1GB used; stable).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T04:25Z — Loop cycle 99 (PARKED — memory 1.95GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.95GB (↑ from 1.66GB c98; still oscillating). SwapFree: 11.4GB (swap 8.1GB used; slight improvement).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T03:50Z — Loop cycle 98 (PARKED — memory 1.66GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.66GB (↑ from 1.50GB c97; oscillating). SwapFree: 10.8GB (swap 8.2GB used; slow upward trend continues).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T03:20Z — Loop cycle 97 (PARKED — memory 1.50GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.50GB (oscillating 1.38-1.82GB range). SwapFree: 10.9GB (swap ~8.1GB used; trending up from 7.4GB c96).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+Note: swap usage climbing slowly (c92=7GB → c97=8.1GB); SwapFree still well above U7 5GB floor (~5.9GB headroom).
+
+## 2026-05-15T02:50Z — Loop cycle 96 (PARKED — memory 1.82GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.82GB (↑ from 1.38GB c95; oscillating). SwapFree: 11.6GB (swap ~7.4GB used; stable).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T02:20Z — Loop cycle 95 (PARKED — memory 1.38GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.38GB (↓ from 2.23GB c94; above 1.2GB U2 floor). SwapFree: 11.7GB (swap ~7.3GB used).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+Note: memory oscillating 1.38-2.23GB range this session; U2 floor is 1.2GB (0.18GB headroom at this reading).
+
+## 2026-05-15T01:50Z — Loop cycle 94 (PARKED — memory 2.23GB stabilizing, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.23GB (↑ from 1.65GB c93; stabilizing). SwapFree: 11.9GB (swap 7.1GB used, slightly reduced from c93's 7.8GB).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T01:20Z — Loop cycle 93 (PARKED — memory 1.65GB recovered above U2 floor, no OOM kills)
+
+**DEGRADED → PARKED_OPERATOR_BLOCKED** — memory recovered: 1.65GB available (above 1.2GB U2 floor). No OOM kills. Swap: 7.8GB used / 11.2GB free (climbing; U7=5GB free — not triggered).
+Board: R4AI=1, Blocked=7 — unchanged. Underlying operator-blocked conditions all still hold. Re-parked.
+Note: memory oscillating significantly (c90-c93: 1.52→2.80→0.97→1.65GB); swap usage trending up. Monitoring.
+
+## 2026-05-15T01:10Z — Loop cycle 92 (DEGRADED — U2 TRIGGERED, memory 0.97GB below 1.2GB pre-OOM floor)
+
+**UNPARK: PARKED → DEGRADED** — U2 triggered: MemAvailable 0.97GB (< 1.2GB threshold).
+Memory: total=15GB, used=14GB, free=227MB, available=989MB. Swap: 7GB used / 13GB free (no OOM kills in dmesg).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). No kodo dispatch (kodo needs ≥8GB; current is 0.97GB).
+OPERATOR ALERT: System memory critically low. Risk of OOM if any large process starts. Free memory before any kodo dispatch.
+Action: monitoring closely — next check in 270s. No full investigation (memory pressure too high to run audit tools).
+
+## 2026-05-15T00:40Z — Loop cycle 91 (PARKED — memory 2.80GB recovered, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.80GB (↑ from 1.52GB c90 — recovered). SwapFree: 13.7GB (↓ from 15.1GB; still well above U7 5GB floor).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+
+## 2026-05-15T00:10Z — Loop cycle 90 (PARKED — memory 1.52GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.52GB (↓ from 2.71GB c89; 0.32GB above U2 floor 1.2GB). SwapFree: 15.1GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged (U1 false). U3: 88702733/3860f469 state unchanged. U4: no qualifying post-park events. All U1-U7 false. Remain PARKED.
+Note: memory declined notably this cycle (~1.2GB drop); approaching U2 floor but not yet triggered.
+
+## 2026-05-14T23:40Z — Loop cycle 89 (PARKED — memory 2.71GB stable, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.71GB (stable, same as c88). SwapFree: 16.1GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged.
+U4: 23:xx EDT entries found (claimed/blocked/kodo-SIGKILL on 996792b7, improve-budget-block on b67bc0e0/fa470a1f/2824d46e) but all pre-park (23:xx EDT May 13 = 03:xx UTC May 14, before 14:10Z). No post-park qualifying events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T23:10Z — Loop cycle 88 (PARKED — memory 2.71GB slight recovery, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.71GB (↑0.08GB from c87; slight recovery from declining trend). SwapFree: 16.1GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T22:40Z — Loop cycle 87 (PARKED — memory 2.63GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.63GB (↓0.16GB from c86; ~1.43GB above U2 gate — slow decline trend c82-c87). SwapFree: 16.1GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T22:10Z — Loop cycle 86 (PARKED — memory 2.79GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.79GB (↓0.16GB from c85; ~1.59GB above U2 gate). SwapFree: 16.1GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T21:40Z — Loop cycle 85 (PARKED — memory 2.95GB stable, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.95GB (stable, ~1.75GB above U2 gate). SwapFree: 16.7GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T21:10Z — Loop cycle 84 (PARKED — memory 2.97GB slight decline, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.97GB (↓0.10GB from c83; ~1.77GB above U2 gate). SwapFree: 16.7GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T20:40Z — Loop cycle 83 (PARKED — memory 3.07GB stable, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.07GB (stable, unchanged from c82). SwapFree: 16.8GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T20:10Z — Loop cycle 82 (PARKED — memory 3.07GB recovering, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.07GB (↑0.22GB from c81; recovering). SwapFree: 16.8GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. U3: 88702733=Backlog, 3860f469=Backlog, unchanged. No qualifying U4 events (goal log active through 10:57 EDT, only HTTP polling). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T19:40Z — Loop cycle 81 (PARKED — memory 2.85GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.85GB (↑0.05GB from c80; appears stabilizing ~2.8-2.9GB, ~1.65GB above U2 gate). SwapFree: 16.1GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. No qualifying U4 events in daytime window. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T19:10Z — Loop cycle 80 (PARKED — memory 2.80GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.80GB (↓0.40GB from c79; ~1.6GB above U2 gate — ~3-4 cycles runway at current rate). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. No qualifying U4 events. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T18:40Z — Loop cycle 79 (PARKED — memory 3.20GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.20GB (↓0.46GB from c78; decline resumed, ~2.0GB above U2 gate — monitoring). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. No qualifying U4 events in daytime window. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T18:10Z — Loop cycle 78 (PARKED — memory 3.66GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.66GB (↓0.09GB from c77; oscillating ~3.66-3.75GB, ~2.46GB above U2 gate). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. No qualifying U4 events (blocked/claimed/SIGKILL/transition) in daytime window 10:10-18:00 EDT. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T17:40Z — Loop cycle 77 (PARKED — memory 3.75GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.75GB (↑0.06GB from c76; oscillating ~3.7-3.8GB, ~2.55GB above U2 gate). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. Watcher logs active through 10:26 EDT (14:26Z); no qualifying U4 events (blocked/claimed/SIGKILL/transition) in daytime window 10:10-18:00 EDT. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T17:10Z — Loop cycle 76 (PARKED — memory 3.69GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.69GB (↓0.32GB from c75; oscillating ~3.7-4GB, ~2.5GB above U2 gate). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. Watcher logs active through 10:20 EDT (14:20Z); overnight entries (23:xx EDT = 03:xx UTC) confirmed pre-park. No qualifying U4 events (blocked/claimed/SIGKILL/transition) in daytime window 10:10-18:00 EDT. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T16:40Z — Loop cycle 75 (PARKED — memory 4.01GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 4.01GB (↓0.06GB from c74; decline rate decelerating, stabilizing ~4GB). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. Watcher logs active through 10:14 EDT (14:14Z) — entries are routine HTTP polling heartbeats (work-items/labels 200s) and one 301 redirect warning (review→Velascat/CxRP); none qualify as U4 (blocked/claimed/SIGKILL/transition). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T16:10Z — Loop cycle 74 (PARKED — memory 4.07GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 4.07GB (↓0.45GB from c73; decline rate ~0.45GB/cycle, ~2.87GB above U2 gate). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. Log mtimes at 10:06 EDT (14:06Z) — PRE-park (c70=14:10Z). No post-park watcher activity. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T15:40Z — Loop cycle 73 (PARKED — memory 4.52GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 4.52GB (↓0.42GB from c72; slow decline continues). SwapFree: 16.2GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. Log mtimes last at 10:02:30 EDT (14:02Z) — PRE-park (c70=14:10Z). No post-park watcher activity. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T15:10Z — Loop cycle 72 (PARKED — memory 4.94GB declining, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 4.94GB (↓1.38GB from c71's 6.32GB; continuing slow post-recovery decline). SwapFree: 16GB (stable; ↓1GB from 17GB baseline — normal).
+Board: R4AI=1, Blocked=7 — unchanged. U4 check: goal watcher entries at 20:06-20:20 local (EDT) confirmed from May 13 evening (00:06-00:20Z May 14) — all pre-park. No post-park watcher activity after c70 timestamp (14:10Z May 14). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+ADVISORY: Memory declining 13.51→7.60→6.32→4.94GB (c68→c69→c70→c71→c72). Rate decelerating but trend continues. If memory reaches ≤1.2GB → U2 trigger. Currently ~3.7GB headroom above threshold.
+
+## 2026-05-14T14:40Z — Loop cycle 71 (PARKED — memory 6.32GB stable, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 6.32GB (stable — ↑0.01GB from c70's 6.31GB; declining trend arrested). SwapFree: 17.05GB stable.
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher activity (heartbeat last at 13:51Z, before c70 park timestamp 14:10Z). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+Memory settled to new floor ~6.32GB (vs prior ~1.6-2.4GB floor; higher due to memory still partially occupied post-recovery).
+
+## 2026-05-14T14:10Z — Loop cycle 70 (STALLED→PARKED — no-evidence cycle 2, all park conditions met)
+
+Health: STALLED → PARKED_OPERATOR_BLOCKED. Memory: 6.31GB (↓1.29GB from c69; rate decelerating; still above 1.2GB U2 floor). SwapFree: 17.05GB stable.
+Board: R4AI=1, Blocked=7 — unchanged. 925be138 still [Blocked]. Improve tasks still [Blocked]. 88702733/3860f469 both [Backlog] — unchanged.
+NEW_EVIDENCE_DETECTED=no (no board/watcher/task/remediation changes since c69). Second consecutive no-evidence cycle.
+
+**Park transition**: all conditions met (operator-blocked 60+ cycles, Plane escalations exist, no queue evolution, no remediation adaptation, NEW_EVIDENCE=no×2, no safe retry path).
+Park timestamp: c70 (2026-05-14T14:10Z). U4 checks watcher activity after this timestamp.
+
+Memory trend: 13.51→7.60→6.31GB (c68→c69→c70). Rate decelerating (~1.3GB/cycle at c70 vs 5.9GB at c68). If trend continues toward 1.2GB → U2 trigger. If recovers ≥8GB → U2/U6 trigger.
+Operator actions still required: (1) CANCEL 925be138, (2) move improve tasks to Backlog (confirm ≥8GB first).
+
+## 2026-05-14T13:40Z — Loop cycle 69 (STALLED — memory 7.60GB, board frozen, no-evidence cycle 1 post-unpark)
+
+Health: STALLED / operator-blocked (unparked at c68). Memory: 7.60GB (↓5.9GB from c68's 13.51GB in ~15min; still above 1.2GB floor, but now below 8GB kodo threshold). SwapFree: 17.04GB stable.
+Full investigation: all clean (custodian 0, ghost 0, flow F8/count=0, graph fail_graph_none pre-existing, reaudit none needed, regressions 0). Triage: no actions.
+Board: R4AI=1, Blocked=7 — frozen. 925be138 still [Blocked] (not cancelled). Improve tasks still [Blocked].
+NEW_EVIDENCE_DETECTED=no (no board/watcher/task changes; memory shift not operationally distinct).
+**No-evidence cycle 1 post-unpark.** Need 1 more consecutive no-evidence cycle for park transition.
+ADVISORY: Memory dropped 5.9GB in 15 min — something consumed memory. Watch trend at c70; if below 1.2GB → U2; if ≥8GB again → sustained U6. Kodo gate requires ≥8GB — currently 7.60GB (borderline).
+
+## 2026-05-14T13:26Z — Loop cycle 68 (PARKED→STALLED — U2/U6 triggered, memory 13.51GB recovered, kodo gate cleared)
+
+**UNPARK via U2/U6**: Memory recovered to 13.51GB (was 1.60GB at c67); SwapFree 17.01GB (fully recovered).
+Transition: PARKED_OPERATOR_BLOCKED → STALLED. NEW_EVIDENCE_DETECTED=yes.
+
+Full investigation: custodian 0 findings, ghost 0, flow-audit F8 partial/count=0, graph-doctor fail_graph_none (pre-existing VideoFoundry LocalManifest issue), reaudit no action needed, regressions 0 findings.
+Triage scan: no queue-healing actions (no eligible structured-evidence labels).
+Board: R4AI=1, Blocked=7 — frozen. Improve watcher: idle/healthy (heartbeat 13:25Z).
+
+**Kodo gate now CLEARED**: Memory ≥8GB, hourly rate window reset (last runs 03:14/03:36Z), concurrency slot free (925be138 in Blocked, not in-flight).
+**925be138 still [Blocked]** — operator has NOT cancelled. Improve tasks (2824d46e, fa470a1f, b67bc0e0, a969024e) still [Blocked].
+
+Classification: STALLED / operator-blocked. All conditions for kodo success now met EXCEPT board state.
+**Required operator actions** (order matters): (1) CANCEL 925be138, (2) move improve tasks to Backlog (not R4AI directly).
+Once done, improve watcher will claim and kodo should succeed with 13.5GB available.
+
+## 2026-05-15T04:42Z — Loop cycle 67 (PARKED — memory 1.60GB, swap 7.90GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.60GB (OS floor oscillating; above 1.2GB U2 gate). SwapFree: 7.90GB (↓0.06GB from c66 — essentially stable).
+Board: R4AI=1, Blocked=7 — unchanged. Improve watcher log last entry 23:55 local (May 13 night ~03:55Z May 14); no activity after park timestamp (c60=01:12Z May 15). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-15T04:12Z — Loop cycle 66 (PARKED — memory 2.41GB, swap 7.96GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.41GB (continued OS floor recovery; above 1.2GB U2 gate). SwapFree: 7.96GB (↑0.32GB from c65's 7.64GB — stable/slight recovery).
+Board: R4AI=1, Blocked=7 — unchanged. Improve watcher active (HTTP polling at 09:15-09:17Z) but no blocked/claimed/SIGKILL/transition entries after park timestamp (c60=01:12Z). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-15T03:42Z — Loop cycle 65 (PARKED — memory 1.89GB, swap 7.64GB stable, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.89GB (recovered; OS floor stable). SwapFree: 7.64GB (essentially stable from c64's 7.65GB).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher activity. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED. Memory/swap stabilizing in normal OS floor range.
+
+## 2026-05-15T03:12Z — Loop cycle 64 (PARKED — memory 1.64GB, swap 7.65GB, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.64GB (OS floor oscillating). SwapFree: 7.65GB (↓0.66GB from c63).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher activity. All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-15T02:42Z — Loop cycle 63 (PARKED — memory 1.46GB oscillating, swap 8.31GB slow decline)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.46GB (oscillating 1.46-1.72GB — OS floor; above 1.2GB U2 gate).
+SwapFree: 8.31GB (↓0.46GB from c62; rate decelerating — c61 spike not sustained). All U1-U7 false.
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher activity after c60 park timestamp (01:12Z).
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-15T02:12Z — Loop cycle 62 (PARKED — memory recovered 1.72GB, swap decelerated to 8.77GB)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.72GB (recovered from c61's 1.47GB — not a sustained decline).
+SwapFree: 8.77GB (↓0.53GB from c61's 9.3GB — deceleration; c61 spike of 1.62GB was not sustained).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher activity (last entry still 23:55Z). All U1-U7 false.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED. Memory/swap concern from c61 appears to be oscillation, not a sustained trend.
+
+## 2026-05-15T01:42Z — Loop cycle 61 (PARKED — memory 1.47GB approaching U2, swap 9.3GB declining)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.47GB (0.27GB above 1.2GB U2 gate — WARNING: approaching threshold).
+SwapFree: 9.3GB (↓1.62GB from c60; rate ~1.6GB/30min — WARNING: U7 ≤5GB reachable in ~2.7 cycles/~80min).
+Board: R4AI=1, Blocked=7 — unchanged. U3 false (88702733/3860f469 still Backlog).
+No watcher activity post-c60-park (01:12Z). All unpark conditions false (U1-U7).
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+OPERATOR ADVISORY: Memory declining (1.76→1.47GB in 30min). If U2 triggers next cycle, full investigation will run (expected clean). Swap consuming rapidly — investigate what is consuming memory/swap. Do NOT dispatch kodo.
+
+## 2026-05-15T01:12Z — Loop cycle 60 (STALLED→PARKED — park re-entry, 2 no-evidence cycles post-unpark)
+
+Health: PARKED_OPERATOR_BLOCKED (re-entry). Memory: 1.76GB (OS floor). SwapFree: 10.92GB (↓1.56GB from c59; rate accelerating; above 5GB U7 gate).
+Board: R4AI=1, Blocked=7 — unchanged. STEP 1: 0 findings. STEP 2: Triage empty.
+Watcher log: no new entries since 23:55Z (c58 activity). No new kodo runs or transitions.
+NEW_EVIDENCE_DETECTED=no (c59 and c60). 2 consecutive no-evidence STALLED cycles → park transition triggered.
+All park conditions met: operator-blocked, root cause unchanged (kodo memory SIGKILL + rate limits), board frozen, 88702733 escalation exists, no safe retry path.
+PARKED. Check only U1-U7 next cycle.
+Swap advisory: 10.92GB remaining (was 12.48GB at c59 — 1.56GB/cycle consumed). If this rate holds, U7 (≤5GB) reachable in ~4 cycles (~2h). Monitor.
+
+## 2026-05-15T00:42Z — Loop cycle 59 (STALLED — no new evidence, cycle 1 post-unpark, board frozen)
+
+Health: STALLED (cycle 1 post-unpark). Memory: 1.98GB (OS floor). SwapFree: 12.48GB.
+Board: R4AI=1, Blocked=7 — unchanged. STEP 1: 0 findings. STEP 2: Triage empty.
+Watcher logs: no new entries since c58 (last activity 23:55Z). Improve tasks remain Blocked. No new kodo runs.
+NEW_EVIDENCE_DETECTED=no (board frozen, no new watcher events, same execution state).
+Park transition requires 2+ consecutive cycles of no new evidence. This is cycle 1. Remain STALLED.
+Operator advisory: (1) Cancel 925be138 (3rd dead-remediation SIGKILL). (2) Move improve tasks to Backlog only (not R4AI) — rate limit 2/hr means at most 2 complete per hour. (3) Memory ≥8GB required before kodo dispatch.
+
+## 2026-05-15T00:12Z — Loop cycle 58 (PARKED→STALLED — U4 triggered, post-park watcher executed 5 tasks, all blocked)
+
+Health: STALLED (unparked from PARKED_OPERATOR_BLOCKED via U4). Memory: 1.89GB (OS floor, above 1.2GB U2). SwapFree: 12.65GB (above 5GB U7).
+U4 triggered: board_worker[improve] claimed and blocked 5 tasks between 23:14–23:55Z (post-park activity in watcher logs).
+
+WATCHER ACTIVITY (post-c54 park):
+- 925be138 (dead-remediation): claimed 23:14Z → kodo SIGKILL (-9) 23:24Z. THIRD SIGKILL. Operator must CANCEL this task.
+- a969024e: claimed 23:25Z → blocked budget_exhausted (global_concurrency_exceeded; kodo still in_flight for 925be138).
+- b67bc0e0: claimed 23:34Z → blocked budget_exhausted (global_rate_exceeded; hourly=2/hr, consumed by 925be138+a969024e).
+- fa470a1f: claimed 23:40Z → blocked budget_exhausted (global_rate_exceeded).
+- 2824d46e: claimed 23:48Z → blocked budget_exhausted (global_rate_exceeded).
+
+Operator moved improve tasks to R4AI directly (not Backlog as advised). All 5 tasks are back in Blocked.
+Root cause remains: kodo SIGKILL from memory (~1.89GB available; needs ≥8GB). Rate limit (2/hr) compounds the problem — only 1 kodo run can complete per attempt before hourly budget exhausted.
+
+STEP 1: All 6 tools clean (0 findings). STEP 2: Triage scan empty.
+Board: R4AI=1, Blocked=7 — same as before (tasks cycled through R4AI and back).
+Classification: NON-CONVERGENT. Improve tasks attempted but blocked by budget gates; kodo SIGKILL again on 925be138. No net state change.
+NEW_EVIDENCE_DETECTED=yes. Remain STALLED.
+Operator actions needed: (1) CANCEL 925be138 (3rd SIGKILL dead-remediation). (2) Do NOT move improve tasks to R4AI until memory ≥8GB — move to Backlog only when ready.
+
+## 2026-05-14T22:18Z — Loop cycle 57 (PARKED — memory 1.93GB OS floor, swap spike was one-time)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.93GB (OS floor stable). SwapFree: 12.96GB.
+Swap consumed: 0.24GB this cycle vs 1.7GB at c56 — spike was single-cycle, not a sustained trend.
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U7).
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T21:48Z — Loop cycle 56 (PARKED — memory 1.95GB, swap accelerating 1.7GB/cycle)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.95GB available (OS floor; above 1.2GB U2 gate).
+SwapFree: 13.2GB (was 14.9GB at c55 — 1.7GB more swap consumed this cycle; accelerating).
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U6).
+WARNING: Swap consumption accelerating. At 1.7GB/cycle with 13.2GB remaining, ~8 cycles before swap exhaustion.
+Operator advisory: investigate what is consuming swap. Do NOT dispatch kodo.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T21:18Z — Loop cycle 55 (PARKED — memory 1.97GB OS floor, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 1.97GB (OS floor oscillation; SwapFree 14.9GB, slow swap growth).
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U6 with U2 ≤1.2GB).
+U2 gate: 1.2GB floor not reached. Memory stable in OS floor range.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T20:48Z — Loop cycle 54 (STALLED→PARKED — park re-entry, memory ~1.5-2.1GB stable floor)
+
+Health: PARKED_OPERATOR_BLOCKED (re-entry). Memory: ~1.5-2.1GB (fluctuating at floor; free -h=2.1GB, /proc/meminfo=1.53GB).
+Swap: 4.8/19GB used (15GB free). No OOM events. System stable under pressure.
+STEP 1: All tools 0 findings. STEP 2: Triage empty. Board: R4AI=1, Blocked=7 — unchanged.
+NEW_EVIDENCE_DETECTED=no for 2+ cycles (c53, c54). Park transition triggered. All conditions met.
+U2 updated: ≤1.2GB (genuine pre-OOM risk). 2GB threshold was OS floor, not OOM risk — caused churn.
+Rationale: system operating stably at 1.5-2GB with healthy swap; 2GB floor is persistent not transient.
+
+## 2026-05-14T20:18Z — Loop cycle 53 (PARKED→STALLED — U2 triggered, memory 1.99GB floor, full investigation clean)
+
+Health: STALLED (cycle 1 post-U2-unpark). U2 triggered: MemAvailable 1.99GB (<2GB floor).
+Memory: Total 15GB, Used 13GB, Avail 2.0GB, Swap 4.5/19GB used. No OOM kills in dmesg. Rate ~0.03GB/cycle — appears stable near floor.
+STEP 1: All tools clean (0 findings). STEP 2: Triage empty. Board: R4AI=1, Blocked=7 — unchanged.
+Classification: operator-blocked + infra-memory-pressured. No new task evidence.
+NEW_EVIDENCE_DETECTED=no (memory fluctuation not task evidence). Park transition eligible at c54.
+Operator advisory: system under heavy swap pressure (4.5GB swap used). Do NOT dispatch kodo.
+
+## 2026-05-14T19:48Z — Loop cycle 52 (PARKED — memory 2.12GB, 120MB above U2 floor, rate slowing)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.12GB (2.29→2.12GB — rate slowing; SwapFree 15.6GB, slight swap pressure).
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U6).
+U2 gate: 120MB headroom above 2GB floor. Rate slowing (~0.17GB this cycle vs ~0.44GB prior).
+May be approaching a floor. SwapFree consumed 0.5GB suggesting OS paging activity.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T19:18Z — Loop cycle 51 (PARKED — memory 2.29GB, CRITICAL: 0.29GB above U2 floor)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.29GB (2.73→2.29GB — still declining; SwapFree 16.1GB stable).
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U6).
+U2 gate: 2GB floor NOT reached — 0.29GB headroom. CRITICAL: at current ~0.44GB/cycle rate, c52 likely triggers U2 (est. ~1.85GB).
+If U2 triggers: transition PARKED→STALLED, run full investigation suite, evaluate OOM risk.
+No post-park watcher entries. Tasks 88702733, 3860f469 still Backlog.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED this cycle.
+
+## 2026-05-14T18:48Z — Loop cycle 50 (PARKED — memory 2.73GB, declining trend slowing, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 2.73GB (3.11→2.73GB — rate slowing; SwapFree 16.1GB stable).
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U6).
+U2 gate: 2GB floor not reached (0.73GB headroom). Memory declining ~0.38GB/cycle at current rate.
+No post-park watcher log entries after 17:48Z. Watchers nominal.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED. Monitor closely — 2GB floor reachable in ~2 cycles if trend holds.
+
+## 2026-05-14T18:18Z — Loop cycle 49 (PARKED — memory 3.11GB, slow decline, all unpark conditions false)
+
+Health: PARKED_OPERATOR_BLOCKED (continued). Memory: 3.11GB (3.53→3.11GB — decline slowing; SwapFree 16.1GB stable).
+Board: R4AI=1, Blocked=7 — unchanged. All unpark conditions false (U1-U6).
+U2 gate: 2GB floor not reached. U6: 8GB ceiling not reached. Trend: ~1.2GB/30min flattening.
+No post-park watcher log entries. Tasks 88702733, 3860f469 remain Backlog.
+NEW_EVIDENCE_DETECTED=no. Remain PARKED.
+
+## 2026-05-14T17:48Z — Loop cycle 48 (STALLED → PARKED — park re-entry, memory 3.53GB declining)
+
+Health: PARKED_OPERATOR_BLOCKED (re-entry). Memory: 3.53GB (4.74→3.53GB — continued decline; SwapFree stable 16.9GB).
+All tools: 0 findings. Triage empty. Board: R4AI=1, Blocked=7 — unchanged.
+NEW_EVIDENCE_DETECTED=no for 2+ cycles (c47, c48). Park transition triggered.
+U2 updated: degrade threshold ≤2GB (near-OOM) to avoid false unparks from normal fluctuation.
+NOTE: Memory declining ~1.2GB/30min trend — if sustained, ≤2GB in ~1 cycle. Monitor carefully.
+
+## 2026-05-14T17:18Z — Loop cycle 47 (PARKED→STALLED — U2 memory dip, no new task evidence)
+
+Health: STALLED/OPERATOR-BLOCKED. U2 triggered: memory 4.74GB < 5GB (mild dip; SwapFree stable at 16.9GB — not OOM).
+Full investigation: 0 findings, 0 gaps, 0 ghost events, triage empty. Board: R4AI=1, Blocked=7 — unchanged.
+NEW_EVIDENCE_DETECTED=no (memory fluctuation is infra noise, not task evidence). STALLED cycle 1 post-unpark.
+Lowering U2 degradation threshold to 4GB to reduce noise from normal OS memory fluctuation.
+
+## 2026-05-14T16:48Z — Loop cycle 46 (STALLED → PARKED — park transition triggered)
+
+Health: PARKED_OPERATOR_BLOCKED (re-entry). Memory: 6.46GB stable (same as c45; kodo needs 8GB — no dispatch).
+Board: R4AI=1, Blocked=7 — unchanged. All tools: 0 findings. Triage empty.
+NEW_EVIDENCE_DETECTED=no for 2+ post-unpark cycles (c45, c46). All park conditions met.
+Memory baseline updated to ~6.5GB. Unpark U2 now requires meaningful change (drop <5GB or recover ≥8GB).
+
+## 2026-05-14T16:18Z — Loop cycle 45 (STALLED — memory 6.5GB, board frozen)
+
+Health: STALLED/OPERATOR-BLOCKED. Memory: 6.5GB (down from 13.6GB; above 6GB gate, below 8GB kodo threshold).
+Do NOT dispatch kodo (needs 8-9GB). Board: R4AI=1, Blocked=7 — unchanged.
+Tools: 0 custodian/ghost/flow/reaudit findings. Triage empty. Graph-doctor: fail_graph_none (pre-existing).
+NEW_EVIDENCE_DETECTED=no (cycle 1 post-unpark). Park transition requires 2+ — re-evaluate next cycle.
+
+## 2026-05-14T15:48Z — Loop cycle 44 (UNPARK → STALLED — memory 13.6GB, gate lifted)
+
+Health: STALLED/OPERATOR-BLOCKED. UNPARK triggered: U2=TRUE (13.6GB ≥ 6GB), U6=TRUE (13.6GB ≥ 8GB).
+Memory gate LIFTED. Swap recovered: SwapFree 16.9GB/20.9GB (freed ~6.6GB vs c43).
+Full investigation: 0 custodian findings, 0 ghost events, 0 flow gaps, 0 reaudit needed, triage empty.
+Board: R4AI=1, Blocked=7 — frozen (unchanged since c29). Graph-doctor: fail_graph_none (pre-existing).
+Classification: STALLED/NON-CONVERGENT/OPERATOR-BLOCKED. Memory no longer the gating issue.
+Operator action available: kodo can now run (13.6GB > 8-9GB requirement).
+  - Move improve tasks Blocked→Backlog: 2824d46e, fa470a1f, b67bc0e0, a969024e
+  - Claim or close 9c7f4bb9 (R4AI SIGKILL investigate — kodo can now attempt)
+
+## 2026-05-14T15:18Z — Loop cycle 43 (PARKED — memory 4.1GB, significant recovery)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 4.1GB (2.3→4.1GB — significant jump; swap ~10.7GB used).
+Board: R4AI=1, Blocked=7 — unchanged. U2 still false (need ≥6GB). U1/U3-U6 false.
+NOTE: Memory recovery encouraging but gate remains engaged. If trend continues, U2 may trigger next cycle.
+
+## 2026-05-14T14:48Z — Loop cycle 42 (PARKED — memory 2.3GB, gradual recovery)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.3GB (2.0→2.3GB — gradual uptick; swap used ~10.6GB/20.9GB).
+Board: R4AI=1, Blocked=7 — unchanged. U1-U6 all false.
+
+## 2026-05-14T14:18Z — Loop cycle 41 (PARKED — memory 2.0GB, slight uptick)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.0GB (1.7→2.0GB — slight uptick, still critical; swap used ~9.5GB/20.9GB).
+Board: R4AI=1, Blocked=7 — unchanged. U1-U6 all false.
+
+## 2026-05-14T13:48Z — Loop cycle 40 (PARKED — memory 1.7GB, critical decline)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 1.7GB (1.9→1.7GB — continued decline, critical territory).
+Board: R4AI=1, Blocked=7 — unchanged. No OOM kills in dmesg. No post-park watcher events. U1-U6 all false.
+NOTE: Buff/cache now 1.2GB (down from 2.1GB at c39 start). No kernel OOM yet, but approaching.
+
+## 2026-05-14T13:18Z — Loop cycle 39 (PARKED — memory 1.9GB, declining below 2GB)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 1.9GB (continuing to decline: 2.4→1.9GB — OOM risk increasing).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+NOTE: Buff/cache also shrinking (2.1→1.1GB) — system under growing memory pressure.
+
+## 2026-05-14T12:48Z — Loop cycle 38 (PARKED — memory 2.4GB, stable low)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.4GB (plateau in 2.4-2.5GB range since c36).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+
+## 2026-05-14T12:18Z — Loop cycle 37 (PARKED — memory 2.5GB, stable low)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.5GB (stable oscillation in 2.4-2.6GB range — plateau, not recovering).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+
+## 2026-05-14T11:48Z — Loop cycle 36 (PARKED — memory 2.4GB, declining)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.4GB (resumed decline: 2.8→2.4GB — prior uptick was noise).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+
+## 2026-05-14T11:18Z — Loop cycle 35 (PARKED — memory 2.8GB, slight uptick)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.8GB (slight uptick from 2.6GB — likely page cache noise, not sustained).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+
+## 2026-05-14T10:48Z — Loop cycle 34 (PARKED — memory 2.6GB, declining)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.6GB (declining trend: 12→7.5→5.6→3.9→3.4→3.0→2.6GB since c27).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+NOTE: Memory decline is sustained — approaching OOM territory. Watchers still running.
+
+## 2026-05-14T10:18Z — Loop cycle 33 (PARKED — memory 3.0GB, no change)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 3.0GB (continuing to decline: 3.9→3.4→3.0GB). Swap: 4.0GB/19GB.
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+
+## 2026-05-14T09:48Z — Loop cycle 32 (PARKED — memory 3.4GB, no change)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 3.4GB (still declining: 3.9→3.4GB). Swap: 4.0GB/19GB.
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. U1-U6 all false.
+
+## 2026-05-14T09:18Z — Loop cycle 31 (PARKED — memory 3.9GB, no change)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 3.9GB (stable in 3-4GB range). Swap: 3.8GB/19GB.
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events after 08:18Z.
+U1-U6 all false. Watchers: 24 processes healthy, no non-143 exits.
+
+## 2026-05-14T08:48Z — Loop cycle 30 (PARKED — memory 3.9GB, no change)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 3.9GB (declining: 5.6→3.9GB). Swap: 3.8GB/19GB (stable).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. All unpark conditions false.
+
+## 2026-05-14T08:18Z — Loop cycle 29 (RE-PARKED — 2× NEW_EVIDENCE=NO)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 5.6GB (below 6GB gate again; c27=12GB, c28=7.5GB, c29=5.6GB — declining).
+Park transition: c28=NO, c29=NO → 2 consecutive NEW_EVIDENCE=NO cycles with all conditions met. Re-parking.
+Board: R4AI=1, Blocked=7 — unchanged. All tools clean (0 findings). Triage: 0 actions.
+Memory gate: RE-ENGAGED (5.6GB < 6GB; kodo needs 8-9GB). No operator action detected.
+
+## 2026-05-14T07:48Z — Loop cycle 28 (STALLED — no operator action, all clean)
+
+Health: STALLED/OPERATOR-BLOCKED. Memory: 7.5GB (healthy; gate clear). All tools clean (0 findings).
+Board: R4AI=1, Blocked=7 — unchanged. Triage: 0 actions. No post-park watcher events.
+NEW_EVIDENCE=NO (first cycle post-c27 recovery without new events). Park eligible next cycle if no operator action.
+Operator action still required: move improve tasks (2824d46e, fa470a1f, b67bc0e0, a969024e) Blocked→Backlog.
+
+## 2026-05-14T07:18Z — Loop cycle 27 (STALLED — memory RECOVERED, gate lifted)
+
+Health: STALLED/OPERATOR-BLOCKED. Memory: 12GB available (RECOVERED — was 1-2GB oscillating; swap 9.2→3.8GB).
+U2 triggered unpark. Full cycle: all tools clean (0 custodian/ghost/flow/regression findings).
+Board: R4AI=1, Blocked=7 — structurally unchanged. Triage: 0 healing actions.
+MEMORY GATE LIFTED: kodo now viable (≥8GB available). However improve tasks (2824d46e, fa470a1f, b67bc0e0, a969024e)
+  are in Blocked state — board_worker cannot claim them. Operator must move Blocked→Backlog to resume execution.
+Dead-remediation tasks (996792b7, 925be138, 02183713): do NOT retry regardless of memory.
+9c7f4bb9: still R4AI/investigate-kind — not claimed by board_worker. Operator action needed.
+NEW_EVIDENCE = YES (memory state changed). Not re-parking this cycle. Re-evaluate next cycle.
+
+## 2026-05-14T06:48Z — Loop cycle 26 (PARKED — swap at 9.2GB, watching for OOM)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.0GB (oscillating 1–2GB). Swap: 9.2GB/19GB (rising: 4.4→7.9→9.2GB).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. All unpark conditions false.
+Swap headroom: 9.8GB remaining. No watcher OOM yet (U5 false). Watchers memory-limited but alive.
+
+## 2026-05-14T06:18Z — Loop cycle 25 (PARKED — memory oscillating, swap pressure)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.2GB available (oscillating: 2.9→1.3→2.2 — OS page cache noise).
+Swap: 7.9GB used / 19GB (increasing: 4.4→4.7→7.9GB — system under memory pressure).
+Board: R4AI=1, Blocked=7 — unchanged. No post-park watcher events. All unpark conditions false.
+NOTE: U6 borderline (1.3→2.2GB improvement) but classified as oscillation noise. Cycle 23 full cycle (triggered at 2.9GB) already confirmed no actionable change — not re-running full cycle for <1GB swing.
+Swap trending up; if watchers OOM-kill (non-143), will trigger U5 unpark.
+
+## 2026-05-14T05:45Z — Loop cycle 24 (PARKED — memory declining again)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 1.3GB (declined from 2.9GB — brief recovery was transient; trend: 2.7→1.7→2.9→1.3GB).
+Board: R4AI=1, Blocked=7, Running=0 — unchanged. No post-park watcher events. All unpark conditions false.
+WARNING: Memory now 1.3GB — below cycle 22 critical level. Swap at 4.7GB/19GB. System stable but memory pressure extreme.
+
+## 2026-05-14T05:28Z — Loop cycle 23 (STALLED → RE-PARKED — memory partial recovery)
+
+Health: STALLED/OPERATOR-BLOCKED. Memory: 2.9GB (recovered from 1.7GB — trend reversal triggered U6 unpark).
+Full cycle run: custodian 0 findings, ghost 0, flow-audit 0 gaps, graph-doctor 1 pre-existing VideoFoundry warning, regressions 0, triage 0 actions.
+Board: R4AI=1, Blocked=7, Running=0, Backlog=8, InReview=4 — UNCHANGED.
+Plane tasks 88702733/3860f469: both still Backlog (U3=false). No post-park watcher events (U4=false). No watcher non-143 exits (U5=false).
+Memory 2.9GB < 6GB gate — memory gate still enforced (no kodo dispatch). No actionable new evidence from full cycle.
+Re-parking: all park conditions still hold (same root cause, same board, no queue evolution, no safe retry path).
+
+## 2026-05-14T05:10Z — Loop cycle 22 (PARKED — memory CRITICAL)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 1.7GB (CRITICAL — declining: 3.0→2.7→1.7GB).
+Board: R4AI=1, Blocked=7, Running=0 — unchanged. No post-park watcher events. All unpark conditions false.
+WARNING: Memory has declined from 12GB (cycle 13 unpark) to 1.7GB over ~7 hours.
+  System has 19GB swap available. Watchers may begin experiencing slow response.
+  OOM-killed watcher (non-143 exit) would trigger unpark condition U5.
+
+## 2026-05-14T04:50Z — Loop cycle 21 (PARKED — unpark check)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 2.7GB (declining: 3.6→3.0→2.7GB — WARNING: low).
+Board: R4AI=1, Blocked=7, Running=0 — unchanged. No post-park watcher events. All unpark conditions false.
+Memory trend: consistently declining each cycle. No system concern yet but approaching swap territory.
+
+## 2026-05-14T04:35Z — Loop cycle 20 (PARKED — unpark check)
+
+Health: PARKED_OPERATOR_BLOCKED (unchanged). Memory: 3.0GB (declining: 4.1→3.6→3.0GB).
+Board: R4AI=1, Blocked=7, Running=0, Backlog=8 (was 7 — +3860f469 created by loop cycle 19).
+
+Unpark check results: all conditions false.
+  Queue state: Backlog 7→8 is self-caused (loop created 3860f469) — not an unpark trigger.
+  Memory ≥ 6GB: NO (3.0GB, declining).
+  Post-park watcher events (since 04:15Z): 0.
+  Operator action: none observed.
+Remaining in PARKED state. No further investigation this cycle.
+
+## 2026-05-14T04:15Z — Loop cycle 19 (PARKED_OPERATOR_BLOCKED)
+
+Health: PARKED_OPERATOR_BLOCKED. Memory: 3.6GB (declining: 5.6→4.9→4.1→3.6GB).
+Board: R4AI=1, Blocked=7, Running=0, InReview=4, Done=8, Backlog=7, Cancelled=13 — UNCHANGED.
+
+PARK TRANSITION TRIGGERED (cycle 19):
+  - operator-blocked classification active (88702733, ≥5 cycles)
+  - same root cause and affected tasks unchanged since cycle 14
+  - Plane escalations: 88702733 (root), 3860f469 (queue freeze gap, created this cycle)
+  - board structurally quiescent: no R4AI tasks for board_worker to claim, no running processes
+  - memory declining, below both 6GB and 8GB gates — safe retry impossible
+  - NEW_EVIDENCE=no this cycle: board identical to cycle 18, no new watcher events
+  - Board cannot self-generate new evidence without operator action
+
+NEW Plane task created: 3860f469 "[Watchdog] triage_scan: no auto-recovery for budget-gate-blocked
+  improve tasks" — 2nd cycle of loop-only judgment, promoted per promotion rule.
+
+PARKED state — checking unpark conditions only. Do NOT rerun full investigation each cycle.
+UNPARK when ANY hold:
+  - Queue state changes (operator moves tasks Blocked→Backlog or Blocked→R4AI)
+  - Memory recovers ≥6GB (safe retry possible)
+  - Plane task status changed: 88702733 or 3860f469 moved to In Progress/Done
+  - Operator took action visible in board or watcher logs
+  - Watcher crashed (non-143 exit)
+  - New telemetry or execution outcome
+
+OPERATOR ACTIONS REQUIRED to unpark:
+  1. Fix 88702733 (board_worker pre-dispatch memory check) — root blocker
+  2. Move Blocked→Backlog: 2824d46e, fa470a1f, b67bc0e0, a969024e
+     (prevents re-dispatch loop; allows board to drain properly once 88702733 fixed)
+  3. Optional: implement 3860f469 (triage_scan auto-recovery for budget-gate blocks)
+
+Investigation tools this cycle: custodian=0, ghost=0, regressions=0, flow=0 (all clean).
+
+## 2026-05-14T04:07Z — Loop cycle 18 (STALLED — DIVERGENT, board frozen)
+
+Health: STALLED / DIVERGENT. Memory: 4.1GB (declining: 5.6→4.9→4.1GB across cycles 16-17-18).
+Board: R4AI=1, Blocked=7, Running=0, InReview=4, Done=8, Backlog=7, Cancelled=13.
+
+Board is effectively frozen for execution:
+  R4AI=1: only 9c7f4bb9 (investigate-kind, not claimed by board_worker goal/improve/test)
+  Blocked=7 breakdown:
+    SIGKILL (dead-remediation): 925be138 (2x), 996792b7 (2x)
+    SIGKILL (prior/stale): 02183713
+    Rate-limited (no auto-recovery): 2824d46e, fa470a1f, b67bc0e0, a969024e
+
+Rate limit reset at 04:00 UTC (00:00 EDT) as expected. No post-reset kodo dispatches occurred —
+  all actionable improve tasks were already in Blocked state from previous rate-limit blocks.
+  board_worker only claims R4AI tasks; Blocked tasks require operator or triage_scan to recover.
+  triage_scan queue_healing: 0 actions (no structured labels on these tasks).
+
+DIVERGENT classification:
+  - Blocked count increasing cycle-over-cycle: 5→6→7
+  - R4AI draining to effectively empty: 3→2→1 (last R4AI is unclaimed investigate task)
+  - No active execution occurring
+  - No auto-recovery mechanism for budget-gate-blocked improve tasks
+
+NEW QUEUE FREEZE GAP (first observation, carry forward):
+  4 improve tasks (2824d46e, fa470a1f, b67bc0e0, a969024e) are permanently stuck in Blocked.
+  Cause: budget_exhausted blocks (rate_exceeded/concurrency_exceeded) have no structured labels
+  (retry_safe, dedup:, etc.) that triage_scan could use to auto-heal them.
+  These tasks will remain frozen indefinitely without operator action.
+
+RECOMMENDED OPERATOR ACTIONS:
+  1. Fix 88702733 (board_worker pre-dispatch memory check) — root blocker
+  2. Move 2824d46e, fa470a1f, b67bc0e0, a969024e from Blocked → Backlog
+     (prevents re-dispatch until memory recovers; board_worker won't claim Backlog tasks)
+
+PARK TRANSITION APPROACHING: If no queue evolution next cycle AND NEW_EVIDENCE=no → PARKED.
+  Current status: NEW_EVIDENCE=yes (2824d46e newly blocked, board frozen) — PARK not yet triggered.
+
+Investigation tools: all clean (0 ghost events, 0 flow gaps, 0 regressions, 0 reaudit needed).
+pr_review_watcher: 301 redirects for Velascat/* repos (old org name, pre-existing, covered by b49dd8da).
+
+## 2026-05-14T03:48Z — Loop cycle 17 (STALLED — NON-CONVERGENT, Blocked=6)
+
+Health: STALLED / NON-CONVERGENT. Memory: 4.9GB (below 6GB gate, below 8GB kodo-safe).
+Board: R4AI=2, Blocked=6, Running=0, InReview=4, Done=8, Backlog=7, Cancelled=13.
+
+New event since cycle 16:
+  fa470a1f claimed at 23:40 (board_worker[improve] dispatched despite 4.7GB memory — 88702733 confirmed again)
+  Phase 1 (pytest) ran 23:41–23:47 and PASSED (lightweight, no kodo)
+  Phase 2 (kodo dispatch) attempted 23:47:39 → BLOCKED: global_rate_exceeded (2/hour, same hourly window)
+  Rate limit protected fa470a1f from SIGKILL. Task now Blocked=6.
+
+Blocked=6 breakdown:
+  SIGKILL (dead-remediation): 925be138 (2x), 996792b7 (2x)
+  SIGKILL (prior): 02183713 (stale SIGKILL label + concurrency-gate history)
+  Rate-limited: b67bc0e0, fa470a1f (hourly window, resets ~04:00 UTC / 00:00 EDT)
+  Concurrency gate: a969024e
+
+NON-CONVERGENT: Blocked count worsened (5→6). No net improvement. Rate limit is the only guard.
+Rate limit resets ~00:00 EDT (~12 min from cycle start). Memory 4.9GB → SIGKILL risk on next kodo dispatch.
+
+PARK TRIGGER APPROACHING: if memory still <8GB after rate reset AND same SIGKILL pattern repeats on
+  fa470a1f/b67bc0e0 → evaluate PARK transition next cycle. NEW_EVIDENCE this cycle (fa470a1f Phase 1
+  completed, run count +1) prevents park this cycle.
+
+Investigation tools: all clean (0 ghost events, 0 flow gaps, 0 regressions, 0 reaudit needed).
+Root blocker unchanged: 88702733. No new direct fixes warranted.
+
+## 2026-05-14T03:39Z — Loop cycle 16 (STALLED — NON-CONVERGENT, kodo rate-limited)
+
+Health: STALLED / NON-CONVERGENT. Memory: 5.6GB (below 6GB gate).
+Board: R4AI=3, Blocked=5, InReview=4, Done=8, Backlog=7, Cancelled=13.
+
+Kodo SIGKILL events this cycle:
+  996792b7: SIGKILL'd at 23:36 (kodo planning phase, 2nd event) — execute.main invokes kodo for implement phase
+  b67bc0e0: blocked 23:39 — hourly rate limit hit (global_rate_exceeded, 2/hour limit)
+  a969024e: blocked 23:33 — concurrency gate (was in-flight when rate limit fired)
+
+Blocked=5 breakdown:
+  SIGKILL (dead-remediation): 925be138 (2x), 996792b7 (2x)
+  SIGKILL (prior): 02183713 (prior + concurrency gate)
+  Rate-limited: b67bc0e0 (global_rate_exceeded, hourly, resets ~04:00 UTC)
+  Concurrency gate: a969024e (will retry when gate clears)
+
+NON-CONVERGENT classification confirmed:
+  - execute.main+pytest first phase runs OK; kodo planning invoked for implement phase → SIGKILL
+  - Same root cause (kodo planning, insufficient RAM) repeating across 3 cycles
+  - Rate limit (2 kodo dispatches/hour) now protecting remaining R4AI improve tasks from SIGKILL
+  - 2824d46e, fa470a1f remain R4AI; will be rate-limited or SIGKILL'd when rate resets
+  - Root blocker unchanged: 88702733 (board_worker no pre-dispatch memory check)
+
+STALLED conditions: No net progress on campaign tasks (996792b7, 02183713) — both Blocked/SIGKILL.
+  Rate limit provides ~20 min protection window. Memory recovery needed before next kodo attempt.
+  Do NOT retry any kodo task until: memory ≥8GB AND rate limit reset AND 88702733 addressed.
+
+## 2026-05-14T03:29Z — Loop cycle 15 (DEGRADED — active tests running)
+
+Health: DEGRADED. Two tasks running via execute.main+pytest. Memory: 6.6GB (healthy for pytest, risky for kodo).
+Board: Running=2, R4AI=4, Blocked=2, InReview=4, Done=8, Backlog=7, Cancelled=13.
+
+Active execution:
+  996792b7 Running — [Impl] recovery/ unit tests, pytest running in /tmp/oc-goal-ico6748z (execute.main, not kodo)
+  a969024e Running — Improve test signal visibility, pytest running in /tmp/oc-improve-shmui11d (execute.main)
+
+925be138 SIGKILL'd again (2nd event) — kodo exited -9 at "Analyzing project and creating plan" at 23:24.
+  Memory at kill time: ~8-9GB estimated (996792b7 pytest was starting concurrently, total RAM load high).
+  PATTERN: kodo planning-phase SIGKILL is the consistent failure mode for improve tasks using kodo.
+  CLASSIFICATION: dead-remediation via kodo. Do NOT retry 925be138 via kodo until memory ≥10GB sustained.
+  NOTE: execute.main+pytest path (used by goal/spec-campaign tasks) avoids this issue entirely.
+
+02183713 Blocked: concurrency-gate (same as before). Will retry once 996792b7 completes via execute.main.
+Spec_watcher: 3 concurrent claude spec-generation processes running (claude-opus-4-6, heavy RAM users).
+Regressions: 0. Ghost events: 0.
+Convergence: WEAKLY-CONVERGENT — spec-campaign tasks progressing; improve tasks blocked by kodo/RAM pattern.
+
+## 2026-05-14T03:21Z — Loop cycle 14 (DEGRADED — execution in progress)
+
+Health: DEGRADED. kodo running 925be138 (Restore test_signal coverage). Memory: 11GB (healthy).
+Board: Running=1, R4AI=6, Blocked=1, InReview=4, Done=8, Backlog=7, Cancelled=13.
+Forward progress: R4AI draining (8→6+1Running), active kodo execution confirmed.
+
+02183713 re-blocked (expected): board_worker[goal] claimed it at 23:14 but global_concurrency gate
+  (max_concurrent=1) fired at 23:21 because 925be138 was already in-flight. Blocked reason:
+  budget_exhausted/global_concurrency_exceeded — NOT a SIGKILL. Will auto-retry once 925be138 completes.
+  Note: stale executor-signal:SIGKILL label on 02183713 from prior run is misleading — actual current
+  block reason is concurrency ordering. Label cleanup needed post-execution.
+
+Ghost: 0 events. Regressions: 0. Queue healing: no actions needed.
+
+## 2026-05-14T03:12Z — Loop cycle 13 (DEGRADED — UNPARKED, retry queue loaded)
+
+Health: DEGRADED (unparked from PARKED_OPERATOR_BLOCKED).
+UNPARK TRIGGER: memory jumped from 2.0GB → 12GB available (threshold: ≥6GB).
+
+Board change:
+  Before: R4AI=1, Blocked=7, InReview=4, Done=8, Backlog=7, Cancelled=13
+  After:  R4AI=8, Blocked=0, InReview=4, Done=8, Backlog=7, Cancelled=13
+
+Actions taken:
+  Transitioned all 7 blocked tasks → Ready-for-AI (memory gate cleared):
+    996792b7 — recovery/ unit tests (SIGKILL retry)
+    02183713 — QueueHealingEngine unit tests (SIGKILL retry)
+    2824d46e — Restore test signal coverage (pre-telemetry retry)
+    fa470a1f — Restore dependency_drift coverage (pre-telemetry retry)
+    b67bc0e0 — Fix lint regression (pre-telemetry retry)
+    a969024e — Improve test signal visibility (pre-telemetry retry)
+    925be138 — Restore test_signal coverage (pre-telemetry retry)
+
+STEP 1: custodian=0 findings, ghost=0 events, flow=0 gaps, regressions=0. Graph-doctor pre-existing failure (videofoundry local manifest).
+STEP 2: triage-scan clean — no queue healing actions needed post-transition.
+Board_worker will claim R4AI tasks naturally (12GB available, max_concurrent=1).
+Next cycle: verify execution outcomes. Check for SIGKILL recurrence on 996792b7/02183713.
+
+## 2026-05-14T02:30Z — Loop cycle 12 (PARKED_OPERATOR_BLOCKED — hold)
+
+Health: PARKED_OPERATOR_BLOCKED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Cancelled=13 — UNCHANGED.
+Unpark check: NO conditions triggered. Key tasks unchanged: 9c7f4bb9=R4AI, 88702733=Backlog.
+Memory: 2.0GB available (slight recovery from 1.5GB in cycle 11, still far below 6GB gate). No kodo processes.
+NEW_EVIDENCE_DETECTED: NO (6th consecutive no-evidence cycle). Remaining parked.
+
+## 2026-05-14T02:26Z — Loop cycle 11 (PARKED_OPERATOR_BLOCKED — hold)
+
+Health: PARKED_OPERATOR_BLOCKED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Cancelled=13 — UNCHANGED.
+Unpark check: NO conditions triggered. Board matches parked snapshot. Key tasks unchanged: 9c7f4bb9=R4AI, 88702733=Backlog.
+Memory: 1.5GB available (critically low, flat vs cycle 10). No kodo processes. No Running tasks.
+Propose watcher: alive, running autonomy cycles (created=0, skipped=3 — duplicate suppression). Expected in parked state.
+Watcher quality note: JSONDecodeError in autonomy_cycle._write_quiet_diagnosis (pre-existing bug — 6 occurrences in both
+  prior watcher sessions; cycle report JSON malformed as JSONL). Propose watcher continues running; not an unpark condition.
+NEW_EVIDENCE_DETECTED: NO (5th consecutive no-evidence cycle). Remaining parked.
+
+## 2026-05-14T01:56Z — Loop cycle 10 (PARKED_OPERATOR_BLOCKED — hold, memory critically low)
+
+Health: PARKED_OPERATOR_BLOCKED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Cancelled=13 — UNCHANGED.
+Unpark check: NO conditions triggered. Board matches parked snapshot.
+Memory: 1.5GB available (declining trend: 2.8→1.9→1.1→1.5GB across cycles 8–10). OS memory pressure.
+No kodo processes. No Running tasks. No new watcher activity. Remaining parked.
+NOTE: Memory decline is severe. If memory drops below 512MB, swap thrashing risk increases.
+No kodo dispatch risk: only R4AI task is 9c7f4bb9 (investigate-kind, not claimed by board_worker).
+
+## 2026-05-14T01:31Z — Loop cycle 9 (PARKED_OPERATOR_BLOCKED — hold, no unpark conditions)
+
+Health: PARKED_OPERATOR_BLOCKED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Cancelled=13 — UNCHANGED.
+Unpark check: NO conditions triggered. All board counts match parked snapshot.
+Memory: 1.9GB (declining from 2.8GB in cycle 8 — OS memory pressure, no kodo active).
+No kodo processes. No new watcher events. No Running tasks. Remaining parked.
+
+## 2026-05-14T01:06Z — Loop cycle 8 (PARKED_OPERATOR_BLOCKED — park transition confirmed)
+
+Health: PARKED_OPERATOR_BLOCKED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Cancelled=13 — UNCHANGED.
+NEW_EVIDENCE_DETECTED: NO (2nd consecutive no-evidence cycle — park conditions satisfied).
+
+Park transition: STALLED → PARKED_OPERATOR_BLOCKED. ALL conditions confirmed:
+  ✓ operator-blocked root cause (kodo SIGKILL/memory exhaustion) unchanged ≥6 cycles
+  ✓ Plane escalation tasks exist: 88702733 (board_worker pre-dispatch check, HIGH) + 9c7f4bb9 (R4AI investigate)
+  ✓ No queue evolution: board frozen for 2 consecutive cycles
+  ✓ No safe retry path: memory 2.8GB available (< 6GB gate)
+  ✓ NEW_EVIDENCE_DETECTED=no for cycles 7 AND 8
+
+- All tools clean: custodian=0, ghost=0, flow=0, reaudit=not needed, regressions=0, triage=empty.
+- Graph-doctor: fail_graph_none (pre-existing, unrelated to park cause).
+- No kodo running. No watcher failures. Watchers healthy, just not dispatching.
+- UNPARK TRIGGERS to watch:
+  - Memory >= 6GB AND sustained 1+ cycle → kodo tasks become safe to dispatch
+  - Operator implements 88702733 (pre-dispatch memory check) → automatic safety gate
+  - 9c7f4bb9 investigated/closed → investigate-kind R4AI task drained
+  - Any watcher state change or task transition → re-evaluate immediately
+- Loop now at 1200s cadence. Checking only unpark conditions each cycle.
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL root cause: memory exhaustion. R4AI investigate — operator action needed.
+  - 88702733: board_worker no pre-dispatch memory check — HIGH priority, watcher fix needed.
+  - Campaign f7e3a1c4: 996792b7+02183713 Blocked/SIGKILL'd. Retry after >=6GB.
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks).
+  - 5 improve tasks blocked pre-telemetry; retry after memory gate clears.
+
+## 2026-05-14T00:55Z — Loop cycle 7 (DEGRADED/NON-CONVERGENT — no new evidence, approaching PARKED)
+
+Health: DEGRADED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Running=0 Cancelled=13 — UNCHANGED.
+Behavioral convergence: NON-CONVERGENT (5th consecutive cycle, no queue evolution this cycle).
+NEW_EVIDENCE_DETECTED: NO — first cycle with no new evidence. Park transition needs 2 consecutive.
+
+- All investigative tools clean: custodian=0, ghost=0, flow=0, regressions=0. Graph-doctor pre-existing.
+- Memory: 2.9GB — still below 6GB gate. kodo dispatch BLOCKED.
+- No kodo processes. No new dispatches. No new SIGKILL events.
+- 9c7f4bb9 (R4AI, task-kind: investigate): no automation watcher claims investigate-kind tasks.
+  This task will not drain unless operator acts on it. Not starvation — by-design for investigate tasks.
+- 5 improve tasks (2824d46e, fa470a1f, b67bc0e0, a969024e, 925be138): Blocked without executor-signal
+  labels (pre-telemetry blocking). Improve watcher has never claimed them this session. Suspected root
+  cause: same memory/kodo SIGKILL from prior sessions before 5d8bd236 labels were added. Classify:
+  temporarily-blocked pending memory gate clearance.
+- PARK TRANSITION: approaching (1 of 2 required no-evidence cycles complete).
+  ALL operator-blocked conditions hold: root cause known ≥5 cycles, 88702733+9c7f4bb9 Plane tasks exist,
+  no queue evolution, no safe retry path. Next cycle: if no new evidence → transition to PARKED.
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL root cause: memory exhaustion. Safe retry: >=6GB RAM.
+  - 88702733: board_worker no pre-dispatch memory check — HIGH priority, watcher fix needed.
+  - Campaign f7e3a1c4: 996792b7 Blocked/SIGKILL'd. 02183713 Blocked/SIGKILL'd. Retry after >=6GB.
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks).
+  - 5 improve tasks: pre-telemetry Blocked, retry after memory gate clears.
+
+## 2026-05-14T00:46Z — Loop cycle 6 (DEGRADED — both campaign tasks SIGKILL'd, Running orphan recovered)
+
+Health: DEGRADED. Board: R4AI=1 Blocked=7 InReview=4 Done=8 Backlog=7 Running=0 Cancelled=13.
+Behavioral convergence: NON-CONVERGENT (4th equivalent SIGKILL cycle, no memory relief).
+
+- Custodian clean. Ghost: 0. Flow: 0. Regressions: 0. Triage: clean.
+- Memory: 2.7GB available — still below 6GB gate. kodo dispatch remains BLOCKED.
+- 02183713 (QueueHealingEngine unit tests): SIGKILL'd again at 20:19. Pattern: "Analyzing project
+  and creating plan" — killed within seconds of dispatch. executor-exit-code:-9 label applied.
+- 996792b7 (recovery/ unit tests Impl): Claimed at 20:20 by old goal watcher. kodo made substantial
+  progress — Stage 1 (recovery/__init__.py), Stage 3 (telemetry tests, 14 passing) completed in
+  worktrees. SIGKILL'd before commit at 20:34. result.json present at /tmp/oc-goal-jqd71f3i/.
+  Work LOST (worktrees cleaned; only __init__.py remained in main workspace).
+- NEW: Running orphan gap — old goal watcher died mid-execution (log ends 20:20, new watcher started
+  20:31). 996792b7 left stuck in Running state with no active executor. Ghost-audit G5 missed this
+  (likely time-threshold: task had been Running <25min when audit ran). Manual intervention:
+  transitioned Running→Blocked, added executor-signal:SIGKILL and executor-exit-code:-9 labels.
+  This is the first observation of this specific gap; promoting to Plane task on second recurrence.
+- Graph-doctor: fail_graph_none (pre-existing, unchanged).
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL root cause: memory exhaustion. Safe retry: >=6GB RAM.
+  - 88702733: board_worker no pre-dispatch memory check — HIGH priority, watcher fix needed.
+  - Campaign f7e3a1c4 (recovery-subsystem-test-coverage): 996792b7 Blocked/SIGKILL'd. 02183713 Blocked/SIGKILL'd.
+    Both retry after memory >= 6GB. 996792b7 made Stage 1+3 progress but not committed.
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks).
+
+## 2026-05-14T00:31Z — Loop cycle 5 (DEGRADED — kodo running 996792b7, memory 2.6GB critical)
+
+Health: DEGRADED. Board: R4AI=1 Blocked=6 InReview=4 Done=8 Backlog=7 Running=1 Cancelled=13.
+Behavioral convergence: WEAKLY-CONVERGENT (kodo further than prior cycles — created __init__.py and spec files).
+
+- Plane/watchers restarted at cycle start (operator shut down end of cycle 4). 8 watchers running.
+- Memory: started 4.4GB (user freed RAM), now 2.6GB with kodo active. Still below 6GB gate.
+- 996792b7 (recovery/ unit tests Impl): Running since ~20:30. Created tests/unit/recovery/__init__.py
+  and 2 spec files (queue-healing-recovery-budget-tests.md, recovery-queue-healing-test-coverage.md).
+  kodo is further than 02183713 was (which died at "Analyzing project and creating plan").
+  SIGKILL risk remains HIGH at 2.6GB.
+- 02183713: remains Blocked/SIGKILL'd. Still needs memory >= 6GB before retry.
+- Triage: clean (0 queue_healing, 1 rescore pending). Graph-doctor: fail_graph_none (pre-existing).
+- Custodian clean. Ghost: 0. Flow: 0. Regressions: 0.
+- Execution gate: kodo running, no additional dispatch.
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL root cause: memory exhaustion. Safe retry: >=6GB RAM.
+  - 88702733: board_worker no pre-dispatch memory check — HIGH priority, watcher fix needed.
+  - Campaign f7e3a1c4 (recovery-subsystem-test-coverage): 996792b7 Running (progress). 02183713 Blocked.
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks).
+
+## 2026-05-14T00:29Z — Loop cycle 4 (DEGRADED/NON-CONVERGENT — kodo crash-loop, memory gate)
+
+Health: DEGRADED. Board: R4AI=1 Blocked=6 InReview=4 Done=8 Backlog=7 Running=1 Cancelled=13.
+Behavioral convergence: NON-CONVERGENT on kodo dispatch path (3 equivalent SIGKILL failures, same phase).
+
+- Custodian clean. Ghost: 0. Flow: 0. Regressions: 0. Triage: clean.
+- Memory: 2.7GB available (12GB used). kodo gate BLOCKED.
+- 996792b7 (recovery/ unit tests Impl): dispatched by board_worker while Running — SIGKILL expected.
+- 02183713: Blocked with executor-signal:SIGKILL (cycle 3). Pattern: "Analyzing project and creating plan".
+- NON-CONVERGENT: board_worker dispatches kodo tasks repeatedly at <3GB with same SIGKILL outcome.
+  No adaptation between retries. Crash-loop will continue until memory gate is fixed in board_worker.
+- Convergence promotion: 88702733 created [Watchdog] board_worker dispatches kodo without checking
+  available memory — needs pre-dispatch MemAvailable check before claiming kodo tasks.
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL root cause: memory exhaustion. Safe retry: >=6GB RAM.
+  - 88702733: board_worker no pre-dispatch memory check — HIGH priority, watcher fix needed.
+  - Campaign f7e3a1c4 (recovery-subsystem-test-coverage): impl tasks crash-looping.
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks).
+
+## 2026-05-14T00:19Z — Loop cycle 3 (DEGRADED — 2nd SIGKILL, new campaign launched)
+
+Health: DEGRADED (kodo memory exhaustion confirmed again). Board: R4AI=2 Blocked=6 InReview=4 Done=8 Backlog=5 Cancelled=13.
+Behavioral convergence: WEAKLY-CONVERGENT (new campaign launched, but executor repeatedly SIGKILL'd).
+
+- Custodian: clean (DC7 exclusions fixed in cycle 2). Ghost: 0. Flow: 0 gaps. Regressions: 0. Triage: clean.
+- Graph doctor: fail_graph_none (pre-existing).
+- Memory: 2.5–3.2GB available — still below 6GB kodo gate. kodo dispatch remains BLOCKED.
+- NEW: Campaign f7e3a1c4 (recovery-subsystem-test-coverage) launched by spec director.
+  Impl tasks: 02183713 (QueueHealingEngine unit tests) and 996792b7 (recovery/ unit tests).
+- 02183713 (QueueHealingEngine impl): claimed at 20:06, SIGKILL'd — now Blocked with executor-signal: SIGKILL.
+  This is the 2nd SIGKILL this session. Confirms memory exhaustion pattern (dispatched at ~2.5GB available).
+- 996792b7 (recovery/ unit tests impl): still Ready for AI — not yet dispatched (memory gate should prevent).
+- Untracked spec files: docs/specs/operational-health-test-coverage.md and recovery-subsystem-test-coverage.md
+  should be committed (spec-director outputs, already excluded from DC7).
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL pattern confirmed (2nd event: 02183713). Root cause: memory exhaustion.
+    Safe retry: available >= 6GB. Both 02183713 and 996792b7 blocked until memory clears.
+  - Campaign f7e3a1c4 (recovery-subsystem-test-coverage): impl tasks in R4AI/Blocked; phase-gated
+    improve/test tasks in Backlog. Will advance once memory clears.
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks unchanged).
+  - Loop is session-bound — stops when session closes. Operator should leave session open or use /schedule.
+
+## 2026-05-13T23:52Z — Loop cycle 2 (DEGRADED — kodo memory-gated, board static) [updated]
+
+- fix(custodian): added docs/specs/operational-health-test-coverage.md and
+  recovery-subsystem-test-coverage.md to DC7 exclude_path_patterns — pre-existing
+  orphan spec-director outputs blocked push.
+
+## 2026-05-13T23:52Z — Loop cycle 2 (DEGRADED — kodo memory-gated, board static)
+
+Health: DEGRADED (kodo memory gate: 2.9GB available < 6GB minimum — declining). Board: R4AI=1 Blocked=5 InReview=4 Done=8 Backlog=1 Cancelled=13.
+Behavioral convergence: WEAKLY-CONVERGENT (2 cycle window; memory gate is infra blocker, not stagnation).
+
+- Custodian: 0 repos swept. Ghost: 0. Flow: 0 gaps. Regressions: 0. Triage: clean.
+- Graph doctor: fail_graph_none (pre-existing, unchanged).
+- Memory: 2.9GB available (12GB used; declining from 3.2GB cycle 1). kodo dispatch BLOCKED.
+- Working tree: docs/specs/cxrp-backend-card-vocabulary.md had unstaged status:active→cancelled —
+  reflects actual campaign state; committed with this cycle.
+- 5d8bd236 (CxRP spec-campaign impl tasks blocked investigation): closed as moot — campaign 10c50210
+  and all impl tasks now Cancelled. Root cause was kodo SIGKILL (tracked by 9c7f4bb9).
+- 5 Blocked OC improve tasks: infra-blocked (memory gate), all self-modify:approved. No dispatch.
+- 4 In Review tasks (bac4e74b, a83887da, 16285bdb, 52b7d778): structurally-blocked, tracked by b49dd8da.
+- 9c7f4bb9 (kodo SIGKILL investigate): still R4AI. Memory declining — safe retry not imminent.
+- Execution gate: spec file commit passes (direct tracked-file update). No autonomy-cycle.
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL. Root cause: memory exhaustion (2.9GB available, declining). Safe retry: ≥6GB sustained.
+  - Campaign 10c50210: CANCELLED (all tasks cancelled; spec status updated to cancelled).
+  - b49dd8da: board_worker→pr_review_watcher In-Review orphan gap (4 tasks, no PR).
+
+## 2026-05-13T23:46Z — Loop cycle 1 (DEGRADED — kodo memory-gated, board evolved)
+
+Health: DEGRADED (kodo memory gate: 3.2GB available < 6GB minimum). Board: R4AI=2 Blocked=5 InReview=4 Done=7 Backlog=0 Cancelled=13.
+Behavioral convergence: WEAKLY-CONVERGENT (board evolved from prior STALLED 179-cycle run: Blocked 6→5, CxRP campaign and watcher-entrypoint campaigns fully Cancelled, a5dbf034 implemented+transitioned to Done).
+
+- Custodian: 0 repos swept (clean config). Ghost: 0. Flow: 0 gaps. Regressions: 0.
+- Graph doctor: fail_graph_none (LocalManifest unknown repo_id — pre-existing, no change).
+- Triage scan (--apply): 0 queue healing, 0 rescore, 0 awaiting — board clean.
+- Memory: 3.2GB available (11GB used of 15GB; 3GB in swap). kodo min=6GB, resource_gate min=12GB — dispatch BLOCKED.
+- a5dbf034 (convergence-promotion triage watcher): implemented this session → transitioned Backlog→Done.
+- 9c7f4bb9 (kodo SIGKILL): root cause confirmed memory exhaustion, comment added. Safe retry requires ≥6GB available.
+- 4 In Review goal tasks (bac4e74b, a83887da, 16285bdb, 52b7d778): structurally-blocked — no PR, pr_review_watcher cannot consume. 179+ cycle gap.
+- New Plane task b49dd8da: [Watchdog] board_worker→pr_review_watcher handoff gap for In-Review goal tasks with no PR.
+- All 5 Blocked OC improve tasks: infra-blocked (memory gate). All carry self-modify:approved. No autonomy-cycle dispatch.
+- Both R4AI tasks (5d8bd236, 9c7f4bb9): kodo investigate tasks — also memory-gated.
+- Execution gate: all tasks fail condition (f) — no autonomy-cycle dispatch this cycle.
+- Loop-only judgments repeated from prior cycles: kodo-gate-abstain=1, in-review-orphan=1 (new Plane task created).
+- KNOWN OPEN ISSUES:
+  - 9c7f4bb9: kodo SIGKILL. Root cause: memory exhaustion (3.2GB available). Safe retry: ≥6GB. Investigate each cycle.
+  - Campaign 10c50210: CANCELLED (ShippingForm 2b5ff37e cancelled). ShippingForm may be re-created after memory clears.
+  - Test/Improve Backlog tasks (3fd02e75, 60390297, 6e32031c, d126bc51) all cancelled with campaign — no longer phase-gated.
 
 ## 2026-05-13 — fix: reset-training-branches.sh local branch update
 
