@@ -2,7 +2,11 @@
 # Copyright (C) 2026 ProtocolWarden
 """Autonomous board unblocking — resolves stuck patterns without operator intervention.
 
-Applies three rules on every run:
+The loop is the operator for all conditions handled here.  Do not add "operator action
+required" notes for patterns this tool covers.  When a new stuck pattern emerges, add a
+rule here rather than logging it and waiting.
+
+Applies four rules on every run:
 
   Rule 1 — DEAD_REMEDIATION_CANCEL
     Tasks with label dead-remediation OR (executor-signal:SIGKILL + retry-count ≥ 3)
@@ -17,6 +21,12 @@ Applies three rules on every run:
       - If their blocker (blocked-by: label) is Cancelled/Done → move to Backlog.
       - OR if they have been Blocked for longer than --stale-blocked-hours (default 4h)
         with no executor progress → move to Backlog.
+
+  Rule 4 — SELF_MODIFY_REQUEUE
+    Tasks with label self-modify:approved in Blocked state whose blocking dependency
+    (blocked-by: label) is either absent or already in a terminal state → move to
+    Ready for AI.  These tasks have operator approval to proceed; keeping them Blocked
+    when the dependency is gone is pure queue waste.
 
 Usage:
     python -m operations_center.entrypoints.maintenance.board_unblock \\
@@ -38,6 +48,7 @@ _TERMINAL_STATES = {"done", "cancelled", "cancelled by operator", "closed"}
 _DEAD_REMEDIATION_LABEL = "dead-remediation"
 _INVESTIGATE_LABEL = "task-kind:investigate"
 _IMPROVE_LABEL = "improve"
+_SELF_MODIFY_APPROVED_LABEL = "self-modify:approved"
 _SIGKILL_SIGNAL_PREFIX = "executor-signal:sigkill"
 _RETRY_COUNT_PREFIX = "retry-count:"
 _BLOCKED_BY_PREFIX = "blocked-by:"
@@ -182,6 +193,25 @@ def _apply_rules(
                     "from_state": state,
                     "to_state": "Backlog",
                     "reason": f"stale in Blocked >{stale_blocked_hours}h with no executor progress",
+                })
+                continue
+
+        # Rule 4 — self-modify:approved tasks blocked on a resolved (or absent) dependency
+        if state_lower == "blocked" and _has_label(labels, _SELF_MODIFY_APPROVED_LABEL):
+            blocker_id = _blocker_task_id(labels)
+            if blocker_id is None or _is_terminal(id_state.get(blocker_id, "")):
+                reason = (
+                    "no blocking dependency; operator approval already granted"
+                    if blocker_id is None
+                    else f"blocker {blocker_id} is now {id_state.get(blocker_id, 'unknown')}"
+                )
+                actions.append({
+                    "task_id": task_id,
+                    "title": title,
+                    "rule": "SELF_MODIFY_REQUEUE",
+                    "from_state": state,
+                    "to_state": "Ready for AI",
+                    "reason": reason,
                 })
 
     return actions

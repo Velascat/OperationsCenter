@@ -229,7 +229,15 @@ and safety evidence allow it; otherwise it comments an escalation.
 
 STEP 2.5 — AUTONOMOUS BOARD UNBLOCKING:
   .venv/bin/operations-center-board-unblock --config config/operations_center.local.yaml --apply
-This step runs after triage and autonomously resolves known stuck patterns without operator intervention:
+
+GOVERNING PRINCIPLE: The loop is the operator for all conditions handled here.
+  Do NOT log "operator action required" for stuck patterns this tool covers.
+  Do NOT create Plane escalation tasks for conditions with a direct programmatic remedy.
+  When a new stuck pattern appears in Step 3 investigation, ADD A RULE HERE — not a note.
+  Operator-blocked classification is reserved for conditions that genuinely require human
+  decisions, infrastructure changes, or code changes that the loop cannot safely make itself.
+
+This step resolves known stuck patterns without human intervention:
   Rule 1 DEAD_REMEDIATION_CANCEL — cancel tasks labelled dead-remediation OR with ≥3 SIGKILL retries
     that are not already in a terminal state (Cancelled/Done).
   Rule 2 INVESTIGATE_DEPRIORITISE — move task-kind:investigate tasks out of Ready for AI → Backlog.
@@ -237,6 +245,10 @@ This step runs after triage and autonomously resolves known stuck patterns witho
   Rule 3 IMPROVE_UNBLOCK — move improve tasks from Blocked → Backlog when:
     (a) their blocking dependency (blocked-by: label) is now Cancelled/Done, OR
     (b) they have been Blocked for >4h with no executor progress (stale).
+  Rule 4 SELF_MODIFY_REQUEUE — move self-modify:approved tasks from Blocked → Ready for AI when:
+    (a) their blocked-by dependency is absent, OR
+    (b) their blocked-by dependency is now Cancelled/Done.
+    Operator approval is already on record; holding these Blocked is queue waste.
 Log all actions taken (applied or would_apply) in the cycle summary.
 
 STEP 3 — BLOCKED/STALLED WORK INVESTIGATION:
@@ -696,7 +708,7 @@ Append one block per completed cycle to `.console/log.md`:
 | Preflight | curl, git status, grep | Confirm all services + config up front |
 | Investigate | 6 audit CLIs in parallel | Collect findings; classify affected repos |
 | Triage | `triage-scan --apply` | Promote Backlog → Ready for AI; queue self-healing if evidence allows |
-| **Board unblock** | `board-unblock --apply` | Cancel dead-remediation tasks; deprioritise investigate tasks out of R4AI; move stale improve tasks to Backlog |
+| **Board unblock** | `board-unblock --apply` | Loop acts as operator: cancel dead-remediation; deprioritise investigate→Backlog; move stale improve→Backlog; requeue self-modify:approved→R4AI when blocker cleared |
 | Blocked work | `.console/log.md` history + Plane | Classify stuck items; escalate starvation/stagnation immediately |
 | Behavioral convergence | Last 3 cycle summaries | Classify convergence state; detect semantic duplication; check remediation lineage |
 | Phase estimate | Structured telemetry + recovery actions | Estimate self-healing phase 1–7; identify ownership migration candidates |

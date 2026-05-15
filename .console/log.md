@@ -3,6 +3,18 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-15 — Expand autonomous board unblocking: Rule 4 + governing principle
+
+Added Rule 4 SELF_MODIFY_REQUEUE to `board_unblock.py`: tasks with `self-modify:approved`
+in Blocked state whose blocked-by dependency is absent or terminal → transition to Ready for AI.
+Operator approval already on record; holding these Blocked was pure queue waste.
+
+Updated Step 2.5 in `docs/operator/watchdog_loop.md` with the governing principle:
+"The loop is the operator for all conditions handled here. Do NOT log 'operator action
+required' for stuck patterns this tool covers. When a new stuck pattern appears in Step 3
+investigation, ADD A RULE HERE — not a note." Operator-blocked classification now explicitly
+reserved for conditions requiring genuine human decisions or infrastructure changes.
+
 ## 2026-05-15 — Add Step 2.5 (autonomous board unblocking) to watchdog loop runbook
 
 Added STEP 2.5 to `docs/operator/watchdog_loop.md` and updated the cycle table.
