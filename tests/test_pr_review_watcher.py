@@ -123,9 +123,17 @@ def test_is_lgtm_comment_exact() -> None:
     assert watcher._is_lgtm_comment(_make_comment(1, "  /lgtm  "))
 
 
+def test_is_lgtm_comment_with_trailing_text() -> None:
+    # /lgtm followed by explanation on same line or subsequent lines must still match
+    assert watcher._is_lgtm_comment(_make_comment(1, "/lgtm spec-compliance verified"))
+    assert watcher._is_lgtm_comment(_make_comment(1, "/lgtm\n\nOperator approval — all checks pass."))
+    assert watcher._is_lgtm_comment(_make_comment(1, "/LGTM\n\nsome note"))
+
+
 def test_is_not_lgtm_comment() -> None:
     assert not watcher._is_lgtm_comment(_make_comment(1, "lgtm, great work"))
     assert not watcher._is_lgtm_comment(_make_comment(1, "please /lgtm this"))
+    assert not watcher._is_lgtm_comment(_make_comment(1, "/lgtm-not-really"))
 
 
 # ── Phase 1: LGTM path ───────────────────────────────────────────────────────

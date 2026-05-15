@@ -39,6 +39,82 @@ audit:
   cross_repo:
     platform_manifest_repo: ../PlatformManifest
 
+  plumbing:
+    # P1/P2/P3: OC heartbeat JSON → OperatorConsole stale-role check.
+    # Reader uses mtime only; P2 ignore_keys suppresses pid-check dict accesses
+    # (alive, pid, mtime) that appear in the same function as "heartbeat_".
+    - id: heartbeat
+      writer_glob: "src/operations_center/entrypoints/*/main.py"
+      reader_path: "../OperatorConsole/src/operator_console/watcher_status_pane.py"
+      written_keys: [role, at, status]
+      path_fragment: "heartbeat_"
+      ignore_keys: [alive, pid, mtime]
+    # P1/P2/P3: OC usage.json → OperatorConsole budget/rate display.
+    # written_keys covers top-level keys + event object keys (both written
+    # by usage_store.py). P2 ignore_keys suppresses TUI state dict accesses
+    # (resources, backend_usage, resource_gate, budget sub-dicts) that appear
+    # in functions sharing "usage.json" UI labels or docstrings.
+    - id: usage
+      writer_glob: "src/operations_center/execution/usage_store.py"
+      reader_path: "../OperatorConsole/src/operator_console/watcher_status_pane.py"
+      written_keys:
+        # top-level object keys
+        - updated_at
+        - events
+        - hourly_exec_count
+        - daily_exec_count
+        - task_attempts
+        - last_task_signatures
+        - task_artifacts
+        - skipped_due_to_budget
+        - skipped_due_to_noop
+        - skipped_due_to_cooldown
+        - blocked_due_to_retry_cap
+        - suppressed_due_to_proposal_budget
+        # event object keys (nested inside events[])
+        - kind
+        - task_id
+        - timestamp
+        - backend
+        - id
+      path_fragment: "usage.json"
+      # Keys accessed in the same scoped functions but on TUI state dicts,
+      # not on the usage.json object itself.
+      ignore_keys:
+        # TUI state snapshot keys (aggregated from multiple sources)
+        - backend_usage
+        - resource_gate
+        - resources
+        - budget
+        - found
+        # budget sub-dict keys (computed, not from usage.json)
+        - daily_cap
+        - daily_used
+        - hourly_cap
+        - hourly_used
+        # per-backend counter keys (built by _per_backend_live_counters)
+        - hourly
+        - daily
+        - in_flight
+        # system resource sub-dict keys (from _sys_resources)
+        - load
+        - load_pct
+        - max_concurrent
+        - mem_pct
+        - mem_total_gb
+        - mem_used_gb
+        - min_available_memory_mb
+        - num_cores
+        - swap_pct
+        - swap_total_gb
+        - swap_used_gb
+    # P1/P2/P3: OC spec_director campaigns state → OperatorConsole campaign pane.
+    - id: campaigns
+      writer_glob: "src/operations_center/spec_director/state.py"
+      reader_path: "../OperatorConsole/src/operator_console/watcher_status_pane.py"
+      written_keys: [campaigns]
+      path_fragment: "active.json"
+
   exclude_paths:
     T1:
       # OC is tested through integration and end-to-end tests, not unit tests

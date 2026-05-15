@@ -222,7 +222,10 @@ def _is_bot_comment(comment: dict, bot_logins: set[str], bot_marker: str) -> boo
 
 
 def _is_lgtm_comment(comment: dict) -> bool:
-    return (comment.get("body") or "").strip().lower() == "/lgtm"
+    import re
+    body = (comment.get("body") or "").strip()
+    first_line = body.splitlines()[0].strip() if body else ""
+    return bool(re.match(r"^/lgtm(\s|$)", first_line, re.IGNORECASE))
 
 
 # ── Merge + Plane done ────────────────────────────────────────────────────────
@@ -261,6 +264,74 @@ def _merge_and_done(
     state_path.unlink(missing_ok=True)
 
 
+# ── Spec + Custodian context helpers ─────────────────────────────────────────
+
+def _load_campaign_spec(oc_root: Path, settings, plane_task_id: str | None) -> str:
+    """Return the campaign spec text for a Plane task, or '' if unavailable."""
+    if not plane_task_id:
+        return ""
+    try:
+        client = _plane_client(settings)
+        try:
+            issue = client.fetch_issue(plane_task_id)
+        finally:
+            client.close()
+        labels = issue.get("labels", []) or []
+        campaign_id = _label_value(labels, "campaign-id")
+        if not campaign_id:
+            return ""
+        from operations_center.spec_director.state import CampaignStateManager
+        campaigns_state = CampaignStateManager().load()
+        for campaign in campaigns_state.active_campaigns():
+            if campaign.campaign_id == campaign_id:
+                spec_path = Path(campaign.spec_file)
+                if not spec_path.is_absolute():
+                    spec_path = oc_root / spec_path
+                if spec_path.exists():
+                    return spec_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        logger.debug("pr_review_watcher: spec lookup failed — %s", exc)
+    return ""
+
+
+def _custodian_findings(oc_root: Path, repo_key: str, settings) -> str:
+    """Run custodian-multi on the repo's local path and return findings text.
+
+    Silently returns '' when Custodian is unavailable or the repo has no local
+    clone configured — so the review falls back to diff-only assessment.
+    """
+    repo_cfg = settings.repos.get(repo_key)
+    local_path = getattr(repo_cfg, "local_path", None) if repo_cfg else None
+    if not local_path or not Path(local_path).exists():
+        return ""
+    custodian_bin = oc_root / ".venv" / "bin" / "custodian-multi"
+    if not custodian_bin.exists():
+        return ""
+    try:
+        proc = subprocess.run(
+            [str(custodian_bin), "--repos", str(local_path), "--json"],
+            capture_output=True, text=True, timeout=60,
+        )
+        output = (proc.stdout or "").strip()
+        if not output:
+            return ""
+        results = json.loads(output)
+        findings = []
+        for repo_result in results:
+            for det in (repo_result.get("detectors") or []):
+                if det.get("findings"):
+                    for f in det["findings"]:
+                        findings.append(
+                            f"  [{det.get('code','?')}] {det.get('description','?')}: "
+                            f"{f.get('path','?')}:{f.get('line','?')} — {f.get('message','')}"
+                        )
+        if findings:
+            return "Custodian findings on current branch:\n" + "\n".join(findings[:50])
+    except Exception as exc:
+        logger.debug("pr_review_watcher: custodian check failed — %s", exc)
+    return ""
+
+
 # ── Phase 1: self-review ──────────────────────────────────────────────────────
 
 def _phase1(
@@ -287,16 +358,37 @@ def _phase1(
     diff_excerpt = diff[:8000] + ("\n...[diff truncated]" if len(diff) > 8000 else "")
     title        = pr_data.get("title", "")
 
+    # Load optional campaign spec and Custodian findings for spec-aware review
+    spec_text       = _load_campaign_spec(oc_root, settings, state.get("plane_task_id"))
+    custodian_text  = _custodian_findings(oc_root, repo_key, settings)
+
+    spec_section = (
+        f"\n\n## Campaign spec (review against this — violations are CONCERNS)\n\n{spec_text}"
+        if spec_text else ""
+    )
+    custodian_section = (
+        f"\n\n## Custodian static analysis\n\n{custodian_text}"
+        if custodian_text else ""
+    )
+
     goal_text = (
-        f"Review the following pull-request diff for correctness, style, and potential bugs.\n\n"
+        f"Review the following pull-request diff for correctness, style, and spec compliance.\n\n"
         f"PR #{pr_number}: {title}\n\n"
-        f"```diff\n{diff_excerpt}\n```\n\n"
+        f"```diff\n{diff_excerpt}\n```"
+        f"{spec_section}"
+        f"{custodian_section}\n\n"
+        f"**Review checklist** (raise CONCERNS for any failure):\n"
+        f"1. If a campaign spec is provided above, verify the diff implements EXACTLY what the spec\n"
+        f"   requires — correct filenames, member names, member count, exports, tests, version bumps.\n"
+        f"2. If Custodian findings are listed above, each finding is a CONCERN unless already fixed.\n"
+        f"3. Standard code quality: correctness, style, potential bugs.\n"
+        f"4. No tooling artifacts (.kodo/, .baseline-validation.json, run-status.md) in the diff.\n\n"
         f"Write your verdict as JSON to a file named `verdict.json` in the current working directory:\n"
         f'{{"result": "LGTM", "summary": "..."}}\n'
         f"or\n"
         f'{{"result": "CONCERNS", "summary": "bullet list of specific issues"}}\n\n'
-        "Use LGTM if the code is correct and ready to merge. "
-        "Use CONCERNS only if there are concrete, actionable issues. "
+        "Use LGTM only if ALL checklist items pass. "
+        "Use CONCERNS when anything fails — be specific and actionable. "
         "Do NOT push any code changes to the repository."
     )
 
