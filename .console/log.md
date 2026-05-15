@@ -3,6 +3,13 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-15 — board_unblock: pre-dispatch memory check
+
+Added memory guard to board_unblock.py: skip all rules if MemAvailable < 1.7GB (pre-OOM).
+Rule 4 SELF_MODIFY_REQUEUE additionally skipped if MemAvailable < 8GB — requeueing to R4AI
+when memory is below the kodo dispatch threshold would cause the executor to get OOM-killed
+on the next dispatch. mem_available_gb now included in JSON output.
+
 ## 2026-05-15 — Expand autonomous board unblocking: Rule 4 + governing principle
 
 Added Rule 4 SELF_MODIFY_REQUEUE to `board_unblock.py`: tasks with `self-modify:approved`

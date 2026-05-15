@@ -43,8 +43,20 @@ from typing import Any
 from operations_center.adapters.plane import PlaneClient
 from operations_center.config import load_settings
 
+_MEM_SKIP_THRESHOLD_GB = 1.7   # skip all rules below this
+_MEM_R4AI_THRESHOLD_GB = 8.0   # skip Rule 4 (requeue to R4AI) below this
 
 _TERMINAL_STATES = {"done", "cancelled", "cancelled by operator", "closed"}
+
+
+def _mem_available_gb() -> float:
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) / (1024 * 1024)
+    except Exception:
+        pass
+    return float("inf")
 _DEAD_REMEDIATION_LABEL = "dead-remediation"
 _INVESTIGATE_LABEL = "task-kind:investigate"
 _IMPROVE_LABEL = "improve"
@@ -125,6 +137,7 @@ def _apply_rules(
     *,
     now: datetime,
     stale_blocked_hours: int,
+    mem_available_gb: float,
 ) -> list[dict[str, Any]]:
     id_state = _build_id_state_map(issues)
     actions = []
@@ -197,22 +210,35 @@ def _apply_rules(
                 continue
 
         # Rule 4 — self-modify:approved tasks blocked on a resolved (or absent) dependency
+        # Skipped when memory is below the kodo dispatch threshold — requeueing to R4AI
+        # when memory is low would cause kodo to get OOM-killed on the next dispatch.
         if state_lower == "blocked" and _has_label(labels, _SELF_MODIFY_APPROVED_LABEL):
-            blocker_id = _blocker_task_id(labels)
-            if blocker_id is None or _is_terminal(id_state.get(blocker_id, "")):
-                reason = (
-                    "no blocking dependency; operator approval already granted"
-                    if blocker_id is None
-                    else f"blocker {blocker_id} is now {id_state.get(blocker_id, 'unknown')}"
-                )
+            if mem_available_gb < _MEM_R4AI_THRESHOLD_GB:
                 actions.append({
                     "task_id": task_id,
                     "title": title,
                     "rule": "SELF_MODIFY_REQUEUE",
                     "from_state": state,
                     "to_state": "Ready for AI",
-                    "reason": reason,
+                    "reason": f"SKIPPED — mem {mem_available_gb:.2f}GB < {_MEM_R4AI_THRESHOLD_GB}GB threshold",
+                    "skipped": True,
                 })
+            else:
+                blocker_id = _blocker_task_id(labels)
+                if blocker_id is None or _is_terminal(id_state.get(blocker_id, "")):
+                    reason = (
+                        "no blocking dependency; operator approval already granted"
+                        if blocker_id is None
+                        else f"blocker {blocker_id} is now {id_state.get(blocker_id, 'unknown')}"
+                    )
+                    actions.append({
+                        "task_id": task_id,
+                        "title": title,
+                        "rule": "SELF_MODIFY_REQUEUE",
+                        "from_state": state,
+                        "to_state": "Ready for AI",
+                        "reason": reason,
+                    })
 
     return actions
 
@@ -234,6 +260,15 @@ def main() -> int:
         project_id=settings.plane.project_id,
     )
 
+    mem_gb = _mem_available_gb()
+    if mem_gb < _MEM_SKIP_THRESHOLD_GB:
+        client.close()
+        print(json.dumps({
+            "skipped": True,
+            "reason": f"mem_available {mem_gb:.2f}GB < {_MEM_SKIP_THRESHOLD_GB}GB threshold — pre-OOM, skip all rules",
+        }, ensure_ascii=False))
+        return 0
+
     try:
         issues = client.list_issues()
     except Exception as exc:
@@ -242,11 +277,16 @@ def main() -> int:
         return 1
 
     now = datetime.now(UTC)
-    actions = _apply_rules(issues, now=now, stale_blocked_hours=args.stale_blocked_hours)
+    actions = _apply_rules(
+        issues, now=now, stale_blocked_hours=args.stale_blocked_hours, mem_available_gb=mem_gb
+    )
 
     results = []
     for action in actions:
         entry = {k: v for k, v in action.items()}
+        if action.get("skipped"):
+            results.append(entry)
+            continue
         if not args.apply:
             entry["action"] = "would_apply"
         else:
@@ -267,6 +307,7 @@ def main() -> int:
     client.close()
     print(json.dumps({
         "scanned_at": now.isoformat(),
+        "mem_available_gb": round(mem_gb, 2),
         "apply": args.apply,
         "actions": results,
     }, indent=2, ensure_ascii=False))
