@@ -3,6 +3,13 @@
 _Chronological continuity log. Decisions, stop points, what changed and why._
 _Not a task tracker — that's backlog.md. Keep entries concise and dated._
 
+## 2026-05-15 — Add Step 2.5 (autonomous board unblocking) to watchdog loop runbook
+
+Added STEP 2.5 to `docs/operator/watchdog_loop.md` and updated the cycle table.
+The loop now calls `operations-center-board-unblock --apply` between triage and the
+blocked-work investigation, autonomously resolving dead-remediation tasks, R4AI
+investigate-task starvation, and stale improve-task blocks without deferring to operator.
+
 ## 2026-05-15T17:01Z — Loop cycle 497 (DEGRADED — ✓ U6 clear — 12.64GB open / 12.66GB post-triage — SwapFree 16.91GB stable — audits clean — triage clean — graph-doctor EXIT:1 ×81 — board frozen — operator action required)
 
 Health: DEGRADED (board frozen, operator-blocked). U6 clear (12.64GB open — memory healthy, external workload remains fully released). SwapFree 16.91GB stable. U2: clear. U7: clear. kodo memory gate: UNBLOCKED (memory ≥8GB) — pending operator board actions. Audits run: custodian-sweep 0, ghost-audit 0, flow-audit 0, reaudit-check needed=false, check-regressions 0; graph-doctor EXIT:1 B1-constrained ×81 — non-fatal. Triage: 0 rescore, 0 awaiting, 0 queue healing. Board: R4AI=1 (9c7f4bb9), Blocked=7 (U1 false — frozen). OPERATOR-BLOCKED/NON-CONVERGENT/AUTOMATION SELF-DECEPTION active. NEW_EVIDENCE_DETECTED=no. Operator actions required: (1) CANCEL 925be138, (2) move improve tasks 2824d46e/fa470a1f/b67bc0e0/a969024e to Backlog, (3) review/close/relabel 9c7f4bb9. Cadence: 1200s.
